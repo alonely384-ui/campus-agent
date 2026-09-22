@@ -1,0 +1,29 @@
+{
+  "_说明": "评测集。第 2 周你要自己出 100 题填进来，其中 20 题是'资料里根本没有'的，用来测拒答率。",
+  "_字段": {
+    "id": "题号",
+    "question": "问题",
+    "expected_keywords": "答案里应该出现的关键词（全部命中算对）",
+    "should_refuse": "true 表示资料里没有这个信息，正确行为是拒绝回答而不是编造"
+  },
+  "questions": [
+    {
+      "id": 1,
+      "question": "示例：本课程的考核方式是什么？",
+      "expected_keywords": ["考试", "作业"],
+      "should_refuse": false
+    },
+    {
+      "id": 2,
+      "question": "示例：这门课的总学时是多少？",
+      "expected_keywords": ["学时"],
+      "should_refuse": false
+    },
+    {
+      "id": 3,
+      "question": "示例：食堂三楼今天供应什么菜？",
+      "expected_keywords": [],
+      "should_refuse": true
+    }
+  ]
+}

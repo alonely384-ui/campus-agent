@@ -1,0 +1,37 @@
+# ============================================
+# 依赖清单
+# 用法： uv add <包名>   （不要手动改这个文件的版本号）
+# 手动装： uv pip install -r requirements.txt
+# ============================================
+
+# --- Web 服务 ---
+fastapi>=0.115
+uvicorn[standard]>=0.32          # 启动服务的服务器
+python-multipart>=0.0.12         # 处理文件上传
+sse-starlette>=2.1               # SSE 流式输出
+
+# --- 数据校验与配置 ---
+pydantic>=2.9
+pydantic-settings>=2.5           # 从 .env 读配置
+
+# --- LLM ---
+openai>=1.50                     # 通用 LLM 客户端（DeepSeek/通义等兼容此协议）
+
+# --- RAG ---
+chromadb>=0.5                    # 轻量向量库
+pypdf>=5.0                       # 解析 PDF
+tiktoken>=0.8                    # 算 token 数（估算成本）
+
+# --- 数据库 / 缓存 ---
+redis>=5.0
+sqlalchemy>=2.0
+pymysql>=1.1
+
+# --- HTTP ---
+httpx>=0.27
+aiohttp>=3.10
+
+# --- 开发工具 ---
+pytest>=8.3
+pytest-asyncio>=0.24
+ruff>=0.7
