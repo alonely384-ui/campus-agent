@@ -39,10 +39,17 @@ Write-Host "[3] API key" -ForegroundColor Cyan
 $envFile = "$proj\.env"
 if (Test-Path $envFile) {
     $c = Get-Content $envFile -Raw
-    if ($c -match 'LLM_API_KEY=(sk-[A-Za-z0-9_\-]{10,})') {
+    # Match sk- followed by real key characters, but NOT placeholder text.
+    # The template ships with "sk-在这里填你的key" which also starts with sk-,
+    # so we must explicitly exclude placeholder markers.
+    if ($c -match 'LLM_API_KEY=(sk-[A-Za-z0-9_\-]{20,})') {
         Chk ".env has a real API key" $true "($($matches[1].Length) chars)"
+    } elseif ($c -match 'LLM_API_KEY=.*(在这里填|your|xxx|placeholder|填入)') {
+        Chk ".env API key" $false "still the placeholder - run run-set-key.cmd"
+    } elseif ($c -match 'LLM_API_KEY=\s*$') {
+        Chk ".env API key" $false "empty - run run-set-key.cmd"
     } else {
-        Chk ".env API key" $false "still a placeholder - run run-set-key.cmd"
+        Chk ".env API key" $false "not a recognisable sk- key - run run-set-key.cmd"
     }
 } else {
     Chk ".env" $false "missing - copy .env.example to .env"
