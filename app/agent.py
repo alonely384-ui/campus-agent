@@ -26,8 +26,9 @@
 """
 
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
+from typing import Any
 
 from app.config import settings
 from app.llm import get_client

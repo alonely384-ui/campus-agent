@@ -1,3 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# 只把 app/ 当作代码包。
+# 不写这段的话 setuptools 会自动扫描，看到 app/ tests/ eval/ scripts/ 好几个目录
+# 就不知道哪个才是包，直接报 "Multiple top-level packages discovered" 然后装不上。
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [project]
 name = "campus-agent"
 version = "0.1.0"
@@ -36,6 +46,11 @@ target-version = "py311"
 # 常用规则：语法错误 / import 顺序 / 未使用变量 / 命名
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI 的惯例就是 File(...) / Depends(...) 直接写在参数默认值里，
+# 这是框架规定的写法，不是 bug，所以对 main.py 关掉 B008 这条检查。
+"app/main.py" = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

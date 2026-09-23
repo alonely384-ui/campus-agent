@@ -9,7 +9,7 @@
    后面无论怎么改配置都不会生效。这是个非常常见的坑。
 """
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from openai import AsyncOpenAI
 

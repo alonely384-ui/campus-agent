@@ -6,8 +6,6 @@
     **测试要优先覆盖最容易出问题的地方，而不是最容易写的地方。**
 """
 
-import pytest
-
 from app.agent import _parse_arguments
 from app.tools.registry import get_tool, list_tools, tool_schemas
 

@@ -1,0 +1,27 @@
+{
+  // 自动使用项目里的虚拟环境（不用每次手动切换解释器）
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+
+  // 保存时自动格式化 + 自动修复 import 顺序
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+
+  // 用 ruff 做检查，保存时自动修掉小问题
+  "ruff.enable": true,
+  "ruff.organizeImports": true,
+
+  // 测试配置：点侧边栏的烧瓶图标就能跑测试
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests"],
+
+  // 让编辑器对中文注释更友好
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "editor.rulers": [100]
+}
