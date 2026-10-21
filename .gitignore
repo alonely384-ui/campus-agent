@@ -14,6 +14,7 @@ venv/
 data/uploads/*
 !data/uploads/.gitkeep
 data/chroma/
+data/papers/
 *.sqlite3
 
 # ---- 工具缓存 ----
@@ -36,6 +37,11 @@ Thumbs.db
 # ---- 日志 ----
 *.log
 logs/
+
+# ---- 赛题材料 / 本地临时文件（体积大，不进仓库）----
+科研小助手*
+第八届传智杯赛项*.docx
+.pytest_tmp/
 
 # ---- 鐜鍙橀噺澶囦唤 / 涓存椂鏂囦欢锛堥槻姝㈣鎻愪氦瀵嗛挜锛?---
 .env.*

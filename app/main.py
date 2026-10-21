@@ -18,6 +18,12 @@ from pydantic import BaseModel, Field
 from app.agent import run_agent, run_agent_stream
 from app.config import settings
 from app.logging_config import get_logger, setup_logging
+from app.papers import (
+    delete_paper,
+    get_paper,
+    list_papers,
+    save_paper,
+)
 
 setup_logging()
 logger = get_logger(__name__)
@@ -132,6 +138,62 @@ async def upload(file: UploadFile = File(...)) -> dict:
     logger.info("已保存上传文件: %s (%d 字节)", dest, len(content))
 
     return {"filename": safe_name, "size": len(content), "saved_to": str(dest)}
+
+
+# ---------------- 论文库 ----------------
+# 和 /upload 的区别：/upload 是「随便存个文件」；
+# /papers/* 是「存进论文库，抽文字、算相似度、判重」，后续 RAG 从这里取数据。
+
+class PaperOut(BaseModel):
+    """论文列表里的单项。显式声明字段，前端能一眼看到结构。"""
+
+    paper_id: str
+    filename: str
+    size: int
+    pages: int
+    uploaded_at: str
+    duplicate_of: str = ""
+
+
+@app.get("/papers", summary="论文列表")
+async def papers_list() -> dict:
+    items = list_papers()
+    return {"total": len(items), "papers": [PaperOut(**vars(p)) for p in items]}
+
+
+@app.post("/papers/upload", summary="上传论文（自动查重）")
+async def papers_upload(file: UploadFile = File(...)) -> dict:
+    """上传 PDF 并返回是否和库里已有的论文重复。
+
+    重复不会拒绝，而是返回 duplicate_of 让前端提示「与 xxx 相似，保留哪一版？」
+    —— 赛题要求就是这个行为。
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+
+    content = await file.read()
+    try:
+        paper, dup, score = save_paper(file.filename, content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "paper": PaperOut(**vars(paper)),
+        "duplicate": (
+            {"paper_id": dup.paper_id, "filename": dup.filename, "score": score}
+            if dup
+            else None
+        ),
+    }
+
+
+@app.delete("/papers/{paper_id}", summary="删除论文")
+async def papers_delete(paper_id: str) -> dict:
+    if get_paper(paper_id) is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    if not delete_paper(paper_id):
+        raise HTTPException(status_code=500, detail="删除失败")
+    return {"deleted": paper_id}
 
 
 # ---------------- 前端页面 ----------------
