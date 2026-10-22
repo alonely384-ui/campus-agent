@@ -503,16 +503,13 @@ def index_chunks(chunks: list[Chunk]) -> int:
     return len(ids)
 
 
-def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[Chunk]:
-    """[4] 混合检索：向量召回 + BM25 精排，融合后取前 top_k。
+def retrieve_scored(
+    question: str, top_k: int = 4, source: str | None = None
+) -> list[tuple[Chunk, float, list[str]]]:
+    """[4] 混合检索，返回 (块, RRF 分数, 命中通道)。
 
-    为什么两路都要：
-        向量擅长"意思接近但用词不同"，但哈希碰撞会带进无关块；
-        BM25 只认真正出现过的词，精确但换个说法就找不到。
-        两路结果用 RRF（倒数排名融合）合并：谁在各自榜单里靠前就加分，
-        不比较两路的绝对分数（它们量纲不同，没法直接相加）。
-
-    source：只在这一篇论文里检索（单篇问答必须传，否则会串到别的论文）。
+    和 retrieve() 的区别：多带"为什么排在这"的信息，供证据卡片和调试脚本用。
+    RRF 分数只反映"在几路榜单里排第几"，不是概率，不能当正确率看。
     """
     import chromadb
 
@@ -525,7 +522,7 @@ def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[C
     else:
         total = collection.count()
     if total == 0:
-        return []          # 库里没东西，直接返回空（上层可以据此拒答）
+        return []
 
     n = min(max(top_k * 3, top_k), total)
     result = collection.query(
@@ -535,7 +532,6 @@ def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[C
     )
     vector_ids = (result.get("ids") or [[]])[0]
 
-    # 稠密向量召回：真正按语义比较。模型/集合不可用时降级，不影响主流程。
     dense_ids: list[str] = []
     try:
         dense_col = client.get_or_create_collection(
@@ -543,21 +539,24 @@ def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[C
         )
         dense_res = dense_col.query(query_texts=[question], n_results=n, where=where)
         dense_ids = (dense_res.get("ids") or [[]])[0]
-    except Exception:  # noqa: BLE001 —— 检索是"尽力而为"，任何异常都不该让问答崩
+    except Exception:  # noqa: BLE001 —— 检索尽力而为，异常不该让问答崩
         dense_ids = []
 
-    # RRF：名次越靠前得分越高；常数 60 是经验值，压制"断崖式"领先。
-    # 权重：稠密向量 2.0（语义最准）、BM25 1.0（精确词）、哈希向量 0.5（只当兜底，
-    # 它的碰撞噪声实测会把 GPU 题顶到错误的页）。稠密不可用时把它的权重让给哈希向量。
     dense_w = 2.0 if dense_ids else 0.0
     hash_w = 0.5 if dense_ids else 2.0
     fused: dict[str, float] = {}
+    channels: dict[str, list[str]] = {}
+
+    def _add(cid: str, weight: float, rank: int, channel: str) -> None:
+        fused[cid] = fused.get(cid, 0.0) + weight / (60 + rank + 1)
+        channels.setdefault(cid, []).append(channel)
+
     for rank, cid in enumerate(dense_ids):
-        fused[cid] = fused.get(cid, 0.0) + dense_w / (60 + rank + 1)
+        _add(cid, dense_w, rank, "dense")
     for rank, cid in enumerate(vector_ids):
-        fused[cid] = fused.get(cid, 0.0) + hash_w / (60 + rank + 1)
+        _add(cid, hash_w, rank, "hash")
     for rank, cid in enumerate(_bm25_ids(question, n, source=source)):
-        fused[cid] = fused.get(cid, 0.0) + 1.0 / (60 + rank + 1)
+        _add(cid, 1.0, rank, "bm25")
 
     order = sorted(fused, key=lambda k: fused[k], reverse=True)[:top_k]
     if not order:
@@ -574,19 +573,23 @@ def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[C
         )
     }
 
-    chunks: list[Chunk] = []
+    out: list[tuple[Chunk, float, list[str]]] = []
     for cid in order:
         item = by_id.get(cid)
         if not item:
             continue
         text, meta = item
         page = (meta or {}).get("page", -1)
-        chunks.append(
-            Chunk(
-                text=text,
-                source=(meta or {}).get("source", "unknown"),
-                page=None if page == -1 else page,
-                chunk_id=(meta or {}).get("chunk_id", 0),
-            )
+        chunk = Chunk(
+            text=text,
+            source=(meta or {}).get("source", "unknown"),
+            page=None if page == -1 else page,
+            chunk_id=(meta or {}).get("chunk_id", 0),
         )
-    return chunks
+        out.append((chunk, fused[cid], channels.get(cid, [])))
+    return out
+
+
+def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[Chunk]:
+    """[4] 混合检索：向量召回 + BM25 精排，RRF 融合后取前 top_k（只返回块）。"""
+    return [chunk for chunk, _score, _ch in retrieve_scored(question, top_k, source)]
