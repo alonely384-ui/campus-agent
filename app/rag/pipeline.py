@@ -50,6 +50,9 @@ class Chunk:
 # 注意：Chroma 的集合一旦建成，维度就固定；改 DIM 必须清库重建。
 DIM = 1024
 
+# 入库时的最小块长：小于这个字数的块直接丢弃（见 index_chunks 第 0 步）。
+_MIN_CHUNK_CHARS = 100
+
 # 英文停用词：每篇论文都有一堆，留着会让所有文本彼此"很像"，淹没真正的关键词。
 _EN_STOPWORDS = {
     "the", "a", "an", "of", "and", "to", "in", "is", "are", "was", "were",
@@ -426,6 +429,10 @@ def index_chunks(chunks: list[Chunk]) -> int:
     写入时按批提交：Chroma 单次 upsert 上限 5461 条，全量 39 篇会超。
     """
     import chromadb  # 延迟导入：只有真要写库时才加载
+
+    # 0) 丢掉"碎片块"：少于 _MIN_CHUNK_CHARS 字的块（页眉页脚、公式残渣、参考文献尾巴）
+    #    它们 BM25 分数虚高（块短 → 长度归一化后分数放大），实测会抢走 GPU 题的 top1。
+    chunks = [c for c in chunks if len(c.text.strip()) >= _MIN_CHUNK_CHARS]
 
     if not chunks:
         return 0
