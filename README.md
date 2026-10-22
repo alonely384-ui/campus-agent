@@ -1,9 +1,11 @@
-# campus-agent
+# 科研小助手（research-agent）
 
-> 校园智能助手 Agent：RAG 文档问答 + 手写工具调用 + 流式输出
+> 面向学术论文的阅读助手 Agent：PDF 管理 + 内容去重 + RAG 检索问答（带原文引用）+ 流式输出
+>
+> 第九届传智杯 · AI大模型创新应用挑战赛 · 个人赛 · B 组参赛作品
 
 <!-- ⚠️ 下面两行是你要填的。项目没上线之前先留着占位，别删。 -->
-**🔗 在线体验**：（待第 3 周部署后填入）
+**🔗 在线体验**：（待部署后填入）
 **🎬 演示视频**：（待上传后填入）
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
@@ -13,10 +15,12 @@
 
 ## 这是什么
 
-一个能"查资料 + 用工具"的校园助手：
+一个能"读论文、找原文、做对比"的助手：
 
-- 上传课件/培养方案，用自然语言提问，**基于原文回答并给出引用来源**
-- 涉及计算时，自己调用计算器工具，不靠模型心算
+- 上传论文 PDF，自动完成**内容去重**（《Attention Is All You Need》v1/v7 是同一篇，会被识别出来）
+- 提问基于原文检索作答，**每句标注来源**：`[来源: 1706.03762v7.pdf 第3页]`
+- 检索不到就明确拒答，**不编造作者、页码、数字**
+- 涉及计算时自己调用计算器工具，不靠模型心算
 - 回答以流式（打字机效果）输出，工具调用过程对用户可见
 
 ## 快速开始
@@ -95,10 +99,13 @@ python -m app.main
 - [x] 计算器工具（含安全防护）
 - [x] FastAPI 接口：`/health` `/chat` `/chat/stream` `/upload`
 - [x] 极简前端：SSE 流式渲染 + 工具调用可见
-- [ ] **第 2 周目标** RAG：PDF 解析 → 切分 → Chroma → 检索问答带引用
+- [x] **第 2 周目标** RAG 管道：PDF/TXT 载入 → 重叠切段 → Chroma 入库 → 检索（`app/rag/pipeline.py`）
+- [x] **第 2 周目标** 论文库：上传/列表/删除 + 内容去重（真实 v1/v7 实测 0.873 判重）
+- [ ] **第 2 周目标** 把 RAG 接进 Agent：回答带 `[来源: 文件 第N页]`，检索不到要拒答
 - [ ] **第 2 周目标** 100 题评测集 + 命中率统计
+- [ ] **第 3 周目标** 论文阅读页（PDF.js 预览 + 引用点击跳转）
 - [ ] **第 3 周目标** Docker + 云服务器 + Nginx + HTTPS 公网部署
-- [ ] 第 4 周：再补 2 个工具（课表、笔记）
+- [ ] **第 4 周目标** 引用图谱（PageRank 核心节点）+ 自动综述
 
 ## 已知问题
 
@@ -117,7 +124,8 @@ campus-agent/
 │   ├── cli.py             # 命令行入口
 │   ├── config.py          # 配置中心（读 .env）
 │   ├── logging_config.py  # 日志
-│   ├── rag/               # 检索增强（待第 2 周实现）
+│   ├── rag/               # RAG 管道（载入/切段/入库/检索）
+│   ├── papers.py          # 论文库：上传/列表/删除/内容查重
 │   └── tools/             # 工具
 │       ├── base.py        # 工具基类
 │       ├── calculator.py  # 计算器
@@ -127,10 +135,30 @@ campus-agent/
 ├── scripts/               # 辅助脚本
 ├── web/index.html         # 前端页面
 ├── data/uploads/          # 上传的文档
+├── data/papers/           # 论文库（本地数据，不进 git）
 ├── .env.example
 ├── requirements.txt
 └── pyproject.toml
 ```
+
+## 依赖与许可
+
+本项目基于以下开源库构建（均为宽松许可）：
+
+| 库 | 用途 | 许可 |
+|---|---|---|
+| FastAPI | Web 接口 | MIT |
+| uvicorn | ASGI 服务器 | BSD-3-Clause |
+| pydantic / pydantic-settings | 配置与请求校验 | MIT |
+| openai | LLM 客户端（兼容 DeepSeek / 通义等） | Apache-2.0 |
+| chromadb | 向量存储 | Apache-2.0 |
+| pypdf | PDF 文本抽取 | BSD-3-Clause |
+| sse-starlette | SSE 流式输出 | MIT |
+| pytest / ruff | 测试与静态检查 | MIT |
+
+本项目自研部分：Agent 工具调用循环（`app/agent.py`）、工具注册（`app/tools/`）、RAG 管道（`app/rag/pipeline.py`）、论文库与内容查重（`app/papers.py`）、前端页面（`web/`）。
+
+> 若后续引入第三方开源项目代码，会在 `THIRD_PARTY.md` 中注明来源、修改点与遵循的协议。
 
 ## License
 
