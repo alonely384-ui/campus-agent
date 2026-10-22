@@ -9,13 +9,13 @@ from app.agent import _rag_context, run_agent
 from app.rag.pipeline import Chunk
 
 
-def test_rag_context_has_source_and_page(monkeypatch):
+async def test_rag_context_has_source_and_page(monkeypatch):
     def fake_retrieve(question, top_k=4, source=None):
         assert "GPUs" in question
         return [Chunk(text="8 NVIDIA P100 GPUs", source="1706.03762v7.pdf", page=7)]
 
     monkeypatch.setattr(agent_module, "retrieve", fake_retrieve)
-    context = _rag_context("How many GPUs were used for training?")
+    context = await _rag_context("How many GPUs were used for training?")
 
     assert "1706.03762v7.pdf 第7页" in context
     assert "8 NVIDIA P100 GPUs" in context
@@ -23,17 +23,17 @@ def test_rag_context_has_source_and_page(monkeypatch):
     assert "论文库中没有找到相关信息" in context
 
 
-def test_rag_context_survives_retrieve_error(monkeypatch):
+async def test_rag_context_survives_retrieve_error(monkeypatch):
     def boom(question, top_k=4, source=None):
         raise RuntimeError("chroma 没建好")
 
     monkeypatch.setattr(agent_module, "retrieve", boom)
-    assert _rag_context("任何问题") == ""
+    assert await _rag_context("任何问题") == ""
 
 
-def test_rag_context_empty_when_no_hits(monkeypatch):
+async def test_rag_context_empty_when_no_hits(monkeypatch):
     monkeypatch.setattr(agent_module, "retrieve", lambda q, top_k=4, source=None: [])
-    assert _rag_context("库里没有的问题") == ""
+    assert await _rag_context("库里没有的问题") == ""
 
 
 @pytest.mark.asyncio
@@ -66,3 +66,13 @@ async def test_run_agent_passes_context_to_model(monkeypatch):
     assert messages[0]["role"] == "system"
     assert "p.pdf 第7页" in messages[1]["content"]
     assert messages[-1]["role"] == "user"
+
+
+@pytest.fixture(autouse=True)
+def _no_translate(monkeypatch):
+    """单测里不要真的调 LLM 做查询翻译：直接原样返回。"""
+
+    async def _fake(q):
+        return q
+
+    monkeypatch.setattr(agent_module, "_search_query", _fake)

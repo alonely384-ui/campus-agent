@@ -26,6 +26,7 @@
 """
 
 import json
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -58,8 +59,45 @@ SYSTEM_PROMPT = """你是「科研小助手」，帮用户阅读、检索和对�
 
 RETRIEVE_TOP_K = 4
 
+# 判断问题里有没有中文：有中文才需要先翻成英文检索词
+_CJK = re.compile(r"[\u4e00-\u9fff]")
 
-def _rag_context(question: str) -> str:
+
+async def _search_query(question: str) -> str:
+    """把中文问题转成英文检索词；英文问题原样返回。
+
+    为什么单独一步、不让模型"顺便答"：
+        检索只需要"一串英文关键词"。如果让它同时给答案，模型会在没有原文时
+        凭记忆编答案（就是幻觉）。这一步只允许输出查询词，回答交给后一步。
+
+    翻译失败时退回原问题：宁可检索不到，也不能让整段对话挂掉。
+    """
+    if not _CJK.search(question):
+        return question
+    try:
+        resp = await get_client().chat.completions.create(
+            model=settings.llm_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You turn a user's question into ONE short English search query "
+                        "for a corpus of English academic papers. Output only the query, "
+                        "no quotes, no explanation."
+                    ),
+                },
+                {"role": "user", "content": question},
+            ],
+            temperature=0,
+        )
+        q = (resp.choices[0].message.content or "").strip().strip('"').strip()
+        return q or question
+    except Exception:
+        logger.exception("查询翻译失败，改用原问题检索")
+        return question
+
+
+async def _rag_context(question: str) -> str:
     """检索论文库，把命中的片段拼成一段"参考资料"系统消息。
 
     为什么不在 prompt 里塞整篇论文：
@@ -70,9 +108,11 @@ def _rag_context(question: str) -> str:
     模型会按规则 3 回答"论文库中没有找到相关信息"。
     """
     try:
+        # 中文问题先换成英文检索词（库是英文论文），否则字面/向量都对不上
+        query = await _search_query(question)
         # 问句里点名了论文标题时，先锁定单篇，避免跑到别的论文里
         source = find_paper_by_title(question)
-        chunks = retrieve(question, top_k=RETRIEVE_TOP_K, source=source)
+        chunks = retrieve(query, top_k=RETRIEVE_TOP_K, source=source)
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
         return ""
@@ -193,7 +233,7 @@ async def _execute_tool(name: str, arguments: dict[str, Any]) -> str:
 async def run_agent(user_message: str, history: list[dict] | None = None) -> AgentResult:
     """Agent 主循环（非流式版）。返回最终答案 + 调用轨迹。"""
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context = _rag_context(user_message)
+    context = await _rag_context(user_message)
     if context:
         messages.append({"role": "system", "content": context})
     if history:
@@ -282,7 +322,7 @@ async def run_agent_stream(user_message: str, history: list[dict] | None = None)
         {"type": "done", "rounds": 2}
     """
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context = _rag_context(user_message)
+    context = await _rag_context(user_message)
     if context:
         messages.append({"role": "system", "content": context})
     if history:
