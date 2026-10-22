@@ -51,6 +51,7 @@ class ChatResponse(BaseModel):
     answer: str
     rounds: int
     steps: list[dict] = Field(default_factory=list)
+    evidence: list[dict] = Field(default_factory=list, description="检索证据（证据卡片）")
 
 
 # ---------------- 接口 ----------------
@@ -77,6 +78,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
             {"tool": s.tool_name, "arguments": s.arguments, "result": s.result}
             for s in result.steps
         ],
+        evidence=[e.to_dict() for e in result.evidence],
     )
 
 

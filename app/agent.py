@@ -25,17 +25,20 @@
 ==================================================================
 """
 
+from __future__ import annotations
+
 import json
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from app.config import settings
 from app.llm import get_client
 from app.logging_config import get_logger
 from app.papers import find_paper_by_title, paper_meta
-from app.rag.pipeline import retrieve
+from app.rag.pipeline import retrieve_scored
 from app.tools.registry import get_tool, list_tools, tool_schemas
 
 logger = get_logger(__name__)
@@ -62,6 +65,81 @@ RETRIEVE_TOP_K = 4
 # 判断问题里有没有中文：有中文才需要先翻成英文检索词
 _CJK = re.compile(r"[\u4e00-\u9fff]")
 
+# 问题里的英文术语（LayerNorm / β1 / BLEU / GPU / Adam…）：翻译时可能被模型改写成
+# "Layer normalization"，反而丢掉原文里的 "LayerNorm"。所以翻译后把它们补回去。
+_ASCII_TERM = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*[A-Za-z0-9]|[A-Za-z]")
+
+# 同一道题重复问，复用上次的检索词：演示和评测时不能出现"两次结果不一样"。
+# 缓存落盘到 data/chroma/query_cache.json，重启服务也不会变。
+_QUERY_CACHE: dict[str, str] = {}
+_QUERY_CACHE_FILE = Path(settings.chroma_dir) / "query_cache.json"
+
+
+def _load_query_cache() -> None:
+    """启动时读回上次的检索词；文件坏了就当没有（不能因为缓存把服务卡住）。"""
+    try:
+        if _QUERY_CACHE_FILE.exists():
+            _QUERY_CACHE.update(json.loads(_QUERY_CACHE_FILE.read_text("utf-8")))
+    except Exception:  # noqa: BLE001
+        logger.warning("检索词缓存读取失败，忽略", exc_info=True)
+
+
+def _save_query_cache() -> None:
+    try:
+        _QUERY_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _QUERY_CACHE_FILE.write_text(
+            json.dumps(_QUERY_CACHE, ensure_ascii=False, indent=0), "utf-8"
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("检索词缓存写入失败，忽略", exc_info=True)
+
+
+_load_query_cache()
+
+
+def key_terms(question: str) -> list[str]:
+    """抽出问题里的英文/数字术语，保持出现顺序、去重。"""
+    return list(dict.fromkeys(m.group(0) for m in _ASCII_TERM.finditer(question)))
+
+
+# 提问意图 → 检索时补的英文词。
+# 例："LayerNorm 对应哪条参考文献" 翻成 "LayerNorm reference" 时，BM25 找不到
+# References 章节（原文写的是 "Layer normalization" 和 "References"），实测补上这两个词后
+# 正确页从"进不了 top5"变成"排第 1"。
+_INTENT_TERMS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("文献", "引用", "reference", "citation"), "references citation"),
+    (("作者", "author"), "authors"),
+    (("数据集", "dataset", "benchmark"), "dataset benchmark"),
+)
+
+
+def _intent_terms(question: str) -> str:
+    """按问题意图补检索词（只加词，不改原查询）。"""
+    low = question.lower()
+    extra = [words for keys, words in _INTENT_TERMS if any(k in low for k in keys)]
+    return " ".join(extra)
+
+
+def _split_camel(term: str) -> str:
+    """LayerNorm → Layer Norm：补一个"原文可能写成两个词"的版本。"""
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", term)
+
+
+def _merge_terms(query: str, question: str) -> str:
+    """把问题里出现、但翻译结果里丢掉的术语补到检索词末尾。"""
+    parts = [query]
+    low = query.lower()
+    for term in key_terms(question):
+        if term.lower() not in low:
+            parts.append(term)
+        spaced = _split_camel(term)
+        if spaced != term and spaced.lower() not in low:
+            parts.append(spaced)
+    intent = _intent_terms(question)
+    if intent and intent.lower() not in low:
+        parts.append(intent)
+    return " ".join(parts)
+
 
 async def _search_query(question: str) -> str:
     """把中文问题转成英文检索词；英文问题原样返回。
@@ -74,6 +152,11 @@ async def _search_query(question: str) -> str:
     """
     if not _CJK.search(question):
         return question
+
+    cached = _QUERY_CACHE.get(question.strip())
+    if cached:
+        return cached
+
     try:
         resp = await get_client().chat.completions.create(
             model=settings.llm_model,
@@ -91,34 +174,47 @@ async def _search_query(question: str) -> str:
             temperature=0,
         )
         q = (resp.choices[0].message.content or "").strip().strip('"').strip()
-        return q or question
+        q = _merge_terms(q or question, question)
+        _QUERY_CACHE[question.strip()] = q
+        _save_query_cache()
+        return q
     except Exception:
         logger.exception("查询翻译失败，改用原问题检索")
         return question
 
 
-async def _rag_context(question: str, source: str | None = None) -> str:
-    """检索论文库，把命中的片段拼成一段"参考资料"系统消息。
+async def _rag_context_with_evidence(
+    question: str, source: str | None = None
+) -> tuple[str, list[Evidence]]:
+    """检索论文库，返回 (给模型看的参考资料, 给前端看的证据列表)。
 
-    为什么不在 prompt 里塞整篇论文：
-        39 篇论文 12 万字，全塞进去又贵又慢，模型还会"看漏"；
-        只给最相关的 4 段，既省钱，也逼模型只依据原文回答。
-
-    检索失败时返回空串而不是抛异常：库没建好不应该让整个对话挂掉，
-    模型会按规则 3 回答"论文库中没有找到相关信息"。
+    两样东西同源：模型看到的是"4 段原文 + 页码"，用户看到的是"哪 4 段、排第几、融合分多少"。
     """
     try:
         # 中文问题先换成英文检索词（库是英文论文），否则字面/向量都对不上
         query = await _search_query(question)
         # 问句里点名了论文标题时，先锁定单篇，避免跑到别的论文里
         source = source or find_paper_by_title(question)
-        chunks = retrieve(query, top_k=RETRIEVE_TOP_K, source=source)
+        scored = retrieve_scored(query, top_k=RETRIEVE_TOP_K, source=source)
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
-        return ""
+        return "", []
 
-    if not chunks:
-        return ""
+    if not scored:
+        return "", []
+
+    evidence = [
+        Evidence(
+            rank=rank,
+            source=chunk.source,
+            page=chunk.page,
+            score=score,
+            channels=channels,
+            text=chunk.text,
+        )
+        for rank, (chunk, score, channels) in enumerate(scored, 1)
+    ]
+    chunks = [chunk for chunk, _score, _channels in scored]
 
     lines = ["以下是从论文库检索到的原文片段（回答只能依据它们，并标注来源）："]
 
@@ -137,7 +233,13 @@ async def _rag_context(question: str, source: str | None = None) -> str:
         where = f"{c.source} 第{c.page}页" if c.page is not None else c.source
         lines.append(f"\n【{where}】\n{c.text}")
     lines.append("\n如果以上片段没有能回答问题的内容，直接回答：论文库中没有找到相关信息。")
-    return "\n".join(lines)
+    return "\n".join(lines), evidence
+
+
+async def _rag_context(question: str, source: str | None = None) -> str:
+    """只要上下文文本的简化版（测试和老调用方用）。"""
+    context, _evidence = await _rag_context_with_evidence(question, source)
+    return context
 
 
 @dataclass
@@ -151,12 +253,40 @@ class AgentStep:
 
 
 @dataclass
+class Evidence:
+    """一条检索证据：前端"证据卡片"直接渲染这个。
+
+    score 是 RRF 融合分（多路名次换算来的），不是相似度概率，
+    所以界面上要标"融合分"，不能标成"相似度"。
+    """
+
+    rank: int
+    source: str
+    page: int | None
+    score: float
+    channels: list[str]
+    text: str
+
+    def to_dict(self) -> dict:
+        return {
+            "rank": self.rank,
+            "source": self.source,
+            "page": self.page,
+            "score": round(self.score, 5),
+            "score_type": "rrf",
+            "channels": self.channels,
+            "text": self.text,
+        }
+
+
+@dataclass
 class AgentResult:
     """Agent 的最终结果。"""
 
     answer: str
     steps: list[AgentStep] = field(default_factory=list)
     rounds: int = 0
+    evidence: list[Evidence] = field(default_factory=list)
 
 
 def _parse_arguments(raw: str) -> dict[str, Any]:
@@ -235,7 +365,7 @@ async def run_agent(
 ) -> AgentResult:
     """Agent 主循环（非流式版）。返回最终答案 + 调用轨迹。"""
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context = await _rag_context(user_message, source)
+    context, evidence = await _rag_context_with_evidence(user_message, source)
     if context:
         messages.append({"role": "system", "content": context})
     if history:
@@ -260,7 +390,9 @@ async def run_agent(
         if not msg.tool_calls:
             answer = msg.content or "（模型没有返回内容）"
             logger.info("Agent 结束，共 %d 轮", round_no)
-            return AgentResult(answer=answer, steps=steps, rounds=round_no)
+            return AgentResult(
+                answer=answer, steps=steps, rounds=round_no, evidence=evidence
+            )
 
         # ---- 情况 B：模型要求调用工具 ----
         # 先把模型这条"我要调工具"的消息放进对话历史（协议要求，别漏）
@@ -311,6 +443,7 @@ async def run_agent(
         answer=f"抱歉，我尝试了 {MAX_ROUNDS} 轮仍没能完成任务，请把问题拆小一点再问我。",
         steps=steps,
         rounds=MAX_ROUNDS,
+        evidence=evidence,
     )
 
 
@@ -326,12 +459,15 @@ async def run_agent_stream(
         {"type": "done", "rounds": 2}
     """
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context = await _rag_context(user_message, source)
+    context, evidence = await _rag_context_with_evidence(user_message, source)
     if context:
         messages.append({"role": "system", "content": context})
     if history:
         messages.extend(history)
     messages.append({"role": "user", "content": user_message})
+    # 先把手里的证据发给前端，卡片在回答出来之前就能看到
+    if evidence:
+        yield {"type": "evidence", "items": [e.to_dict() for e in evidence]}
 
     for round_no in range(1, MAX_ROUNDS + 1):
         stream = await get_client().chat.completions.create(

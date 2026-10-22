@@ -33,6 +33,19 @@
              font-family: Consolas, monospace; max-width: 82%; white-space: pre-wrap; }
     .err { align-self: center; color: #dc3545; font-size: 13px; }
 
+    /* 证据卡片：回答下方的"可核验"区块 —— 评委一眼能看到检索到了什么 */
+    .evidence { align-self: flex-start; width: 82%; display: flex; flex-direction: column;
+                gap: 8px; margin-top: -4px; }
+    .ev { background: #fff; border: 1px solid #e3e7ee; border-left: 3px solid #1a73e8;
+          border-radius: 10px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .ev.miss { border-left-color: #dc3545; }
+    .ev-head { font-size: 12px; color: #6b7280; display: flex; gap: 10px; flex-wrap: wrap; }
+    .ev-head b { color: #1a73e8; font-weight: 600; }
+    .ev-text { font-size: 13px; color: #333; line-height: 1.6; margin-top: 6px;
+               max-height: 96px; overflow: hidden; position: relative; cursor: pointer; }
+    .ev-text.open { max-height: none; }
+    .ev-badge { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #eef1f5; color: #6b7280; }
+
     footer { width: 100%; max-width: 820px; padding: 12px 16px 20px; display: flex; gap: 8px; }
     #q { flex: 1; padding: 12px 14px; border: 1px solid #d5d9e0; border-radius: 10px;
          font-size: 15px; outline: none; }
@@ -91,6 +104,48 @@ fetch('/health')
     statusEl.className = 'status bad';
   });
 
+
+// ---------- 证据卡片：把检索到的原文、页码、融合分、命中通道摊开给用户看 ----------
+function renderEvidence(botEl, items) {
+  const box = document.createElement('div');
+  box.className = 'evidence';
+
+  if (!items || items.length === 0) {
+    const miss = document.createElement('div');
+    miss.className = 'ev miss';
+    miss.innerHTML = '<div class="ev-head"><b>证据不足</b><span class="ev-badge">未检索到原文</span></div>' +
+      '<div class="ev-text open">论文库里没有找到能回答这个问题的段落，因此系统应当拒答，而不是编造。</div>';
+    box.appendChild(miss);
+  } else {
+    items.forEach(it => {
+      const card = document.createElement('div');
+      card.className = 'ev';
+      const channels = (it.channels || []).join(' + ') || '未知';
+      // 注意：score 是 RRF 融合分（由多路名次换算），不是"相似度概率"
+      card.innerHTML =
+        '<div class="ev-head">' +
+        `<b>证据 #${it.rank}</b>` +
+        `<span>第 ${it.page == null ? '?' : it.page} 页</span>` +
+        `<span>融合分 ${Number(it.score).toFixed(4)}</span>` +
+        `<span>命中通道 ${channels}</span>` +
+        `<span class="ev-badge">${it.source}</span>` +
+        '</div>' +
+        `<div class="ev-text">${escapeHtml(it.text).slice(0, 400)}${it.text.length > 400 ? '…' : ''}</div>`;
+      card.querySelector('.ev-text').addEventListener('click', e => {
+        e.currentTarget.classList.toggle('open');
+      });
+      box.appendChild(card);
+    });
+  }
+  botEl.insertAdjacentElement('afterend', box);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 function addMsg(text, cls) {
   const div = document.createElement('div');
   div.className = 'msg ' + cls;
@@ -112,6 +167,7 @@ async function send() {
   const botEl = addMsg('', 'bot');
   let traceEl = null;
   let answer = '';
+  let evidenceItems = [];
 
   try {
     const resp = await fetch('/chat/stream', {
@@ -143,7 +199,9 @@ async function send() {
         let ev;
         try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
 
-        if (ev.type === 'answer_delta') {
+        if (ev.type === 'evidence') {
+          evidenceItems = ev.items || [];
+        } else if (ev.type === 'answer_delta') {
           answer += ev.text;
           botEl.textContent = answer;
         } else if (ev.type === 'tool_call') {
@@ -160,6 +218,7 @@ async function send() {
     }
 
     if (!answer) botEl.textContent = '（没有返回内容）';
+    renderEvidence(botEl, evidenceItems);
   } catch (e) {
     addMsg('请求失败：' + e.message, 'err');
   } finally {
