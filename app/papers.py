@@ -164,6 +164,27 @@ def paper_path(paper_id: str) -> Path | None:
     return path if path.exists() else None
 
 
+def structure_path(paper_id: str) -> Path:
+    return PAPERS_DIR / f"{paper_id}.structure.json"
+
+
+def save_structure(paper_id: str, structure: dict) -> None:
+    """把标题/作者/章节树存成旁挂 JSON（不进主索引，老数据无需迁移）。"""
+    structure_path(paper_id).write_text(
+        json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def get_structure(paper_id: str) -> dict | None:
+    path = structure_path(paper_id)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def save_paper(
     filename: str,
     content: bytes,
@@ -194,6 +215,17 @@ def save_paper(
     text = text_extractor(dest)
     cached = TEXT_DIR / f"{paper_id}.txt"
     cached.write_text(text, encoding="utf-8")
+
+    # 结构化解析：标题/作者/章节树存成旁挂文件（data/papers/<id>.structure.json）。
+    # 失败只记日志，不影响上传和检索——这是"附加信息"，不是主流程。
+    try:
+        from app.structure import parse_structure
+
+        structure = parse_structure(str(dest))
+        if structure.get("title") or structure.get("authors"):
+            save_structure(paper_id, structure)
+    except Exception:  # noqa: BLE001
+        logger.exception("结构化解析失败，跳过（不影响上传）")
 
     # 先把新内容从索引里排除（同一个文件重复上传时，不该跟自己比）
     existing = [p for p in _load_index() if p.paper_id != paper_id]
