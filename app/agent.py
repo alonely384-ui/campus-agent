@@ -97,7 +97,7 @@ async def _search_query(question: str) -> str:
         return question
 
 
-async def _rag_context(question: str) -> str:
+async def _rag_context(question: str, source: str | None = None) -> str:
     """检索论文库，把命中的片段拼成一段"参考资料"系统消息。
 
     为什么不在 prompt 里塞整篇论文：
@@ -111,7 +111,7 @@ async def _rag_context(question: str) -> str:
         # 中文问题先换成英文检索词（库是英文论文），否则字面/向量都对不上
         query = await _search_query(question)
         # 问句里点名了论文标题时，先锁定单篇，避免跑到别的论文里
-        source = find_paper_by_title(question)
+        source = source or find_paper_by_title(question)
         chunks = retrieve(query, top_k=RETRIEVE_TOP_K, source=source)
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
@@ -230,10 +230,12 @@ async def _execute_tool(name: str, arguments: dict[str, Any]) -> str:
         return f"错误：{name} 执行失败（{type(e).__name__}: {e}）"
 
 
-async def run_agent(user_message: str, history: list[dict] | None = None) -> AgentResult:
+async def run_agent(
+    user_message: str, history: list[dict] | None = None, source: str | None = None
+) -> AgentResult:
     """Agent 主循环（非流式版）。返回最终答案 + 调用轨迹。"""
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context = await _rag_context(user_message)
+    context = await _rag_context(user_message, source)
     if context:
         messages.append({"role": "system", "content": context})
     if history:
@@ -312,7 +314,9 @@ async def run_agent(user_message: str, history: list[dict] | None = None) -> Age
     )
 
 
-async def run_agent_stream(user_message: str, history: list[dict] | None = None) -> AsyncIterator[dict]:
+async def run_agent_stream(
+    user_message: str, history: list[dict] | None = None, source: str | None = None
+) -> AsyncIterator[dict]:
     """Agent 流式版：边执行边把过程吐出去，供 SSE 接口使用。
 
     每条事件的形状：
@@ -322,7 +326,7 @@ async def run_agent_stream(user_message: str, history: list[dict] | None = None)
         {"type": "done", "rounds": 2}
     """
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context = await _rag_context(user_message)
+    context = await _rag_context(user_message, source)
     if context:
         messages.append({"role": "system", "content": context})
     if history:

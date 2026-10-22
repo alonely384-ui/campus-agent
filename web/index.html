@@ -53,6 +53,9 @@
   </div>
 
   <footer>
+    <select id="paper" title="选择要问的论文（不选=全库检索）">
+      <option value="">全部论文（全库检索）</option>
+    </select>
     <input id="q" placeholder="输入你的问题，回车发送…" autocomplete="off" />
     <button id="send">发送</button>
   </footer>
@@ -62,6 +65,19 @@ const chatEl = document.getElementById('chat');
 const inputEl = document.getElementById('q');
 const sendEl = document.getElementById('send');
 const statusEl = document.getElementById('status');
+const paperEl = document.getElementById('paper');
+
+// 论文下拉：从 /papers 取列表，选中后只在那一篇里检索（单篇问答）
+fetch('/papers/files')
+  .then(r => r.json())
+  .then(d => {
+    (d.files || []).forEach(f => {
+      const o = document.createElement('option');
+      o.value = f; o.textContent = f;
+      paperEl.appendChild(o);
+    });
+  })
+  .catch(() => {});
 
 // ---------- 健康检查：确认后端活着 ----------
 fetch('/health')
@@ -101,7 +117,7 @@ async function send() {
     const resp = await fetch('/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: question, history: [] }),
+      body: JSON.stringify({ message: question, history: [], source: paperEl.value || null }),
     });
 
     if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()).slice(0, 200));

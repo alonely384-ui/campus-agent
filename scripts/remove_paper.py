@@ -53,7 +53,7 @@ def main(filename: str) -> None:
             page=(meta or {}).get("page", -1),
             chunk_id=(meta or {}).get("chunk_id", 0),
         )
-        for text, meta in zip(all_docs["documents"], all_docs["metadatas"])
+        for text, meta in zip(all_docs["documents"], all_docs["metadatas"], strict=False)
     ]
     df: dict[str, int] = {}
     for c in chunks:
