@@ -168,6 +168,51 @@ def structure_path(paper_id: str) -> Path:
     return PAPERS_DIR / f"{paper_id}.structure.json"
 
 
+STRUCTURES_FILE = PAPERS_DIR / "structures.json"
+
+
+def load_structures() -> dict[str, dict]:
+    """按文件名索引的结构化元数据缓存（由 scripts/build_structure.py 生成）。"""
+    if not STRUCTURES_FILE.exists():
+        return {}
+    try:
+        return json.loads(STRUCTURES_FILE.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def paper_meta(source: str) -> dict | None:
+    """按文件名（如 1706.03762v7.pdf）取标题/作者/章节树。"""
+    return load_structures().get(source)
+
+
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _norm_words(text: str) -> list[str]:
+    return _WORD_RE.findall(text.lower())
+
+
+def find_paper_by_title(question: str) -> str | None:
+    """问题里点名了某篇论文的标题时，返回该论文文件名。
+
+    为什么需要：多篇混在一个库里时，"第六作者是谁"这种问题本身不含论文名，
+    检索会随便命中一篇。只要用户在问句里带了标题（"In Attention Is All You
+    Need, who is ..."），就先锁定论文，再在单篇内检索。
+    """
+    q = set(_norm_words(question))
+    q_text = " ".join(_norm_words(question))
+    for source, meta in load_structures().items():
+        title = (meta.get("title") or "").strip()
+        if not title or len(_norm_words(title)) < 2:
+            continue
+        t_words = _norm_words(title)
+        # 标题原样出现，或标题里 ≥80% 的词都出现在问句里，算点名
+        if " ".join(t_words) in q_text or sum(1 for w in t_words if w in q) >= max(2, int(len(t_words) * 0.8)):
+            return source
+    return None
+
+
 def save_structure(paper_id: str, structure: dict) -> None:
     """把标题/作者/章节树存成旁挂 JSON（不进主索引，老数据无需迁移）。"""
     structure_path(paper_id).write_text(

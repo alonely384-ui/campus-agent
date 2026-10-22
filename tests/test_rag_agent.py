@@ -10,7 +10,7 @@ from app.rag.pipeline import Chunk
 
 
 def test_rag_context_has_source_and_page(monkeypatch):
-    def fake_retrieve(question, top_k=4):
+    def fake_retrieve(question, top_k=4, source=None):
         assert "GPUs" in question
         return [Chunk(text="8 NVIDIA P100 GPUs", source="1706.03762v7.pdf", page=7)]
 
@@ -24,7 +24,7 @@ def test_rag_context_has_source_and_page(monkeypatch):
 
 
 def test_rag_context_survives_retrieve_error(monkeypatch):
-    def boom(question, top_k=4):
+    def boom(question, top_k=4, source=None):
         raise RuntimeError("chroma 没建好")
 
     monkeypatch.setattr(agent_module, "retrieve", boom)
@@ -32,7 +32,7 @@ def test_rag_context_survives_retrieve_error(monkeypatch):
 
 
 def test_rag_context_empty_when_no_hits(monkeypatch):
-    monkeypatch.setattr(agent_module, "retrieve", lambda q, top_k=4: [])
+    monkeypatch.setattr(agent_module, "retrieve", lambda q, top_k=4, source=None: [])
     assert _rag_context("库里没有的问题") == ""
 
 
@@ -40,7 +40,7 @@ def test_rag_context_empty_when_no_hits(monkeypatch):
 async def test_run_agent_passes_context_to_model(monkeypatch):
     captured: list[list[dict]] = []
 
-    def fake_retrieve(question, top_k=4):
+    def fake_retrieve(question, top_k=4, source=None):
         return [Chunk(text="We trained on 8 NVIDIA P100 GPUs", source="p.pdf", page=7)]
 
     class FakeCompletions:

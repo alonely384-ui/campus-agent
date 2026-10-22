@@ -33,6 +33,7 @@ from typing import Any
 from app.config import settings
 from app.llm import get_client
 from app.logging_config import get_logger
+from app.papers import find_paper_by_title, paper_meta
 from app.rag.pipeline import retrieve
 from app.tools.registry import get_tool, list_tools, tool_schemas
 
@@ -69,7 +70,9 @@ def _rag_context(question: str) -> str:
     模型会按规则 3 回答"论文库中没有找到相关信息"。
     """
     try:
-        chunks = retrieve(question, top_k=RETRIEVE_TOP_K)
+        # 问句里点名了论文标题时，先锁定单篇，避免跑到别的论文里
+        source = find_paper_by_title(question)
+        chunks = retrieve(question, top_k=RETRIEVE_TOP_K, source=source)
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
         return ""
@@ -78,6 +81,18 @@ def _rag_context(question: str) -> str:
         return ""
 
     lines = ["以下是从论文库检索到的原文片段（回答只能依据它们，并标注来源）："]
+
+    # 结构化元数据：把"标题/作者列表"直接放进上下文。
+    # 为什么需要：像"第六作者是谁"这种问题，原文里没有 author/sixth 字样，
+    # 检索只能碰到标题页；而作者列表是版式信息，已经从 PDF 里抽成字段了。
+    meta = paper_meta(chunks[0].source)
+    if meta and meta.get("authors"):
+        authors = "、".join(meta["authors"][:40])
+        lines.append(
+            f"\n【本篇元数据】标题：{meta.get('title') or '未知'}；"
+            f"作者（共 {len(meta['authors'])} 人，按原顺序）：{authors}"
+        )
+
     for c in chunks:
         where = f"{c.source} 第{c.page}页" if c.page is not None else c.source
         lines.append(f"\n【{where}】\n{c.text}")
