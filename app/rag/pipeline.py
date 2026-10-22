@@ -53,6 +53,11 @@ DIM = 1024
 # 入库时的最小块长：小于这个字数的块直接丢弃（见 index_chunks 第 0 步）。
 _MIN_CHUNK_CHARS = 100
 
+# 默认切块大小：300 字（约 2–3 句）。实测 120/150/200/300 的检索命中率在 150 之后
+# 就不再提升（top3 都是 3/3），但 300 的块数只有 150 的一半（180 vs 334），
+# 存储和检索成本都更低，块内也更不容易掺进无关句子。
+DEFAULT_CHUNK_SIZE = 300
+
 # 英文停用词：每篇论文都有一堆，留着会让所有文本彼此"很像"，淹没真正的关键词。
 _EN_STOPWORDS = {
     "the", "a", "an", "of", "and", "to", "in", "is", "are", "was", "were",
@@ -420,6 +425,22 @@ def split_text(text: str, chunk_size: int = 500, overlap: int | None = None) -> 
     return [c for c in chunks if c]
 
 
+# 稠密向量模型：Chroma 内置的 ONNX MiniLM（384 维，模型约 80MB，首次用自动下载）。
+# 它按"语义"比较（"GPUs used for training" ≈ "8 NVIDIA P100 GPUs"），
+# 和上面的哈希特征（按字面、精确）互补，两路一起用才是真正的混合检索。
+_dense_ef = None
+
+
+def _dense():
+    """懒加载 + 单例：ONNX 会话很重，每次新建会慢十倍。"""
+    global _dense_ef
+    if _dense_ef is None:
+        from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
+
+        _dense_ef = ONNXMiniLM_L6_V2()
+    return _dense_ef
+
+
 def index_chunks(chunks: list[Chunk]) -> int:
     """[3] 把块存进 Chroma（带向量），返回存入的数量。
 
@@ -469,6 +490,16 @@ def index_chunks(chunks: list[Chunk]) -> int:
             embeddings=embeddings[start : start + batch],
             metadatas=metadatas[start : start + batch],
         )
+
+    # 再写一份"稠密向量"集合：只存原文，384 维向量交给 ONNX 模型现算。
+    # 两份集合的 id 完全一致，检索时按 id 对齐、分数分开算，最后 RRF 融合。
+    dense = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
+    for start in range(0, len(ids), batch):
+        dense.upsert(
+            ids=ids[start : start + batch],
+            documents=documents[start : start + batch],
+            metadatas=metadatas[start : start + batch],
+        )
     return len(ids)
 
 
@@ -504,10 +535,27 @@ def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[C
     )
     vector_ids = (result.get("ids") or [[]])[0]
 
-    # RRF：名次越靠前得分越高；常数 60 是经验值，压制"断崖式"领先
+    # 稠密向量召回：真正按语义比较。模型/集合不可用时降级，不影响主流程。
+    dense_ids: list[str] = []
+    try:
+        dense_col = client.get_or_create_collection(
+            name="docs_dense", embedding_function=_dense()
+        )
+        dense_res = dense_col.query(query_texts=[question], n_results=n, where=where)
+        dense_ids = (dense_res.get("ids") or [[]])[0]
+    except Exception:  # noqa: BLE001 —— 检索是"尽力而为"，任何异常都不该让问答崩
+        dense_ids = []
+
+    # RRF：名次越靠前得分越高；常数 60 是经验值，压制"断崖式"领先。
+    # 权重：稠密向量 2.0（语义最准）、BM25 1.0（精确词）、哈希向量 0.5（只当兜底，
+    # 它的碰撞噪声实测会把 GPU 题顶到错误的页）。稠密不可用时把它的权重让给哈希向量。
+    dense_w = 2.0 if dense_ids else 0.0
+    hash_w = 0.5 if dense_ids else 2.0
     fused: dict[str, float] = {}
+    for rank, cid in enumerate(dense_ids):
+        fused[cid] = fused.get(cid, 0.0) + dense_w / (60 + rank + 1)
     for rank, cid in enumerate(vector_ids):
-        fused[cid] = fused.get(cid, 0.0) + 1.0 / (60 + rank + 1)
+        fused[cid] = fused.get(cid, 0.0) + hash_w / (60 + rank + 1)
     for rank, cid in enumerate(_bm25_ids(question, n, source=source)):
         fused[cid] = fused.get(cid, 0.0) + 1.0 / (60 + rank + 1)
 
