@@ -36,6 +36,9 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.config import settings
+from app.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -801,46 +804,17 @@ def index_paper(path: str, source: str | None = None) -> int:
     return add_chunks(chunks)
 
 
-def retrieve_scored(
-    question: str, top_k: int = 4, source: str | None = None
-) -> list[tuple[Chunk, float, list[str]]]:
-    """[4] 混合检索，返回 (块, RRF 分数, 命中通道)。
+def _fuse_ids(
+    dense_ids: list[str],
+    hash_ids: list[str],
+    bm25_ids: list[str],
+    top_k: int,
+) -> tuple[list[str], dict[str, float], dict[str, list[str]]]:
+    """RRF 融合三路召回结果，返回 (排序后的 id, 融合分, 命中通道)。
 
-    和 retrieve() 的区别：多带"为什么排在这"的信息，供证据卡片和调试脚本用。
-    RRF 分数只反映"在几路榜单里排第几"，不是概率，不能当正确率看。
+    权重策略：稠密可用时 dense=2.0 / bm25=1.0 / hash=0.5；
+    稠密不可用时 hash 接管 dense 的 2.0（哈希当离线兜底，不让检索整体失效）。
     """
-    import chromadb
-
-    client = chromadb.PersistentClient(path=settings.chroma_dir)
-    collection = client.get_or_create_collection(name="docs")
-
-    where = {"source": source} if source else None
-    if where:
-        total = len((collection.get(where=where, include=[]) or {}).get("ids") or [])
-    else:
-        total = collection.count()
-    if total == 0:
-        return []
-
-    n = min(max(top_k * 3, top_k), total)
-    result = collection.query(
-        query_embeddings=[embed(question)],
-        n_results=n,
-        where=where,
-    )
-    vector_ids = (result.get("ids") or [[]])[0]
-
-    dense_ids: list[str] = []
-    try:
-        dense_col = client.get_or_create_collection(
-            name="docs_dense", embedding_function=_dense()
-        )
-        dense_res = dense_col.query(query_texts=[question], n_results=n, where=where)
-        dense_ids = (dense_res.get("ids") or [[]])[0]
-    except Exception:  # noqa: BLE001 —— 检索尽力而为，异常不该让问答崩
-        dense_ids = []
-
-    # 三路权重可用环境变量覆盖，方便做消融实验（不用改代码就能对比）
     dense_w = _W_DENSE if dense_ids else 0.0
     hash_w = _W_HASH if dense_ids else _W_DENSE
     fused: dict[str, float] = {}
@@ -852,16 +826,83 @@ def retrieve_scored(
 
     for rank, cid in enumerate(dense_ids):
         _add(cid, dense_w, rank, "dense")
-    for rank, cid in enumerate(vector_ids):
+    for rank, cid in enumerate(hash_ids):
         _add(cid, hash_w, rank, "hash")
-    for rank, cid in enumerate(_bm25_ids(question, n, source=source)):
+    for rank, cid in enumerate(bm25_ids):
         _add(cid, _W_BM25, rank, "bm25")
 
     order = sorted(fused, key=lambda k: fused[k], reverse=True)[:top_k]
-    if not order:
+    return order, fused, channels
+
+
+def retrieve_scored(
+    question: str, top_k: int = 4, source: str | None = None
+) -> list[tuple[Chunk, float, list[str]]]:
+    """[4] 混合检索，返回 (块, RRF 分数, 命中通道)。
+
+    和 retrieve() 的区别：多带"为什么排在这"的信息，供证据卡片和调试脚本用。
+    RRF 分数只反映"在几路榜单里排第几"，不是概率，不能当正确率看。
+
+    容错策略：三路召回各自 try/except——哪一路挂了就跳过这一路并记日志，
+    其余通道继续融合；全挂才返回 []，绝不让检索异常把整轮问答打崩。
+    """
+    import chromadb
+
+    client = chromadb.PersistentClient(path=settings.chroma_dir)
+    try:
+        collection = client.get_collection(name="docs")
+    except Exception:  # noqa: BLE001 —— 索引可能还没建，按"空库"处理
+        logger.warning("向量集合 docs 不存在，本次检索返回空")
         return []
 
-    fetched = collection.get(ids=order)
+    where = {"source": source} if source else None
+    try:
+        if where:
+            total = len((collection.get(where=where, include=[]) or {}).get("ids") or [])
+        else:
+            total = collection.count()
+    except Exception:  # noqa: BLE001
+        logger.exception("读取向量集合规模失败，本次检索返回空")
+        return []
+    if total == 0:
+        return []
+
+    n = min(max(top_k * 3, top_k), total)
+
+    # 通道一：哈希向量（离线兜底，也是稠密不可用时的替补）
+    hash_ids: list[str] = []
+    try:
+        result = collection.query(query_embeddings=[embed(question)], n_results=n, where=where)
+        hash_ids = (result.get("ids") or [[]])[0]
+    except Exception:  # noqa: BLE001
+        logger.exception("哈希召回失败，跳过该通道")
+
+    # 通道二：稠密向量（ONNX MiniLM，语义相似）
+    dense_ids: list[str] = []
+    try:
+        dense_col = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
+        dense_res = dense_col.query(query_texts=[question], n_results=n, where=where)
+        dense_ids = (dense_res.get("ids") or [[]])[0]
+    except Exception:  # noqa: BLE001
+        logger.exception("稠密召回失败，降级为哈希 + BM25")
+
+    # 通道三：BM25（关键词精确匹配）
+    bm25_ids: list[str] = []
+    try:
+        bm25_ids = _bm25_ids(question, n, source=source)
+    except Exception:  # noqa: BLE001
+        logger.exception("BM25 召回失败，跳过该通道")
+
+    order, fused, channels = _fuse_ids(dense_ids, hash_ids, bm25_ids, top_k)
+    if not order:
+        logger.warning("三路召回均为空，返回空结果")
+        return []
+
+    try:
+        fetched = collection.get(ids=order)
+    except Exception:  # noqa: BLE001
+        logger.exception("按 id 取回原文失败，返回空结果")
+        return []
     by_id = {
         cid: (text, meta)
         for cid, text, meta in zip(
