@@ -1,4 +1,4 @@
-# ---- Python ----
+﻿# ---- Python ----
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -13,7 +13,8 @@ venv/
 # ---- 数据与向量库 ----
 data/uploads/*
 !data/uploads/.gitkeep
-data/chroma/
+data/chroma*/
+data/chroma_*/
 data/papers/
 data/eval/pages/
 data/models/
