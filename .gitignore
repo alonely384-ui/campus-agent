@@ -15,6 +15,7 @@ data/uploads/*
 !data/uploads/.gitkeep
 data/chroma/
 data/papers/
+data/eval/pages/
 *.sqlite3
 
 # ---- 工具缓存 ----
