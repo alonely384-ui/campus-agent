@@ -173,6 +173,12 @@ def _tokens(text: str) -> list[tuple[str, float]]:
 
 _BM25_FILE = "bm25.json"
 _BM25: dict | None = None
+# 三路检索的 RRF 权重（可用环境变量覆盖，做消融实验用）：
+#   RAG_W_DENSE / RAG_W_HASH / RAG_W_BM25
+_W_DENSE = float(os.getenv("RAG_W_DENSE", "2.0"))
+_W_HASH = float(os.getenv("RAG_W_HASH", "0.5"))
+_W_BM25 = float(os.getenv("RAG_W_BM25", "1.0"))
+
 _BM25_K1 = 1.2   # 词频饱和速度：越大，重复出现的词加分越多
 _BM25_B = 0.6    # 长度归一化强度：1 = 完全按长度惩罚长块
 
@@ -542,8 +548,9 @@ def retrieve_scored(
     except Exception:  # noqa: BLE001 —— 检索尽力而为，异常不该让问答崩
         dense_ids = []
 
-    dense_w = 2.0 if dense_ids else 0.0
-    hash_w = 0.5 if dense_ids else 2.0
+    # 三路权重可用环境变量覆盖，方便做消融实验（不用改代码就能对比）
+    dense_w = _W_DENSE if dense_ids else 0.0
+    hash_w = _W_HASH if dense_ids else _W_DENSE
     fused: dict[str, float] = {}
     channels: dict[str, list[str]] = {}
 
@@ -556,7 +563,7 @@ def retrieve_scored(
     for rank, cid in enumerate(vector_ids):
         _add(cid, hash_w, rank, "hash")
     for rank, cid in enumerate(_bm25_ids(question, n, source=source)):
-        _add(cid, 1.0, rank, "bm25")
+        _add(cid, _W_BM25, rank, "bm25")
 
     order = sorted(fused, key=lambda k: fused[k], reverse=True)[:top_k]
     if not order:
