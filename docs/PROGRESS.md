@@ -60,7 +60,7 @@
 - 提交 `d7268d5 feat(L2): 多篇对比——每篇各检索、合并去重、前端勾选与对比表渲染`，已 push。
 - 未验证：浏览器里对比表的实际视觉效果（只核对了页面元素与接口返回，没有人工点页面）。
 
-## 2026-10-24（周六）重排（Cross-Encoder）落地
+## 2026-10-23（周五·晚）重排（Cross-Encoder）落地
 
 - 新增 `app/rag/rerank.py`：交叉编码器 `ms-marco-MiniLM-L-6-v2`（ONNX 量化 22.1MB + `tokenizer.json`，放 `data/models/`，已进 `.gitignore`）；懒加载，`score_pairs()` 返回 logits，`rerank()` 按分数重排并追加 `rerank` 通道；模型缺失抛 `RerankUnavailable`。
 - `app/rag/pipeline.py`：新增 `_RERANK_ENABLED`（`RAG_RERANK=0` 关闭）、`_RERANK_POOL=15`；`retrieve_scored` 先融合取 15 个候选、再重排取 top_k；重排不可用时自动回退融合顺序并记 warning。
@@ -70,7 +70,7 @@
 - 端到端：`/chat` GPU 题 evidence `#1 p7 score=4.91676 type=rerank channels=[dense, hash, bm25, rerank]`，回答 `【结论】训练使用 1 台机器、8 块 NVIDIA P100 GPU。[来源: 1706.03762v7.pdf 第7页]`。
 - `75 passed`、`ruff check app tests scripts` 全绿。
 
-## 2026-10-24（下午·修）
+## 2026-10-23（周五·深夜）修切分与摘录
 
 修的是"切块把词切断"和"检索对了但答不出来"两类硬问题：
 
@@ -83,7 +83,7 @@
 - 提交：`78dc127`、`bdcbd2e`、`ca13284`、`e59bde1`；`77 passed`、ruff 全绿。
 - 剩余 8 题未中 top1 的归因：①同一事实多页出现（token 数 p9/p43），"标准页"本身有歧义；②表格内计数需跨行数；③块跨页（BERT head dimension p28/p29）。
 
-## 2026-10-24（周六·晚）表格计数
+## 2026-10-23（周五·深夜）表格计数
 
 修的是"问一共几个/几种，答案在表格里"这一类问题：
 
