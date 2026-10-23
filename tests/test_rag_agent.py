@@ -174,3 +174,18 @@ def _no_translate(monkeypatch):
         return q
 
     monkeypatch.setattr(agent_module, "_search_query", _fake)
+
+
+def test_numeric_excerpt_keeps_numbers_beyond_first_1600_chars():
+    """按字符截前 1600 字会切掉摘要里的数字（实测 61.4% 在第 1980 个字符）。
+
+    所以整页补充要按"含数字的行"取样，既保数字也不把无关正文塞进上下文。
+    """
+    filler = "\n".join(["无数字的说明行 " * 30] * 20)  # 约 3000 字，把数字挤到 1600 之后
+    text = filler + "\non the Path-X challenge (seq. length 16K, 61.4% accuracy)"
+
+    excerpt = agent_module._numeric_excerpt(text)
+
+    assert "61.4% accuracy" in excerpt
+    assert "无数字" not in excerpt
+    assert len(excerpt) <= 1604

@@ -136,6 +136,31 @@ def _needs_page_text(question: str) -> bool:
     return bool(_NUMERIC_QUESTION.search(question))
 
 
+_DIGIT_LINE = re.compile(r"\d")
+
+
+def _numeric_excerpt(text: str, limit: int = 1600) -> str:
+    """从整页文本里只挑"含数字的行"拼成摘录。
+
+    为什么不能直接截前 1600 字：摘要里的数值常出现在页面中后段
+    （实测 `61.4% accuracy` 在第 1980 个字符），按字符截会把它切掉；
+    而按行过滤既保留表格行，又能在同样的 1600 字里装下更多数字。
+    """
+    kept: list[str] = []
+    used = 0
+    for line in text.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        if not _DIGIT_LINE.search(s):
+            continue
+        if used + len(s) + 1 > limit:
+            break
+        kept.append(s)
+        used += len(s) + 1
+    return "\n".join(kept)
+
+
 def key_terms(question: str) -> list[str]:
     """抽出问题里的英文/数字术语，保持出现顺序、去重。"""
     return list(dict.fromkeys(m.group(0) for m in _ASCII_TERM.finditer(question)))
@@ -293,17 +318,22 @@ async def _rag_context_with_evidence(
     # 数值类问题：答案常在表格里，切块后可能只剩一个孤零零的数字
     # （例如 "Transformer (big) 28.4 41.8"），所以把命中页整页文本再补一份给模型。
     if _needs_page_text(question):
+        # 取 3 页而不是 2 页：摘要里的数字（如 "61.4% accuracy"）常常排在证据第 3、4 位，
+        # 只补前两页会漏掉它；每页仍截 1600 字，只对数值类问题生效，token 成本可控。
         seen: list[tuple[str, int]] = []
         for ev in evidence:
             if ev.page and (ev.source, ev.page) not in seen:
                 seen.append((ev.source, ev.page))
-            if len(seen) >= 2:
+            if len(seen) >= 3:
                 break
         for src, pg in seen:
             full = page_text(src, pg)
             if not full:
                 continue
-            lines.append(f"\n【{src} 第{pg}页 整页原文（补数值，含表格）】\n{full[:1600]}")
+            excerpt = _numeric_excerpt(full)
+            if not excerpt:
+                continue
+            lines.append(f"\n【{src} 第{pg}页 含数字的行（补数值，含表格）】\n{excerpt}")
     lines.append("\n如果以上片段没有能回答问题的内容，直接回答：论文库中没有找到相关信息。")
     return "\n".join(lines), evidence
 
