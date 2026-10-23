@@ -51,3 +51,4 @@ logs/
 *.bak
 *.orig
 !.env.example
+_public/
