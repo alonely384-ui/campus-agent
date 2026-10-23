@@ -17,8 +17,6 @@ from app.rag.pipeline import Chunk, add_chunks, index_paper, remove_source
 class _StubEmbedding:
     """最小可用的稠密 embedding 函数：固定 384 维，避免测试时下载 ONNX 模型。"""
 
-    is_legacy = False  # Chroma 1.5 用它判断配置格式，不给会报 DeprecationWarning
-
     def __call__(self, input):  # noqa: A002 —— Chroma 的协议参数名就是 input
         return [[0.01 * (i + 1)] * 384 for i in range(len(input))]
 

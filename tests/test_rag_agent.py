@@ -29,6 +29,24 @@ async def test_rag_context_has_source_and_page(monkeypatch):
     assert "论文库中没有找到相关信息" in context
 
 
+async def test_metadata_block_carries_page_1(monkeypatch):
+    """元数据（标题/作者）也要能标页码，否则模型会写出"本篇元数据"这种非法引用。"""
+
+    def fake_retrieve(question, top_k=4, source=None):
+        return [(Chunk(text="title page", source="v7.pdf", page=1), 0.05, ["hash"])]
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    monkeypatch.setattr(
+        agent_module,
+        "paper_meta",
+        lambda source: {"title": "Attention Is All You Need", "authors": ["A", "B", "C"]},
+    )
+
+    context = await _rag_context("第六作者是谁？")
+    assert "【本篇元数据｜第1页】" in context
+    assert "第1页" in context
+
+
 async def test_evidence_card_fields(monkeypatch):
     """证据卡片要有：排名、页码、融合分、命中通道、原文。"""
 
