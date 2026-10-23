@@ -115,6 +115,15 @@ async def test_run_agent_passes_context_to_model(monkeypatch):
     assert messages[-1]["role"] == "user"
 
 
+def test_system_prompt_has_four_sections():
+    """L1：回答必须按【结论/依据/局限/下一步】四段输出，否则前端和文档口径就变了。"""
+    prompt = agent_module.SYSTEM_PROMPT
+    for section in ["【结论】", "【依据】", "【局限】", "【下一步】"]:
+        assert section in prompt
+    # 依据段必须要求带来源，否则会退化成"没有出处的分析"
+    assert "句末标注 [来源: 文件名 第N页]" in prompt
+
+
 @pytest.fixture(autouse=True)
 def _no_translate(monkeypatch):
     """单测里不要真的调 LLM 做查询翻译：直接原样返回。"""
