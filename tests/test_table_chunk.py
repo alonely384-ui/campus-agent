@@ -72,8 +72,8 @@ def test_page_text_fallback_injected(monkeypatch):
         agent_module._rag_context_with_evidence("这篇论文的 BLEU 是多少？", source="x.pdf")
     )
     assert evidence
-    assert "整页原文" in context
-    assert "【x.pdf 第8页 整页原文" in context
+    assert "28.4" in context
+    assert "【x.pdf 第8页 含数字的行" in context
 
 
 def test_page_text_not_injected_for_general_question(monkeypatch):
