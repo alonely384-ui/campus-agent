@@ -32,6 +32,8 @@ import re
 import zlib
 from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 
 from app.config import settings
 
@@ -363,6 +365,136 @@ def _recursive_split(text: str, chunk_size: int, separators: list[str]) -> list[
     return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
 
 
+_TABLE_NUM = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _is_table_row(line: str) -> bool:
+    """判断一行是否表格数据行：至少两个数字，且数字字符占比够高。"""
+    s = line.strip()
+    if not (8 <= len(s) <= 160):
+        return False
+    nums = _TABLE_NUM.findall(s)
+    if len(nums) < 2:
+        return False
+    return sum(len(n) for n in nums) / len(s) >= 0.15
+
+
+def _looks_like_header(line: str) -> bool:
+    """判断一行是否像表头：短、不以句号结尾、多数词首字母大写（或数字/符号）。"""
+    s = line.strip()
+    if not s or len(s) > 140 or s.endswith(("。", ".", "；", ";", "：", ":", ",")):
+        return False
+    words = s.split()
+    if len(words) < 2:
+        return False
+    upper = sum(1 for w in words if w[:1].isupper() or not w[:1].isalpha())
+    return upper / len(words) >= 0.5
+
+
+def _split_table_blocks(text: str) -> list[tuple[bool, str]]:
+    """把文本切成 (是否表格, 内容) 块；表格块会尽量带上紧邻的表头行。
+
+    为什么要单独认表格：论文里的关键数字（BLEU、参数量、GPU 数）常常在表格里，
+    普通句子切分会把表头和数据行拆到两块，"28.4 是哪一列"就丢了。
+    """
+    lines = text.split("\n")
+    blocks: list[tuple[bool, str]] = []
+    buf: list[str] = []
+
+    def flush() -> None:
+        if buf:
+            blocks.append((False, "\n".join(buf)))
+            buf.clear()
+
+    i = 0
+    while i < len(lines):
+        if not _is_table_row(lines[i]):
+            buf.append(lines[i])
+            i += 1
+            continue
+
+        flush()
+        start = i
+        while i < len(lines) and _is_table_row(lines[i]):
+            i += 1
+
+        header_lines: list[str] = []
+        # 表头通常紧挨在表格上方，有时还是两行（如 "Model BLEU EN-DE ..." + "EN-DE EN-FR ..."）：
+        # 从上一个文本块末尾最多取 2 行像表头的行，保证数字不脱列、不丢列名
+        if blocks and not blocks[-1][0]:
+            prev = blocks[-1][1].rstrip("\n").split("\n")
+            while prev and len(header_lines) < 2 and _looks_like_header(prev[-1]):
+                header_lines.insert(0, prev.pop())
+            if header_lines:
+                if prev:
+                    blocks[-1] = (False, "\n".join(prev))
+                else:
+                    blocks.pop()
+        header = "".join(h + "\n" for h in header_lines)
+        blocks.append((True, header + "\n".join(lines[start:i])))
+
+    flush()
+    return blocks
+
+
+def _table_chunks(content: str, chunk_size: int) -> list[str]:
+    """把表格块按行分组，每块都重复表头，保证数字不脱列。"""
+    lines = [ln for ln in content.split("\n") if ln.strip()]
+    if not lines:
+        return []
+    header = ""
+    if not _is_table_row(lines[0]) and _looks_like_header(lines[0]):
+        header = lines[0] + "\n"
+        lines = lines[1:]
+    if not lines:
+        return [header.strip()] if header.strip() else []
+
+    out: list[str] = []
+    current = header
+    for line in lines:
+        if len(header) + len(line) > chunk_size:
+            # 单行就超长：交给普通递归切分兜底
+            if current.strip():
+                out.append(current.strip())
+            current = header
+            out.extend(_recursive_split(line, max(chunk_size - len(header), 1), _SEPARATORS))
+            continue
+        if len(current) + len(line) + 1 > chunk_size:
+            out.append(current.strip())
+            current = header
+        current += line + "\n"
+    if current.strip():
+        out.append(current.strip())
+    return [c for c in out if c]
+
+
+def _pack_pieces(pieces: list[str], chunk_size: int, overlap: int) -> list[str]:
+    """把碎片按块长合并，并在相邻块之间保留约 overlap 字的重叠。"""
+    chunks: list[str] = []
+    current = ""
+    for piece in pieces:
+        if not current:
+            current = piece
+            continue
+        if len(current) + len(piece) <= chunk_size:
+            current += piece
+            continue
+
+        chunks.append(current.strip())
+
+        tail = _overlap_tail(current, overlap)
+        room = chunk_size - len(piece)
+        if room <= 0:
+            tail = ""
+        elif len(tail) > room:
+            tail = tail[-room:]
+        current = tail + piece
+
+    if current.strip():
+        chunks.append(current.strip())
+    return [c for c in chunks if c]
+
+
 def _overlap_tail(text: str, overlap: int) -> str:
     """从上一块末尾取 overlap 个字当重叠，尽量从一个句子开头开始。"""
     if overlap <= 0 or not text:
@@ -402,32 +534,15 @@ def split_text(text: str, chunk_size: int = 500, overlap: int | None = None) -> 
     if not text:
         return []
 
-    pieces = _recursive_split(text, chunk_size, _SEPARATORS)
-
     chunks: list[str] = []
-    current = ""
-    for piece in pieces:
-        if not current:
-            current = piece
+    for is_table, block in _split_table_blocks(text):
+        if not block.strip():
             continue
-        if len(current) + len(piece) <= chunk_size:
-            current += piece
-            continue
-
-        chunks.append(current.strip())
-
-        # 新块 = 上一块的尾巴（重叠）+ 当前碎片；超长就从尾巴里截短
-        tail = _overlap_tail(current, overlap)
-        room = chunk_size - len(piece)
-        if room <= 0:
-            tail = ""
-        elif len(tail) > room:
-            tail = tail[-room:]
-        current = tail + piece
-
-    if current.strip():
-        chunks.append(current.strip())
-
+        if is_table:
+            chunks.extend(_table_chunks(block, chunk_size))
+        else:
+            pieces = _recursive_split(block, chunk_size, _SEPARATORS)
+            chunks.extend(_pack_pieces(pieces, chunk_size, overlap))
     return [c for c in chunks if c]
 
 
@@ -777,3 +892,29 @@ def retrieve_scored(
 def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[Chunk]:
     """[4] 混合检索：向量召回 + BM25 精排，RRF 融合后取前 top_k（只返回块）。"""
     return [chunk for chunk, _score, _ch in retrieve_scored(question, top_k, source)]
+
+
+# 页级兜底用：数值类问题的答案常在表格里，块内可能只剩一个孤零零的数字，
+# 所以命中页整页文本也补一份给模型（带缓存，同一页只解析一次）。
+_PAPERS_DIR = Path(__file__).resolve().parents[2] / "data" / "papers"
+
+
+@lru_cache(maxsize=128)
+def _page_text_cached(source: str, page: int) -> str:
+    path = _PAPERS_DIR / source
+    if not path.exists():
+        return ""
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path))
+        if not 1 <= page <= len(reader.pages):
+            return ""
+        return (reader.pages[page - 1].extract_text() or "").strip()
+    except Exception:
+        return ""
+
+
+def page_text(source: str, page: int) -> str:
+    """取某篇论文第 page 页的全文（带缓存）；取不到返回空串。"""
+    return _page_text_cached(source, page)

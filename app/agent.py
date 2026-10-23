@@ -38,7 +38,7 @@ from app.config import settings
 from app.llm import get_client
 from app.logging_config import get_logger
 from app.papers import find_paper_by_title, paper_meta
-from app.rag.pipeline import retrieve_scored
+from app.rag.pipeline import page_text, retrieve_scored
 from app.tools.registry import get_tool, list_tools, tool_schemas
 
 logger = get_logger(__name__)
@@ -95,6 +95,17 @@ def _save_query_cache() -> None:
 
 
 _load_query_cache()
+
+
+_NUMERIC_QUESTION = re.compile(
+    r"[0-9]|多少|几个|几块|几天|几篇|几层|比例|百分比|数值|参数|得分|分数|准确率|召回率|耗时|损失|维度|BLEU|F1|epoch|batch",
+    re.IGNORECASE,
+)
+
+
+def _needs_page_text(question: str) -> bool:
+    """数值类问题是否要补整页原文：这类答案常以表格或行内数字形式出现，切块容易切散。"""
+    return bool(_NUMERIC_QUESTION.search(question))
 
 
 def key_terms(question: str) -> list[str]:
@@ -233,6 +244,20 @@ async def _rag_context_with_evidence(
     for c in chunks:
         where = f"{c.source} 第{c.page}页" if c.page is not None else c.source
         lines.append(f"\n【{where}】\n{c.text}")
+    # 数值类问题：答案常在表格里，切块后可能只剩一个孤零零的数字
+    # （例如 "Transformer (big) 28.4 41.8"），所以把命中页整页文本再补一份给模型。
+    if _needs_page_text(question):
+        seen: list[tuple[str, int]] = []
+        for ev in evidence:
+            if ev.page and (ev.source, ev.page) not in seen:
+                seen.append((ev.source, ev.page))
+            if len(seen) >= 2:
+                break
+        for src, pg in seen:
+            full = page_text(src, pg)
+            if not full:
+                continue
+            lines.append(f"\n【{src} 第{pg}页 整页原文（补数值，含表格）】\n{full[:1600]}")
     lines.append("\n如果以上片段没有能回答问题的内容，直接回答：论文库中没有找到相关信息。")
     return "\n".join(lines), evidence
 

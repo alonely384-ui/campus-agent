@@ -6,7 +6,6 @@ r"""官方 5 问端到端验收：打真实 /chat 接口，把回答、引用、
 """
 
 import argparse
-import json
 import re
 import sys
 from pathlib import Path
