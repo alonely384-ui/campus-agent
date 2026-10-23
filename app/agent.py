@@ -65,6 +65,7 @@ SYSTEM_PROMPT = """你是「科研小助手」，帮用户阅读、检索和对�
 【结论】一句话直接回答用户的问题。
 【依据】2–4 条要点，每条必须是检索原文里写到的内容，句末标注 [来源: 文件名 第N页]。
         没有依据的句子不要写；证据不足时在这段写“资料不足，无法确认”。
+        问“一共几个/几种”时：先在依据里把符合条件的条目逐行列出来（可引用表格行），再给总数。
 【局限】指出资料缺口、版本差异或你无法确认的地方；确实没有就写“无明显局限”。
 【下一步】给 1–2 条可执行建议：读哪一节、或接下来该追问什么。
 例外：用户只问单个数字或名词时，可以只答【结论】一段，但必须带来源。"""
@@ -164,6 +165,64 @@ def _numeric_excerpt(text: str, limit: int = 1600) -> str:
 def key_terms(question: str) -> list[str]:
     """抽出问题里的英文/数字术语，保持出现顺序、去重。"""
     return list(dict.fromkeys(m.group(0) for m in _ASCII_TERM.finditer(question)))
+
+
+# "一共几种/几个"这类问题，答案往往是表格的行数，单块检索必然漏（实测 p8 表 2.1 有 8 行，
+# 但向量/BM25 都把 p9 排前面，答案页根本进不了证据）。
+_COUNT_QUESTION = re.compile(r"(几个|几种|几类|几款|多少个|多少种|多少类|多少款)")
+_NUMBER_TOKEN = re.compile(r"\d+(?:\.\d+)?")
+# 表题里出现这些词，说明这张表在列"模型规模/参数/结构"，例如
+# "Table 2.1: Sizes, architectures, and learning hyper-parameters for 8 models"。
+_SIZE_WORD = re.compile(r"sizes?\b|parameters?\b|architectures?\b|hyper-parameters?\b")
+
+
+def _is_count_question(question: str) -> bool:
+    """问数量的问题：需要去表格里逐行数，而不是找"最像的一段话"。"""
+    return bool(_COUNT_QUESTION.search(question))
+
+
+def _table_pages(source: str, question: str, max_pages: int = 40, top_n: int = 3) -> list[tuple[int, int]]:
+    """在某一篇里找"最像答案表格"的页，按命中行数降序返回 [(页码, 行数)]。
+
+    评分只看"含问题术语、且像表格行"的行数，而不是整页表格行数：
+    实测整页行数会让 p2（摘要+图注）压过 p8 的真实表格。
+    返回多页而不是一页：同一篇里可能有好几张表（实测 p26 的行数比 p8 还多），
+    让模型按问题挑那张对的表，比我们猜一张更稳。
+    """
+    terms = [t.lower() for t in key_terms(question) if len(t) >= 3]
+    if not terms:
+        return []
+    scored: list[tuple[int, int]] = []
+    empty_run = 0
+    for page in range(1, max_pages + 1):
+        text = page_text(source, page)
+        if not text:
+            empty_run += 1
+            if empty_run >= 3:
+                break
+            continue
+        empty_run = 0
+        rows = 0
+        for line in text.splitlines():
+            s = line.strip().lower()
+            if len(s) < 12 or len(_NUMBER_TOKEN.findall(s)) < 2:
+                continue
+            if any(t in s for t in terms):
+                rows += 1
+        if rows >= 3:
+            # 表题（caption）命中"规模/参数/结构"类字样时加权：同一篇里往往还有更大的表
+            # （实测 p26 表 3.11 命中 16 行，但问"几个规模"时 p8 表 2.1 才是答案）。
+            # 只扫表题行、不扫整页——正文里也常出现 parameters 之类的词，扫整页会误伤。
+            caption = " ".join(
+                line.strip()
+                for line in text.splitlines()
+                if re.match(r"\s*table\s*\d", line.strip().lower())
+            ).lower()
+            if _SIZE_WORD.search(caption):
+                rows += 20
+            scored.append((page, rows))
+    scored.sort(key=lambda item: item[1], reverse=True)
+    return scored[:top_n]
 
 
 # 提问意图 → 检索时补的英文词。
@@ -334,6 +393,40 @@ async def _rag_context_with_evidence(
             if not excerpt:
                 continue
             lines.append(f"\n【{src} 第{pg}页 含数字的行（补数值，含表格）】\n{excerpt}")
+
+    # 数量类问题：答案通常是表格行数，而表格页常常进不了 top4。
+    # 单篇问答时直接在全篇里找"最像答案的表格页"补进来（最多 3 页，让模型按问题挑）。
+    if _is_count_question(question) and not multi and chunks:
+        src = chunks[0].source
+        candidates = _table_pages(src, question)
+        if candidates:
+            parts: list[str] = []
+            for page, rows in candidates:
+                table_text = _numeric_excerpt(page_text(src, page), limit=2400)
+                if table_text:
+                    parts.append(
+                        f"\n【{src} 第{page}页 候选表格（含问题术语的数据行 {rows} 条）】\n{table_text}"
+                    )
+                    # 补进证据列表：模型会引用这些页，evidence 里必须有它们，
+                    # 否则前端"证据卡片"和回答里的页码对不上（评审一眼能看出来）。
+                    evidence.append(
+                        Evidence(
+                            rank=len(evidence) + 1,
+                            source=src,
+                            page=page,
+                            score=0.0,
+                            channels=["table"],
+                            text=table_text[:160],
+                        )
+                    )
+            if parts:
+                lines.extend(parts)
+                label = "、".join(f"第{p}页（{r} 条）" for p, r in candidates)
+                lines.append(
+                    f"\n（数量问题：候选表格页 {label}。先判断哪一页的表格在回答这个问题，"
+                    "再把符合条件的行逐行列出来，最后给总数，并说明数的是哪一列/哪一类。）"
+                )
+
     lines.append("\n如果以上片段没有能回答问题的内容，直接回答：论文库中没有找到相关信息。")
     return "\n".join(lines), evidence
 
