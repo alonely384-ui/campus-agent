@@ -225,9 +225,10 @@ async def _rag_context_with_evidence(
     if meta and meta.get("authors"):
         authors = "、".join(meta["authors"][:40])
         lines.append(
-            f"\n【本篇元数据】标题：{meta.get('title') or '未知'}；"
+            f"\n【本篇元数据｜第1页】标题：{meta.get('title') or '未知'}；"
             f"作者（共 {len(meta['authors'])} 人，按原顺序）：{authors}"
         )
+        lines.append("（标题与作者来自论文第 1 页，引用它们时同样标注 [来源: 文件名 第1页]。）")
 
     for c in chunks:
         where = f"{c.source} 第{c.page}页" if c.page is not None else c.source

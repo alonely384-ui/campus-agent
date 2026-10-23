@@ -304,13 +304,36 @@ def save_paper(
     return paper, best, score
 
 
+def delete_structure(source: str) -> bool:
+    """从 structures.json 里删掉一篇（删论文时同步，避免"三处数据不同步"）。
+
+    structures.json 是按文件名索引的，所以传的是 filename 而不是 paper_id。
+    """
+    data = load_structures()
+    if source not in data:
+        return False
+    data.pop(source)
+    STRUCTURES_FILE.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return True
+
+
 def delete_paper(paper_id: str) -> bool:
-    """删除论文原件、文字缓存和索引项。返回是否真的删掉了。"""
+    """删除论文原件、文字缓存和索引项。返回是否真的删掉了。
+
+    注意：这里只删磁盘文件与 index.json；向量库和 BM25 的清理在
+    app/rag/pipeline.py 的 remove_source() 里，由 /papers 删除接口一起调用。
+    """
     remaining = [p for p in _load_index() if p.paper_id != paper_id]
     if len(remaining) == len(_load_index()):
         return False
 
-    for path in (PAPERS_DIR / f"{paper_id}.pdf", TEXT_DIR / f"{paper_id}.txt"):
+    for path in (
+        PAPERS_DIR / f"{paper_id}.pdf",
+        TEXT_DIR / f"{paper_id}.txt",
+        structure_path(paper_id),
+    ):
         path.unlink(missing_ok=True)
     _save_index(remaining)
     return True

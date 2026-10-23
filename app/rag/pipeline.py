@@ -509,6 +509,183 @@ def index_chunks(chunks: list[Chunk]) -> int:
     return len(ids)
 
 
+def _dfs_from_postings(postings: dict[str, list[list[int]]]) -> dict[str, int]:
+    """从倒排表反推 df（文档频率）。
+
+    每篇论文的每个块对同一特征只记一条 [doc_id, tf]，
+    所以 len(entries) 就是"有多少块含这个词"，不需要额外维护 df 表。
+    """
+    return {term: len(entries) for term, entries in postings.items()}
+
+
+def _merge_bm25(index: dict | None, chunks: list[Chunk]) -> dict:
+    """把新块追加到已有倒排表末尾（doc_id 继续往后排）。
+
+    为什么不整库重建：全量重建 26000 块要 20 多分钟，
+    上传一篇论文只该多花"这篇的时间"（几秒）。
+    """
+    if not index:
+        return _build_bm25(chunks)
+
+    docs = index["docs"]
+    lens = list(index["lens"])
+    postings = index["postings"]
+    start = len(docs)
+
+    for offset, c in enumerate(chunks):
+        counts = Counter(name for name, _w in _tokens(c.text))
+        lens.append(sum(counts.values()) or 1)
+        for term, tf in counts.items():
+            postings.setdefault(term, []).append([start + offset, tf])
+        docs.append({"source": c.source, "page": c.page, "chunk_id": c.chunk_id})
+
+    avg = (sum(lens) / len(lens)) if lens else 1.0
+    return {"avg_len": avg, "lens": lens, "postings": postings, "docs": docs}
+
+
+def _prune_bm25(index: dict, source: str) -> tuple[dict, int]:
+    """删掉某篇论文的全部块，并把 doc_id 重新编号成连续的。
+
+    重新编号是必须的：lens 是按 doc_id 下标的数组，
+    删掉中间一段却不压缩编号，之后 BM25 的 |D| 长度就会错位。
+    """
+    docs = index["docs"]
+    lens = index["lens"]
+    keep = [i for i, d in enumerate(docs) if d.get("source") != source]
+    removed = len(docs) - len(keep)
+    if removed == 0:
+        return index, 0
+
+    remap = {old: new for new, old in enumerate(keep)}
+    postings: dict[str, list[list[int]]] = {}
+    for term, entries in index["postings"].items():
+        kept = [[remap[i], tf] for i, tf in entries if i in remap]
+        if kept:
+            postings[term] = kept
+
+    new_lens = [lens[i] for i in keep]
+    avg = (sum(new_lens) / len(new_lens)) if new_lens else 1.0
+    return (
+        {
+            "avg_len": avg,
+            "lens": new_lens,
+            "postings": postings,
+            "docs": [docs[i] for i in keep],
+        },
+        removed,
+    )
+
+
+def add_chunks(chunks: list[Chunk]) -> int:
+    """[3b] 增量入库：把新块并进现有索引，返回入库块数。
+
+    与 index_chunks 的区别：
+        index_chunks 用"这一批块"重建 IDF 和 BM25（会覆盖全库统计）；
+        add_chunks 在旧统计上做增量合并，适合"上传一篇新论文"。
+
+    已知取舍：已入库块的向量是用当时的 IDF 算的，新块用更新后的 IDF，
+    向量之间会有细微不同步。这是增量的固有代价，全量重建可消除。
+    """
+    import chromadb
+
+    chunks = [c for c in chunks if len(c.text.strip()) >= _MIN_CHUNK_CHARS]
+    if not chunks:
+        return 0
+
+    index = _merge_bm25(_load_bm25(), chunks)
+    _save_idf(_dfs_from_postings(index["postings"]), len(index["docs"]))
+    _save_bm25(index)
+
+    client = chromadb.PersistentClient(path=settings.chroma_dir)
+    collection = client.get_or_create_collection(name="docs")
+
+    ids = [f"{c.source}:{c.chunk_id}" for c in chunks]
+    documents = [c.text for c in chunks]
+    embeddings = [embed(c.text) for c in chunks]
+    metadatas = [
+        {
+            "source": c.source,
+            "chunk_id": c.chunk_id,
+            "page": c.page if c.page is not None else -1,
+        }
+        for c in chunks
+    ]
+
+    batch = 2000
+    for start in range(0, len(ids), batch):
+        collection.upsert(
+            ids=ids[start : start + batch],
+            documents=documents[start : start + batch],
+            embeddings=embeddings[start : start + batch],
+            metadatas=metadatas[start : start + batch],
+        )
+
+    dense = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
+    for start in range(0, len(ids), batch):
+        dense.upsert(
+            ids=ids[start : start + batch],
+            documents=documents[start : start + batch],
+            metadatas=metadatas[start : start + batch],
+        )
+    return len(ids)
+
+
+def remove_source(source: str) -> int:
+    """[3c] 从三路索引里彻底删掉一篇论文，返回删掉的块数。
+
+    只删文件不删索引，会出现"论文已删除、AI 还能引用它"（P0-2 实测确认过）：
+    PDF 和文本缓存没了，但向量库和 BM25 里的块还在，检索照样命中。
+    """
+    import chromadb
+
+    client = chromadb.PersistentClient(path=settings.chroma_dir)
+    collection = client.get_or_create_collection(name="docs")
+    where = {"source": source}
+    ids = (collection.get(where=where, include=[]) or {}).get("ids") or []
+    removed = len(ids)
+    if ids:
+        collection.delete(where=where)
+
+    try:
+        dense = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
+        dense.delete(where=where)
+    except Exception:  # noqa: BLE001 —— 稠密集合异常不该阻断删除，但会留下未清理块
+        pass
+
+    index = _load_bm25()
+    if index:
+        pruned, bm_removed = _prune_bm25(index, source)
+        if bm_removed:
+            _save_idf(_dfs_from_postings(pruned["postings"]), len(pruned["docs"]))
+            _save_bm25(pruned)
+        removed = max(removed, bm_removed)
+
+    return removed
+
+
+def index_paper(path: str, source: str | None = None) -> int:
+    """[3a] 把一篇 PDF 切块后增量入库（上传接口调用）。
+
+    chunk_id 用"页码 × 1000 + 页内序号"，和 scripts/build_index.py 的编号规则一致，
+    这样上传的论文和全量建库的论文在索引里长得一样。
+    """
+    pages = load_pdf(path)
+    name = source or os.path.basename(path)
+
+    chunks: list[Chunk] = []
+    for page_chunk in pages:
+        for i, piece in enumerate(split_text(page_chunk.text, DEFAULT_CHUNK_SIZE)):
+            chunks.append(
+                Chunk(
+                    text=piece,
+                    source=name,
+                    page=page_chunk.page,
+                    chunk_id=(page_chunk.page or 0) * 1000 + i,
+                )
+            )
+    return add_chunks(chunks)
+
+
 def retrieve_scored(
     question: str, top_k: int = 4, source: str | None = None
 ) -> list[tuple[Chunk, float, list[str]]]:

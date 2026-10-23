@@ -20,10 +20,13 @@ from app.config import settings
 from app.logging_config import get_logger, setup_logging
 from app.papers import (
     delete_paper,
+    delete_structure,
     get_paper,
     list_papers,
+    paper_path,
     save_paper,
 )
+from app.rag.pipeline import index_paper, remove_source
 
 setup_logging()
 logger = get_logger(__name__)
@@ -191,8 +194,19 @@ async def papers_upload(file: UploadFile = File(...)) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # 保存成功后立刻入库（切块 → 向量 → BM25），否则会出现"上传了但 AI 检索不到"。
+    # 入库失败不让整个上传 500：文件已经存好了，返回 indexed=0 提示前端/用户稍后重建。
+    indexed = 0
+    try:
+        path = paper_path(paper.paper_id)
+        if path is not None:
+            indexed = index_paper(str(path), paper.filename)
+    except Exception:
+        logger.exception("论文已保存，但入库失败（paper_id=%s）", paper.paper_id)
+
     return {
         "paper": PaperOut(**vars(paper)),
+        "indexed": indexed,
         "duplicate": (
             {"paper_id": dup.paper_id, "filename": dup.filename, "score": score}
             if dup
@@ -203,11 +217,21 @@ async def papers_upload(file: UploadFile = File(...)) -> dict:
 
 @app.delete("/papers/{paper_id}", summary="删除论文")
 async def papers_delete(paper_id: str) -> dict:
-    if get_paper(paper_id) is None:
+    paper = get_paper(paper_id)
+    if paper is None:
         raise HTTPException(status_code=404, detail="论文不存在")
     if not delete_paper(paper_id):
         raise HTTPException(status_code=500, detail="删除失败")
-    return {"deleted": paper_id}
+
+    # 文件删掉后必须同步清索引，否则"删了还能被检索到"（赛题实测会翻车）
+    removed_chunks = 0
+    try:
+        removed_chunks = remove_source(paper.filename)
+        delete_structure(paper.filename)
+    except Exception:
+        logger.exception("论文文件已删，但清理索引失败（source=%s）", paper.filename)
+
+    return {"deleted": paper_id, "removed_chunks": removed_chunks}
 
 
 # ---------------- 前端页面 ----------------
