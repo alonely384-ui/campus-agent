@@ -183,6 +183,9 @@ _BM25: dict | None = None
 _W_DENSE = float(os.getenv("RAG_W_DENSE", "2.0"))
 _W_HASH = float(os.getenv("RAG_W_HASH", "0.5"))
 _W_BM25 = float(os.getenv("RAG_W_BM25", "1.0"))
+# RRF 的 k 常数（可用 RAG_RRF_K 覆盖）：越大名次差异被抹得越平，
+# 越小头部名次越吃重。常见取值 60；短查询、库小的时候 20–30 有时更好。
+_RRF_K = int(os.getenv("RAG_RRF_K", "60"))
 
 _BM25_K1 = 1.2   # 词频饱和速度：越大，重复出现的词加分越多
 _BM25_B = 0.6    # 长度归一化强度：1 = 完全按长度惩罚长块
@@ -821,7 +824,7 @@ def _fuse_ids(
     channels: dict[str, list[str]] = {}
 
     def _add(cid: str, weight: float, rank: int, channel: str) -> None:
-        fused[cid] = fused.get(cid, 0.0) + weight / (60 + rank + 1)
+        fused[cid] = fused.get(cid, 0.0) + weight / (_RRF_K + rank + 1)
         channels.setdefault(cid, []).append(channel)
 
     for rank, cid in enumerate(dense_ids):

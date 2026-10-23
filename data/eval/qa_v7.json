@@ -1,0 +1,155 @@
+{
+  "paper": "1706.03762v7.pdf",
+  "items": [
+    {
+      "q": "论文训练用了多少块 GPU？",
+      "pages": [
+        7
+      ],
+      "marker": "8 NVIDIA P100 GPUs"
+    },
+    {
+      "q": "Adam 优化器的 β1 设为多少？",
+      "pages": [
+        7
+      ],
+      "marker": "β1 = 0.9"
+    },
+    {
+      "q": "Adam 优化器的 β2 设为多少？",
+      "pages": [
+        7
+      ],
+      "marker": "β2 = 0.98"
+    },
+    {
+      "q": "Adam 的 epsilon 设为多少？",
+      "pages": [
+        7
+      ],
+      "marker": "ϵ = 10−9"
+    },
+    {
+      "q": "base 模型的层数 N 是多少？",
+      "pages": [
+        3
+      ],
+      "marker": "N = 6"
+    },
+    {
+      "q": "注意力头数 h 是多少？",
+      "pages": [
+        5
+      ],
+      "marker": "h = 8"
+    },
+    {
+      "q": "训练时 dropout 率 Pdrop 是多少？",
+      "pages": [
+        8
+      ],
+      "marker": "Pdrop = 0.1"
+    },
+    {
+      "q": "label smoothing 的取值是多少？",
+      "pages": [
+        8
+      ],
+      "marker": "ϵls = 0.1"
+    },
+    {
+      "q": "warmup 步数是多少？",
+      "pages": [
+        7
+      ],
+      "marker": "warmup_steps = 4000"
+    },
+    {
+      "q": "base 模型训练了多少步？",
+      "pages": [
+        7
+      ],
+      "marker": "100,000 steps"
+    },
+    {
+      "q": "big 模型训练了多少步？",
+      "pages": [
+        7
+      ],
+      "marker": "300,000 steps"
+    },
+    {
+      "q": "每一步训练耗时多久？",
+      "pages": [
+        7
+      ],
+      "marker": "1.0 second"
+    },
+    {
+      "q": "用的优化器是什么？",
+      "pages": [
+        7
+      ],
+      "marker": "Adam optimizer"
+    },
+    {
+      "q": "训练用了多少台机器？",
+      "pages": [
+        7
+      ],
+      "marker": "one machine"
+    }
+  ],
+  "rejected": [
+    {
+      "q": "d_model 的取值是多少？",
+      "marker": "dmodel = 512",
+      "pages": [
+        3,
+        5
+      ]
+    },
+    {
+      "q": "big 模型训练了多久？",
+      "marker": "3.5 days",
+      "pages": [
+        1,
+        7,
+        8
+      ]
+    },
+    {
+      "q": "WMT 2014 英德任务 big 模型 BLEU 是多少？",
+      "marker": "28.4",
+      "pages": [
+        1,
+        8
+      ]
+    },
+    {
+      "q": "big 模型的参数量是多少？",
+      "marker": "213 million",
+      "pages": []
+    },
+    {
+      "q": "base 模型的参数量是多少？",
+      "marker": "65 million",
+      "pages": []
+    },
+    {
+      "q": "attention 的 key 维度 dk 是多少？",
+      "marker": "dk = 64",
+      "pages": []
+    },
+    {
+      "q": "attention 的 value 维度 dv 是多少？",
+      "marker": "dv = 64",
+      "pages": []
+    },
+    {
+      "q": "feed-forward 的维度 dff 是多少？",
+      "marker": "dff = 2048",
+      "pages": []
+    }
+  ]
+}
