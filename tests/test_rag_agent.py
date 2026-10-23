@@ -124,6 +124,48 @@ def test_system_prompt_has_four_sections():
     assert "句末标注 [来源: 文件名 第N页]" in prompt
 
 
+async def test_multi_source_retrieval_merges_per_paper(monkeypatch):
+    """多篇对比：每篇各查一次（各取 3 块），证据里两篇都在，且提示模型出对比表。"""
+    calls: list[tuple[int, str | None]] = []
+
+    def fake_retrieve(question, top_k=4, source=None):
+        calls.append((top_k, source))
+        if source == "a.pdf":
+            return [(Chunk(text="A 的方法", source="a.pdf", page=1), 0.05, ["dense"])]
+        return [(Chunk(text="B 的方法", source="b.pdf", page=2), 0.06, ["bm25"])]
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    context, evidence = await _rag_context_with_evidence(
+        "这两篇的方法有什么区别？", sources=["a.pdf", "b.pdf"]
+    )
+
+    assert [c[1] for c in calls] == ["a.pdf", "b.pdf"]
+    assert all(c[0] == agent_module.PER_PAPER_TOP_K for c in calls)
+    assert {e.source for e in evidence} == {"a.pdf", "b.pdf"}
+    assert "多篇对比" in context
+
+
+async def test_multi_source_survives_one_failure_and_caps_evidence(monkeypatch):
+    """一篇检索炸了不影响另一篇；合并后证据不超过上限。"""
+
+    def fake_retrieve(question, top_k=4, source=None):
+        if source == "bad.pdf":
+            raise RuntimeError("索引坏了")
+        return [
+            (Chunk(text=f"片段{i}", source="good.pdf", page=i), 1 / (i + 1), ["hash"])
+            for i in range(10)
+        ]
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    context, evidence = await _rag_context_with_evidence(
+        "对比一下", sources=["bad.pdf", "good.pdf"]
+    )
+
+    assert context  # 好的一篇仍然进了上下文
+    assert {e.source for e in evidence} == {"good.pdf"}
+    assert len(evidence) <= agent_module.MULTI_MAX_EVIDENCE
+
+
 @pytest.fixture(autouse=True)
 def _no_translate(monkeypatch):
     """单测里不要真的调 LLM 做查询翻译：直接原样返回。"""

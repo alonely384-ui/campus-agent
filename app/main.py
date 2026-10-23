@@ -48,6 +48,9 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000, description="用户问题")
     history: list[dict] = Field(default_factory=list, description="历史消息，可留空")
     source: str | None = Field(default=None, description="只在这篇论文里检索（单篇问答）")
+    sources: list[str] | None = Field(
+        default=None, description="多篇对比：只在这些论文里检索（每篇各取 3 块）"
+    )
 
 
 class ChatResponse(BaseModel):
@@ -68,7 +71,9 @@ async def health() -> dict:
 async def chat(req: ChatRequest) -> ChatResponse:
     """最简单的一问一答。前端想要"打字机效果"请用 /chat/stream。"""
     try:
-        result = await run_agent(req.message, req.history, source=req.source)
+        result = await run_agent(
+            req.message, req.history, source=req.source, sources=req.sources
+        )
     except Exception as e:
         logger.exception("处理 /chat 失败")
         # 不要把原始异常直接抛给用户（可能泄漏内部信息），记日志 + 返回通用提示
@@ -99,7 +104,9 @@ async def chat_stream(req: ChatRequest) -> StreamingResponse:
 
     async def event_generator():
         try:
-            async for event in run_agent_stream(req.message, req.history, source=req.source):
+            async for event in run_agent_stream(
+                req.message, req.history, source=req.source, sources=req.sources
+            ):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception:
             logger.exception("流式处理失败")
