@@ -37,6 +37,8 @@ from pathlib import Path
 
 from app.config import settings
 from app.logging_config import get_logger
+from app.rag.rerank import RerankUnavailable
+from app.rag.rerank import rerank as rerank_fn
 
 logger = get_logger(__name__)
 
@@ -186,6 +188,12 @@ _W_BM25 = float(os.getenv("RAG_W_BM25", "1.0"))
 # RRF 的 k 常数（可用 RAG_RRF_K 覆盖）：越大名次差异被抹得越平，
 # 越小头部名次越吃重。常见取值 60；短查询、库小的时候 20–30 有时更好。
 _RRF_K = int(os.getenv("RAG_RRF_K", "60"))
+
+# 交叉编码器重排：RAG_RERANK=0 关闭；RAG_RERANK_POOL 决定拿多少候选去重排。
+# 实测 pool=10/15/20 的 R@1 分别是 28/31/30（38 题），差异在噪声内；
+# 取 15 是"质量不吃亏、候选少 1/4"的折中。
+_RERANK_ENABLED = os.getenv("RAG_RERANK", "1") != "0"
+_RERANK_POOL = int(os.getenv("RAG_RERANK_POOL", "15"))
 
 _BM25_K1 = 1.2   # 词频饱和速度：越大，重复出现的词加分越多
 _BM25_B = 0.6    # 长度归一化强度：1 = 完全按长度惩罚长块
@@ -896,7 +904,9 @@ def retrieve_scored(
     except Exception:  # noqa: BLE001
         logger.exception("BM25 召回失败，跳过该通道")
 
-    order, fused, channels = _fuse_ids(dense_ids, hash_ids, bm25_ids, top_k)
+    # 重排只在候选池内部做：池子要比重排后取的数量大，否则等于没重排
+    pool = max(top_k, _RERANK_POOL) if _RERANK_ENABLED else top_k
+    order, fused, channels = _fuse_ids(dense_ids, hash_ids, bm25_ids, pool)
     if not order:
         logger.warning("三路召回均为空，返回空结果")
         return []
@@ -930,6 +940,15 @@ def retrieve_scored(
             chunk_id=(meta or {}).get("chunk_id", 0),
         )
         out.append((chunk, fused[cid], channels.get(cid, [])))
+
+    if _RERANK_ENABLED:
+        try:
+            out = rerank_fn(question, out, top_k)
+        except RerankUnavailable as exc:
+            logger.warning("重排不可用，回退融合排序：%s", exc)
+            out = out[:top_k]
+    else:
+        out = out[:top_k]
     return out
 
 

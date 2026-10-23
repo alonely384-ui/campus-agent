@@ -347,7 +347,7 @@ class Evidence:
             "source": self.source,
             "page": self.page,
             "score": round(self.score, 5),
-            "score_type": "rrf",
+            "score_type": "rerank" if "rerank" in self.channels else "rrf",
             "channels": self.channels,
             "text": self.text,
         }
