@@ -194,6 +194,9 @@ _RRF_K = int(os.getenv("RAG_RRF_K", "60"))
 # 取 15 是"质量不吃亏、候选少 1/4"的折中。
 _RERANK_ENABLED = os.getenv("RAG_RERANK", "1") != "0"
 _RERANK_POOL = int(os.getenv("RAG_RERANK_POOL", "15"))
+# 每路召回取多深：太浅（12）会把"排第 15 的正确块"直接漏掉，重排也无从救；
+# 太深受重排成本限制。50 是 38 题集上把 GPT-3 参数题捞回来的最小代价点。
+_RECALL_DEPTH = int(os.getenv("RAG_RECALL_DEPTH", "50"))
 
 _BM25_K1 = 1.2   # 词频饱和速度：越大，重复出现的词加分越多
 _BM25_B = 0.6    # 长度归一化强度：1 = 完全按长度惩罚长块
@@ -515,6 +518,14 @@ def _overlap_tail(text: str, overlap: int) -> str:
         return ""
 
     tail = text[-overlap:]
+    # 英文/数字场景：切点落在单词中间（如 "language" 被切成 "nguage"）时，
+    # 往后挪到下一个空格 —— 带着半截单词的块会让向量和重排都误判。
+    before = text[-overlap - 1 : -overlap] if len(text) > overlap else ""
+    if before.isascii() and before.isalnum() and tail[:1].isascii() and tail[:1].isalnum():
+        space = tail.find(" ")
+        if 0 < space < len(tail) - 1:
+            tail = tail[space + 1 :]
+
     for sep in ("。", "！", "？", "；", ". ", "\n"):
         pos = tail.find(sep)
         # 只在分隔符后面还有内容时才从那里开始，否则等于整个 tail
@@ -878,7 +889,7 @@ def retrieve_scored(
     if total == 0:
         return []
 
-    n = min(max(top_k * 3, top_k), total)
+    n = min(max(top_k * 3, _RECALL_DEPTH), total)
 
     # 通道一：哈希向量（离线兜底，也是稠密不可用时的替补）
     hash_ids: list[str] = []

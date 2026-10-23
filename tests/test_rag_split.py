@@ -6,7 +6,7 @@
     3. 优先在句子边界断开，而不是把句子劈两半。
 """
 
-from app.rag.pipeline import split_text
+from app.rag.pipeline import _overlap_tail, split_text
 
 
 def test_empty_text_returns_nothing():
@@ -71,3 +71,12 @@ def test_overlap_zero_means_no_duplicate_content():
     chunks = split_text(text, chunk_size=20, overlap=0)
     assert chunks, "至少切出一块"
     assert all(len(c) <= 20 for c in chunks)
+
+
+def test_overlap_tail_starts_at_word_boundary():
+    """英文重叠不能从半个单词开始："language" 被切成 "guage" 时，应退到空格后。"""
+    text = "we train a language model"
+    # 最后 10 个字符是 "guage model"，落在 "language" 中间
+    assert _overlap_tail(text, 10) == "model"
+    # 中文没有空格，保持原样取尾
+    assert _overlap_tail("这是中文句子没有空格", 4) == "没有空格"

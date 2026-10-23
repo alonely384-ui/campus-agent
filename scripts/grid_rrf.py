@@ -49,6 +49,10 @@ def rank_of(hits, expected_pages) -> int | None:
     return None
 
 
+def accepted_pages(case) -> list[int]:
+    return [*case["pages"], *case.get("pages_alt", [])]
+
+
 def load_cases(path: str | None):
     if not path:
         return [{"q": c["q"], "pages": c["pages"], "paper": SOURCE} for c in CASES]
@@ -74,7 +78,7 @@ async def run_grid(cases) -> list[dict]:
             ranks = [
                 rank_of(
                     pipeline.retrieve_scored(q, top_k=5, source=case["paper"]),
-                    case["pages"],
+                    accepted_pages(case),
                 )
                 for q, case in zip(queries, cases, strict=True)
             ]

@@ -36,6 +36,11 @@ def rank_of(hits, pages: list[int]) -> int | None:
     return None
 
 
+def accepted_pages(case: dict) -> list[int]:
+    """人工标注的可接受答案页：pages 为主，pages_alt 是"原文用另一种措辞写同一事实"的页。"""
+    return [*case["pages"], *case.get("pages_alt", [])]
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cases", default="data/eval/qa_multi.json")
@@ -52,7 +57,10 @@ async def main() -> int:
     for label, enabled in (("关重排", False), ("开重排", True)):
         pipeline._RERANK_ENABLED = enabled
         ranks = [
-            rank_of(pipeline.retrieve_scored(q, top_k=5, source=case["paper"]), case["pages"])
+            rank_of(
+                pipeline.retrieve_scored(q, top_k=5, source=case["paper"]),
+                accepted_pages(case),
+            )
             for q, case in zip(queries, cases, strict=True)
         ]
         r1 = sum(1 for r in ranks if r == 1)
