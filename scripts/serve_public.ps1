@@ -13,6 +13,14 @@
 # (needs a domain) or deploy to Render/Railway.
 
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5.1 has a Start-Process bug: it copies environment variables into a
+# case-insensitive dictionary, so having both NO_PROXY and no_proxy makes it throw
+# "Item has already been added". Drop the lower-case duplicates in THIS process only;
+# the tunnel child does not need them (cloudflared talks to Cloudflare directly).
+foreach ($dup in 'http_proxy', 'https_proxy', 'no_proxy', 'all_proxy') {
+    if (Test-Path -Path "env:$dup") { Remove-Item -Path "env:$dup" -ErrorAction SilentlyContinue }
+}
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
