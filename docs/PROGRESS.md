@@ -97,6 +97,27 @@
 - 新增 `tests/test_table_count.py` 4 例（数量词识别、表题加权排序、无术语返回空、注入上下文且 evidence 带表格页）。
 - `81 passed`、`ruff check app tests` 全绿。
 
+## 2026-10-24（周六）学习材料站点与保活
+
+- 做了本地学习站点：`web/project-tour.html`（PyCharm 风格：文件树 + 行号 + 语法高亮，60 个文件段落），生成脚本放 `_verify/build_tour.py`，页面写进 `.git/info/exclude` 不入库。
+- 加了 12 步学习路线 + 28 道自测题 + 视频清单 + 4 天排期；另做 `scripts/check_all.py`（8 项体检）与 `scripts/keep_alive.ps1`（uvicorn + 隧道自愈，开机自启）。
+- 证据：`check_all.py` 8 项全 PASS；`81 passed in 4.30s`；提交 `360296b`、`db834c0`。
+
+## 2026-10-25（周日）学习测验与隧道故障排查
+
+学习者侧（自述，不算代码变更）：
+
+- 学习测验做到第 11 题；自己动手跑过 FastAPI 流式接口 `/chat/stream`（能收到事件流）、论文去重（v1/v7 相似度 0.873）、Function Calling（calculator 工具调用）。
+- 结论：RAG 七步与 FastAPI 请求链路到了"能讲清、能跑通"的程度，后面改成在项目里改参数、看效果，不再新看视频。
+
+维护侧：
+
+- 现象：手机端页面打不开；日志里 `cloudflared` 在 20:40–20:43 每分钟退出一次，而 uvicorn 一直正常（8000 监听、`/health` 200）。
+- 根因一：保活脚本只在 `logs/cloudflared.log`（stdout）找隧道地址，cloudflared 实际把地址打在 **stderr** → `_public/public-url.txt` 一直停在旧地址。
+- 根因二：quick tunnel 重连后地址必换。
+- 修复：`scripts/keep_alive.ps1` 改为同时扫 stdout/stderr、启动加 `--protocol http2`、失败时记录 stderr 尾巴；手动起隧道后公网 `/health` 200、页面 200（1398 KB），新地址写入 `_public/public-url.txt`。
+- 遗留：quick tunnel 地址不稳定，评审期要换学生机或命名隧道。
+
 ## 下一步
 
 1. 官方 5 问端到端验收（第 6 作者 / Adam β1β2 / GPU 数量型号 / BLEU 对比 / LayerNorm 引用），记录页码与引用格式

@@ -42,14 +42,17 @@ while ($true) {
         Log "cloudflared down -> restart"
         Remove-Item Env:http_proxy,Env:https_proxy,Env:no_proxy,Env:all_proxy -ErrorAction SilentlyContinue
         Start-Process -FilePath $cloudflared `
-            -ArgumentList "tunnel","--url","http://127.0.0.1:8000","--no-autoupdate" `
+            -ArgumentList "tunnel","--url","http://127.0.0.1:8000","--no-autoupdate","--protocol","http2" `
             -WorkingDirectory $base -WindowStyle Hidden `
             -RedirectStandardOutput "$base\logs\cloudflared.log" -RedirectStandardError "$base\logs\cloudflared.err.log"
         Start-Sleep -Seconds 12
+        $tail = Get-Content "$base\logs\cloudflared.err.log" -Tail 3 -ErrorAction SilentlyContinue
+        if ($tail) { Log ("cloudflared errors: " + ($tail -join " | ")) }
     }
 
-    if (Test-Path "$base\logs\cloudflared.log") {
-        $hit = Select-String -Path "$base\logs\cloudflared.log" -Pattern 'https://[a-z0-9-]+\.trycloudflare\.com' |
+    $logFiles = @("$base\logs\cloudflared.log", "$base\logs\cloudflared.err.log") | Where-Object { Test-Path $_ }
+    if ($logFiles) {
+        $hit = Select-String -Path $logFiles -Pattern 'https://[a-z0-9-]+\.trycloudflare\.com' |
             Select-Object -Last 1
         if ($hit) {
             $u = [regex]::Match($hit.Line, 'https://[a-z0-9-]+\.trycloudflare\.com').Value
