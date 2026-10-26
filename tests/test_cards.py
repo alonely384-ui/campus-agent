@@ -150,3 +150,20 @@ def test_abbreviation_question_injects_card(monkeypatch):
     )
     cards = [ev for ev in evidence if ev.channels == ["card"]]
     assert {ev.source for ev in cards} == {"1707.06347v2.pdf"}
+
+
+def test_history_reference_picks_first_paper(monkeypatch):
+    """「这三篇中第一篇的主旨」：篇名在上一轮回答里，按序号取第一篇的卡。"""
+    _patch_named(monkeypatch)
+    history = [
+        {
+            "role": "assistant",
+            "content": "对齐与推理共 5 篇：1707.06347v2.pdf、2305.18290v3.pdf",
+        }
+    ]
+    assert agent_module._history_files(history) == ["1707.06347v2.pdf", "2305.18290v3.pdf"]
+    _context, evidence = asyncio.run(
+        agent_module._rag_context_with_evidence("这三篇中第一篇的主旨是啥", history=history)
+    )
+    cards = [ev for ev in evidence if ev.channels == ["card"]]
+    assert {ev.source for ev in cards} == {"1707.06347v2.pdf"}

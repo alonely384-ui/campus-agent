@@ -326,7 +326,7 @@ def _plan_multi_sources(question: str, default_n: int = 3) -> list[str]:
     return [str(i.get("file")) for i in pool[:n] if i.get("file")]
 
 
-def _category_sources(question: str, limit: int = 3) -> list[str]:
+def _category_sources(question: str, limit: int = 12) -> list[str]:
     """问题里点名了类别（"强化学习是哪三篇"）时，直接返回该类别的篇目。
 
     为什么单独抽一个：这类问题既是"清单类"又是"摘要类"，卡片注入的目标
@@ -375,6 +375,34 @@ def _named_sources(question: str, limit: int = 3) -> list[str]:
         if f not in seen:
             seen.append(f)
     return seen[:limit]
+
+
+_ORDINAL = re.compile(r"第\s*([一二三四五六七八九十]|\d{1,2})\s*篇")
+_PLURAL_DEIXIS = re.compile(r"这几篇|这三篇|这五篇|上述|上面|前面|以上")
+
+
+def _history_files(history: list[dict] | None) -> list[str]:
+    """从对话历史里按出现顺序抽出被列过的 .pdf 文件名（去重）。
+
+    为什么需要：用户上一轮让系统列了 5 篇，下一轮说"这三篇中第一篇的主旨"，
+    指代必须能解析，否则检索只能拿着这句话去全库瞎找。
+    """
+    if not history:
+        return []
+    text = "\n".join(str(m.get("content") or "") for m in history if isinstance(m, dict))
+    known = {str(i.get("file")): i for i in load_catalog() if i.get("indexed")}
+    out: list[str] = []
+    for name in re.findall(r"([A-Za-z0-9][A-Za-z0-9_.\-]*\.pdf)", text):
+        if name in known and name not in out:
+            out.append(name)
+    return out
+
+
+def _second(value: str) -> int | None:
+    """'三' → 3，'3' → 3，解析不了返回 None。"""
+    if value.isdigit():
+        return int(value)
+    return _CN_NUM.get(value)
 
 
 def _table_pages(source: str, question: str, max_pages: int = 40, top_n: int = 3) -> list[tuple[int, int]]:
@@ -503,7 +531,10 @@ async def _search_query(question: str) -> str:
 
 
 async def _rag_context_with_evidence(
-    question: str, source: str | None = None, sources: list[str] | None = None
+    question: str,
+    source: str | None = None,
+    sources: list[str] | None = None,
+    history: list[dict] | None = None,
 ) -> tuple[str, list[Evidence]]:
     """检索论文库，返回 (给模型看的参考资料, 给前端看的证据列表)。
 
@@ -589,9 +620,19 @@ async def _rag_context_with_evidence(
             # 问题点名了具体论文（"总结 1707.06347v2.pdf"）：按文件名/标题片段锁篇
             targets = _named_sources(question)
         if not targets:
-            # 点名了类别（"强化学习是哪三篇，他们的主旨是？"）：按类别元数据取篇目
+            # 问题点名了类别（"强化学习是哪三篇，他们的主旨是？"）：按类别元数据取篇目
             category_only = _category_sources(question)
             targets = category_only
+        if not targets:
+            # 指代上一轮列过的论文（"这三篇中第一篇的主旨"）：从 history 里把篇名捞出来
+            hist_files = _history_files(history)
+            if hist_files:
+                m = _ORDINAL.search(question)
+                idx = _second(m.group(1)) if m else None
+                if idx and 1 <= idx <= len(hist_files):
+                    targets = [hist_files[idx - 1]]
+                elif _PLURAL_DEIXIS.search(question):
+                    targets = hist_files[:5]
         if not targets and _DEICTIC.search(question):
             # "这篇/它"指代时，才允许用"唯一检索到的论文"兜底；否则会把 PPO 问题锁到别的论文
             uniq = {c.source for c in (chunk for chunk, _s, _c in scored)}
@@ -733,10 +774,13 @@ async def _rag_context_with_evidence(
 
 
 async def _rag_context(
-    question: str, source: str | None = None, sources: list[str] | None = None
+    question: str,
+    source: str | None = None,
+    sources: list[str] | None = None,
+    history: list[dict] | None = None,
 ) -> str:
     """只要上下文文本的简化版（测试和老调用方用）。"""
-    context, _evidence = await _rag_context_with_evidence(question, source, sources)
+    context, _evidence = await _rag_context_with_evidence(question, source, sources, history)
     return context
 
 
@@ -866,7 +910,7 @@ async def run_agent(
 ) -> AgentResult:
     """Agent 主循环（非流式版）。返回最终答案 + 调用轨迹。"""
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context, evidence = await _rag_context_with_evidence(user_message, source, sources)
+    context, evidence = await _rag_context_with_evidence(user_message, source, sources, history)
     if context:
         messages.append({"role": "system", "content": context})
     if history:
@@ -963,7 +1007,7 @@ async def run_agent_stream(
         {"type": "done", "rounds": 2}
     """
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context, evidence = await _rag_context_with_evidence(user_message, source, sources)
+    context, evidence = await _rag_context_with_evidence(user_message, source, sources, history)
     if context:
         messages.append({"role": "system", "content": context})
     if history:
