@@ -59,13 +59,26 @@ def page_count(path: Path) -> int | None:
         return None
 
 
+def previous_items() -> dict[str, dict]:
+    """重建清单时保留已有的人工/规则字段（category、topic、arxiv_category），别覆盖。"""
+    try:
+        data = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if isinstance(data, list):
+        return {d.get("file"): d for d in data if isinstance(d, dict) and d.get("file")}
+    return {}
+
+
 def main() -> None:
     no_title = "--no-title" in sys.argv
     items: list[dict] = []
+    old = previous_items()
     pdfs = sorted(PAPERS_DIR.glob("*.pdf"))
     indexed = indexed_sources()
     for i, pdf in enumerate(pdfs, 1):
         arxiv = arxiv_id(pdf.name)
+        prev = old.get(pdf.name, {})
         title = ""
         authors = 0
         if not no_title:
@@ -78,12 +91,14 @@ def main() -> None:
         items.append(
             {
                 "file": pdf.name,
-                "title": title or pdf.stem,
-                "authors_count": authors,
+                "title": title or prev.get("title") or pdf.stem,
+                "authors_count": authors or prev.get("authors_count", 0),
                 "pages": page_count(pdf),
                 "arxiv_id": arxiv,
                 "year": year_from_arxiv(arxiv),
-                "category": "未分类",  # B1 步会用 arXiv API 补 primary_category
+                "category": prev.get("category") or "未分类",
+                "topic": prev.get("topic"),
+                "arxiv_category": prev.get("arxiv_category"),
                 "indexed": pdf.name in indexed,
             }
         )

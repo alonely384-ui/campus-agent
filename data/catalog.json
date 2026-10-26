@@ -8,7 +8,7 @@
     "year": 2016,
     "category": "模型架构",
     "indexed": true,
-    "arxiv_category": "stat.ML",
+    "arxiv_category": "未分类",
     "topic": "模型架构"
   },
   {
@@ -20,7 +20,7 @@
     "year": 2017,
     "category": "模型架构",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "模型架构"
   },
   {
@@ -31,8 +31,8 @@
     "arxiv_id": "1706.03762",
     "year": 2017,
     "category": "模型架构",
-    "indexed": false,
-    "arxiv_category": "cs.CL",
+    "indexed": true,
+    "arxiv_category": "未分类",
     "topic": "模型架构"
   },
   {
@@ -44,7 +44,7 @@
     "year": 2017,
     "category": "模型架构",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "模型架构"
   },
   {
@@ -56,7 +56,7 @@
     "year": 2017,
     "category": "对齐与推理",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "对齐与推理"
   },
   {
@@ -68,7 +68,7 @@
     "year": 2019,
     "category": "训练效率与微调",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "训练效率与微调"
   },
   {
@@ -80,7 +80,7 @@
     "year": 2019,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -92,7 +92,7 @@
     "year": 2020,
     "category": "能力评测与规模",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "能力评测与规模"
   },
   {
@@ -104,7 +104,7 @@
     "year": 2020,
     "category": "模型架构",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "模型架构"
   },
   {
@@ -116,7 +116,7 @@
     "year": 2020,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -128,7 +128,7 @@
     "year": 2020,
     "category": "多模态模型",
     "indexed": true,
-    "arxiv_category": "cs.CV",
+    "arxiv_category": "未分类",
     "topic": "多模态模型"
   },
   {
@@ -140,7 +140,7 @@
     "year": 2021,
     "category": "训练效率与微调",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "训练效率与微调"
   },
   {
@@ -152,7 +152,7 @@
     "year": 2021,
     "category": "多模态模型",
     "indexed": true,
-    "arxiv_category": "cs.CV",
+    "arxiv_category": "未分类",
     "topic": "多模态模型"
   },
   {
@@ -164,7 +164,7 @@
     "year": 2021,
     "category": "训练效率与微调",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "训练效率与微调"
   },
   {
@@ -176,7 +176,7 @@
     "year": 2021,
     "category": "能力评测与规模",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "能力评测与规模"
   },
   {
@@ -188,7 +188,7 @@
     "year": 2022,
     "category": "对齐与推理",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "对齐与推理"
   },
   {
@@ -200,7 +200,7 @@
     "year": 2022,
     "category": "对齐与推理",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "对齐与推理"
   },
   {
@@ -212,7 +212,7 @@
     "year": 2022,
     "category": "训练效率与微调",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "训练效率与微调"
   },
   {
@@ -224,7 +224,7 @@
     "year": 2022,
     "category": "能力评测与规模",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "能力评测与规模"
   },
   {
@@ -236,7 +236,7 @@
     "year": 2022,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -248,7 +248,7 @@
     "year": 2022,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -260,7 +260,7 @@
     "year": 2022,
     "category": "多模态模型",
     "indexed": true,
-    "arxiv_category": "eess.AS",
+    "arxiv_category": "未分类",
     "topic": "多模态模型"
   },
   {
@@ -272,7 +272,7 @@
     "year": 2023,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -284,7 +284,7 @@
     "year": 2023,
     "category": "多模态模型",
     "indexed": true,
-    "arxiv_category": "cs.CV",
+    "arxiv_category": "未分类",
     "topic": "多模态模型"
   },
   {
@@ -296,7 +296,7 @@
     "year": 2023,
     "category": "模型架构",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "模型架构"
   },
   {
@@ -308,7 +308,7 @@
     "year": 2023,
     "category": "训练效率与微调",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "训练效率与微调"
   },
   {
@@ -320,7 +320,7 @@
     "year": 2023,
     "category": "对齐与推理",
     "indexed": true,
-    "arxiv_category": "cs.LG",
+    "arxiv_category": "未分类",
     "topic": "对齐与推理"
   },
   {
@@ -332,7 +332,7 @@
     "year": 2023,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -344,7 +344,7 @@
     "year": 2023,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -356,7 +356,7 @@
     "year": 2024,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -368,7 +368,7 @@
     "year": 2024,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.AI",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -380,7 +380,7 @@
     "year": 2024,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -392,7 +392,7 @@
     "year": 2024,
     "category": "基础模型与预训练",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -404,7 +404,7 @@
     "year": 2025,
     "category": "对齐与推理",
     "indexed": true,
-    "arxiv_category": "cs.CL",
+    "arxiv_category": "未分类",
     "topic": "对齐与推理"
   },
   {
@@ -416,8 +416,7 @@
     "year": null,
     "category": "基础模型与预训练",
     "indexed": true,
-    "category_source": "llm",
-    "arxiv_category": "自然语言处理",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -429,8 +428,7 @@
     "year": null,
     "category": "模型架构",
     "indexed": true,
-    "category_source": "llm",
-    "arxiv_category": "自然语言处理",
+    "arxiv_category": "未分类",
     "topic": "模型架构"
   },
   {
@@ -442,8 +440,7 @@
     "year": null,
     "category": "基础模型与预训练",
     "indexed": true,
-    "category_source": "llm",
-    "arxiv_category": "自然语言处理",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -455,8 +452,7 @@
     "year": null,
     "category": "基础模型与预训练",
     "indexed": true,
-    "category_source": "llm",
-    "arxiv_category": "自然语言处理",
+    "arxiv_category": "未分类",
     "topic": "基础模型与预训练"
   },
   {
@@ -468,8 +464,7 @@
     "year": null,
     "category": "教材与理论",
     "indexed": true,
-    "category_source": "llm",
-    "arxiv_category": "理论与其他",
+    "arxiv_category": "未分类",
     "topic": "教材与理论"
   }
 ]
