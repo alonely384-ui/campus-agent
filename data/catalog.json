@@ -132,19 +132,6 @@
     "topic": "多模态模型"
   },
   {
-    "file": "209_Emergent_Abilities_of_Larg.pdf",
-    "title": "Emergent Abilities of Large Language Models",
-    "authors_count": 0,
-    "pages": 30,
-    "arxiv_id": "",
-    "year": null,
-    "category": "能力评测与规模",
-    "indexed": true,
-    "category_source": "llm",
-    "arxiv_category": "自然语言处理",
-    "topic": "能力评测与规模"
-  },
-  {
     "file": "2101.03961v3.pdf",
     "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
     "authors_count": 3,
