@@ -144,6 +144,15 @@
 - 端到端：「这些论文都是什么类型的？」→ 直接给出五类分布（证据首条 `channels=['catalog']`）；「有多少篇是自然语言处理的？」→ 22 篇。
 - 证据：`85 passed in 3.37s`；`ruff check app tests scripts` → All checks passed。
 
+## 2026-10-27（周二·下午）推荐/对比为什么答不出：清单缺名单、对比没锁篇、参考文献被当正文
+
+- 症状（用户手机截图）：「推荐一篇强化学习的论文」→ 只能搜到别的论文参考文献里的综述条目；「三篇对比」→ 只覆盖 1 篇。
+- 根因三条：①清单只给"强化学习 3 篇"这种统计，不给"是哪 3 篇"；②多篇对比只在界面勾选 ≥2 篇时触发，问句里说"三篇"没人接；③References 列表片段被当作正文证据。
+- 修：①`_catalog_block` 按类别列"文件名（短标题）"，`CATALOG_MAX_CHARS` 1200→3200（实测 1567 字，40 篇全列出）；②新增 `_COMPARE_QUESTION`/`_wants_compare`/`_plan_multi_sources`，问句里点名类别或论文时自动锁定篇并各检一次；补 `_TERM_ALIASES`（PPO→Proximal Policy Optimization 等）解决"标题里没有缩写"；③`pipeline._looks_like_citation` + `RAG_CITATION_PENALTY=0.6` 给参考文献片段降权并打 `citation` 通道，上下文加"不能当正文依据"前缀，prompt 加规则 8。
+- 端到端：「给我推荐一篇强化学习的论文」→ 点出 3 篇并推荐 PPO；「对比 PPO 和 DPO」→ 自动锁 2 篇、出 4 列对比表、每格带来源页码；「三篇对比，强化学习方向」→ 3 篇表。
+- 证据：`92 passed in 3.36s`；`ruff check app tests scripts` → All checks passed。
+- 坑：清单类问题的 `catalog` 证据会插到第 0 条，断言要按来源找而不是看 `evidence[0]`。
+
 ## 下一步
 
 1. 官方 5 问端到端验收（第 6 作者 / Adam β1β2 / GPU 数量型号 / BLEU 对比 / LayerNorm 引用），记录页码与引用格式

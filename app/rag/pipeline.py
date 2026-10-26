@@ -198,6 +198,23 @@ _RERANK_POOL = int(os.getenv("RAG_RERANK_POOL", "15"))
 # 太深受重排成本限制。50 是 38 题集上把 GPT-3 参数题捞回来的最小代价点。
 _RECALL_DEPTH = int(os.getenv("RAG_RECALL_DEPTH", "50"))
 
+# 参考文献列表片段：形如 "Author et al. Title. arXiv:2312.14925, 2023." 或 "In Proceedings of ACL"。
+# 这类片段是"某论文引用过它"，不是论文正文；实测它们会抢到强化学习/对比类问题的 top1，
+# 所以命中 >=2 个特征时降权，并在上下文里加提示（不是硬删，保留可追溯）。
+_CITATION_RE = re.compile(
+    r"\bet al\.|\barXiv:\s*\d{4}\.\d{4}|https?://|doi:|Proceedings of|NeurIPS|ICLR|ICML"
+    r"|EMNLP|NAACL|ACL|CVPR|ICCV|AAAI|Advances in Neural",
+    re.IGNORECASE,
+)
+_CITATION_PENALTY = float(os.getenv("RAG_CITATION_PENALTY", "0.6"))
+
+
+def _looks_like_citation(text: str) -> bool:
+    """短块 + 多个引用格式特征 → 判为参考文献条目。"""
+    if len(text) > 700:
+        return False
+    return len(_CITATION_RE.findall(text)) >= 2
+
 _BM25_K1 = 1.2   # 词频饱和速度：越大，重复出现的词加分越多
 _BM25_B = 0.6    # 长度归一化强度：1 = 完全按长度惩罚长块
 
@@ -960,7 +977,16 @@ def retrieve_scored(
             out = out[:top_k]
     else:
         out = out[:top_k]
-    return out
+
+    # 参考文献片段降权：放在重排之后，否则重排分会把惩罚覆盖掉
+    penalized: list[tuple[Chunk, float, list[str]]] = []
+    for chunk, score, chans in out:
+        if _looks_like_citation(chunk.text):
+            score = score * _CITATION_PENALTY
+            chans = [*chans, "citation"]
+        penalized.append((chunk, score, chans))
+    penalized.sort(key=lambda item: item[1], reverse=True)
+    return penalized[:top_k]
 
 
 def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[Chunk]:

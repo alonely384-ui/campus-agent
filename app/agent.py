@@ -39,7 +39,7 @@ from app.config import settings
 from app.llm import get_client
 from app.logging_config import get_logger
 from app.papers import find_paper_by_title, paper_meta
-from app.rag.pipeline import page_text, retrieve_scored
+from app.rag.pipeline import _looks_like_citation, page_text, retrieve_scored
 from app.tools.registry import get_tool, list_tools, tool_schemas
 
 logger = get_logger(__name__)
@@ -63,6 +63,8 @@ SYSTEM_PROMPT = """你是「科研小助手」，帮用户阅读、检索和对�
    表格每个单元格末尾标 [来源: 文件名 第N页]；表后用【结论】写差异结论。
 7. 遇到“一共多少篇 / 都有哪些论文 / 都是什么类型”这类全库问题：必须依据上下文里的【论文库清单】，
    不许用检索片段里出现过的论文数来推断；清单里类别为“未分类”的，要如实说“暂无分类元数据”。
+8. 标注了「参考文献列表片段」的内容，是某篇论文的参考文献条目（谁引用过谁），
+   不能当作那篇论文的正文依据；只能说明“这篇论文引用过它”。
 
 回答结构：默认按下面四段输出，段首保留这四个方括号标题。
 【结论】一句话直接回答用户的问题。
@@ -83,11 +85,11 @@ MULTI_MAX_EVIDENCE = 8
 # 为什么要单独一份：向量检索每次只回 top-k 片段，模型看不见"全库"，
 # 问"多少篇"时它只能数片段里出现过几篇（这就是之前答成 3–4 篇的原因）。
 CATALOG_PATH = Path(__file__).resolve().parent.parent / "data" / "catalog.json"
-CATALOG_MAX_CHARS = 1200
+CATALOG_MAX_CHARS = 3200
 _CATALOG_CACHE: dict[str, object] = {"mtime": None, "items": []}
 _CATALOG_QUESTION = re.compile(
     r"(多少篇|几篇|哪些论文|都有(?:哪些|什么)|所有论文|全部论文|论文库(?:里|中)?(?:一共)?有"
-    r"|什么类型|哪些类型|几个领域|哪些领域|多少种论文)"
+    r"|什么类型|哪些类型|几个领域|哪些领域|多少种论文|推荐|哪几篇|列一下|哪些是)"
 )
 
 
@@ -127,8 +129,17 @@ def _catalog_block(limit: int = CATALOG_MAX_CHARS) -> str:
         lines.append(f"其中已建立检索索引 {indexed_n} 篇（其余为扫描件或解析失败，暂不参与检索）。")
     lines.append("按年份：" + "、".join(f"{y}年 {n} 篇" for y, n in sorted(years.items())))
     lines.append("按类别：" + "、".join(f"{c} {n} 篇" for c, n in cats.most_common()))
-    titles = [str(i.get("title") or i.get("file") or "") for i in items]
-    lines.append("标题（前 10 篇）：" + "；".join(t for t in titles[:10] if t))
+    # 按类别列名单：只有"强化学习 3 篇"不够，模型得知道"是哪 3 篇"才能推荐/对比，
+    # 否则它会去全库检索，撞上别的论文参考文献里的综述条目（实测踩过）。
+    by_cat: dict[str, list[str]] = {}
+    for i in items:
+        cat = str(i.get("category") or "未分类")
+        short = (str(i.get("title") or "").strip() or str(i.get("file") or ""))[:36]
+        by_cat.setdefault(cat, []).append(f"{i.get('file')}（{short}）")
+    for cat, _n in cats.most_common():
+        names = by_cat.get(cat, [])
+        more = "…" if len(names) > 8 else ""
+        lines.append(f"【{cat}】{len(names)} 篇：" + "；".join(names[:8]) + more)
     return "\n".join(lines)[:limit]
 
 
@@ -234,6 +245,74 @@ _SIZE_WORD = re.compile(r"sizes?\b|parameters?\b|architectures?\b|hyper-paramete
 def _is_count_question(question: str) -> bool:
     """问数量的问题：需要去表格里逐行数，而不是找"最像的一段话"。"""
     return bool(_COUNT_QUESTION.search(question))
+
+
+# "对比三篇"这类问题：用户没在下拉里勾选论文时，也要能自动选出几篇，
+# 否则会退化成全库检索，命中别人论文参考文献里的条目（实测截图里就是这个症状）。
+_COMPARE_QUESTION = re.compile(r"对比|比较|区别|差异|异同|不同之处|vs\.?\s|versus", re.IGNORECASE)
+_CN_NUM = {"一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8}
+
+# 论文标题里通常不写缩写（"Proximal Policy Optimization" 没有 "PPO"），
+# 用户却习惯说缩写。不展开的话"对比 PPO 和 DPO"匹配不到任何标题 → 退化全库检索。
+_TERM_ALIASES = {
+    "ppo": "proximal policy optimization",
+    "dpo": "direct preference optimization",
+    "grpo": "group relative policy optimization",
+    "rlhf": "human feedback",
+    "lora": "low-rank adaptation",
+    "vit": "vision transformer",
+    "clip": "transferable visual",
+    "rag": "retrieval augmented",
+    "instructgpt": "training language models to follow instructions",
+    "gpt3": "few-shot learners",
+}
+
+
+def _wants_compare(question: str) -> bool:
+    return bool(_COMPARE_QUESTION.search(question))
+
+
+def _plan_multi_sources(question: str, default_n: int = 3) -> list[str]:
+    """从清单里挑出"该对比哪几篇"：优先按问题里点名的类别，其次按英文术语匹配标题。
+
+    只返回已建索引的论文（扫描件没有正文，选进去也检索不到东西）。
+    """
+    items = [i for i in load_catalog() if i.get("indexed")]
+    if not items:
+        return []
+    m = re.search(r"([一二两三四五六七八]|\d+)\s*篇", question)
+    n = default_n
+    if m:
+        tok = m.group(1)
+        n = _CN_NUM.get(tok) or (int(tok) if tok.isdigit() else default_n)
+    n = max(2, min(n, MULTI_MAX_EVIDENCE))
+
+    pool = items
+    matched = False
+    for cat in {str(i.get("category") or "") for i in items}:
+        if cat and cat != "未分类" and cat in question:
+            pool = [i for i in items if str(i.get("category") or "") == cat]
+            matched = True
+            break
+    if not matched:
+        terms = [t.lower() for t in key_terms(question) if len(t) >= 3]
+        # 缩写展开：PPO → proximal policy optimization，否则标题匹配不到
+        for t in list(terms):
+            alias = _TERM_ALIASES.get(t)
+            if alias:
+                terms.append(alias)
+        if terms:
+            hit = [
+                i for i in pool
+                if any(t in (str(i.get("title") or "") + str(i.get("file") or "")).lower() for t in terms)
+            ]
+            if hit:
+                pool = hit
+                matched = True
+    if not matched:
+        # 没说类别、也没点名论文：不瞎选，交给模型提示用户去勾选下拉框
+        return []
+    return [str(i.get("file")) for i in pool[:n] if i.get("file")]
 
 
 def _table_pages(source: str, question: str, max_pages: int = 40, top_n: int = 3) -> list[tuple[int, int]]:
@@ -370,6 +449,11 @@ async def _rag_context_with_evidence(
     source 传单篇时只搜那一篇；sources 传多篇时每篇各取 3 块，合并去重后最多 8 条。
     """
     picked = [s for s in (sources or []) if s]
+    if not picked and not source and _wants_compare(question):
+        auto = _plan_multi_sources(question)
+        if len(auto) >= 2:
+            picked = auto
+            logger.info("对比类问题自动锁定 %d 篇：%s", len(picked), picked)
     multi = bool(picked) and not source
     try:
         # 中文问题先换成英文检索词（库是英文论文），否则字面/向量都对不上
@@ -443,6 +527,11 @@ async def _rag_context_with_evidence(
             f"（本次检索覆盖 {len({c.source for c in chunks})} 篇论文，属于多篇对比："
             "请先给 Markdown 对比表，再写【结论】。）"
         )
+    elif _wants_compare(question):
+        lines.append(
+            "（用户要求对比，但没有勾选具体论文：如果无法从清单判断要对比哪几篇，"
+            "请在【下一步】提示用户勾选下拉框，或说出论文类别。）"
+        )
 
     # 结构化元数据：把"标题/作者列表"直接放进上下文。
     # 为什么需要：像"第六作者是谁"这种问题，原文里没有 author/sixth 字样，
@@ -459,7 +548,13 @@ async def _rag_context_with_evidence(
 
     for c in chunks:
         where = f"{c.source} 第{c.page}页" if c.page is not None else c.source
-        lines.append(f"\n【{where}】\n{c.text}")
+        # 参考文献片段要显式标出来：模型很容易把它当成"这篇论文写了这些内容"
+        marker = (
+            "【参考文献列表片段：说明「某论文引用过它」，不能当作该论文正文依据】\n"
+            if _looks_like_citation(c.text)
+            else ""
+        )
+        lines.append(f"\n【{where}】\n{marker}{c.text}")
     # 数值类问题：答案常在表格里，切块后可能只剩一个孤零零的数字
     # （例如 "Transformer (big) 28.4 41.8"），所以把命中页整页文本再补一份给模型。
     if _needs_page_text(question):
