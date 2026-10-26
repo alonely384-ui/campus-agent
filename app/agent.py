@@ -39,7 +39,7 @@ from app.cards import get_card, render_card
 from app.config import settings
 from app.llm import get_client
 from app.logging_config import get_logger
-from app.papers import find_paper_by_title, paper_meta
+from app.papers import find_paper_by_title, load_structures, paper_meta
 from app.rag.pipeline import _looks_like_citation, page_text, retrieve_scored
 from app.tools.registry import get_tool, list_tools, tool_schemas
 
@@ -295,6 +295,10 @@ def _plan_multi_sources(question: str, default_n: int = 3) -> list[str]:
     items = [i for i in load_catalog() if i.get("indexed")]
     if not items:
         return []
+    # 问题里直接点了文件名的（"对比 A.pdf 和 B.pdf"）：优先按点名走，别去猜类别
+    named = _named_sources(question, limit=max(2, MULTI_MAX_EVIDENCE))
+    if len(named) >= 2:
+        return named
     m = re.search(r"([一二两三四五六七八]|\d+)\s*篇", question)
     n = default_n
     if m:
@@ -310,7 +314,7 @@ def _plan_multi_sources(question: str, default_n: int = 3) -> list[str]:
             matched = True
             break
     if not matched:
-        terms = [t.lower() for t in key_terms(question) if len(t) >= 3]
+        terms = [t.lower() for t in key_terms(question) if len(t) >= 3 and t.lower() != "pdf"]
         # 缩写展开：PPO → proximal policy optimization，否则标题匹配不到
         for t in list(terms):
             alias = _TERM_ALIASES.get(t)
@@ -319,7 +323,7 @@ def _plan_multi_sources(question: str, default_n: int = 3) -> list[str]:
         if terms:
             hit = [
                 i for i in pool
-                if any(t in (str(i.get("title") or "") + str(i.get("file") or "")).lower() for t in terms)
+                if any(t in str(i.get("title") or "").lower() for t in terms)
             ]
             if hit:
                 pool = hit
@@ -383,6 +387,31 @@ def _named_sources(question: str, limit: int = 3) -> list[str]:
 
 _ORDINAL = re.compile(r"第\s*([一二三四五六七八九十]|\d{1,2})\s*篇")
 _PLURAL_DEIXIS = re.compile(r"这几篇|这三篇|这五篇|上述|上面|前面|以上")
+_SECTION_REF = re.compile(
+    r"第\s*(\d{1,2}|[一二三四五六七八九十])\s*(?:节|章|部分)|section\s*(\d{1,2})",
+    re.IGNORECASE,
+)
+
+
+def _section_page(source: str, question: str) -> tuple[int, str] | None:
+    """问题里说"第 3 节"时，按 structures.json 的章节表定位到该节所在页。
+
+    为什么需要：章节号是版式信息，检索按字面/向量都找不到（"第 3 节"里没有论文原词），
+    所以直接查结构表，把那一页正文补进上下文。
+    """
+    m = _SECTION_REF.search(question)
+    if not m:
+        return None
+    raw = m.group(1) or m.group(2) or ""
+    num = _second(raw)
+    if not num:
+        return None
+    info = load_structures().get(source) or {}
+    for sec in info.get("sections") or []:
+        if str(sec.get("number") or "") == str(num):
+            page = int(sec.get("page") or 0) + 1  # 结构里是 0 基，PDF 页码从 1 起
+            return page, str(sec.get("title") or "")
+    return None
 
 
 def _history_files(history: list[dict] | None) -> list[str]:
@@ -771,6 +800,31 @@ async def _rag_context_with_evidence(
                 lines.append(
                     f"\n（数量问题：候选表格页 {label}。先判断哪一页的表格在回答这个问题，"
                     "再把符合条件的行逐行列出来，最后给总数，并说明数的是哪一列/哪一类。）"
+                )
+
+    # 章节类问题（"第 3 节讲了什么"）：按章节结构直接补那一节所在的整页正文。
+    if not multi and source:
+        sec = _section_page(source, question)
+        if sec:
+            page, title = sec
+            full = page_text(source, page)
+            if full:
+                lines.append(
+                    f"\n【{source} 第{page}页（第 {title} 节开头，来自章节结构）】\n"
+                    f"{_numeric_excerpt(full, limit=1800)}"
+                )
+                evidence.append(
+                    Evidence(
+                        rank=len(evidence) + 1,
+                        source=source,
+                        page=page,
+                        score=0.0,
+                        channels=["section"],
+                        text=full[:160],
+                    )
+                )
+                lines.append(
+                    "（用户问的是该章节内容：以上是该节所在页正文，据此回答并标注 [来源: 文件名 第N页]。）"
                 )
 
     lines.append("\n如果以上片段没有能回答问题的内容，直接回答：论文库中没有找到相关信息。")
