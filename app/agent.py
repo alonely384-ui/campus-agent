@@ -581,6 +581,7 @@ async def _rag_context_with_evidence(
             picked = auto
             logger.info("对比类问题自动锁定 %d 篇：%s", len(picked), picked)
     multi = bool(picked) and not source
+    ref_note = ""
     try:
         # 中文问题先换成英文检索词（库是英文论文），否则字面/向量都对不上
         query = await _search_query(question)
@@ -649,6 +650,8 @@ async def _rag_context_with_evidence(
     if _EXPLAIN_QUESTION.search(question):
         targets = picked if multi else [source] if source else []
         category_only: list[str] = []
+        hist_files = _history_files(history)
+        ref_note = ""
         if not targets:
             # 问题点名了具体论文（"总结 1707.06347v2.pdf"）：按文件名/标题片段锁篇
             targets = _named_sources(question)
@@ -656,16 +659,26 @@ async def _rag_context_with_evidence(
             # 问题点名了类别（"强化学习是哪三篇，他们的主旨是？"）：按类别元数据取篇目
             category_only = _category_sources(question)
             targets = category_only
-        if not targets:
+        if not targets and hist_files:
             # 指代上一轮列过的论文（"这三篇中第一篇的主旨"）：从 history 里把篇名捞出来
-            hist_files = _history_files(history)
-            if hist_files:
-                m = _ORDINAL.search(question)
-                idx = _second(m.group(1)) if m else None
-                if idx and 1 <= idx <= len(hist_files):
-                    targets = [hist_files[idx - 1]]
-                elif _PLURAL_DEIXIS.search(question):
-                    targets = hist_files[:5]
+            m = _ORDINAL.search(question)
+            idx = _second(m.group(1)) if m else None
+            if idx and 1 <= idx <= len(hist_files):
+                targets = [hist_files[idx - 1]]
+                ref_note = (
+                    f"\n【对话上下文｜第{idx}篇】用户上一轮列出的论文依次为："
+                    + "、".join(hist_files[:8])
+                    + f"。用户说的「第{idx}篇」就是「{hist_files[idx - 1]}」，请直接按它作答，"
+                    "不要因为篇数说法不符而拒绝或反问。"
+                )
+            elif _PLURAL_DEIXIS.search(question):
+                targets = hist_files
+                ref_note = (
+                    "\n【对话上下文】用户上一轮列出的论文依次为："
+                    + "、".join(hist_files[:8])
+                    + "。用户说「这几篇」即指这些篇目；篇数说法与实际不符时按实际列表理解，"
+                    "不要因此拒绝或反问。"
+                )
         if not targets and _DEICTIC.search(question):
             # "这篇/它"指代时，才允许用"唯一检索到的论文"兜底；否则会把 PPO 问题锁到别的论文
             uniq = {c.source for c in (chunk for chunk, _s, _c in scored)}
@@ -739,6 +752,8 @@ async def _rag_context_with_evidence(
     if card_blocks:
         lines.extend(card_blocks)
         lines.append("（精华卡用于回答主旨/研究问题/方法/贡献类问题；引用时标注 [来源: 文件名 第1页]。）")
+    if ref_note:
+        lines.append(ref_note)
 
     for c in chunks:
         where = f"{c.source} 第{c.page}页" if c.page is not None else c.source
