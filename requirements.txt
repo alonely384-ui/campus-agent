@@ -20,6 +20,7 @@ openai>=1.50                     # 通用 LLM 客户端（DeepSeek/通义等兼�
 # --- RAG ---
 chromadb>=0.5                    # 轻量向量库
 pypdf>=5.0                       # 解析 PDF
+pdfplumber>=0.11                 # 表格抽取（文本策略，见 app/structure.py）
 tiktoken>=0.8                    # 算 token 数（估算成本）
 
 # --- 数据库 / 缓存 ---
