@@ -1,4 +1,4 @@
-﻿"""演示前 30 秒体检：服务 / 页面 / 索引 / 模型 / Git。用法：python scripts/check_all.py"""
+"""演示前 30 秒体检：服务 / 页面 / 索引 / 模型 / Git。用法：python scripts/check_all.py"""
 
 from __future__ import annotations
 
@@ -33,11 +33,11 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         add("/health", False, f"{type(e).__name__}: {e}")
 
-    # 2. 页面
-    for path, key in (("/ui/", b"guide"), ("/ui/project-tour.html", b"project-tour")):
+    # 2. 页面（不只查 200，还查页面里是否真有关键标记）
+    for path, marker in (("/ui/", "科研小助手".encode()), ("/ui/project-tour.html", b"project-tour")):
         try:
             code, body = http("http://127.0.0.1:8000" + path, 20)
-            add(path, code == 200, f"{code} {len(body) // 1024}KB")
+            add(path, code == 200 and marker in body, f"{code} {len(body) // 1024}KB")
         except Exception as e:  # noqa: BLE001
             add(path, False, f"{type(e).__name__}: {e}")
 
