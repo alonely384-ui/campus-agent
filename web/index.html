@@ -142,12 +142,23 @@ function trimHistory() {
 history.forEach(m => addMsg(m.content, m.role === 'user' ? 'user' : 'bot'));
 
 // 论文多选：勾 0 篇 = 全库检索；勾 1 篇 = 单篇问答；勾 2 篇及以上 = 多篇对比
+// 选择存 localStorage：刷新/换页后不清空，避免"勾了但没发出去"
+const PICK_KEY = 'campus-agent-picks-v1';
+function savedPicks() {
+  try { return JSON.parse(localStorage.getItem(PICK_KEY) || '[]'); } catch { return []; }
+}
+function persistPicks() {
+  const picked = selectedPapers();
+  try { localStorage.setItem(PICK_KEY, JSON.stringify(picked)); } catch { /* 隐私模式忽略 */ }
+}
+
 function selectedPapers() {
   return Array.from(pickListEl.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
 }
 
 function refreshPickSummary() {
   const picked = selectedPapers();
+  persistPicks();
   if (picked.length === 0) pickSummaryEl.textContent = '全部论文';
   else if (picked.length === 1) pickSummaryEl.textContent = '单篇：' + picked[0];
   else pickSummaryEl.textContent = `已选 ${picked.length} 篇（对比）`;
@@ -156,11 +167,13 @@ function refreshPickSummary() {
 fetch('/papers/files')
   .then(r => r.json())
   .then(d => {
+    const keep = new Set(savedPicks());
     (d.files || []).forEach(f => {
       const label = document.createElement('label');
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.value = f;
+      box.checked = keep.has(f);
       box.addEventListener('change', refreshPickSummary);
       const name = document.createElement('span');
       name.textContent = f;
@@ -168,6 +181,7 @@ fetch('/papers/files')
       label.appendChild(name);
       pickListEl.appendChild(label);
     });
+    refreshPickSummary();
   })
   .catch(() => {});
 
