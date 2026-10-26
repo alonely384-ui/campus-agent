@@ -54,4 +54,6 @@ def test_broken_pdf_returns_empty_not_crash(tmp_path):
     bad = tmp_path / "bad.pdf"
     bad.write_bytes(b"not a pdf at all")
     s = parse_structure(str(bad))
-    assert s == {"title": "", "authors": [], "sections": [], "pages": 0}
+    assert s["title"] == "" and s["authors"] == [] and s["sections"] == [] and s["pages"] == 0
+    assert s["references"] == {"page": None, "count": 0, "first": "", "last": ""}
+    assert s["tables"] == [] and s["figures"] == [] and s["formulas"] == []
