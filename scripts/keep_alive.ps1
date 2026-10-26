@@ -40,9 +40,10 @@ while ($true) {
 
     if (-not (FastAlive)) {
         Log "cloudflared down -> restart"
+        Remove-Item $urlFile -ErrorAction SilentlyContinue
         Remove-Item Env:http_proxy,Env:https_proxy,Env:no_proxy,Env:all_proxy -ErrorAction SilentlyContinue
         Start-Process -FilePath $cloudflared `
-            -ArgumentList "tunnel","--url","http://127.0.0.1:8000","--no-autoupdate","--protocol","http2" `
+            -ArgumentList "tunnel","--url","http://127.0.0.1:8000","--no-autoupdate","--protocol","http2","--edge-ip-version","4" `
             -WorkingDirectory $base -WindowStyle Hidden `
             -RedirectStandardOutput "$base\logs\cloudflared.log" -RedirectStandardError "$base\logs\cloudflared.err.log"
         Start-Sleep -Seconds 12
