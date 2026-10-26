@@ -153,6 +153,17 @@
 - 证据：`92 passed in 3.36s`；`ruff check app tests scripts` → All checks passed。
 - 坑：清单类问题的 `catalog` 证据会插到第 0 条，断言要按来源找而不是看 `evidence[0]`。
 
+## 2026-10-27（周二·晚）论文精华卡：摘要/研究问题/方法/贡献一次抽好，摘要类问题不再靠检索碰运气
+
+- 病理：问「三篇的主旨/研究问题」失败——摘要页和参考文献列表里都有 `reinforcement learning` 这类词，检索器分不清，召回的是别的论文 References。
+- 做法（模板化，加论文只需重跑脚本）：
+  - `app/cards.py`：固定字段 `title/abstract/problem/method/contributions/results/limitations/keywords`，`load_cards/get_card/render_card`，mtime 缓存，先写临时文件再替换。
+  - `scripts/build_cards.py`：从第 1 页切 `Abstract`（到 Introduction/Keywords 为止，切不到退化为前 1200 字），DeepSeek `temperature=0` + JSON 模式生成卡片；失败或扫描件走规则兜底（`generated_by=rule`，写明"扫描件无文本层"），不静默丢篇。支持 `--rebuild/--only/--limit`，默认增量。
+  - `app/agent.py`：`_EXPLAIN_QUESTION` 命中且能确定篇目时，注入「精华卡（来自论文第 1 页）」并加 `channels=["card"]` 证据；SYSTEM_PROMPT 规则 9 约束"优先依据精华卡、引用标第 1 页、摘要未提及就如实说"。
+- 结果：40 篇全部有卡片（39 篇 LLM 生成、1 篇扫描件规则卡片）；全量测试 `97 passed`，ruff 全绿。
+- 端到端：「对比 PPO、DPO、DeepSeek-R1 三篇的研究问题和方法」→ 证据前三条都是 `page=1, channels=['card']`，回答出三列对比表，每格带 `[来源: 文件名 第1页]`。
+- 以后加论文：PDF 丢进 `data/papers/` → `python scripts/build_cards.py`（增量，只跑新篇）→ 问答侧自动生效。
+
 ## 下一步
 
 1. 官方 5 问端到端验收（第 6 作者 / Adam β1β2 / GPU 数量型号 / BLEU 对比 / LayerNorm 引用），记录页码与引用格式
