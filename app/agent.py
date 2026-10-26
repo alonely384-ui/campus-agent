@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from app.cards import get_card, render_card
 from app.config import settings
 from app.llm import get_client
 from app.logging_config import get_logger
@@ -65,6 +66,8 @@ SYSTEM_PROMPT = """你是「科研小助手」，帮用户阅读、检索和对�
    不许用检索片段里出现过的论文数来推断；清单里类别为“未分类”的，要如实说“暂无分类元数据”。
 8. 标注了「参考文献列表片段」的内容，是某篇论文的参考文献条目（谁引用过谁），
    不能当作那篇论文的正文依据；只能说明“这篇论文引用过它”。
+9. 上下文里出现「精华卡」时，问主旨/摘要/研究问题/方法/贡献/局限，优先依据精华卡，
+   引用同样标 [来源: 文件名 第1页]；精华卡里写“摘要未提及”或“无文本层”的，如实转述，不许补全。
 
 回答结构：默认按下面四段输出，段首保留这四个方括号标题。
 【结论】一句话直接回答用户的问题。
@@ -250,6 +253,12 @@ def _is_count_question(question: str) -> bool:
 # "对比三篇"这类问题：用户没在下拉里勾选论文时，也要能自动选出几篇，
 # 否则会退化成全库检索，命中别人论文参考文献里的条目（实测截图里就是这个症状）。
 _COMPARE_QUESTION = re.compile(r"对比|比较|区别|差异|异同|不同之处|vs\.?\s|versus", re.IGNORECASE)
+# "主旨/摘要/研究问题/贡献"这类问题，答案在第 1 页，不该靠检索碰运气（见 app/cards.py 说明）
+_EXPLAIN_QUESTION = re.compile(
+    r"主旨|主题|摘要|概述|讲了什么|讲什么|主要内容|研究问题|研究目标|贡献|方法|结论|局限|总结"
+    r"|summarize|summary|abstract|topic|problem|contribution|method",
+    re.IGNORECASE,
+)
 _CN_NUM = {"一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8}
 
 # 论文标题里通常不写缩写（"Proximal Policy Optimization" 没有 "PPO"），
@@ -513,10 +522,38 @@ async def _rag_context_with_evidence(
         )
         for rank, (chunk, score, channels) in enumerate(scored, 1)
     ]
+    # 精华卡：摘要级问题（主旨/研究问题/方法/贡献）走预计算卡片，不靠检索碰运气。
+    # 只在问题明确涉及摘要语义、且能确定"是哪几篇"时注入，避免污染普通内容问答。
+    card_evidences: list[Evidence] = []
+    card_blocks: list[str] = []
+    if _EXPLAIN_QUESTION.search(question):
+        targets = picked if multi else [source] if source else []
+        if not targets:
+            uniq = {c.source for c in (chunk for chunk, _s, _c in scored)}
+            if len(uniq) == 1:
+                targets = list(uniq)
+        for one in targets:
+            card = get_card(one)
+            if not card:
+                continue
+            text = render_card(card)
+            card_blocks.append(f"【{one} 精华卡（来自论文第 1 页）】\n{text}")
+            card_evidences.append(
+                Evidence(
+                    rank=1,
+                    source=one,
+                    page=1,
+                    score=0.0,
+                    channels=["card"],
+                    text=text[:160],
+                )
+            )
+    if card_evidences:
+        evidence = card_evidences + evidence
     if catalog_evidence:
         evidence.insert(0, catalog_evidence)
-        for i, ev in enumerate(evidence, 1):
-            ev.rank = i
+    for i, ev in enumerate(evidence, 1):
+        ev.rank = i
     chunks = [chunk for chunk, _score, _channels in scored]
 
     lines = ["以下是从论文库检索到的原文片段（回答只能依据它们，并标注来源）："]
@@ -545,6 +582,10 @@ async def _rag_context_with_evidence(
             f"作者（共 {len(meta['authors'])} 人，按原顺序）：{authors}"
         )
         lines.append("（标题与作者来自论文第 1 页，引用它们时同样标注 [来源: 文件名 第1页]。）")
+
+    if card_blocks:
+        lines.extend(card_blocks)
+        lines.append("（精华卡用于回答主旨/研究问题/方法/贡献类问题；引用时标注 [来源: 文件名 第1页]。）")
 
     for c in chunks:
         where = f"{c.source} 第{c.page}页" if c.page is not None else c.source
