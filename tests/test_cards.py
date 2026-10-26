@@ -72,6 +72,29 @@ async def _fake_query(question: str) -> str:
     return question
 
 
+def test_category_question_injects_cards(monkeypatch):
+    """「强化学习是哪三篇，他们的主旨是？」：按类别元数据取篇目，注 3 张卡。"""
+    catalog = [
+        {"file": "ppo.pdf", "title": "PPO", "category": "强化学习", "indexed": True},
+        {"file": "dpo.pdf", "title": "DPO", "category": "强化学习", "indexed": True},
+        {"file": "r1.pdf", "title": "DeepSeek-R1", "category": "强化学习", "indexed": True},
+        {"file": "bert.pdf", "title": "BERT", "category": "自然语言处理", "indexed": True},
+    ]
+    monkeypatch.setattr(agent_module, "load_catalog", lambda: catalog)
+    monkeypatch.setattr(agent_module, "_search_query", _fake_query)
+    monkeypatch.setattr(agent_module, "retrieve_scored", _fake_retrieve)
+    monkeypatch.setattr(agent_module, "get_card", lambda source: _sample_card())
+    monkeypatch.setattr(agent_module, "paper_meta", lambda source: None)
+    monkeypatch.setattr(agent_module, "find_paper_by_title", lambda question: None)
+
+    context, evidence = asyncio.run(
+        agent_module._rag_context_with_evidence("强化学习是哪三篇，他们的主旨是？")
+    )
+    cards = [ev for ev in evidence if ev.channels == ["card"]]
+    assert {ev.source for ev in cards} == {"ppo.pdf", "dpo.pdf", "r1.pdf"}
+    assert "精华卡" in context
+
+
 class _FakeChunk:
     def __init__(self, text: str, source: str, page: int) -> None:
         self.text, self.source, self.page = text, source, page

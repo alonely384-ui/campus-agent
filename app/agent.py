@@ -324,6 +324,20 @@ def _plan_multi_sources(question: str, default_n: int = 3) -> list[str]:
     return [str(i.get("file")) for i in pool[:n] if i.get("file")]
 
 
+def _category_sources(question: str, limit: int = 3) -> list[str]:
+    """问题里点名了类别（"强化学习是哪三篇"）时，直接返回该类别的篇目。
+
+    为什么单独抽一个：这类问题既是"清单类"又是"摘要类"，卡片注入的目标
+    不能靠检索结果猜（检索会命中别的论文的参考文献），只能按元数据取。
+    """
+    items = [i for i in load_catalog() if i.get("indexed")]
+    for cat in {str(i.get("category") or "") for i in items}:
+        if cat and cat != "未分类" and cat in question:
+            files = [str(i.get("file")) for i in items if str(i.get("category") or "") == cat]
+            return [f for f in files if f][:limit]
+    return []
+
+
 def _table_pages(source: str, question: str, max_pages: int = 40, top_n: int = 3) -> list[tuple[int, int]]:
     """在某一篇里找"最像答案表格"的页，按命中行数降序返回 [(页码, 行数)]。
 
@@ -528,10 +542,29 @@ async def _rag_context_with_evidence(
     card_blocks: list[str] = []
     if _EXPLAIN_QUESTION.search(question):
         targets = picked if multi else [source] if source else []
+        category_only: list[str] = []
+        if not targets:
+            # 点名了类别（"强化学习是哪三篇，他们的主旨是？"）：按类别元数据取篇目
+            category_only = _category_sources(question)
+            targets = category_only
         if not targets:
             uniq = {c.source for c in (chunk for chunk, _s, _c in scored)}
             if len(uniq) == 1:
                 targets = list(uniq)
+        if category_only:
+            # 先把"这类到底有哪几篇"写死给模型，否则它会拿检索片段里的其他论文凑数
+            meta = {str(i.get("file")): i for i in load_catalog()}
+            labels = []
+            for f in category_only:
+                info = meta.get(f) or {}
+                year = info.get("year")
+                title = str(info.get("title") or "").strip()
+                labels.append(f"{f}（{title}，{year}）" if title and year else f)
+            card_blocks.append(
+                "【类别论文清单（来自元数据，不是检索结果）】提问的类别共 "
+                f"{len(category_only)} 篇：" + "；".join(labels)
+                + "\n（只允许基于下面这些论文的精华卡回答；检索片段里其他论文不能算进这个类别。）"
+            )
         for one in targets:
             card = get_card(one)
             if not card:
