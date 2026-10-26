@@ -8,19 +8,21 @@ from app.rag import pipeline
 
 def test_catalog_block_lists_members_of_each_category():
     block = agent_module._catalog_block(limit=4000)
-    assert "【强化学习】3 篇" in block
-    assert "1707.06347v2.pdf" in block  # PPO：强化学习名单里必须有它
+    assert "【对齐与推理】5 篇" in block
+    assert "1707.06347v2.pdf" in block  # PPO：对齐与推理名单里必须有它
     assert "Proximal Policy" in block
 
 
 def test_plan_multi_sources_uses_category_and_count():
-    files = agent_module._plan_multi_sources("三篇对比，强化学习方向的论文主要内容和侧重")
+    files = agent_module._plan_multi_sources("三篇对比，对齐与推理方向的论文主要内容和侧重")
     assert len(files) == 3
-    assert all(f in files for f in ("1707.06347v2.pdf", "2305.18290v3.pdf", "2501.12948v2.pdf"))
+    assert "1707.06347v2.pdf" in files
+    catalog = {i["file"]: i["category"] for i in agent_module.load_catalog()}
+    assert all(catalog.get(f) == "对齐与推理" for f in files)
 
 
 def test_plan_multi_sources_respects_explicit_count():
-    files = agent_module._plan_multi_sources("对比两篇强化学习的论文")
+    files = agent_module._plan_multi_sources("对比两篇对齐与推理的论文")
     assert len(files) == 2
 
 
