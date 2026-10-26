@@ -118,6 +118,14 @@
 - 修复：`scripts/keep_alive.ps1` 改为同时扫 stdout/stderr、启动加 `--protocol http2`、失败时记录 stderr 尾巴；手动起隧道后公网 `/health` 200、页面 200（1398 KB），新地址写入 `_public/public-url.txt`。
 - 遗留：quick tunnel 地址不稳定，评审期要换学生机或命名隧道。
 
+## 2026-10-27（周二）网页版多轮记忆修复（前端）
+
+- 现象：连续追问时模型"失忆"，上一轮的建议接不上。
+- 根因（代码行）：后端早已支持——`app/main.py:75`/`:108` 把 `req.history` 传给 Agent，`app/agent.py:571-572`/`:668-669` 用 `messages.extend(history)` 拼进对话；但 `web/index.html` 每轮都发 `history: []`，等于把记忆这一半关掉了。
+- 修复（只改前端）：`web/index.html` 维护 `history`（最近 6 轮 / 单条截断 1000 字），每轮随请求发出，成功回答后入栈；存 `localStorage['campus-agent-history-v1']`，刷新恢复；新增「新对话」按钮清空。后端零改动。
+- 顺带修 `scripts/check_all.py`：页面检查由"只看 200"改成"200 + 关键标记存在"（`/ui/` 查 `科研小助手`，tour 页查 `project-tour`），此前 `key` 变量未使用被 ruff 报 B007。
+- 证据：`/ui/` 返回 15774 字节且含 `campus-agent-history-v1`/`history.slice()`/`newChat`；`node --check` 对抽出的 `<script>` 退出码 0；`81 passed in 3.62s`；`ruff check app tests scripts` → All checks passed。
+
 ## 下一步
 
 1. 官方 5 问端到端验收（第 6 作者 / Adam β1β2 / GPU 数量型号 / BLEU 对比 / LayerNorm 引用），记录页码与引用格式
