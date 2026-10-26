@@ -172,3 +172,10 @@
 2. 公网演示地址（隧道或云平台）+ 技术文档 PDF（≤30 页）+ 5–8 分钟视频
 3. 多篇对比问答、阅读页与引用图谱（P1/P2）
 4. 缴费：10/31 15:00 前必须完成（预指导门槛）
+
+## 2026-10-27（周二·上午）去重与类别容错
+
+- 删除重复论文 209_Emergent_Abilities_of_Larg.pdf（与 2206.07682v2.pdf 同为 Wei et al.《Emergent Abilities of LLM》，TMLR 2022）：emove_source 清掉 401 块，docs/dense 25995→25594；catalog/cards/structures 同步删，现共 39 篇（38 篇已建索引）。
+- 类别名容错：用户把「能力评测与规模」写成「能力测评与规模」，旧的精确匹配锁不到篇、卡片为 0；改为最长公共子串兜底（≥max(3, len/2)），	ests/test_category_match.py 3 例。
+- 章节定位：问「第 3 节」时按 structures.json 的章节表补该页正文（	ests/test_section.py 3 例）；指代上一轮论文时给显式上下文映射。
+- 验收：107 passed、ruff 全绿；e2e「共 39 篇（38 已索引）」「能力评测 3 篇」；提交 1380bc3、0d8be5、ce61ae1、db43b28 已 push。
