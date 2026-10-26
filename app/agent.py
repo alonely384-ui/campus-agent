@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -60,6 +61,8 @@ SYSTEM_PROMPT = """你是「科研小助手」，帮用户阅读、检索和对�
 5. 回答用简洁的中文；论文标题、作者名、公式、术语保留英文原文。
 6. 当参考资料来自两篇以上论文时：先给一张 Markdown 对比表（第一列是维度，后面每列一篇论文），
    表格每个单元格末尾标 [来源: 文件名 第N页]；表后用【结论】写差异结论。
+7. 遇到“一共多少篇 / 都有哪些论文 / 都是什么类型”这类全库问题：必须依据上下文里的【论文库清单】，
+   不许用检索片段里出现过的论文数来推断；清单里类别为“未分类”的，要如实说“暂无分类元数据”。
 
 回答结构：默认按下面四段输出，段首保留这四个方括号标题。
 【结论】一句话直接回答用户的问题。
@@ -75,6 +78,58 @@ RETRIEVE_TOP_K = 4
 # 多篇对比：每篇各取几块、合并后最多留几条（防止上下文塞爆、模型看花眼）
 PER_PAPER_TOP_K = 3
 MULTI_MAX_EVIDENCE = 8
+
+# 全库清单：由 scripts/build_catalog.py 生成，回答"一共多少篇/都有哪些"用。
+# 为什么要单独一份：向量检索每次只回 top-k 片段，模型看不见"全库"，
+# 问"多少篇"时它只能数片段里出现过几篇（这就是之前答成 3–4 篇的原因）。
+CATALOG_PATH = Path(__file__).resolve().parent.parent / "data" / "catalog.json"
+CATALOG_MAX_CHARS = 1200
+_CATALOG_CACHE: dict[str, object] = {"mtime": None, "items": []}
+_CATALOG_QUESTION = re.compile(
+    r"(多少篇|几篇|哪些论文|都有(?:哪些|什么)|所有论文|全部论文|论文库(?:里|中)?(?:一共)?有"
+    r"|什么类型|哪些类型|几个领域|哪些领域|多少种论文)"
+)
+
+
+def load_catalog() -> list[dict]:
+    """读论文清单（带 mtime 缓存：文件没变就不重复解析）。"""
+    try:
+        mtime = CATALOG_PATH.stat().st_mtime
+    except OSError:
+        return []
+    if _CATALOG_CACHE["mtime"] == mtime:
+        return _CATALOG_CACHE["items"]  # type: ignore[return-value]
+    try:
+        items = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        items = [i for i in items if isinstance(i, dict)]
+    except (OSError, json.JSONDecodeError):
+        logger.exception("论文清单读取失败，本次不注入全库清单")
+        items = []
+    _CATALOG_CACHE["mtime"] = mtime
+    _CATALOG_CACHE["items"] = items
+    return items
+
+
+def _is_catalog_question(question: str) -> bool:
+    return bool(_CATALOG_QUESTION.search(question or ""))
+
+
+def _catalog_block(limit: int = CATALOG_MAX_CHARS) -> str:
+    """把全库清单压成一小段文本（篇数 + 年份分布 + 类别分布 + 前几篇标题）。"""
+    items = load_catalog()
+    if not items:
+        return ""
+    years = Counter(str(i.get("year") or "未知") for i in items)
+    cats = Counter(str(i.get("category") or "未分类") for i in items)
+    lines = [f"【论文库清单】共 {len(items)} 篇（这是全库统计，不是检索片段）。"]
+    indexed_n = sum(1 for i in items if i.get("indexed"))
+    if indexed_n and indexed_n != len(items):
+        lines.append(f"其中已建立检索索引 {indexed_n} 篇（其余为扫描件或解析失败，暂不参与检索）。")
+    lines.append("按年份：" + "、".join(f"{y}年 {n} 篇" for y, n in sorted(years.items())))
+    lines.append("按类别：" + "、".join(f"{c} {n} 篇" for c, n in cats.most_common()))
+    titles = [str(i.get("title") or i.get("file") or "") for i in items]
+    lines.append("标题（前 10 篇）：" + "；".join(t for t in titles[:10] if t))
+    return "\n".join(lines)[:limit]
 
 
 def _merge_scored(groups: list[list]) -> list:
@@ -335,7 +390,32 @@ async def _rag_context_with_evidence(
         logger.exception("检索失败，本次对话不带参考资料")
         return "", []
 
+    # 全库问题（"一共多少篇/都有哪些"）不吃检索结果：直接注入清单，
+    # 否则模型只能数检索片段里出现过几篇（见 docs/RESEARCH-MEMORY-COUNT.md 问题 A）。
+    catalog_hit = not multi and not source and _is_catalog_question(question)
+    catalog_block = _catalog_block() if catalog_hit else ""
+    catalog_evidence = (
+        Evidence(
+            rank=1,
+            source="论文库清单",
+            page=None,
+            score=0.0,
+            channels=["catalog"],
+            text=catalog_block[:160],
+        )
+        if catalog_block
+        else None
+    )
+
     if not scored:
+        if catalog_block:
+            context = "\n".join(
+                [
+                    catalog_block,
+                    "\n（这是全库清单。如果清单不足以回答，直接说资料不足，不要编造。）",
+                ]
+            )
+            return context, [catalog_evidence] if catalog_evidence else []
         return "", []
 
     evidence = [
@@ -349,9 +429,15 @@ async def _rag_context_with_evidence(
         )
         for rank, (chunk, score, channels) in enumerate(scored, 1)
     ]
+    if catalog_evidence:
+        evidence.insert(0, catalog_evidence)
+        for i, ev in enumerate(evidence, 1):
+            ev.rank = i
     chunks = [chunk for chunk, _score, _channels in scored]
 
     lines = ["以下是从论文库检索到的原文片段（回答只能依据它们，并标注来源）："]
+    if catalog_block:
+        lines.append(catalog_block)
     if multi:
         lines.append(
             f"（本次检索覆盖 {len({c.source for c in chunks})} 篇论文，属于多篇对比："

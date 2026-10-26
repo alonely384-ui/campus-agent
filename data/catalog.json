@@ -1,0 +1,402 @@
+[
+  {
+    "file": "1607.06450v1.pdf",
+    "title": "Layer Normalization",
+    "authors_count": 3,
+    "pages": 14,
+    "arxiv_id": "1607.06450",
+    "year": 2016,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "1706.03762v1.pdf",
+    "title": "Attention Is All You Need",
+    "authors_count": 7,
+    "pages": 15,
+    "arxiv_id": "1706.03762",
+    "year": 2017,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "1706.03762v1_img.pdf",
+    "title": "1706.03762v1_img",
+    "authors_count": 0,
+    "pages": 15,
+    "arxiv_id": "1706.03762",
+    "year": 2017,
+    "category": "未分类",
+    "indexed": false
+  },
+  {
+    "file": "1706.03762v7.pdf",
+    "title": "Attention Is All You Need",
+    "authors_count": 7,
+    "pages": 15,
+    "arxiv_id": "1706.03762",
+    "year": 2017,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "1707.06347v2.pdf",
+    "title": "Proximal Policy Optimization Algorithms",
+    "authors_count": 5,
+    "pages": 12,
+    "arxiv_id": "1707.06347",
+    "year": 2017,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "1910.02054v3.pdf",
+    "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
+    "authors_count": 4,
+    "pages": 24,
+    "arxiv_id": "1910.02054",
+    "year": 2019,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "1910.10683v4.pdf",
+    "title": "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer",
+    "authors_count": 10,
+    "pages": 67,
+    "arxiv_id": "1910.10683",
+    "year": 2019,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2001.08361v1.pdf",
+    "title": "Scaling Laws for Neural Language Models",
+    "authors_count": 10,
+    "pages": 30,
+    "arxiv_id": "2001.08361",
+    "year": 2020,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2002.04745v2.pdf",
+    "title": "On Layer Normalization in the Transformer Architecture",
+    "authors_count": 0,
+    "pages": 17,
+    "arxiv_id": "2002.04745",
+    "year": 2020,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2005.14165v4.pdf",
+    "title": "Language Models are Few-Shot Learners",
+    "authors_count": 31,
+    "pages": 75,
+    "arxiv_id": "2005.14165",
+    "year": 2020,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2010.11929v2.pdf",
+    "title": "AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE",
+    "authors_count": 12,
+    "pages": 22,
+    "arxiv_id": "2010.11929",
+    "year": 2020,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "209_Emergent_Abilities_of_Larg.pdf",
+    "title": "Emergent Abilities of Large Language Models",
+    "authors_count": 0,
+    "pages": 30,
+    "arxiv_id": "",
+    "year": null,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2101.03961v3.pdf",
+    "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+    "authors_count": 3,
+    "pages": 40,
+    "arxiv_id": "2101.03961",
+    "year": 2021,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2103.00020v1.pdf",
+    "title": "Learning Transferable Visual Models From Natural Language Supervision",
+    "authors_count": 0,
+    "pages": 48,
+    "arxiv_id": "2103.00020",
+    "year": 2021,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2106.09685v2.pdf",
+    "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+    "authors_count": 9,
+    "pages": 26,
+    "arxiv_id": "2106.09685",
+    "year": 2021,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2107.03374v2.pdf",
+    "title": "Evaluating Large Language Models Trained on Code",
+    "authors_count": 0,
+    "pages": 35,
+    "arxiv_id": "2107.03374",
+    "year": 2021,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2201.11903v6.pdf",
+    "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+    "authors_count": 9,
+    "pages": 43,
+    "arxiv_id": "2201.11903",
+    "year": 2022,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2203.02155v1.pdf",
+    "title": "Training language models to follow instructions with human feedback",
+    "authors_count": 20,
+    "pages": 68,
+    "arxiv_id": "2203.02155",
+    "year": 2022,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2205.14135v2.pdf",
+    "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
+    "authors_count": 4,
+    "pages": 34,
+    "arxiv_id": "2205.14135",
+    "year": 2022,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2206.07682v2.pdf",
+    "title": "Emergent Abilities of Large Language Models",
+    "authors_count": 0,
+    "pages": 30,
+    "arxiv_id": "2206.07682",
+    "year": 2022,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2210.02414v2.pdf",
+    "title": "GLM-130B: AN OPEN BILINGUAL PRE-TRAINED",
+    "authors_count": 0,
+    "pages": 56,
+    "arxiv_id": "2210.02414",
+    "year": 2022,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2211.05100v4.pdf",
+    "title": "BLOOM: A 176B-Parameter Open-Access Multilingual Language Model",
+    "authors_count": 4,
+    "pages": 73,
+    "arxiv_id": "2211.05100",
+    "year": 2022,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2212.04356v1.pdf",
+    "title": "Robust Speech Recognition via Large-Scale Weak Supervision",
+    "authors_count": 0,
+    "pages": 28,
+    "arxiv_id": "2212.04356",
+    "year": 2022,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2303.08774v6.pdf",
+    "title": "GPT-4 Technical Report",
+    "authors_count": 0,
+    "pages": 100,
+    "arxiv_id": "2303.08774",
+    "year": 2023,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2304.08485v2.pdf",
+    "title": "Visual Instruction Tuning",
+    "authors_count": 0,
+    "pages": 25,
+    "arxiv_id": "2304.08485",
+    "year": 2023,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2305.13048v2.pdf",
+    "title": "RWKV: Reinventing RNNs for the Transformer Era",
+    "authors_count": 0,
+    "pages": 30,
+    "arxiv_id": "2305.13048",
+    "year": 2023,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2305.14314v1.pdf",
+    "title": "QLORA: Efficient Finetuning of Quantized LLMs",
+    "authors_count": 4,
+    "pages": 26,
+    "arxiv_id": "2305.14314",
+    "year": 2023,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2305.18290v3.pdf",
+    "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+    "authors_count": 6,
+    "pages": 27,
+    "arxiv_id": "2305.18290",
+    "year": 2023,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2307.09288v2.pdf",
+    "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+    "authors_count": 5,
+    "pages": 77,
+    "arxiv_id": "2307.09288",
+    "year": 2023,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2310.06825v1.pdf",
+    "title": "Mistral 7B",
+    "authors_count": 15,
+    "pages": 9,
+    "arxiv_id": "2310.06825",
+    "year": 2023,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2406.14491v2.pdf",
+    "title": "Instruction Pre-Training: Language Models are Supervised Multitask Learners",
+    "authors_count": 2,
+    "pages": 22,
+    "arxiv_id": "2406.14491",
+    "year": 2024,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2407.21783v3.pdf",
+    "title": "The Llama 3 Herd of Models",
+    "authors_count": 0,
+    "pages": 92,
+    "arxiv_id": "2407.21783",
+    "year": 2024,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2412.15115v2.pdf",
+    "title": "Qwen2.5 Technical Report",
+    "authors_count": 1,
+    "pages": 26,
+    "arxiv_id": "2412.15115",
+    "year": 2024,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2412.19437v1.pdf",
+    "title": "DeepSeek-V3 Technical Report",
+    "authors_count": 0,
+    "pages": 53,
+    "arxiv_id": "2412.19437",
+    "year": 2024,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "2501.12948v2.pdf",
+    "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+    "authors_count": 1,
+    "pages": 86,
+    "arxiv_id": "2501.12948",
+    "year": 2025,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "333078981_693988129081760_4712707815225756708_n.pdf",
+    "title": "LLaMA: Open and Efficient Foundation Language Models",
+    "authors_count": 13,
+    "pages": 27,
+    "arxiv_id": "",
+    "year": null,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "bdfaa68d8984.pdf",
+    "title": "Attention Is All You Need",
+    "authors_count": 7,
+    "pages": 15,
+    "arxiv_id": "",
+    "year": null,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "language_understanding_paper.pdf",
+    "title": "Improving Language Understanding by Generative Pre-Training",
+    "authors_count": 4,
+    "pages": 12,
+    "arxiv_id": "",
+    "year": null,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "N19-1423.pdf",
+    "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    "authors_count": 5,
+    "pages": 16,
+    "arxiv_id": "",
+    "year": null,
+    "category": "未分类",
+    "indexed": true
+  },
+  {
+    "file": "UnderstandingDeepLearning_02_09_26_C.pdf",
+    "title": "Understanding Deep Learning",
+    "authors_count": 1,
+    "pages": 541,
+    "arxiv_id": "",
+    "year": null,
+    "category": "未分类",
+    "indexed": true
+  }
+]

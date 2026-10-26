@@ -126,6 +126,17 @@
 - 顺带修 `scripts/check_all.py`：页面检查由"只看 200"改成"200 + 关键标记存在"（`/ui/` 查 `科研小助手`，tour 页查 `project-tour`），此前 `key` 变量未使用被 ruff 报 B007。
 - 证据：`/ui/` 返回 15774 字节且含 `campus-agent-history-v1`/`history.slice()`/`newChat`；`node --check` 对抽出的 `<script>` 退出码 0；`81 passed in 3.62s`；`ruff check app tests scripts` → All checks passed。
 
+## 2026-10-27（周二）全库清单：让"一共有多少篇"答得对（A3）
+
+- 现象（复现原文）：问「这里一共有多少篇论文？」，答「检索片段中一共出现 4 篇论文：LLaMA、2001.08361v1、2005.14165v4、333078981_…_n.pdf」——把 top-4 片段当成了全库。
+- 根因：检索只回 top-k 片段，模型没有"全库视角"；`data/papers` 有 40 个 PDF，但任何时候进上下文的只有 4–8 个片段。
+- 修复：
+  - 新增 `scripts/build_catalog.py` → 生成 `data/catalog.json`（40 条：文件名/标题/页数/arXiv 编号/年份/类别/是否已索引），标题来自 `app/structure.py` 的版式解析，是否已索引由 `data/chroma/bm25.json` 的来源集合判定。
+  - `app/agent.py` 新增 `load_catalog()`（按 mtime 缓存）、`_is_catalog_question()`、`_catalog_block()`（篇数 + 年份分布 + 类别分布 + 前 10 个标题，≤1200 字）；全库类问题注入清单，并追加一条 `channels=["catalog"]` 的证据；SYSTEM_PROMPT 加规则 7（必须依据清单，不许用片段数推断；"未分类"要如实说）。
+  - 检索为空时也能回答篇数（不再直接返回空上下文）。
+- 证据：`85 passed in 3.40s`；`ruff check app tests scripts` → All checks passed；e2e「这里一共有多少篇论文？」→「共 40 篇（其中 39 篇已建立检索索引…）」，证据首条 `channels=['catalog']`；「这些论文都是什么类型？」→ 如实答"40 篇全部未分类，暂无分类元数据"；38 题回归 **R@1 30/38、R@3 35/38、R@5 36/38，与改前一致（无退化）**。
+- 下一步（B1+B2）：用 arXiv API 给 34 篇补 `primary_category`，剩下 6 篇（非 arXiv 文件名）用 LLM 兜底打标签。
+
 ## 下一步
 
 1. 官方 5 问端到端验收（第 6 作者 / Adam β1β2 / GPU 数量型号 / BLEU 对比 / LayerNorm 引用），记录页码与引用格式
