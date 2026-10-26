@@ -164,6 +164,7 @@
 - 端到端：「对比 PPO、DPO、DeepSeek-R1 三篇的研究问题和方法」→ 证据前三条都是 `page=1, channels=['card']`，回答出三列对比表，每格带 `[来源: 文件名 第1页]`。
 - 以后加论文：PDF 丢进 `data/papers/` → `python scripts/build_cards.py`（增量，只跑新篇）→ 问答侧自动生效。
 - 补丁：问题里点名类别（"强化学习是哪三篇，他们的主旨是？"）时，卡片目标按 `catalog` 的类别元数据取，并在上下文里写死"该类共 N 篇（文件名/标题/年份）"，防止模型拿检索片段里的其他论文凑数（实测修复前会把 Understanding Deep Learning 混进来）。`98 passed`。
+- 补丁：问题里点名具体论文时（"总结 1707.06347v2.pdf"、"PPO 那篇讲了什么"），`_named_sources()` 按文件名/标题词匹配并展开缩写（PPO→Proximal Policy Optimization），命中就读该篇精华卡，不再落到别的论文的参考文片段。`100 passed`。
 
 ## 下一步
 
