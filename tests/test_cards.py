@@ -103,3 +103,50 @@ class _FakeChunk:
 def _fake_retrieve(question: str, top_k: int = 4, source: str | None = None):
     chunk = _FakeChunk("We used 8 NVIDIA V100 GPUs for training.", source or "dpo.pdf", 5)
     return [(chunk, 0.05, ["dense", "bm25"])]
+
+
+def _catalog_named() -> list[dict]:
+    return [
+        {
+            "file": "1707.06347v2.pdf",
+            "title": "Proximal Policy Optimization Algorithms",
+            "category": "强化学习",
+            "indexed": True,
+        },
+        {
+            "file": "2305.18290v3.pdf",
+            "title": "Direct Preference Optimization",
+            "category": "强化学习",
+            "indexed": True,
+        },
+    ]
+
+
+def _patch_named(monkeypatch):
+    monkeypatch.setattr(agent_module, "load_catalog", _catalog_named)
+    monkeypatch.setattr(agent_module, "_search_query", _fake_query)
+    monkeypatch.setattr(agent_module, "retrieve_scored", _fake_retrieve)
+    monkeypatch.setattr(agent_module, "get_card", lambda source: _sample_card())
+    monkeypatch.setattr(agent_module, "paper_meta", lambda source: None)
+    monkeypatch.setattr(agent_module, "find_paper_by_title", lambda question: None)
+
+
+def test_named_file_question_injects_card(monkeypatch):
+    """「总结一下 1707.06347v2.pdf」：按文件名点名就该出这篇的卡。"""
+    _patch_named(monkeypatch)
+    context, evidence = asyncio.run(
+        agent_module._rag_context_with_evidence("总结一下 1707.06347v2.pdf")
+    )
+    cards = [ev for ev in evidence if ev.channels == ["card"]]
+    assert {ev.source for ev in cards} == {"1707.06347v2.pdf"}
+    assert "精华卡" in context
+
+
+def test_abbreviation_question_injects_card(monkeypatch):
+    """「PPO 那篇讲了什么」：缩写要展开成全称去对标题，不能锁到别的论文。"""
+    _patch_named(monkeypatch)
+    _context, evidence = asyncio.run(
+        agent_module._rag_context_with_evidence("PPO 那篇讲了什么")
+    )
+    cards = [ev for ev in evidence if ev.channels == ["card"]]
+    assert {ev.source for ev in cards} == {"1707.06347v2.pdf"}

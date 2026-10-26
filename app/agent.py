@@ -260,6 +260,8 @@ _EXPLAIN_QUESTION = re.compile(
     re.IGNORECASE,
 )
 _CN_NUM = {"一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8}
+# 指代词：只有出现这些词时，才允许用"唯一检索到的论文"当兜底（否则 "PPO 那篇讲了什么" 会被锁到别的论文）
+_DEICTIC = re.compile(r"这篇|该篇|本文|此篇|这|该|它")
 
 # 论文标题里通常不写缩写（"Proximal Policy Optimization" 没有 "PPO"），
 # 用户却习惯说缩写。不展开的话"对比 PPO 和 DPO"匹配不到任何标题 → 退化全库检索。
@@ -336,6 +338,43 @@ def _category_sources(question: str, limit: int = 3) -> list[str]:
             files = [str(i.get("file")) for i in items if str(i.get("category") or "") == cat]
             return [f for f in files if f][:limit]
     return []
+
+
+def _named_sources(question: str, limit: int = 3) -> list[str]:
+    """问题里直接点名了论文（文件名前缀或标题片段）时，返回对应篇目。
+
+    为什么需要：用户会说"总结 1707.06347v2.pdf"或"PPO 那篇讲了什么"，
+    这类问题既没有类别词、也没勾选下拉框，光靠检索会把别的论文的引用当正文。
+    """
+    items = [i for i in load_catalog() if i.get("indexed")]
+    q = question.lower()
+    for key, val in _TERM_ALIASES.items():
+        # 双向展开：问题里用缩写就补全称，用全称就补缩写（标题匹配靠它们）
+        if key in q and val not in q:
+            q += " " + val
+        elif val in q and key not in q:
+            q += " " + key
+    hits: list[str] = []
+    for item in items:
+        file = str(item.get("file") or "")
+        stem = file.rsplit(".", 1)[0].lower()
+        # 文件名前缀（1707.06347v2）或完整文件名命中，都算点名
+        if stem and (stem in q or file.lower() in q):
+            hits.append(file)
+            continue
+        title = str(item.get("title") or "").lower()
+        words = [w for w in re.findall(r"[a-z0-9]{3,}", title)]
+        if len(words) >= 2:
+            # 标题里连续 2 个以上词出现，才算点名（避免 "language model" 这种泛词误中）
+            for i in range(len(words) - 1):
+                if words[i] in q and words[i + 1] in q:
+                    hits.append(file)
+                    break
+    seen: list[str] = []
+    for f in hits:
+        if f not in seen:
+            seen.append(f)
+    return seen[:limit]
 
 
 def _table_pages(source: str, question: str, max_pages: int = 40, top_n: int = 3) -> list[tuple[int, int]]:
@@ -492,6 +531,9 @@ async def _rag_context_with_evidence(
         else:
             # 问句里点名了论文标题时，先锁定单篇，避免跑到别的论文里
             source = source or find_paper_by_title(question)
+            if not source:
+                named = _named_sources(question)
+                source = named[0] if named else None
             scored = retrieve_scored(query, top_k=RETRIEVE_TOP_K, source=source)
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
@@ -544,10 +586,14 @@ async def _rag_context_with_evidence(
         targets = picked if multi else [source] if source else []
         category_only: list[str] = []
         if not targets:
+            # 问题点名了具体论文（"总结 1707.06347v2.pdf"）：按文件名/标题片段锁篇
+            targets = _named_sources(question)
+        if not targets:
             # 点名了类别（"强化学习是哪三篇，他们的主旨是？"）：按类别元数据取篇目
             category_only = _category_sources(question)
             targets = category_only
-        if not targets:
+        if not targets and _DEICTIC.search(question):
+            # "这篇/它"指代时，才允许用"唯一检索到的论文"兜底；否则会把 PPO 问题锁到别的论文
             uniq = {c.source for c in (chunk for chunk, _s, _c in scored)}
             if len(uniq) == 1:
                 targets = list(uniq)
