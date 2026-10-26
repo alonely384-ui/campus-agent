@@ -179,3 +179,10 @@
 - 类别名容错：用户把「能力评测与规模」写成「能力测评与规模」，旧的精确匹配锁不到篇、卡片为 0；改为最长公共子串兜底（≥max(3, len/2)），	ests/test_category_match.py 3 例。
 - 章节定位：问「第 3 节」时按 structures.json 的章节表补该页正文（	ests/test_section.py 3 例）；指代上一轮论文时给显式上下文映射。
 - 验收：107 passed、ruff 全绿；e2e「共 39 篇（38 已索引）」「能力评测 3 篇」；提交 1380bc3、0d8be5、ce61ae1、db43b28 已 push。
+
+## 2026-10-27（周二）表格行结构化 + 数量题/口语名
+
+- pp/structure.py：_table_rows 改为「PyMuPDF 线框 bbox 裁剪页面 → pdfplumber 文本策略 → 质量校验（≥2 行/≥3 列/宽度一致≥70%/单字符≤35%）」，_pymupdf_table_boxes 做位置交叉验证，剔掉正文误检。39 篇重建 256s：**34/39 篇有数据行，共 2651 行**（表题覆盖 36/39）。
+- pp/agent.py：_table_rows_text() 把结构化行渲染进上下文，数量题优先按「点名论文」取表（新增 _PAPER_ALIASES：GPT-3/PPO/DPO/LoRA/BERT/LLaMA 等口语名 → 文件名），证据新增 	able-rows 通道。
+- 端到端：GPT-3 一共训了几个不同规模的模型？ → 「8 个规模，125M 到 175B」，证据 #5 p8 table-rows；总结一下 1707.06347v2.pdf → 走精华卡，#1 p1 card。
+- 123 passed、uff 全绿；提交 8b0908 已 push。
