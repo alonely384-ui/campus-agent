@@ -137,6 +137,13 @@
 - 证据：`85 passed in 3.40s`；`ruff check app tests scripts` → All checks passed；e2e「这里一共有多少篇论文？」→「共 40 篇（其中 39 篇已建立检索索引…）」，证据首条 `channels=['catalog']`；「这些论文都是什么类型？」→ 如实答"40 篇全部未分类，暂无分类元数据"；38 题回归 **R@1 30/38、R@3 35/38、R@5 36/38，与改前一致（无退化）**。
 - 下一步（B1+B2）：用 arXiv API 给 34 篇补 `primary_category`，剩下 6 篇（非 arXiv 文件名）用 LLM 兜底打标签。
 
+## 2026-10-27（周二）论文"类型"元数据：arXiv 反查 + LLM 兜底（B1+B2）
+
+- 新增 `scripts/enrich_catalog.py`：① 有 arXiv 编号的按 20 个/批调 `https://export.arxiv.org/api/query?id_list=…`（限速 3 秒），取 `arxiv:primary_category`；② 没有编号的（`N19-1423.pdf`、`language_understanding_paper.pdf` 等 6 篇）用 DeepSeek 按标题归到 5 个粗类；③ arXiv 主分类里没有"强化学习"，按标题关键词（Reinforcement Learning / Policy Optimization / Preference Optimization / RLHF）补 3 篇。
+- 结果：40 篇全部有类别——自然语言处理 22、机器学习 10、强化学习 3、计算机视觉 3、理论与其他 2；0 篇"未分类"。
+- 端到端：「这些论文都是什么类型的？」→ 直接给出五类分布（证据首条 `channels=['catalog']`）；「有多少篇是自然语言处理的？」→ 22 篇。
+- 证据：`85 passed in 3.37s`；`ruff check app tests scripts` → All checks passed。
+
 ## 下一步
 
 1. 官方 5 问端到端验收（第 6 作者 / Adam β1β2 / GPU 数量型号 / BLEU 对比 / LayerNorm 引用），记录页码与引用格式

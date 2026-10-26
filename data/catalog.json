@@ -6,8 +6,9 @@
     "pages": 14,
     "arxiv_id": "1607.06450",
     "year": 2016,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "stat.ML"
   },
   {
     "file": "1706.03762v1.pdf",
@@ -16,8 +17,9 @@
     "pages": 15,
     "arxiv_id": "1706.03762",
     "year": 2017,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "1706.03762v1_img.pdf",
@@ -26,8 +28,9 @@
     "pages": 15,
     "arxiv_id": "1706.03762",
     "year": 2017,
-    "category": "未分类",
-    "indexed": false
+    "category": "自然语言处理",
+    "indexed": false,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "1706.03762v7.pdf",
@@ -36,8 +39,9 @@
     "pages": 15,
     "arxiv_id": "1706.03762",
     "year": 2017,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "1707.06347v2.pdf",
@@ -46,8 +50,9 @@
     "pages": 12,
     "arxiv_id": "1707.06347",
     "year": 2017,
-    "category": "未分类",
-    "indexed": true
+    "category": "强化学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "1910.02054v3.pdf",
@@ -56,8 +61,9 @@
     "pages": 24,
     "arxiv_id": "1910.02054",
     "year": 2019,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "1910.10683v4.pdf",
@@ -66,8 +72,9 @@
     "pages": 67,
     "arxiv_id": "1910.10683",
     "year": 2019,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2001.08361v1.pdf",
@@ -76,8 +83,9 @@
     "pages": 30,
     "arxiv_id": "2001.08361",
     "year": 2020,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2002.04745v2.pdf",
@@ -86,8 +94,9 @@
     "pages": 17,
     "arxiv_id": "2002.04745",
     "year": 2020,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2005.14165v4.pdf",
@@ -96,8 +105,9 @@
     "pages": 75,
     "arxiv_id": "2005.14165",
     "year": 2020,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2010.11929v2.pdf",
@@ -106,8 +116,9 @@
     "pages": 22,
     "arxiv_id": "2010.11929",
     "year": 2020,
-    "category": "未分类",
-    "indexed": true
+    "category": "计算机视觉",
+    "indexed": true,
+    "arxiv_category": "cs.CV"
   },
   {
     "file": "209_Emergent_Abilities_of_Larg.pdf",
@@ -116,8 +127,9 @@
     "pages": 30,
     "arxiv_id": "",
     "year": null,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "category_source": "llm"
   },
   {
     "file": "2101.03961v3.pdf",
@@ -126,8 +138,9 @@
     "pages": 40,
     "arxiv_id": "2101.03961",
     "year": 2021,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2103.00020v1.pdf",
@@ -136,8 +149,9 @@
     "pages": 48,
     "arxiv_id": "2103.00020",
     "year": 2021,
-    "category": "未分类",
-    "indexed": true
+    "category": "计算机视觉",
+    "indexed": true,
+    "arxiv_category": "cs.CV"
   },
   {
     "file": "2106.09685v2.pdf",
@@ -146,8 +160,9 @@
     "pages": 26,
     "arxiv_id": "2106.09685",
     "year": 2021,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2107.03374v2.pdf",
@@ -156,8 +171,9 @@
     "pages": 35,
     "arxiv_id": "2107.03374",
     "year": 2021,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2201.11903v6.pdf",
@@ -166,8 +182,9 @@
     "pages": 43,
     "arxiv_id": "2201.11903",
     "year": 2022,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2203.02155v1.pdf",
@@ -176,8 +193,9 @@
     "pages": 68,
     "arxiv_id": "2203.02155",
     "year": 2022,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2205.14135v2.pdf",
@@ -186,8 +204,9 @@
     "pages": 34,
     "arxiv_id": "2205.14135",
     "year": 2022,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2206.07682v2.pdf",
@@ -196,8 +215,9 @@
     "pages": 30,
     "arxiv_id": "2206.07682",
     "year": 2022,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2210.02414v2.pdf",
@@ -206,8 +226,9 @@
     "pages": 56,
     "arxiv_id": "2210.02414",
     "year": 2022,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2211.05100v4.pdf",
@@ -216,8 +237,9 @@
     "pages": 73,
     "arxiv_id": "2211.05100",
     "year": 2022,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2212.04356v1.pdf",
@@ -226,8 +248,9 @@
     "pages": 28,
     "arxiv_id": "2212.04356",
     "year": 2022,
-    "category": "未分类",
-    "indexed": true
+    "category": "理论与其他",
+    "indexed": true,
+    "arxiv_category": "eess.AS"
   },
   {
     "file": "2303.08774v6.pdf",
@@ -236,8 +259,9 @@
     "pages": 100,
     "arxiv_id": "2303.08774",
     "year": 2023,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2304.08485v2.pdf",
@@ -246,8 +270,9 @@
     "pages": 25,
     "arxiv_id": "2304.08485",
     "year": 2023,
-    "category": "未分类",
-    "indexed": true
+    "category": "计算机视觉",
+    "indexed": true,
+    "arxiv_category": "cs.CV"
   },
   {
     "file": "2305.13048v2.pdf",
@@ -256,8 +281,9 @@
     "pages": 30,
     "arxiv_id": "2305.13048",
     "year": 2023,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2305.14314v1.pdf",
@@ -266,8 +292,9 @@
     "pages": 26,
     "arxiv_id": "2305.14314",
     "year": 2023,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2305.18290v3.pdf",
@@ -276,8 +303,9 @@
     "pages": 27,
     "arxiv_id": "2305.18290",
     "year": 2023,
-    "category": "未分类",
-    "indexed": true
+    "category": "强化学习",
+    "indexed": true,
+    "arxiv_category": "cs.LG"
   },
   {
     "file": "2307.09288v2.pdf",
@@ -286,8 +314,9 @@
     "pages": 77,
     "arxiv_id": "2307.09288",
     "year": 2023,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2310.06825v1.pdf",
@@ -296,8 +325,9 @@
     "pages": 9,
     "arxiv_id": "2310.06825",
     "year": 2023,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2406.14491v2.pdf",
@@ -306,8 +336,9 @@
     "pages": 22,
     "arxiv_id": "2406.14491",
     "year": 2024,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2407.21783v3.pdf",
@@ -316,8 +347,9 @@
     "pages": 92,
     "arxiv_id": "2407.21783",
     "year": 2024,
-    "category": "未分类",
-    "indexed": true
+    "category": "机器学习",
+    "indexed": true,
+    "arxiv_category": "cs.AI"
   },
   {
     "file": "2412.15115v2.pdf",
@@ -326,8 +358,9 @@
     "pages": 26,
     "arxiv_id": "2412.15115",
     "year": 2024,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2412.19437v1.pdf",
@@ -336,8 +369,9 @@
     "pages": 53,
     "arxiv_id": "2412.19437",
     "year": 2024,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "2501.12948v2.pdf",
@@ -346,8 +380,9 @@
     "pages": 86,
     "arxiv_id": "2501.12948",
     "year": 2025,
-    "category": "未分类",
-    "indexed": true
+    "category": "强化学习",
+    "indexed": true,
+    "arxiv_category": "cs.CL"
   },
   {
     "file": "333078981_693988129081760_4712707815225756708_n.pdf",
@@ -356,8 +391,9 @@
     "pages": 27,
     "arxiv_id": "",
     "year": null,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "category_source": "llm"
   },
   {
     "file": "bdfaa68d8984.pdf",
@@ -366,8 +402,9 @@
     "pages": 15,
     "arxiv_id": "",
     "year": null,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "category_source": "llm"
   },
   {
     "file": "language_understanding_paper.pdf",
@@ -376,8 +413,9 @@
     "pages": 12,
     "arxiv_id": "",
     "year": null,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "category_source": "llm"
   },
   {
     "file": "N19-1423.pdf",
@@ -386,8 +424,9 @@
     "pages": 16,
     "arxiv_id": "",
     "year": null,
-    "category": "未分类",
-    "indexed": true
+    "category": "自然语言处理",
+    "indexed": true,
+    "category_source": "llm"
   },
   {
     "file": "UnderstandingDeepLearning_02_09_26_C.pdf",
@@ -396,7 +435,8 @@
     "pages": 541,
     "arxiv_id": "",
     "year": null,
-    "category": "未分类",
-    "indexed": true
+    "category": "理论与其他",
+    "indexed": true,
+    "category_source": "llm"
   }
 ]
