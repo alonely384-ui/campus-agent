@@ -1,16 +1,18 @@
-"""PDF 结构化解析：把「标题 / 作者 / 单位 / 章节树」从版式里抽出来。
+"""PDF 结构化解析：把「标题 / 作者 / 单位 / 摘要 / 章节树 / 表格 / 图表 / 公式 / 参考文献 / 附录」抽出来。
 
-为什么需要它：
-    检索只认"字面像不像"。"第六作者是谁"这种问题，原文里没有 author / sixth
-    这样的词，BM25 和向量都搜不到；但作者列表在版式上非常明显（标题下面、
-    字号略大的那一行）。把它抽成字段后，"作者题"就变成查字段，不再靠猜。
+赛题 1.1.2 要求"解析的粒度越细越好"，字段清单就是评分表：
+    标题、作者（顺序 + 单位/邮箱）、摘要、一/二/三级标题、表格、图表、公式、参考文献、附录。
 
 核心做法（不猜内容，只看版式信号）：
     1. 用 PyMuPDF 读每个文本行的字号、坐标、是否加粗；
     2. 全文最常见字号 = 正文字号；
     3. 标题 = 第一页里字号 ≥ 正文 1.3 倍的那几行；
     4. 作者 = 标题下方到 Abstract 之间、"人名样式"且不带邮箱/机构词的行；
-    5. 章节 = 形如 "3.2 Model Architecture" 且字号略大于正文的行。
+    5. 章节 = 形如 "3.2 Model Architecture" 或"编号一行、标题一行"的版式；
+    6. 表格/图表 = "Table 2.1:" / "Figure 3:" 这类题注行；
+    7. 公式 = 含数学符号且没有成句英文的短行；
+    8. 参考文献 = References 之后的 [n] 条目；
+    9. 附录 = 标题里带 Appendix 或 A/B 编号的章节。
 
 失败降级：任何一步抽不到就返回空值，绝不抛异常、绝不影响原文检索。
 """
@@ -30,6 +32,33 @@ _AFFIL_WORDS = (
 )
 # 人名：2~4 个首字母大写的单词，允许中间带 . 或 -
 _NAME_RE = re.compile(r"^[A-Z][a-zA-Z.\-']+(?: [A-Z][a-zA-Z.\-']+){1,3}$")
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+# 题注：Table 2.1 / Figure 3 / Fig. 3
+_TABLE_CAPTION_RE = re.compile(r"^\s*Table\s+(\d+(?:\.\d+)?)\s*[.:]?\s+(.{4,300})", re.IGNORECASE)
+_FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.)\s+(\d+(?:\.\d+)?)\s*[.:]?\s+(.{4,300})", re.IGNORECASE)
+# 参考文献条目：[11] Jimmy Lei Ba, ...
+_REF_ENTRY_RE = re.compile(r"^\s*\[(\d{1,3})\]\s+(.{5,200})")
+_REF_ENTRY_PATTERNS = [
+    re.compile(r"^\s*\[\d{1,3}\]\s+"),                    # [1] Author...
+    re.compile(r"^\s*\[[A-Za-z][A-Za-z+\-]+\d{2,4}\]\s*"),  # [Bel+15]（ACM 模板）
+    re.compile(r"^\s*[A-Z]\.\s*(?:[A-Z]\.\s*)*[A-Z][a-z]"),  # J. Austin, ...
+    re.compile(r"^\s*[A-Z][A-Za-z0-9@&\.\-]{1,40}\.\s+[A-Z]"),  # AI@Meta. / OpenAI.
+    re.compile(r"^\s*[A-Z][A-Za-zÀ-ÿ'’\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'’\-]+)*,\s"),  # Amro Abbas,
+    re.compile(r"^\s*\d{1,3}\.\s+[A-Z]"),                 # 1. Author...
+]
+
+
+def _is_ref_entry(text: str) -> bool:
+    return any(p.match(text) for p in _REF_ENTRY_PATTERNS)
+# 公式：含数学符号、长度短、不像成句英文
+_MATH_RE = re.compile(r"[=≠≈≤≥±∑∫√∞∂∇×÷]")
+_APPENDIX_RE = re.compile(r"appendix|附录", re.IGNORECASE)
+# 排版里常带弯引号/零宽字符："‘References’"、"“Abstract”"，比较前先去掉
+_QUOTES = str.maketrans({"‘": "", "’": "", "“": "", "”": "", "\u200b": ""})
+
+
+def _norm(text: str) -> str:
+    return text.translate(_QUOTES).strip()
 
 
 def _lines(page, page_no: int) -> list[dict]:
@@ -95,6 +124,78 @@ def _authors(first_page: list[dict], title_y: float, body: float) -> list[str]:
     return [n for n in names if not (n in seen or seen.add(n))]
 
 
+def _affiliations(first_page: list[dict], title_y: float) -> list[str]:
+    """单位/机构：标题下方带机构关键词的行（去重、保序）。"""
+    out: list[str] = []
+    for ln in first_page:
+        if ln["y"] <= title_y or ln["y"] - title_y > 300:
+            continue
+        low = ln["text"].lower()
+        if any(w in low for w in _AFFIL_WORDS) and len(ln["text"]) <= 120:
+            out.append(ln["text"])
+    seen: set[str] = set()
+    return [x for x in out if not (x in seen or seen.add(x))][:12]
+
+
+def _emails(first_page: list[dict]) -> list[str]:
+    """邮箱：整页扫一遍（作者行里常带 ∗ 标注，单独抽更稳）。"""
+    found = _EMAIL_RE.findall(" ".join(ln["text"] for ln in first_page))
+    seen: set[str] = set()
+    return [x for x in found if not (x in seen or seen.add(x))][:12]
+
+
+def _abstract(lines: list[dict]) -> str:
+    """摘要 = "Abstract" 行之后、下一个章节标题之前的段落（截 800 字）。"""
+    started = False
+    buf: list[str] = []
+    for ln in lines:
+        t = ln["text"].strip()
+        if not started:
+            if re.fullmatch(r"(abstract|ABSTRACT)[:：]?", _norm(t)) or _norm(t).lower().startswith("abstract"):
+                started = True
+                rest = re.sub(r"^(abstract|ABSTRACT)[:：]?\s*", "", _norm(t))
+                if rest:
+                    buf.append(rest)
+            continue
+        if _SECTION_RE.match(t) or t in ("Introduction", "INTRODUCTION", "1 Introduction"):
+            break
+        if t in ("Keywords", "Key words", "KEYWORDS") or t.lower().startswith("keywords"):
+            break
+        buf.append(t)
+        if sum(len(x) for x in buf) > 800:
+            break
+    return " ".join(buf)[:800].strip()
+
+
+def _abstract_fallback(first_page: list[dict], body: float) -> str:
+    """没有 "Abstract" 标题时（如 LLaMA 3）：首页正文段落直接从标题/作者下方开始。"""
+    buf: list[str] = []
+    for ln in first_page:
+        t = ln["text"].strip()
+        if len(t) < 60:                     # 标题、作者、单位等短行跳过
+            continue
+        if _SECTION_RE.match(t) or t in ("Introduction", "INTRODUCTION", "1 Introduction"):
+            break
+        if t.lower().startswith(("keywords", "key words")):
+            break
+        if not (body * 0.85 <= ln["size"] <= body * 1.2):
+            continue
+        buf.append(t)
+        if sum(len(x) for x in buf) > 800:
+            break
+    return " ".join(buf)[:800].strip()
+
+
+def _keywords(first_page: list[dict]) -> list[str]:
+    """关键词行：Keywords: a; b; c。"""
+    for ln in first_page:
+        t = ln["text"]
+        m = re.match(r"(?i)^key\s*words?\s*[:：]\s*(.+)$", t)
+        if m:
+            return [k.strip(" .;，、") for k in re.split(r"[;,；，、]", m.group(1)) if k.strip()][:12]
+    return []
+
+
 # 章节编号单独一行的版面（NeurIPS 模板就是这样）："1" 一行、"Introduction" 另一行
 _NUMBER_ONLY_RE = re.compile(r"^(\d+(?:\.\d+)*)$")
 # 无编号的特殊章节
@@ -139,33 +240,132 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
     return out
 
 
-def parse_structure(path: str) -> dict:
-    """返回 {"title", "authors", "sections", "pages"}，抽不到就是空值。"""
+def _captions(lines: list[dict]) -> tuple[list[dict], list[dict]]:
+    """表格/图表题注：返回 (tables, figures)，每项 {number, caption, page}。"""
+    tables: list[dict] = []
+    figures: list[dict] = []
+    for ln in lines:
+        t = ln["text"]
+        m = _TABLE_CAPTION_RE.match(t)
+        if m:
+            tables.append({"number": m.group(1), "caption": m.group(2).strip(), "page": ln["page"]})
+            continue
+        m = _FIGURE_CAPTION_RE.match(t)
+        if m:
+            figures.append({"number": m.group(1), "caption": m.group(2).strip(), "page": ln["page"]})
+    return tables[:80], figures[:80]
+
+
+def _formulas(lines: list[dict]) -> list[dict]:
+    """公式行：含数学符号、长度 ≤ 120、且不像成句英文（英文单词少于 8 个）。"""
+    out: list[dict] = []
+    for ln in lines:
+        t = ln["text"].strip()
+        if not (2 <= len(t) <= 120) or not _MATH_RE.search(t):
+            continue
+        words = re.findall(r"[A-Za-z]{2,}", t)
+        if len(words) >= 8:
+            continue
+        out.append({"page": ln["page"], "text": t})
+    return out[:120]
+
+
+def _references(lines: list[dict]) -> dict:
+    """参考文献：从 References 标题后开始数条目。
+
+    两种常见格式都支持：
+    1. 编号式："[1] Jimmy Lei Ba, Jamie Ryan Kiros..."
+    2. 作者-年份式（LLaMA 3、Llama 2 等）："Amro Abbas, Kushal Tirumala..."
+    """
+    start = None
+    for i, ln in enumerate(lines):
+        if _norm(ln["text"]).lower() == "references":
+            start = i
+            break
+    if start is None:
+        return {"page": None, "count": 0, "first": "", "last": ""}
+    entries: list[str] = []
+    for ln in lines[start + 1:]:
+        t = ln["text"].strip()
+        if _norm(t).lower() in ("appendix", "appendices", "a appendix"):
+            break
+        if _is_ref_entry(t):
+            entries.append(re.sub(r"^\s*\[[^\]]{1,12}\]\s*", "", t))
+    page = lines[start]["page"] if start < len(lines) else None
+    return {
+        "page": page,
+        "count": len(entries),
+        "first": entries[0] if entries else "",
+        "last": entries[-1] if entries else "",
+    }
+
+
+def _appendix(sections: list[dict]) -> list[dict]:
+    """附录：标题带 Appendix/附录，或编号形如 A、A.1 的章节。"""
+    out = []
+    for s in sections:
+        num = str(s.get("number") or "")
+        if _APPENDIX_RE.search(str(s.get("title") or "")) or re.fullmatch(r"[A-Z](?:\.\d+)*", num):
+            out.append(s)
+    return out
+
+
+def _find_references(doc, head: list[dict], pages: int, first_pass: int = 25, limit: int = 90) -> dict:
+    """参考文献常在 25 页之后才出现，所以先扫已读行，没有就逐页往后找。"""
+    refs = _references(head)
+    if refs["count"] > 0:
+        return refs
+    extra: list[dict] = []
+    for pno in range(first_pass, min(limit, pages)):
+        extra += _lines(doc[pno], pno)
+        if any(_norm(ln["text"]).lower() == "references" for ln in extra):
+            return _references(extra)
+    return refs
+
+
+def parse_structure(path: str, max_pages: int = 25) -> dict:
+    """返回结构化字段；抽不到就是空值，不抛异常。"""
+    empty = {
+        "title": "", "authors": [], "affiliations": [], "emails": [], "abstract": "",
+        "keywords": [], "sections": [], "tables": [], "figures": [], "formulas": [],
+        "references": {"page": None, "count": 0, "first": "", "last": ""}, "appendix": [], "pages": 0,
+    }
     try:
         import pymupdf  # 延迟导入：只有要解析版式时才需要
 
         doc = pymupdf.open(path)
     except Exception:  # noqa: BLE001 —— 解析失败不能拖垮上传
-        return {"title": "", "authors": [], "sections": [], "pages": 0}
+        return empty
 
     try:
         pages = len(doc)
         first = _lines(doc[0], 0)
-        # 章节树多看几页（12 页）才够用；标题/作者永远只看第一页
+        # 章节/题注/公式/参考文献要往后看，否则 References 都看不到
         head = first[:]
-        for pno in range(1, min(12, pages)):
+        for pno in range(1, min(max_pages, pages)):
             head += _lines(doc[pno], pno)
         body = _body_size(head)
         title = _title(first, body)
         title_y = next((ln["y"] for ln in first if ln["text"] in title), 0.0)
+        sections = _sections(head, body)
+        tables, figures = _captions(head)
         return {
             "title": title,
             "authors": _authors(first, title_y, body),
-            "sections": _sections(head, body),
+            "affiliations": _affiliations(first, title_y),
+            "emails": _emails(first),
+            "abstract": _abstract(first) or _abstract_fallback(first, body),
+            "keywords": _keywords(first),
+            "sections": sections,
+            "tables": tables,
+            "figures": figures,
+            "formulas": _formulas(head),
+            "references": _find_references(doc, head, pages),
+            "appendix": _appendix(sections),
             "pages": pages,
         }
     except Exception:  # noqa: BLE001
-        return {"title": "", "authors": [], "sections": [], "pages": 0}
+        return empty
     finally:
         doc.close()
 
