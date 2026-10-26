@@ -339,7 +339,9 @@ def load_pdf(path: str) -> list[Chunk]:
     for page_no, page in enumerate(reader.pages, start=1):
         text = (page.extract_text() or "").strip()
         if not text:
-            # 扫描版 PDF（整页是图片）没有文字层，extract_text 返回空，跳过。
+            # 扫描版 PDF（整页是图片）没有文字层：读 OCR 缓存（scripts/ocr_scanned.py 生成）
+            text = _ocr_cached(str(path), page_no).strip()
+        if not text:
             continue
         chunks.append(
             Chunk(text=text, source=source, page=page_no, chunk_id=len(chunks))
@@ -1010,8 +1012,21 @@ def _page_text_cached(source: str, page: int) -> str:
         reader = PdfReader(str(path))
         if not 1 <= page <= len(reader.pages):
             return ""
-        return (reader.pages[page - 1].extract_text() or "").strip()
+        text = (reader.pages[page - 1].extract_text() or "").strip()
+        if not text:                      # 扫描件：退回 OCR 缓存
+            text = _ocr_cached(str(path), page).strip()
+        return text
     except Exception:
+        return ""
+
+
+def _ocr_cached(path: str, page_no: int) -> str:
+    """OCR 缓存（0 基页号，由 scripts/ocr_scanned.py 生成）；没有缓存返回空串。"""
+    try:
+        from app.ocr import cached_page
+
+        return cached_page(path, page_no - 1)
+    except Exception:  # noqa: BLE001 - OCR 不可用不能影响主流程
         return ""
 
 
