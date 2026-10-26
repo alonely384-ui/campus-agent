@@ -10,7 +10,8 @@ from app import agent as agent_module
 
 def test_category_tolerates_typo():
     files = agent_module._category_sources("能力测评与规模四篇论文的主旨分别是什么")
-    assert len(files) == 4
+    # 该类原有 4 篇，2026-10-27 删掉重复的 209_Emergent_Abilities_of_Larg.pdf 后剩 3 篇
+    assert len(files) == 3
     assert "2001.08361v1.pdf" in files
 
 
