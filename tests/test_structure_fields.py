@@ -42,7 +42,8 @@ def test_numbered_references_and_captions():
     assert info["references"]["count"] >= 30
     assert info["references"]["first"].startswith("Jimmy Lei Ba")
     assert len(info["tables"]) >= 2 and len(info["figures"]) >= 2
-    assert all({"number", "caption", "page"} == set(t) for t in info["tables"])
+    # tables 现在多了 rows 字段（结构化抽取成功时填充），所以只断言必要键都存在
+    assert all({"number", "caption", "page"} <= set(t) for t in info["tables"])
     assert len(info["formulas"]) >= 10
 
 

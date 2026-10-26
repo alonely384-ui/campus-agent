@@ -323,7 +323,128 @@ def _find_references(doc, head: list[dict], pages: int, first_pass: int = 25, li
     return refs
 
 
-def parse_structure(path: str, max_pages: int = 25) -> dict:
+def _norm_cell(cell) -> str:
+    if cell is None:
+        return ""
+    return re.sub(r"\s+", " ", str(cell)).strip()
+
+
+_CAPTION_ROW = re.compile(r"^(table|figure|fig\.)\s*\d+\s*[:.]", re.IGNORECASE)
+
+
+def _rows_ok(rows: list[list[str]]) -> bool:
+    """判断抽出来的表是真数据表还是"碎片拼起来的假表"。
+
+    质量差的特征（Attention 论文里常见）：列数忽多忽少、满屏单字符。
+    """
+    if len(rows) < 2:
+        return False
+    widths = [len(r) for r in rows]
+    cols = max(widths)
+    if cols < 3:
+        return False
+    if sum(1 for w in widths if w == cols) / len(widths) < 0.7:   # 列数要基本一致
+        return False
+    cells = [c for r in rows for c in r if c]
+    if not cells:
+        return False
+    if sum(1 for c in cells if len(c) <= 1) / len(cells) > 0.35:  # 太多单字符碎片
+        return False
+    return sum(1 for r in rows for c in r if c) / len(rows) >= 2.0  # 每行至少两个非空格
+
+
+def _pymupdf_table_boxes(pdf_path: str, pages: list[int]) -> dict[int, list[tuple[float, float, float, float]]]:
+    """用 PyMuPDF 的线框检测拿到"表格大概在哪"的边框。
+
+    pdfplumber 偶尔会把正文里的半张图误当成表格（Attention 论文就踩过），
+    所以要求它的表和 PyMuPDF 检出的表格区域有足够重叠，否则不认。
+    """
+    try:
+        import pymupdf
+    except Exception:  # noqa: BLE001
+        return {}
+    out: dict[int, list[tuple[float, float, float, float]]] = {}
+    try:
+        with pymupdf.open(pdf_path) as doc:
+            for pno in pages:
+                if not 0 <= pno < len(doc):
+                    continue
+                boxes = [tuple(t.bbox) for t in doc[pno].find_tables().tables]
+                if boxes:
+                    out[pno] = boxes
+    except Exception:  # noqa: BLE001
+        return {}
+    return out
+
+
+def _overlaps(a: tuple, b: tuple) -> float:
+    """两个矩形交集面积 / 较小的那个面积（0–1）。"""
+    x0, y0 = max(a[0], b[0]), max(a[1], b[1])
+    x1, y1 = min(a[2], b[2]), min(a[3], b[3])
+    if x1 <= x0 or y1 <= y0:
+        return 0.0
+    inter = (x1 - x0) * (y1 - y0)
+    area_a = max((a[2] - a[0]) * (a[3] - a[1]), 1e-6)
+    area_b = max((b[2] - b[0]) * (b[3] - b[1]), 1e-6)
+    return inter / min(area_a, area_b)
+
+
+def _table_rows(pdf_path: str, pages: list[int]) -> dict[int, list[list[list[str]]]]:
+    """用 pdfplumber 的文本策略把表格抽成"行 × 列"。
+
+    为什么用 text 策略：这批 LaTeX 论文的表格有竖线但没有完整横线，
+    线框策略（默认）一张都认不出来；按文字间距推断列反而能还原数据行。
+    返回 {0 基页号: [表1 的行, 表2 的行, ...]}，每行是字符串列表。
+    只保留「≥2 行且 ≥3 列」的表，避免把两行小表也当结构化结果。
+    """
+    if not pages:
+        return {}
+    try:
+        import pdfplumber
+    except Exception:  # noqa: BLE001 - 没装就当没有表格内容
+        return {}
+    settings = {
+        "vertical_strategy": "text",
+        "horizontal_strategy": "text",
+        "intersection_tolerance": 3,
+        "min_words_vertical": 2,
+    }
+    out: dict[int, list[list[list[str]]]] = {}
+    boxes_map = _pymupdf_table_boxes(pdf_path, pages)   # 线框检测给的"大概位置"，用来排除误检
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for pno in pages:
+                if not 0 <= pno < len(pdf.pages):
+                    continue
+                boxes = boxes_map.get(pno, [])
+                if not boxes:          # 这一页没有线框表格，就别硬抠正文
+                    continue
+                found: list[list[list[str]]] = []
+                page = pdf.pages[pno]
+                for box in boxes:
+                    try:
+                        cropped = page.crop(box)      # 只抠出线框表格那一块，避免整页被当表
+                        ptabs = cropped.find_tables(settings) or []
+                    except Exception:  # noqa: BLE001
+                        continue
+                    for tab in ptabs:
+                        try:
+                            raw = tab.extract()
+                        except Exception:  # noqa: BLE001
+                            continue
+                        rows = [[_norm_cell(c or "") for c in row] for row in raw if row]
+                        # 题注行（"Table 2: ..."）常被并进表格，先剔掉再用质量规则判断
+                        rows = [r for r in rows if any(r) and not any(_CAPTION_ROW.match(c) for c in r)]
+                        if _rows_ok(rows):
+                            found.append(rows)
+                if found:
+                    out[pno] = found
+    except Exception:  # noqa: BLE001 - 单篇失败不影响其它字段
+        return {}
+    return out
+
+
+def parse_structure(path: str, max_pages: int = 25, with_tables: bool = True) -> dict:
     """返回结构化字段；抽不到就是空值，不抛异常。"""
     empty = {
         "title": "", "authors": [], "affiliations": [], "emails": [], "abstract": "",
@@ -349,6 +470,12 @@ def parse_structure(path: str, max_pages: int = 25) -> dict:
         title_y = next((ln["y"] for ln in first if ln["text"] in title), 0.0)
         sections = _sections(head, body)
         tables, figures = _captions(head)
+        if with_tables and tables:
+            rows_map = _table_rows(path, sorted({t["page"] for t in tables}))
+            # pdfplumber 在每页按从上到下的顺序返回表格，和题注顺序对齐
+            for t in tables:
+                found = rows_map.get(t["page"], [])
+                t["rows"] = found.pop(0) if found else []
         return {
             "title": title,
             "authors": _authors(first, title_y, body),

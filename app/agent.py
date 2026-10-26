@@ -368,6 +368,26 @@ def _category_sources(question: str, limit: int = 12) -> list[str]:
     return []
 
 
+# 常用模型的"口语名 → 文件名"。赛题数据集固定，维护一张小表比让模型猜更可靠；
+# 只在这批论文里生效，命中就当作"用户点名了这篇"。
+_PAPER_ALIASES: dict[str, str] = {
+    "gpt-3": "2005.14165v4.pdf",
+    "gpt3": "2005.14165v4.pdf",
+    "gpt-4": "2303.08774v6.pdf",
+    "llama 3": "2407.21783v3.pdf",
+    "llama3": "2407.21783v3.pdf",
+    "llama 2": "2307.09288v2.pdf",
+    "llama2": "2307.09288v2.pdf",
+    "bert": "N19-1423.pdf",
+    "dpo": "2305.18290v3.pdf",
+    "ppo": "1707.06347v2.pdf",
+    "deepseek-r1": "2501.12948v2.pdf",
+    "deepseek-v3": "2412.19437v1.pdf",
+    "lora": "2106.09685v2.pdf",
+    "attention is all you need": "1706.03762v7.pdf",
+}
+
+
 def _named_sources(question: str, limit: int = 3) -> list[str]:
     """问题里直接点名了论文（文件名前缀或标题片段）时，返回对应篇目。
 
@@ -383,6 +403,10 @@ def _named_sources(question: str, limit: int = 3) -> list[str]:
         elif val in q and key not in q:
             q += " " + key
     hits: list[str] = []
+    # 先认口语别名（"GPT-3 几个规模"），再走文件名/标题匹配
+    for alias, file in _PAPER_ALIASES.items():
+        if alias in q:
+            hits.append(file)
     for item in items:
         file = str(item.get("file") or "")
         stem = file.rsplit(".", 1)[0].lower()
@@ -500,6 +524,32 @@ def _table_pages(source: str, question: str, max_pages: int = 40, top_n: int = 3
             scored.append((page, rows))
     scored.sort(key=lambda item: item[1], reverse=True)
     return scored[:top_n]
+
+
+def _table_rows_text(source: str, max_tables: int = 3, max_rows: int = 40) -> list[tuple[int, str]]:
+    """把某篇论文已结构化的表格（structures.json 里的 rows）渲染成纯文本。
+
+    为什么需要：数量类问题的答案经常就是"表格有几行"。整页文本里表格是错位的，
+    模型数不准；直接给它抽好的行，它只需数行、不用猜。
+    返回 [(页码, 文本)]，页码用于证据卡片对齐。
+    """
+    try:
+        structures = load_structures()
+    except Exception:  # noqa: BLE001 - 缓存坏了不能拖垮问答
+        return []
+    info = structures.get(source) or {}
+    out: list[tuple[int, str]] = []
+    for table in (info.get("tables") or []):
+        rows = table.get("rows") or []
+        if len(rows) < 2:
+            continue
+        page = int(table.get("page") or 0) + 1   # 结构文件里是 0 基页码
+        lines = [f"表 {table.get('number', '?')}（第 {page} 页，{len(rows)} 行）"]
+        lines += [" | ".join(cell for cell in row if cell) for row in rows[:max_rows]]
+        out.append((page, "\n".join(lines)))
+        if len(out) >= max_tables:
+            break
+    return out
 
 
 # 提问意图 → 检索时补的英文词。
@@ -807,10 +857,24 @@ async def _rag_context_with_evidence(
     # 数量类问题：答案通常是表格行数，而表格页常常进不了 top4。
     # 单篇问答时直接在全篇里找"最像答案的表格页"补进来（最多 3 页，让模型按问题挑）。
     if _is_count_question(question) and not multi and chunks:
-        src = chunks[0].source
+        named = _named_sources(question, limit=1)
+        src = named[0] if named else chunks[0].source
+        parts: list[str] = []
+        # 优先给"已经抽好的表格行"：整页文本里表格是错位的，模型数不准
+        for page, rows_text in _table_rows_text(src):
+            parts.append(f"\n【{src} 第{page}页 结构化表格数据行（可据此直接数条目）】\n{rows_text}")
+            evidence.append(
+                Evidence(
+                    rank=len(evidence) + 1,
+                    source=src,
+                    page=page,
+                    score=0.0,
+                    channels=["table-rows"],
+                    text=rows_text[:160],
+                )
+            )
         candidates = _table_pages(src, question)
         if candidates:
-            parts: list[str] = []
             for page, rows in candidates:
                 table_text = _numeric_excerpt(page_text(src, page), limit=2400)
                 if table_text:
@@ -829,13 +893,13 @@ async def _rag_context_with_evidence(
                             text=table_text[:160],
                         )
                     )
-            if parts:
-                lines.extend(parts)
-                label = "、".join(f"第{p}页（{r} 条）" for p, r in candidates)
-                lines.append(
-                    f"\n（数量问题：候选表格页 {label}。先判断哪一页的表格在回答这个问题，"
-                    "再把符合条件的行逐行列出来，最后给总数，并说明数的是哪一列/哪一类。）"
-                )
+        if parts:
+            lines.extend(parts)
+            label = "、".join(f"第{p}页（{r} 条）" for p, r in candidates) or "结构化表格"
+            lines.append(
+                f"\n（数量问题：候选表格页 {label}。先判断哪一页的表格在回答这个问题，"
+                "再把符合条件的行逐行列出来，最后给总数，并说明数的是哪一列/哪一类。）"
+            )
 
     # 章节类问题（"第 3 节讲了什么"）：按章节结构直接补那一节所在的整页正文。
     if not multi and source:

@@ -83,7 +83,7 @@ def main() -> None:
         authors = 0
         if not no_title:
             try:
-                st = parse_structure(str(pdf))
+                st = parse_structure(str(pdf), with_tables=False)
                 title = (st.get("title") or "").strip()
                 authors = len(st.get("authors") or [])
             except Exception as e:  # noqa: BLE001
