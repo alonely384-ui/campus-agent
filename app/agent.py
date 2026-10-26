@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 from collections import Counter
@@ -341,10 +342,29 @@ def _category_sources(question: str, limit: int = 12) -> list[str]:
     不能靠检索结果猜（检索会命中别的论文的参考文献），只能按元数据取。
     """
     items = [i for i in load_catalog() if i.get("indexed")]
-    for cat in {str(i.get("category") or "") for i in items}:
-        if cat and cat != "未分类" and cat in question:
-            files = [str(i.get("file")) for i in items if str(i.get("category") or "") == cat]
-            return [f for f in files if f][:limit]
+    if not items:
+        return []
+    cats = sorted({str(i.get("category") or "") for i in items} - {""})
+    # 先精确匹配；再容忍用户改写（"能力测评与规模" vs 类别名"能力评测与规模"）：
+    # 取「类别名与问题的最长公共子串」长度 ≥ max(3, len(cat)//2) 就认。
+    # 为什么不用整体相似度：问题通常比类别名长很多（"…四篇论文的主旨分别是什么"），
+    # 整体 ratio 会被稀释到 0.4 以下，反而匹配不上。
+    for cat in cats:
+        if cat in question:
+            return [
+                str(i.get("file")) for i in items
+                if str(i.get("category") or "") == cat and i.get("file")
+            ][:limit]
+    best, best_size = "", 0
+    for cat in cats:
+        m = difflib.SequenceMatcher(None, cat, question).find_longest_match(0, len(cat), 0, len(question))
+        if m.size > best_size:
+            best, best_size = cat, m.size
+    if best and best_size >= max(3, len(best) // 2):
+        return [
+            str(i.get("file")) for i in items
+            if str(i.get("category") or "") == best and i.get("file")
+        ][:limit]
     return []
 
 
