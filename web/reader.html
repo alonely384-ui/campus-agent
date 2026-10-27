@@ -142,6 +142,14 @@
   #sidebar .rlist a .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #sidebar .rlist a .pg { margin-left: auto; color: #9aa3af; font-size: 11px; flex: 0 0 auto; }
   #sidebar .rlist .empty { font-size: 11.5px; color: #9aa3af; padding: 2px 8px 6px; }
+  /* 图表清单带缩略图：图是矢量时后端会退回「整页预览」，同样能看 */
+  #sidebar .rlist a.fig { align-items: flex-start; gap: 8px; padding: 6px 8px; }
+  #sidebar .rlist a.fig img {
+    width: 44px; height: 44px; flex: 0 0 auto; border-radius: 4px;
+    border: 1px solid #e3e7ee; background: #fff; object-fit: cover;
+  }
+  #sidebar .rlist a.fig .cap { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  #sidebar .rlist a.fig .cap .txt { white-space: normal; line-height: 1.35; }
   /* 摘要下面的一行快捷入口：章节树很长，表格/公式清单在侧栏底部，先给个"有 7 张表"的提示 */
   #miniLists { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 10px; }
   #miniLists a {
@@ -363,6 +371,8 @@
       <div class="rlist" id="tblList"></div>
       <h2 class="list-head">公式 <span class="cnt" id="fmlCount"></span></h2>
       <div class="rlist" id="fmlList"></div>
+      <h2 class="list-head">图表 <span class="cnt" id="figCount"></span></h2>
+      <div class="rlist" id="figList"></div>
     </aside>
     <main id="viewer">
       <div id="pages"></div>
@@ -429,6 +439,8 @@ const tblListEl = document.getElementById('tblList');
 const fmlListEl = document.getElementById('fmlList');
 const tblCountEl = document.getElementById('tblCount');
 const fmlCountEl = document.getElementById('fmlCount');
+const figListEl = document.getElementById('figList');
+const figCountEl = document.getElementById('figCount');
 const miniListsEl = document.getElementById('miniLists');
 
 const state = {
@@ -519,13 +531,14 @@ async function openPaper(filename, page) {
     if (r.ok) meta = await r.json();
   } catch (e) { /* 结构接口挂了不影响看 PDF，下面按"没解析"处理 */ }
   state.paperMeta = meta;
+  // 图表清单要靠 paperName 拼缩略图地址，所以必须在 renderSidebar 之前设好
+  state.paperName = filename;
   renderHeader(meta, filename);
   renderSidebar(meta);
   // 版式判定（单栏/双栏）要在算"适合宽度/按栏看"之前拿到，否则按栏看会先按整页宽渲染一次
   await loadLayout(filename);
 
   // 换论文时把译文状态清空：A 篇的译文不能留在 B 篇的栏里
-  state.paperName = filename;
   state.trans.pages = new Map();
   state.trans.selHtml = '';
   transStatus('未翻译');
@@ -801,12 +814,17 @@ function renderLayoutPanel() {
   });
 }
 
-/** 侧栏的表格 / 公式清单：原文里的公式和表格保持 PDF 原样，这里只负责"点一下就定位到那页"。 */
+/** 侧栏的表格 / 公式 / 图表清单：原文里的公式和表格保持 PDF 原样，这里只负责"点一下就定位到那页"。 */
 function renderLists(meta) {
   const tables = (meta && meta.tables) || [];
   const formulas = (meta && meta.formula_pages) || [];
+  const figures = (meta && meta.figures) || [];
+  const snippets = new Map(
+    ((meta && meta.formula_samples) || []).map(s => [s.page, s.snippet || ''])
+  );
   tblCountEl.textContent = tables.length ? `${tables.length} 张` : '';
   fmlCountEl.textContent = formulas.length ? `${formulas.length} 页` : '';
+  figCountEl.textContent = figures.length ? `${figures.length} 张` : '';
   tblListEl.innerHTML = tables.length
     ? tables.map(t =>
         `<a href="#" data-page="${t.page}">` +
@@ -815,21 +833,36 @@ function renderLists(meta) {
         `<span class="pg">p${t.page}</span></a>`).join('')
     : '<div class="empty">没有检测到表格</div>';
   fmlListEl.innerHTML = formulas.length
-    ? formulas.map(f =>
-        `<a href="#" data-page="${f.page}">` +
-        `<span class="tag">∑</span><span class="txt">第 ${f.page} 页</span>` +
-        `<span class="pg">${f.count} 个</span></a>`).join('')
+    ? formulas.map(f => {
+        // 公式被 pdf 拆成碎片，直接显示很难看：列表只给页码与个数，片段放 tooltip
+        const snip = snippets.get(f.page) || '';
+        return `<a href="#" data-page="${f.page}" title="${escapeHtml(snip || '看原页')}">` +
+          `<span class="tag">∑</span>` +
+          `<span class="txt">第 ${f.page} 页</span>` +
+          `<span class="pg">${f.count} 个</span></a>`;
+      }).join('')
     : '<div class="empty">没有检测到公式</div>';
+  figListEl.innerHTML = figures.length
+    ? figures.map(f =>
+        `<a class="fig" href="#" data-page="${f.page}" title="${escapeHtml(f.caption)}">` +
+        `<img loading="lazy" alt="图${escapeHtml(f.number || '')}" ` +
+        `src="/paper/${encodeURIComponent(state.paperName)}/figure/${f.index}">` +
+        `<span class="cap"><span class="txt">` +
+        `图${escapeHtml(f.number || '')} ${escapeHtml(f.caption.slice(0, 46))}` +
+        `</span></span>` +
+        `<span class="pg">p${f.page}</span></a>`).join('')
+    : '<div class="empty">没有检测到图表</div>';
 
-  // 侧栏顶部的快捷入口：章节树可能几十行，把"有没有表/公式"提前说一声，
+  // 侧栏顶部的快捷入口：章节树可能几十行，把"有没有表/公式/图"提前说一声，
   // 点一下滚到对应清单（清单本身不跳页，点条目才跳）
   miniListsEl.innerHTML = [
     tables.length ? `<a href="#" data-goto="tbl">表 ${tables.length} 张</a>` : '',
     formulas.length ? `<a href="#" data-goto="fml">公式 ${formulas.length} 页</a>` : '',
+    figures.length ? `<a href="#" data-goto="fig">图 ${figures.length} 张</a>` : '',
   ].filter(Boolean).join('');
 }
 
-for (const listEl of [tblListEl, fmlListEl]) {
+for (const listEl of [tblListEl, fmlListEl, figListEl]) {
   listEl.addEventListener('click', e => {
     const a = e.target.closest('a[data-page]');
     if (!a) return;
@@ -841,8 +874,8 @@ miniListsEl.addEventListener('click', e => {
   const a = e.target.closest('a[data-goto]');
   if (!a) return;
   e.preventDefault();
-  // 清单上面那个 <h2>（表格/公式）就是滚动目标；清单本身可能很长，滚到标题更好认
-  const list = a.dataset.goto === 'tbl' ? tblListEl : fmlListEl;
+  // 清单上面那个 <h2>（表格/公式/图表）就是滚动目标；清单本身可能很长，滚到标题更好认
+  const list = { tbl: tblListEl, fml: fmlListEl, fig: figListEl }[a.dataset.goto] || tblListEl;
   (list.previousElementSibling || list).scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
 layoutBadgeEl.addEventListener('click', () => { layoutPanelEl.hidden = !layoutPanelEl.hidden; });

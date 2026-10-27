@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from app.layout import layout_summary
@@ -106,9 +107,12 @@ def reader_meta(filename: str) -> dict | None:
         # 前端据此在侧栏注明来源，别让人以为扫描件自己解析出了目录。
         "sections_borrowed_from": str(meta.get("sections_borrowed_from") or ""),
         # 赛题 1.3.1「公式和表格的排版」：表格给"表 N + 标题 + 页码"清单，
-        # 公式只给页码（结构里公式的 text 是碎片，展示出来没意义）。
+        # 公式给页码 + 片段（公式的 text 是碎片，只取前 40 字当提示）。
         "tables": _table_list(meta),
         "formula_pages": _formula_pages(meta),
+        "formula_samples": _formula_samples(meta),
+        # 1.1.2「图表 chart」：图给"图 N + 题注 + 页码"，缩略图按需裁（/paper/{f}/figure/{i}）
+        "figures": _figure_list(meta),
         # 版式摘要（单栏/双栏 + 版式切换页），明细走 /paper/{f}/layout
         "layout": layout_summary(path),
     }
@@ -146,6 +150,54 @@ def _formula_pages(meta: dict, limit: int = 40) -> list[dict]:
         counts[page] = counts.get(page, 0) + 1
     rows = [{"page": p, "count": c} for p, c in sorted(counts.items()) if p > 0]
     return rows[:limit]
+
+
+def _formula_samples(meta: dict, limit: int = 30) -> list[dict]:
+    """公式片段：每页挑一条最像公式的当代表，前端在页码后面灰字显示。
+
+    为什么不把它们全列出来：公式被 pdf 拆成好几行，全列是一堆 "= f(x)" 碎片。
+    为什么不随便挑最长的一条：最长的那条往往是"含公式的正文句"（
+    "layers, produce outputs of dimension d_model…"），看着像正文却挂在公式清单里。
+    所以按"带运算符 > 英文单词少 > 短"打分。
+    """
+    operators = set("=∑∫√±×·≈≤≥∂")
+    best: dict[int, tuple[tuple, str]] = {}
+    for item in (meta.get("formulas") or []):
+        page = int(item.get("page") or 0) + 1
+        text = " ".join(str(item.get("text") or "").split())
+        if page <= 0 or not text:
+            continue
+        words = len(re.findall(r"[A-Za-z]{2,}", text))
+        has_op = any(ch in text for ch in operators)
+        score = (has_op, -min(words, 9), -len(text))
+        if page not in best or score > best[page][0]:
+            best[page] = (score, text)
+    rows = [
+        {"page": p, "snippet": text[:40] + ("…" if len(text) > 40 else "")}
+        for p, (_score, text) in sorted(best.items())
+    ]
+    return rows[:limit]
+
+
+def _figure_list(meta: dict, limit: int = 60) -> list[dict]:
+    """图表清单：只留题注非空的；每项带 index，前端用它去裁缩略图。"""
+    items: list[dict] = []
+    for idx, fig in enumerate(meta.get("figures") or []):
+        caption = str(fig.get("caption") or "").strip()
+        if not caption:
+            continue
+        items.append(
+            {
+                "index": idx,
+                "number": str(fig.get("number") or ""),
+                "caption": caption[:80],
+                # json 里 0 基（和章节/表格同口径），这里 +1 给人类看
+                "page": int(fig.get("page") or 0) + 1,
+            }
+        )
+        if len(items) >= limit:
+            break
+    return items
 
 
 def _section_page_of(sections: list[dict], title: str) -> int | None:

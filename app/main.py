@@ -11,13 +11,14 @@ import json
 from pathlib import Path
 
 import fitz
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.agent import run_agent, run_agent_stream
 from app.config import settings
+from app.figures import figure_bytes, page_png
 from app.layout import detect_layout
 from app.logging_config import get_logger, setup_logging
 from app.papers import (
@@ -25,8 +26,10 @@ from app.papers import (
     delete_structure,
     get_paper,
     list_papers,
+    load_structures,
     paper_path,
     save_paper,
+    version_of,
 )
 from app.rag.pipeline import index_paper, remove_source
 from app.reader import list_reader_papers, reader_meta, safe_paper_path
@@ -175,6 +178,7 @@ class PaperOut(BaseModel):
     pages: int
     uploaded_at: str
     duplicate_of: str = ""
+    duplicate_reason: str = ""
 
 
 @app.get("/papers/files", summary="论文库里的文件名（供单篇选择）")
@@ -194,41 +198,84 @@ async def papers_list() -> dict:
     return {"total": len(items), "papers": [PaperOut(**vars(p)) for p in items]}
 
 
-@app.post("/papers/upload", summary="上传论文（自动查重）")
-async def papers_upload(file: UploadFile = File(...)) -> dict:
-    """上传 PDF 并返回是否和库里已有的论文重复。
+@app.post("/papers/upload", summary="上传论文（支持批量，自动查重）")
+async def papers_upload(
+    files: list[UploadFile] | None = File(default=None),
+    file: UploadFile | None = File(default=None),
+) -> dict:
+    """上传一篇或一批 PDF，逐个落盘、解析、查重。
 
-    重复不会拒绝，而是返回 duplicate_of 让前端提示「与 xxx 相似，保留哪一版？」
-    —— 赛题要求就是这个行为。
+    重复不拒绝，而是回 `duplicate`（含依据与版本号），由前端弹窗让用户选
+    「保留新版删旧版 / 两个都留」—— 赛题 1.1.1 要求的就是这个交互。
+
+    兼容两种提交方式：`files`（批量，重复字段）与 `file`（老的单文件）。
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="文件名不能为空")
+    uploads = [f for f in (files or []) if f and f.filename]
+    if file is not None and file.filename:
+        uploads.append(file)
+    if not uploads:
+        raise HTTPException(status_code=400, detail="没有收到文件")
 
-    content = await file.read()
-    try:
-        paper, dup, score = save_paper(file.filename, content)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    results: list[dict] = []
+    for item in uploads:
+        name = item.filename or ""
+        content = await item.read()
+        try:
+            paper, dup, score = save_paper(name, content)
+        except ValueError as exc:
+            if len(uploads) == 1:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            results.append({"filename": name, "error": str(exc)})
+            continue
 
-    # 保存成功后立刻入库（切块 → 向量 → BM25），否则会出现"上传了但 AI 检索不到"。
-    # 入库失败不让整个上传 500：文件已经存好了，返回 indexed=0 提示前端/用户稍后重建。
-    indexed = 0
-    try:
-        path = paper_path(paper.paper_id)
-        if path is not None:
-            indexed = index_paper(str(path), paper.filename)
-    except Exception:
-        logger.exception("论文已保存，但入库失败（paper_id=%s）", paper.paper_id)
+        # 保存成功后立刻入库（切块 → 向量 → BM25），否则会出现"上传了但 AI 检索不到"。
+        # 入库失败不让整个上传 500：文件已经存好了，返回 indexed=0 提示稍后重建。
+        indexed = 0
+        try:
+            path = paper_path(paper.paper_id)
+            if path is not None:
+                indexed = index_paper(str(path), paper.filename)
+        except Exception:
+            logger.exception("论文已保存，但入库失败（paper_id=%s）", paper.paper_id)
 
-    return {
-        "paper": PaperOut(**vars(paper)),
-        "indexed": indexed,
-        "duplicate": (
-            {"paper_id": dup.paper_id, "filename": dup.filename, "score": score}
-            if dup
-            else None
-        ),
+        duplicate = None
+        if dup is not None:
+            old_version = version_of(dup.filename)
+            new_version = version_of(paper.filename)
+            duplicate = {
+                "paper_id": dup.paper_id,
+                "filename": dup.filename,
+                "score": score,
+                "reason": paper.duplicate_reason or "内容相同",
+                "old_version": old_version,
+                "new_version": new_version,
+                # 版本号大的算新版；拿不到版本号时不下结论
+                "newer": bool(new_version and old_version and new_version > old_version),
+            }
+
+        results.append(
+            {
+                "filename": paper.filename,
+                "paper": PaperOut(**vars(paper)).model_dump(),
+                "indexed": indexed,
+                "duplicate": duplicate,
+            }
+        )
+
+    saved = [r for r in results if "paper" in r]
+    dups = [r for r in saved if r.get("duplicate")]
+    body: dict = {
+        "total": len(uploads),
+        "saved": len(saved),
+        "duplicates": len(dups),
+        "results": results,
     }
+    if len(uploads) == 1 and saved:
+        # 单文件的老接口形态（老前端/老测试只读这三个字段）
+        body.update(paper=saved[0]["paper"], indexed=saved[0]["indexed"], duplicate=saved[0]["duplicate"])
+    if not saved and len(uploads) > 1:
+        raise HTTPException(status_code=400, detail="一个文件都没存成功")
+    return body
 
 
 @app.delete("/papers/{paper_id}", summary="删除论文")
@@ -279,6 +326,39 @@ async def paper_layout(filename: str) -> dict:
     if path is None:
         raise HTTPException(status_code=404, detail="论文不存在")
     return detect_layout(path)
+
+
+@app.get("/paper/{filename}/figure/{index}", summary="论文里的图表（按需裁成 PNG）")
+async def paper_figure(filename: str, index: int) -> Response:
+    """把 structures.json 里第 index 张图从 PDF 里裁出来。
+
+    为什么按需裁：全库预裁一次要几分钟，而用户一次只看一张。裁完缓存在
+    data/meta/figures/<stem>/fig<index>.png，同一张图第二次是直接读文件。
+    """
+    path = safe_paper_path(filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    figures = (load_structures().get(filename) or {}).get("figures") or []
+    if not (0 <= index < len(figures)):
+        raise HTTPException(status_code=404, detail="没有这张图")
+    fig = figures[index]
+    page_no = int(fig.get("page") or 0)
+    data = figure_bytes(path, path.stem, index, page_no, str(fig.get("caption") or ""))
+    crop = "figure"
+    if data is None:
+        # 矢量图（没有位图块）裁不出来 → 退回整页预览，并告诉前端这是整页
+        data = page_png(path, page_no)
+        crop = "page"
+    if data is None:
+        raise HTTPException(status_code=404, detail="这张图没能从 PDF 里裁出来")
+    return Response(
+        content=data,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "X-Figure-Crop": crop,
+        },
+    )
 
 
 @app.get("/paper/{filename}", summary="论文原文件 PDF（阅读页渲染用）")

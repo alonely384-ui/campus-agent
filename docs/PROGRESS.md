@@ -315,3 +315,46 @@ uff 全绿；提交 8b0908 已 push。
   - `_captions()` 会把正文里以 "Table 1 …" 开头的句子也当题注，所以表格清单要求 `rows` 非空。
   - CDP 脚本：`cdp.wait()` 的表达式返回 DOM 元素时 `returnByValue` 得到 `{}`（falsy），必须写 `!!document.querySelector(...)`；`start_edge()` 每端口要独立 `--user-data-dir`，否则新实例把命令行转给老实例后自己退出。
 - 下一步：1.4.2 arXiv 每日推荐（可选）、1.6.3 CSV→图（可选）、评分硬线（10/31 15:00 前缴费）、演示视频与技术文档。
+
+## 2026-10-28（周三）1.1 PDF 管理与解析：上传/去重/细粒度结构
+
+### 交付
+
+- **论文库界面**（`web/index.html`）：右上「论文库」按钮 → 面板里拖放或「选择文件」批量上传（单个 ≤30MB）；列表显示 页数 / 大小 / 重复标记 / 已入库，行内可「阅读」「删除」。
+- **批量上传**：`POST /papers/upload` 同时接受 `files`（多文件）与 `file`（老参数），逐个返回 `saved / duplicates / failed`；单文件响应仍带顶层 `paper / indexed / duplicate`，兼容老前端。
+- **查重（1.1.1）**：文本相似度（2 字组 Jaccard，阈值 0.80）+ **同一 arXiv 编号**双信号。`1706.03762v1.pdf` / `1706.03762v1_img.pdf` / 重复上传的 `1706.03762v7.pdf` 都能认出来；扫描件抽不出文字（0 字）也能靠编号判重。上传重复时前端 `confirm`：留新版删旧版 / 留旧版删刚上传的。
+- **索引对齐**：`sync_index()` 让 `index.json` 与磁盘对齐（补登记 38 篇历史论文、清掉已删文件、按 arXiv 编号标出 `duplicate_of`）。修前 `GET /papers` 只回 1 条、`/papers/files` 回 39 条；修后两个接口都是 39 条。
+- **细粒度结构（1.1.2）**：阅读页侧栏新增「表格 / 公式 / 图表」清单；图表缩略图走 `GET /paper/{f}/figure/{i}`，按题注位置从 PDF 里裁 PNG（矢量图没有位图块时退回整页预览，响应头 `X-Figure-Crop: page` 标明）；公式按页给「第 N 页 M 个」，片段进 tooltip。
+
+### 后端
+
+- `app/papers.py`：新增 `arxiv_id_of() / version_of() / _find_duplicate(..., reason) / sync_index() / _text_for() / _page_count()`；`Paper.duplicate_reason`；`save_paper()` 排除自身并记录判重依据；`paper_path()` 同时支持 `{id}.pdf` 与原名两种命名；`delete_paper()` 连带删 `.pdf / .txt / 结构`。
+- `app/figures.py`（新）：`pick_block() / crop_figure() / figure_bytes() / page_png()`，题注定位用 `page.search_for()`，裁切用 `get_pixmap(clip=...)`，结果缓存在 `data/meta/figures/<stem>/figN.png`。
+- `app/reader.py`：`reader_meta()` 新增 `figures / formula_samples`（`formula_samples` 按「带运算符 > 英文词少 > 短」挑每页代表）。
+- `app/main.py`：`/paper/{filename}/figure/{index}`；`Response` 导入；`PaperOut.duplicate_reason`。
+
+### 测试
+
+- `tests/test_papers_sync.py`（8 例）：索引补登记/清理、arXiv 编号判重（空文本也能认）、批量上传逐文件回报、新版提示、全失败 400。
+- `tests/test_figures.py`（6 例）：静态检查侧栏清单、`reader_meta` 的页码 1 基、公式片段长度、裁切路由 200 + PNG 头 + 缓存命中字节一致、越界与未知论文 404。
+- 全量：`192 passed, 11 warnings in 28.61s`；`ruff check app tests scripts` → `All checks passed!`。
+
+### 证据（CDP，真实浏览器）
+
+```json
+{"count":"共 41 篇","rows":41,"firstRows":["9999.99999v2.pdf | 1 页 · 1 KB | 重复","9999.99999v1.pdf | 1 页 · 1 KB | 已入库"]}
+{"figCount":"5 张","chips":["表 4 张","公式 7 页","图 5 张"],"first":{"text":"图1 The Transformer - model architecture.","page":"3","src":"/paper/1706.03762v7.pdf/figure/0","loaded":true,"w":473,"h":690},"click":{"page":"3","input":"3","landed":["3"]}}
+```
+
+### 踩的坑
+
+1. **路由里用了没导入的名字** → `NameError: name 'load_structures' is not defined`（连带发现 `Response` 也没导入）。单测没覆盖新路由就看不出来，先 `TestClient` 手动打一遍再接前端。
+2. **矢量图裁不出来**：CLIP / LayerNorm 的图是矢量绘制的，`get_text("dict")` 里没有 `type==1` 的位图块 → 按图片块定位必然失败。退回整页渲染（`X-Figure-Crop: page`），并让前端如实展示"整页"。
+3. **公式片段挑最长的是错的**：最长的那条通常是"含公式的正文句"。改成按运算符/英文词数打分，且列表里不显示片段（只进 tooltip），碎片留在 PDF 上更好懂。
+4. **缩略图地址依赖 `state.paperName`**：原来在 `renderSidebar()` 之后才赋值，图表清单的 `<img src>` 会拼成 `/paper/undefined/figure/0`。把赋值提到 `renderSidebar()` 之前。
+
+### 已知限制
+
+- `_captions()` 会把正文里以「Figure N …」开头的句子当题注（LayerNorm 有一条），图表清单可能多出一两条假条目。
+- 历史上传的 38 篇论文没有 `.txt` 文字缓存，首次查重时会读 PDF 抽一次（之后缓存）。
+- 扫描件（`1706.03762v1_img.pdf`）没有可抽取文字，查重只能靠 arXiv 编号。
