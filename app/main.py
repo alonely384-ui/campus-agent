@@ -10,6 +10,7 @@
 import json
 from pathlib import Path
 
+import fitz
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +29,12 @@ from app.papers import (
 )
 from app.rag.pipeline import index_paper, remove_source
 from app.reader import list_reader_papers, reader_meta, safe_paper_path
+from app.translate import (
+    load_translation,
+    references_page_of,
+    translate_pages,
+    translate_text,
+)
 
 setup_logging()
 logger = get_logger(__name__)
@@ -276,6 +283,98 @@ async def paper_file(filename: str) -> FileResponse:
         media_type="application/pdf",
         headers={"Cache-Control": "public, max-age=3600"},
     )
+
+
+# ---------------- 论文翻译（1.3.3）----------------
+# 1.3.3.1 部分翻译：POST /translate/selection（选中一段直接译）
+# 1.3.3.2 整篇翻译：GET /paper/{f}/translate（SSE 逐页返回，按页缓存）
+# 1.3.3.3 中英对比：前端拿"页"当锚点做双向滚动同步，翻译结果也按页存
+
+class TranslateSelectionRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=6000, description="要翻译的原文")
+    context: str = Field(default="", max_length=600, description="可选上下文（帮助统一术语）")
+
+
+@app.get("/paper/{filename}/translation", summary="已缓存的译文（按页）")
+async def paper_translation(filename: str) -> dict:
+    """返回缓存里已经翻好的页；一页都没翻过时 pages 为空对象。"""
+    if safe_paper_path(filename) is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    data = load_translation(filename)
+    pages = data.get("pages") or {}
+    ordered = {str(k): v for k, v in sorted(pages.items(), key=lambda kv: int(kv[0]))}
+    return {
+        "filename": filename,
+        "model": data.get("model"),
+        "updated_at": data.get("updated_at"),
+        "total": len(ordered),
+        "references_page": references_page_of(filename),
+        "pages": ordered,
+    }
+
+
+@app.get("/paper/{filename}/translate", summary="论文翻译（SSE 逐页流式返回）")
+async def paper_translate(filename: str, pages: str = "all", force: bool = False) -> StreamingResponse:
+    """逐页翻译并通过 SSE 推送。
+
+    pages=all        → 全文；默认跳过 References 及其后的页面（翻参考文献性价比很低）
+    pages=1,3,5      → 只翻这几页（1 基）
+    force=true       → 无视缓存重译（改过提示词时才需要）
+    """
+    path = safe_paper_path(filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    if not settings.llm_api_key or settings.llm_api_key.startswith("sk-在这里"):
+        raise HTTPException(status_code=503, detail="还没有配置 LLM_API_KEY，无法翻译")
+
+    ref_page = references_page_of(filename)
+    if pages.strip().lower() in ("all", "", "*"):
+        with fitz.open(path) as doc:
+            total_pages = len(doc)
+        limit = ref_page - 1 if ref_page and ref_page > 1 else total_pages
+        wanted: list[int] | None = list(range(1, limit + 1))
+    else:
+        wanted = []
+        for piece in pages.split(","):
+            piece = piece.strip()
+            if piece.isdigit():
+                wanted.append(int(piece))
+        if not wanted:
+            raise HTTPException(status_code=400, detail="pages 参数看不懂，用 all 或 1,3,5 这种页码")
+
+    async def event_generator():
+        try:
+            async for event in translate_pages(filename, path, pages=wanted, force=force):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception:
+            logger.exception("翻译失败: %s", filename)
+            err = {"type": "error", "message": "翻译失败，请稍后重试"}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/translate/selection", summary="翻译一段选中的文字（部分翻译）")
+async def translate_selection(req: TranslateSelectionRequest) -> dict:
+    if not settings.llm_api_key or settings.llm_api_key.startswith("sk-在这里"):
+        raise HTTPException(status_code=503, detail="还没有配置 LLM_API_KEY，无法翻译")
+    text = req.text.strip()
+    if req.context:
+        text = f"（上下文，仅供术语参考，不要翻译它）\n{req.context}\n\n{text}"
+    try:
+        markdown = await translate_text(text)
+    except Exception:
+        logger.exception("选中翻译失败")
+        raise HTTPException(status_code=502, detail="翻译服务暂时不可用") from None
+    return {"markdown": markdown}
 
 
 # ---------------- 前端页面 ----------------

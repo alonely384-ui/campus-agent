@@ -210,6 +210,52 @@
   .papers a:hover { border-color: var(--blue); color: var(--blue); }
   .papers a span.pg { color: #9aa3af; font-size: 12px; white-space: nowrap; }
 
+  /* ---------- 中文翻译（1.3.3）：右侧译文栏，可开可关 ---------- */
+  #transPane {
+    flex: 0 0 420px; width: 420px; background: #fff; border-left: 1px solid var(--line);
+    display: none; flex-direction: column; min-height: 0; z-index: 18;
+  }
+  #transPane.open { display: flex; }
+  #transHead {
+    display: flex; align-items: center; gap: 5px; padding: 8px 10px;
+    border-bottom: 1px solid var(--line); flex: 0 0 auto;
+  }
+  #transHead b { font-size: 13px; white-space: nowrap; }
+  #transStatus { font-size: 11px; color: var(--muted); margin-right: auto; overflow: hidden;
+                 text-overflow: ellipsis; white-space: nowrap; }
+  #transBody {
+    flex: 1 1 auto; overflow-y: scroll; padding: 14px 16px 60px;
+    font-size: 13.5px; line-height: 1.85; color: #1f2937;
+  }
+  #transBody h1, #transBody h2, #transBody h3 { font-size: 14px; margin: 14px 0 6px; }
+  #transBody h1 { font-size: 15px; }
+  #transBody p { margin: 0 0 10px; }
+  #transBody ul, #transBody ol { margin: 0 0 10px; padding-left: 20px; }
+  #transBody li { margin: 2px 0; }
+  #transBody code { background: #f3f4f6; border-radius: 4px; padding: 0 4px; font-size: 12px; }
+  #transBody pre {
+    background: #f8fafc; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; overflow-x: auto; font-size: 12px; margin: 0 0 10px;
+  }
+  #transBody .tpage { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 14px; }
+  #transBody .tpage:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+  #transBody .tpage > .tno {
+    font-size: 10px; color: #9aa3af; letter-spacing: .08em; margin-bottom: 6px;
+  }
+  #transBody .tempty { color: #9aa3af; font-size: 12px; line-height: 1.7; }
+  #transBody .sel {
+    background: #f0f7ff; border: 1px solid #d6e6fb; border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 14px;
+  }
+  #transBody .sel .src { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
+  /* 划词翻译的小浮钮：选中正文里的一段话后浮在鼠标旁边 */
+  #selBtn {
+    position: fixed; z-index: 60; background: #111827; color: #fff; border: none;
+    border-radius: 6px; font-size: 12px; padding: 6px 10px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  }
+  #selBtn[hidden] { display: none; }
+
   /* 窄屏：章节树变抽屉，顶栏减负 */
   @media (max-width: 900px) {
     aside#sidebar {
@@ -218,6 +264,11 @@
     }
     aside#sidebar.open { transform: translateX(0); }
     main#viewer { padding: 12px 8px 32px; gap: 12px; }
+    /* 窄屏上译文栏改成盖住半屏的浮层，不挤压 PDF */
+    #transPane.open {
+      position: fixed; top: 54px; bottom: 0; right: 0; width: min(92vw, 460px);
+      box-shadow: -8px 0 22px rgba(0,0,0,.18);
+    }
     .doc .t { font-size: 13px; }
     .tools select { max-width: 120px; }
   }
@@ -239,6 +290,7 @@
     </div>
     <div class="tools">
       <select id="paperSelect" title="换一篇论文"></select>
+      <button class="icon-btn" id="transToggle" title="中文翻译 / 中英对比（1.3.3）">译</button>
       <input id="pageInput" type="number" min="1" value="1" title="跳到指定页，回车确认" />
       <span class="pager" id="pageTotal">/ 0</span>
       <div class="viewmodes" role="group" aria-label="视图模式">
@@ -263,9 +315,23 @@
       <div id="pages"></div>
       <div id="overlay">正在加载 PDF…</div>
     </main>
+    <!-- 1.3.3 中文翻译：默认收起；「本页/全文」走 SSE 逐页出活，「对比」打开双向滚动同步 -->
+    <section id="transPane" aria-label="中文翻译">
+      <div id="transHead">
+        <b>译文</b>
+        <span id="transStatus">未翻译</span>
+        <button class="icon-btn" id="transPageBtn" title="翻译当前这一页">本页</button>
+        <button class="icon-btn" id="transAllBtn" title="翻译全文（默认跳过参考文献）">全文</button>
+        <button class="icon-btn" id="transSyncBtn" title="中英对比：拖动一侧，另一侧跟着走">对比</button>
+        <button class="icon-btn" id="transStopBtn" hidden title="停止翻译">停止</button>
+        <button class="icon-btn" id="transCloseBtn" title="关闭译文栏">×</button>
+      </div>
+      <div id="transBody"></div>
+    </section>
   </div>
   <div id="scrim"></div>
   <button id="backJump" hidden>↩ 返回第 <b id="backJumpPage">1</b> 页</button>
+  <button id="selBtn" hidden>译</button>
   <div id="toast" hidden></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
@@ -293,6 +359,16 @@ const toastEl = document.getElementById('toast');
 const backJumpEl = document.getElementById('backJump');
 const backJumpPageEl = document.getElementById('backJumpPage');
 const absBoxEl = document.getElementById('absBox');
+const transPaneEl = document.getElementById('transPane');
+const transBodyEl = document.getElementById('transBody');
+const transStatusEl = document.getElementById('transStatus');
+const transToggleEl = document.getElementById('transToggle');
+const transPageBtnEl = document.getElementById('transPageBtn');
+const transAllBtnEl = document.getElementById('transAllBtn');
+const transSyncBtnEl = document.getElementById('transSyncBtn');
+const transStopBtnEl = document.getElementById('transStopBtn');
+const transCloseBtnEl = document.getElementById('transCloseBtn');
+const selBtnEl = document.getElementById('selBtn');
 
 const state = {
   pdf: null,
@@ -310,6 +386,14 @@ const state = {
   citeIndex: new Map(),  // 引用编号 n -> 正文里第一次出现它的页码（惰性扫描后缓存）
   citeOrigin: null,      // 最近一次从正文点进来的引用：{key, page, top}，供 References 条目跳回
   authorIndex: new Map(), // "姓氏|年份" -> {page, needle}，作者-年份引用的惰性索引
+  trans: {
+    open: false,        // 译文栏是否展开
+    sync: false,        // 中英对比：双向滚动同步
+    pages: new Map(),   // 页码（1 基）-> 译文 Markdown
+    selHtml: '',        // 划词翻译结果（置顶显示）
+    running: false,     // 正在流式翻译
+    source: null,       // 当前 EventSource
+  },
 };
 
 // ---------- 小工具 ----------
@@ -374,6 +458,14 @@ async function openPaper(filename, page) {
   state.paperMeta = meta;
   renderHeader(meta, filename);
   renderSidebar(meta);
+
+  // 换论文时把译文状态清空：A 篇的译文不能留在 B 篇的栏里
+  state.paperName = filename;
+  state.trans.pages = new Map();
+  state.trans.selHtml = '';
+  transStatus('未翻译');
+  renderTrans();
+  loadCachedTranslation();
 
   try {
     const task = pdfjsLib.getDocument({ url: `/paper/${encodeURIComponent(filename)}` });
@@ -1070,6 +1162,10 @@ backJumpEl.addEventListener('click', () => {
   });
 });
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !selBtnEl.hidden) {
+    selBtnEl.hidden = true;   // 先关划词浮钮，别把"返回原位置"一起吞掉
+    return;
+  }
   if (e.key === 'Escape' && !backJumpEl.hidden) {
     backJumpEl.click();
   }
@@ -1208,6 +1304,281 @@ window.addEventListener('resize', () => {
     if (!state.pdf || !state.dims.length) return;
     relayout();
   }, 220);
+});
+
+// ---------- 中文翻译（1.3.3）----------------
+// 三条路对应赛题三个小节：
+//   1.3.3.1 部分翻译：选中正文 → 浮出「译」→ POST /translate/selection
+//   1.3.3.2 整篇翻译：「本页 / 全文」→ GET /paper/{f}/translate（SSE 逐页出活，后端按页缓存）
+//   1.3.3.3 中英对比：「对比」打开双向滚动同步，锚点 = 页码 + 页内比例
+
+function transStatus(msg) { transStatusEl.textContent = msg; }
+
+/** 极简 Markdown → HTML：够用就好（标题/列表/代码/粗斜体/引用），先转义防注入。 */
+function mdToHtml(md) {
+  const esc = escapeHtml(String(md || ''));
+  const fences = [];
+  let text = esc.replace(/```[a-zA-Z0-9]*\n([\s\S]*?)```/g, (_, code) => {
+    fences.push(`<pre><code>${code.replace(/\n$/, '')}</code></pre>`);
+    return `\u0000F${fences.length - 1}\u0000`;
+  });
+
+  const inline = (s) => s
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  const out = [];
+  let list = null;
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) { closeList(); continue; }
+    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (h) { closeList(); const n = Math.min(3, h[1].length); out.push(`<h${n}>${inline(h[2])}</h${n}>`); continue; }
+    const ul = /^[-*]\s+(.*)$/.exec(line);
+    if (ul) { if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inline(ul[1])}</li>`); continue; }
+    const ol = /^\d+[.)]\s+(.*)$/.exec(line);
+    if (ol) { if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inline(ol[1])}</li>`); continue; }
+    const bq = /^&gt;\s?(.*)$/.exec(line);
+    if (bq) { closeList(); out.push(`<blockquote>${inline(bq[1])}</blockquote>`); continue; }
+    closeList();
+    out.push(`<p>${inline(line)}</p>`);
+  }
+  closeList();
+  return out.join('\n').replace(/\u0000F(\d+)\u0000/g, (_, i) => fences[Number(i)]);
+}
+
+function renderTrans() {
+  const parts = [];
+  if (state.trans.selHtml) parts.push(state.trans.selHtml);
+  for (const p of [...state.trans.pages.keys()].sort((a, b) => a - b)) {
+    parts.push(`<section class="tpage" data-page="${p}"><div class="tno">P${p}</div>` +
+      `${mdToHtml(state.trans.pages.get(p))}</section>`);
+  }
+  if (!parts.length) {
+    parts.push('<div class="tempty">点「本页」翻译当前页，点「全文」翻译整篇（默认跳过参考文献）；' +
+      '也可以选中正文里的一段话，点浮出的「译」只翻那一段。</div>');
+  }
+  transBodyEl.innerHTML = parts.join('');
+}
+
+function openTrans() {
+  state.trans.open = true;
+  transPaneEl.classList.add('open');
+  transToggleEl.classList.add('on');
+  relayoutKeepingPage();
+}
+
+function closeTrans() {
+  state.trans.open = false;
+  transPaneEl.classList.remove('open');
+  transToggleEl.classList.remove('on');
+  relayoutKeepingPage();
+}
+
+/** 译文栏开关会改变正文可用宽度：重排后要回到原来的页，别把人甩到第 1 页。 */
+function relayoutKeepingPage() {
+  const cur = state.currentPage || 1;
+  if (!state.pdf || !state.dims.length) return;
+  relayout();
+  requestAnimationFrame(() => jumpToPage(cur, { silent: true }));
+}
+
+async function loadCachedTranslation() {
+  if (!state.paperName) return;
+  try {
+    const r = await fetch(`/paper/${encodeURIComponent(state.paperName)}/translation`);
+    if (!r.ok) return;
+    const data = await r.json();
+    const pages = data.pages || {};
+    state.trans.pages = new Map(Object.keys(pages).map(k => [Number(k), pages[k].markdown || '']));
+    renderTrans();
+    const n = state.trans.pages.size;
+    transStatus(n ? `已译 ${n} 页` : '未翻译');
+  } catch (e) { /* 缓存读不到就当没翻过，不影响阅读 */ }
+}
+
+function stopTranslate() {
+  if (state.trans.source) { state.trans.source.close(); state.trans.source = null; }
+  state.trans.running = false;
+  transStopBtnEl.hidden = true;
+}
+
+/** pages 传 'all' 或 '3' 或 '3,4,5'（1 基）。 */
+function startTranslate(pages) {
+  if (!state.paperName) return;
+  if (state.trans.running) { toast('正在翻译，先停止或等它翻完'); return; }
+  openTrans();
+  state.trans.running = true;
+  transStopBtnEl.hidden = false;
+  transStatus('准备中…');
+
+  const url = `/paper/${encodeURIComponent(state.paperName)}/translate?pages=${encodeURIComponent(pages)}`;
+  const es = new EventSource(url);
+  state.trans.source = es;
+
+  es.onmessage = (ev) => {
+    let data = null;
+    try { data = JSON.parse(ev.data); } catch (e) { return; }
+    if (data.type === 'page') {
+      state.trans.pages.set(Number(data.page), data.markdown || '');
+      renderTrans();
+      const tag = data.cached ? '（缓存）' : '';
+      transStatus(`第 ${data.page} 页${tag} · ${data.done}/${data.total}`);
+    } else if (data.type === 'done') {
+      stopTranslate();
+      const n = state.trans.pages.size;
+      transStatus(n ? `已译 ${n} 页` : '未翻译');
+      if (!n) toast('没有可翻译的页');
+    } else if (data.type === 'error') {
+      if (data.page) transStatus(`第 ${data.page} 页失败`);
+      else toast(data.message || '翻译失败');
+    }
+  };
+  es.onerror = () => {
+    if (!state.trans.running) return;
+    stopTranslate();
+    transStatus('翻译中断');
+    toast('翻译连接中断（可再点一次，已翻的页有缓存）');
+  };
+}
+
+// 划词翻译：选中正文里的一段话，鼠标旁边浮出「译」
+function selectedText() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return '';
+  const range = sel.getRangeAt(0);
+  if (!viewerEl.contains(range.commonAncestorContainer)) return '';
+  return sel.toString().replace(/\s+/g, ' ').trim();
+}
+
+document.addEventListener('mouseup', (ev) => {
+  if (!viewerEl.contains(ev.target)) { selBtnEl.hidden = true; return; }
+  const text = selectedText();
+  if (text.length < 4) { selBtnEl.hidden = true; return; }
+  selBtnEl.dataset.text = text.slice(0, 6000);
+  selBtnEl.style.left = `${clamp(ev.clientX - 10, 8, window.innerWidth - 56)}px`;
+  selBtnEl.style.top = `${clamp(ev.clientY + 14, 60, window.innerHeight - 44)}px`;
+  selBtnEl.hidden = false;
+});
+
+selBtnEl.addEventListener('click', async () => {
+  const text = selBtnEl.dataset.text || '';
+  selBtnEl.hidden = true;
+  if (!text) return;
+  openTrans();
+  state.trans.selHtml = '<div class="sel"><div class="src">选中的原文 · 翻译中…</div>' +
+    `<div class="tempty">${escapeHtml(text.slice(0, 160))}${text.length > 160 ? '…' : ''}</div></div>`;
+  renderTrans();
+  try {
+    const r = await fetch('/translate/selection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(() => ({}));
+      throw new Error(detail.detail || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    state.trans.selHtml = '<div class="sel"><div class="src">选中的原文</div>' +
+      `<p style="font-size:12px;color:#6b7280;margin:0 0 8px">${escapeHtml(text.slice(0, 240))}${text.length > 240 ? '…' : ''}</p>` +
+      `${mdToHtml(data.markdown || '')}</div>`;
+  } catch (e) {
+    state.trans.selHtml = '<div class="sel"><div class="src">翻译失败</div>' +
+      `${escapeHtml(String((e && e.message) || e))}</div>`;
+  }
+  renderTrans();
+});
+
+// 中英对比：双向滚动同步。程序滚动时给一段"别理我"的时间窗，避免两边互相拽。
+let syncLockedUntil = 0;
+let syncTick = null;
+
+function pageAtViewport() {
+  const vRect = viewerEl.getBoundingClientRect();
+  const anchorY = vRect.top + vRect.height * 0.25;
+  let best = null;
+  for (const el of pagesEl.querySelectorAll('.page')) {
+    const r = el.getBoundingClientRect();
+    if (anchorY >= r.top && anchorY < r.bottom) {
+      return { page: Number(el.dataset.page), frac: clamp((anchorY - r.top) / Math.max(1, r.height), 0, 1) };
+    }
+    if (r.bottom <= anchorY) best = { page: Number(el.dataset.page), frac: 1 };
+  }
+  return best;
+}
+
+function scrollTransTo(page, frac) {
+  const secs = [...transBodyEl.querySelectorAll('.tpage')];
+  if (!secs.length) return;
+  let target = secs[0];
+  for (const s of secs) if (Number(s.dataset.page) <= page) target = s;
+  const br = transBodyEl.getBoundingClientRect();
+  const sr = target.getBoundingClientRect();
+  const top = transBodyEl.scrollTop + (sr.top - br.top) + frac * sr.height - 12;
+  syncLockedUntil = Date.now() + 220;
+  transBodyEl.scrollTop = Math.max(0, top);
+}
+
+function transPageAtViewport() {
+  const br = transBodyEl.getBoundingClientRect();
+  const anchorY = br.top + 12;
+  let best = null;
+  for (const s of transBodyEl.querySelectorAll('.tpage')) {
+    const r = s.getBoundingClientRect();
+    if (anchorY >= r.top && anchorY < r.bottom) {
+      return { page: Number(s.dataset.page), frac: clamp((anchorY - r.top) / Math.max(1, r.height), 0, 1) };
+    }
+    if (r.bottom <= anchorY) best = { page: Number(s.dataset.page), frac: 1 };
+  }
+  return best;
+}
+
+function scrollViewerTo(page, frac) {
+  const el = pagesEl.querySelector(`.page[data-page="${page}"]`);
+  if (!el) return;
+  const vRect = viewerEl.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  const top = viewerEl.scrollTop + (r.top - vRect.top) + frac * r.height - viewerEl.clientHeight * 0.25;
+  syncLockedUntil = Date.now() + 220;
+  viewerEl.scrollTop = Math.max(0, top);
+}
+
+viewerEl.addEventListener('scroll', () => {
+  if (!state.trans.sync || !state.trans.open || !state.trans.pages.size) return;
+  if (Date.now() < syncLockedUntil) return;
+  clearTimeout(syncTick);
+  syncTick = setTimeout(() => {
+    const at = pageAtViewport();
+    if (at) scrollTransTo(at.page, at.frac);
+  }, 60);
+});
+
+transBodyEl.addEventListener('scroll', () => {
+  if (!state.trans.sync || Date.now() < syncLockedUntil) return;
+  clearTimeout(syncTick);
+  syncTick = setTimeout(() => {
+    const at = transPageAtViewport();
+    if (at) scrollViewerTo(at.page, at.frac);
+  }, 60);
+});
+
+transToggleEl.addEventListener('click', () => {
+  if (state.trans.open) closeTrans(); else openTrans();
+});
+transCloseBtnEl.addEventListener('click', closeTrans);
+transPageBtnEl.addEventListener('click', () => startTranslate(String(state.currentPage)));
+transAllBtnEl.addEventListener('click', () => startTranslate('all'));
+transStopBtnEl.addEventListener('click', stopTranslate);
+transSyncBtnEl.addEventListener('click', () => {
+  state.trans.sync = !state.trans.sync;
+  transSyncBtnEl.classList.toggle('on', state.trans.sync);
+  if (state.trans.sync) {
+    if (!state.trans.pages.size) toast('还没有译文：先点「本页」或「全文」');
+    else toast('对比滚动已开：拖一侧，另一侧跟着走');
+  }
 });
 
 // ---------- 论文清单（没带 paper 参数时当"目录页"用） ----------

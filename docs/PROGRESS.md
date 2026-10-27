@@ -257,3 +257,39 @@ uff 全绿；提交 8b0908 已 push。
   - 扫描版 PDF 没有文本层，CDP 等待 `#viewer .textLayer span` 会永久超时——等页面 `.page` 就行。
   - 日志/输出里的中文在 PowerShell 里会变成乱码（GBK 控制台），要么设 `$env:PYTHONIOENCODING='utf-8'`，要么把结果写进 utf-8 文件再读。
 - 下一步：1.3.3 翻译（部分 / 整篇 / 中英对照），以及 1.3.1 的公式/表格排版体验（题注定位、表格行高亮）。
+
+## 2026-10-28（周三·凌晨）1.3.3 翻译：部分翻译 / 整篇翻译 / 中英对比阅读
+
+- 新增 `app/translate.py`：以**页**为翻译单位（PDF 与阅读页天然共享的坐标，前端对比滚动只需页码 + 页内比例）。
+  - `page_texts()` 用 PyMuPDF 抽块、按 y 排序、去软连字符与断词、清掉 `\x00-\x08` 控制字符（PDF 的项目符号常抽成空字符，会把模型带偏）；
+  - `translate_text()` 按 6000 字切块分别请求，避免长页被截断；
+  - `translate_pages()` 逐页查缓存（`sha1(原文)[:12]`），命中就不调模型；`pages=None` 才是整篇，**显式空列表就是一页不翻**（防止参数算错把整篇烧掉）；单页失败只影响该页；
+  - 缓存写 `data/meta/translations/{filename}.json`（`data/papers/` 被 gitignore，跟着走会丢）。
+- 提示词（`SYSTEM_PROMPT`）：学术英文 → 简体中文、术语首次出现附英文括注、**公式/变量/代码/arXiv 编号/引用标记原样保留**、输出 Markdown（赛题 1.3.3.2 的"可读性"方案）、不写导语。
+- 后端三条路由（`app/main.py`）：
+  - `GET /paper/{filename}/translation` → 已缓存译文的页码与 Markdown；
+  - `GET /paper/{filename}/translate?pages=all|1,3,5&force=false` → SSE 逐页推送（`page` / `done` / `error`），`all` 自动截到 References 之前；未配 Key 返回 503，页码解析不出来返回 400；
+  - `POST /translate/selection` → 划词/选中段落的即时翻译（带 600 字上下文，提示词里明确"上下文不要翻"）。
+- 前端 `web/reader.html`：
+  - 顶栏加「译」按钮，右侧 420px 译文栏（`本页 / 全文 / 对比 / 停止`），窄屏 ≤900px 变成浮层；
+  - **1.3.3.1 部分翻译**：在正文里选中文字，鼠标旁浮出「译」钮，点一下把原文摘要 + 中文译文置顶到译文栏；
+  - **1.3.3.2 整篇翻译**：`全文` 按钮走 SSE，边翻边渲染，已翻过的页直接读缓存；
+  - **1.3.3.3 中英对比阅读**：`对比` 打开同步，拖正文按「页码 + 页内比例」带动译文栏，拖译文栏反过来带动正文（程序滚动时用 220ms 锁防互拽）；
+  - 译文栏开关会改变正文宽度，所以切完要 `relayoutKeepingPage()`（重排后回到原来那一页）。
+- 新增 `scripts/translate_papers.py`：`--pages all|1-9|3,5,7` 批量预翻译（离线演示/换机器后一键补齐），已预翻译 LayerNorm 全篇 10 页。
+- 证据（原文）：
+  - `168 passed, 11 warnings in 34.38s`；`ruff check app tests scripts` → `All checks passed!`
+  - 预翻译：`python scripts/translate_papers.py 1607.06450v1.pdf --pages 1-9` → 9 页新译（1195/1138/1376/1383/1631/1721/1635/2145/1437 字），产物 `data/meta/translations/1607.06450v1.json`；SSE 实测 `/translate?pages=4` 两帧（page + done），再点一次 `cached: true`。
+  - CDP 实测（`.tmp_shot/v4.py`，1440×900）：
+    - 整篇：`{"open":true,"status":"已译 9 页","pages":[1..9],"firstText":"P1 层归一化 Jimmy Lei Ba 多伦多大学 jimmy@psi.toronto.edu …","viewerW":733}`
+    - 划词：`{"hidden":false,"len":101,"text":"vector effectively controls the learning rate for the weight"}`
+    - 译文：`"选中的原文 vector effectively controls the learning rate for the weight vector. During learning, it is harder to … 向量有效地控制了权重向量的学习率。在学习过程中，更难的是"`
+    - 单页补译（第 10 页）：`{"status":"已译 10 页","pages":[1..10],"page10":"P10 10 -1 10 -2 训练 NLL 10 -3 10 -4 BatchNorm bz128 …"}`
+    - 对比同步：`{"pdfPage":3,"transPageAtTop":3,"syncOn":true}`
+- 坑：
+  - PDF 里的公式会把一页的文字顺序打乱（译文栏顶部出现 `μt = 1 / at = μt / ht + f / ot + b` 这种碎片），属抽取层面的限制，提示词只能尽量保留公式原文；
+  - `window.state` 是 `undefined`——`state` 是顶层 `const`，不挂 window；CDP 里直接写 `state` 能取到，判断存在要用 `typeof state !== 'undefined'`；
+  - 译文栏开关会触发 `relayout()`（清空并重渲染占位），测试必须在打开后重新 `jumpToPage()` 再等 `.textLayer > span`；
+  - 划词要挑最长的 span（第一个 span 常是 `3.1` 这类短串，长度 <4 会被浮钮逻辑忽略）；
+  - PowerShell 的 here-string 传给 `python -c` 会吃掉引号（`SyntaxError: invalid decimal literal`）→ 一律写临时 `.py` 文件跑。
+- 下一步：1.3.1 的公式/表格排版体验（题注定位、表格行高亮）、1.4.2 arXiv 每日推荐（可选）、1.6.3 CSV→图（可选）。
