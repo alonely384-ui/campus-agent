@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-27T12:33:51+08:00",
+ "updated_at": "2026-10-27T12:59:14+08:00",
  "library_size": 39,
  "items": [
   {
@@ -36,9 +36,15 @@
     }
    ],
    "base": 0.3827,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.3827,
    "vote": "",
-   "reason": "将混合专家路由用于多智能体路径规划，与库中Switch Transformers的稀疏专家思想呼应，但把路由对象换成地图分布，拓展到多智能体决策场景。"
+   "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的稀疏专家路由基础上，区别在于将MoE用于多智能体路径规划的神经策略学习，而非语言模型规模扩展。"
   },
   {
    "key": "2610.32142",
@@ -74,9 +80,15 @@
     }
    ],
    "base": 0.3586,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.3586,
    "vote": "",
-   "reason": "重新审视LoRA初始化与非对称学习率，与库中LoRA低秩适配工作直接相关，新在指出学习率调好后原版LoRA仍具竞争力。"
+   "reason": "在《LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS》的基础上，区别在于重新审视LoRA初始化与非对称学习率鲁棒性，而非提出新的LoRA变体。"
   },
   {
    "key": "2610.28086",
@@ -115,9 +127,15 @@
     }
    ],
    "base": 0.3546,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.3546,
    "vote": "",
-   "reason": "在扩散Transformer中做简单token路由，借鉴库中Switch Transformers的稀疏专家思路，新在面向视频生成吞吐瓶颈的token级路由。"
+   "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的token路由思想基础上，区别在于将简单token路由用于扩散Transformer以提升视频与图像生成吞吐。"
   },
   {
    "key": "2610.28223",
@@ -153,9 +171,15 @@
     }
    ],
    "base": 0.3533,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.3533,
    "vote": "",
-   "reason": "从数据系统视角研究长上下文LLM本地推理，与库中指令微调大模型工作同属LLM应用，新在聚焦长上下文在本地设备上的服务效率。"
+   "reason": "在《Training language models to follow instructions with human feedback》所代表的LLM应用基础上，区别在于从数据系统视角研究长上下文LLM的本地推理部署，而非对齐训练。"
   },
   {
    "key": "2610.29681",
@@ -193,9 +217,15 @@
     }
    ],
    "base": 0.3506,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.3506,
    "vote": "",
-   "reason": "研究像素语言模型的多语言预训练扩展，与库中关于大模型涌现能力的工作相关，新在考察像素式跨语言能力随预训练规模的演化。"
+   "reason": "在《Emergent Abilities of Large Language Models》关注的规模效应基础上，区别在于研究像素语言模型多语言预训练的规模化，而非文本LLM的涌现能力。"
   },
   {
    "key": "2610.33813",
@@ -228,9 +258,15 @@
     }
    ],
    "base": 0.2524,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.2524,
    "vote": "",
-   "reason": "受控比较LoRA与全量微调在提示安全分类上的表现，与库中LoRA工作直接相关，新在把任务格式作为混淆因素单独考察。"
+   "reason": "在《LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS》的基础上，区别在于控制任务格式变量，系统比较LoRA与全量微调在提示安全分类上的表现。"
   },
   {
    "key": "2610.34180",
@@ -263,9 +299,15 @@
     }
    ],
    "base": 0.2475,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.2475,
    "vote": "",
-   "reason": "在循环记忆中解耦token选择与槽位分配，与库中Layer Normalization同属序列建模基础组件研究，新在提出线性时间记忆的写入策略。"
+   "reason": "在《Layer Normalization》所涉及的序列建模归一化基础上，区别在于解耦循环记忆中的token选择与槽位分配，而非层归一化本身。"
   },
   {
    "key": "2610.34589",
@@ -298,9 +340,15 @@
     }
    ],
    "base": 0.2455,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.2455,
    "vote": "",
-   "reason": "面向科学表格理解提出层级条件秩投影LoRA，与库中LoRA低秩适配工作相关，新在利用表格层级结构指导秩分配。"
+   "reason": "在《LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS》的基础上，区别在于提出层级条件秩投影，用于科学表格理解中的复杂布局信息抽取。"
   },
   {
    "key": "2610.35190",
@@ -333,9 +381,15 @@
     }
    ],
    "base": 0.23,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.23,
    "vote": "",
-   "reason": "提出潜嵌入异常补丁Transformer做时间序列异常检测，与库中关于大模型能力涌现的研究同属表征学习，新在指出重构式检测目标的结构缺陷。"
+   "reason": "在《Emergent Abilities of Large Language Models》所体现的规模基准评测思路基础上，区别在于提出潜嵌入异常补丁Transformer用于时间序列异常检测，而非语言模型能力。"
   },
   {
    "key": "2610.34336",
@@ -368,9 +422,102 @@
     }
    ],
    "base": 0.2285,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
    "score": 0.2285,
    "vote": "",
-   "reason": "用长短对比剪枝提升推理模型思维链可压缩性，与库中DeepSeek-R1的推理强化工作相关，新在联合处理权重剪枝与思维链冗余的相互干扰。"
+   "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的推理模型基础上，区别在于用长短期对比剪枝同时改善权重剪枝与思维链压缩的兼容性。"
+  },
+  {
+   "key": "2610.34507",
+   "arxiv_id": "2610.34507",
+   "title": "The Price of Scale in Proactive Memory Recall",
+   "year": 2026,
+   "abstract": "A long-lived assistant that brings up memories without being asked must decide at every turn whether anything in its store is worth an interruption. We show that this decision is a multiple-testing problem whose difficulty grows with the store size $N$. On streaming replays of LongMemEval and LoCoMo, a similarity threshold tuned to 5% false alarms at $N=8$ reaches 87-100% at $N=2048$, across embedding models and for explicit and implicit cues; LLM judges show the same growth from a lower base. We prove that a gate with false-alarm rate $\\alpha$ operates at a per-item false-positive rate of about $-\\ln(1-\\alpha)/N$, which pins its hit rate to the far left of the single-comparison ROC curve and, under regular variation, makes it decay as a power of $N$ with an explicit constant. The resulting prediction matches the hit rate of a per-$N$ oracle threshold to within one percentage point. The analysis explains why lexical and semantic channels need thresholds growing like $\\ln N$ and $\\sqrt{\\ln N}$, and why per-cue normalisation roughly doubles the hit rate at matched false alarms. A cue-swap conformal gate, which compares the current cue with the user&#39;s other cues on the same store,",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.34507",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Tue, 27 Oct 2026",
+   "category": "cs.CL",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.213,
+   "topic_of": "On Layer Normalization in the Transformer Architecture",
+   "topic_top": [
+    {
+     "title": "On Layer Normalization in the Transformer Architecture",
+     "sim": 0.24
+    },
+    {
+     "title": "Robust Speech Recognition via Large-Scale Weak Supervision",
+     "sim": 0.155
+    },
+    {
+     "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+     "sim": 0.144
+    }
+   ],
+   "base": 0.2244,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.2244,
+   "vote": "",
+   "reason": "在《On Layer Normalization in the Transformer Architecture》的Transformer训练分析基础上，区别在于研究主动记忆召回中的多重检验问题与规模代价，而非归一化位置。"
+  },
+  {
+   "key": "orchardworkerdetectionusingspatialcontextattentionon2dlidardata",
+   "arxiv_id": "",
+   "title": "Orchard worker detection using spatial-context attention on 2D LiDAR data",
+   "year": 2027,
+   "abstract": "",
+   "authors": [
+    "Jintack Jeon",
+    "H. Chung",
+    "Gookhwan Kim",
+    "Seungyun Baek",
+    "Dae-Hyun Lee"
+   ],
+   "url": "",
+   "cited_by": [
+    "Attention Is All You Need",
+    "1706.03762v1_img",
+    "Attention Is All You Need"
+   ],
+   "source": "cited",
+   "github": "",
+   "overlap": 1.0,
+   "topic": 0.18,
+   "topic_of": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
+   "topic_top": [
+    {
+     "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
+     "sim": 0.21
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.111
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.111
+    }
+   ],
+   "base": 0.563,
+   "collab": 0.0,
+   "event": 0.01,
+   "events": 0.2,
+   "score": 0.573,
+   "vote": "",
+   "reason": "在《Attention Is All You Need》的自注意力机制基础上，区别在于将空间上下文注意力用于2D LiDAR果园工人检测，而非序列 transduction 任务。"
   }
  ],
  "errors": [],
@@ -379,7 +526,12 @@
  "without_arxiv": 18,
  "sources": {
   "cited": 23,
-  "recent": 6
+  "recent": 6,
+  "github": 0
  },
- "recent_scanned": 12
+ "recent_scanned": 12,
+ "user": "u-demo",
+ "period": "daily",
+ "collab_hits": 0,
+ "event_hits": 1
 }

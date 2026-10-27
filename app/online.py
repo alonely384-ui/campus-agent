@@ -151,6 +151,63 @@ def find_github(*texts: str) -> str:
     return ""
 
 
+GITHUB_API = "https://api.github.com/search/repositories"
+GITHUB_TTL = timedelta(days=14)
+_TOKEN_RE = re.compile(r"[a-z0-9]{3,}")
+_STOP_TOKENS = {"the", "and", "for", "with", "from", "using", "via", "based", "towards", "into"}
+
+
+def _tokens(text: str) -> set[str]:
+    return {tok for tok in _TOKEN_RE.findall((text or "").lower()) if tok not in _STOP_TOKENS}
+
+
+def github_repo(title: str) -> str:
+    """GitHub 搜索兜底：摘要里没写仓库地址时，按标题找仓库。
+
+    赛题 1.4.3 要求"是否包含 GitHub 代码，有代码优先"。实测不少论文摘要不写链接
+    （``find_github()`` 找不到），但仓库名往往就是论文名，所以再查一次搜索接口。
+    未认证的搜索接口限制 10 次/分钟，因此：只查标题、每次缓存 14 天、
+    标题关键词与仓库名/描述重合度不到 60% 就当没找到（宁可不给，也别给错的）。
+    """
+    title = (title or "").strip()
+    if len(title) < 8:
+        return ""
+    key = f"github_search_{title[:90]}"
+    cached = read_cache(key, GITHUB_TTL)
+    if cached is not None:
+        return str(cached or "")
+    target = _tokens(title)
+    # 少于 3 个关键词的标题不做（"Layer Normalization" 这种会误配到 RMSNorm 仓库：
+    # 它的描述里同样有 layer + normalization，但根本不是同一篇论文的代码）
+    if len(target) < 3:
+        return ""
+    found = ""
+    try:
+        with _client() as client:
+            resp = client.get(
+                GITHUB_API,
+                params={"q": f'"{title[:64]}" in:name,description', "per_page": 5},
+                headers={"Accept": "application/vnd.github+json"},
+            )
+            if resp.status_code != 200:
+                raise OnlineError(f"GitHub 搜索返回 {resp.status_code}")
+            rows = (resp.json() or {}).get("items") or []
+    except (httpx.HTTPError, ValueError, OnlineError) as exc:
+        logger.info("GitHub 搜索失败：%s", exc)
+        return ""
+    for row in rows:
+        name = str(row.get("full_name") or "")
+        desc = str(row.get("description") or "")
+        hit = len(target & _tokens(name + " " + desc))
+        name_hit = len(target & _tokens(name))
+        # 双条件：关键词要基本全覆盖（≥80%），且仓库名本身也要对上一半以上
+        if hit / max(1, len(target)) >= 0.8 and name_hit / max(1, len(target)) >= 0.5:
+            found = f"https://github.com/{name}"
+            break
+    write_cache(key, found)
+    return found
+
+
 def search_papers(title: str, limit: int = 6) -> list[dict[str, Any]]:
     """按标题在 arXiv 上搜，返回 [{arxiv_id, title, url, submitted}]。
 
