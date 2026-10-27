@@ -421,3 +421,63 @@ tables : 305 -> 282
 
 - 图题注里跨行被截断的（如「图4 DRAW model test nega-」）仍带着断字连字符，属于 `_lines()` 不做换行合并的老问题，不在本次范围。
 - 清单顺序按题注在 PDF 里出现的先后排，同一页内可能 图5 在 图4 前面。
+
+## 2026-10-27（周二）1.4 自动下载与推荐：按名下载 / 参考文献下载 / 新论文推荐
+
+赛题 1.4 三块一起做完了：给定论文名自动下载入库、顺着参考文献挑重点批量下载、
+定期刷新 arXiv 给出新论文推荐（带中文理由、有无代码、👍/👎 反馈）。
+
+**新增模块**
+- `app/online.py`：arXiv 搜索页解析、abs 详情页（标题/作者/摘要/日期/GitHub）、
+  `/pdf/{id}` 下载、Semantic Scholar `/references` 与 `/citations`、磁盘缓存
+  （`data/meta/online/`，搜索 7 天 / 详情 30 天 / 引用 3 天）、`citation_counts()`
+  统正文里 `[12]`、`[3, 5]`、`[7–9]` 的出现次数。
+- `app/recommend.py`：被引候选聚合 → 打分（引用重叠 0.35 + 主题相似度 0.35 +
+  有代码 0.15 + 新鲜度 0.15，👍 +0.15 / 👎 −0.35）→ LLM 写中文理由（失败退模板句）
+  → 落 `data/meta/recommendations.json` 与缓存；`rerank_with_feedback()` 让点赞立即重排，
+  不用重新抓网。
+
+**新增接口**
+- `POST /library/download`：`{query}` 可以是标题也可以是 arXiv 号；库里已有同编号
+  论文时直接返回 `downloaded=false`（`force=true` 才覆盖下载）。
+- `POST /paper/{filename}/references/download`：按正文引用频次挑 `min_cites` 以上、
+  最多 `limit` 篇下载入库。
+- `GET /recommendations` / `POST /recommendations/refresh` /
+  `POST /recommendations/{key}/feedback`：读缓存、抓一轮、记一票。
+
+**前端**：`web/index.html` 顶栏新增「发现」面板（按名下载 / 参考文献下载 / 推荐列表 +
+刷新 + 离线提示 + 👍👎 + 一键下载入库）；断网或 S2 限流时显示上次结果并标注时间。
+
+**脚本**：`scripts/refresh_recommend.py [--max-papers N --limit M]` 手动刷新；
+`scripts/download_paper.py <标题或编号> [--refs --limit 3 --min-cites 2]` 命令行下载。
+
+**实测（原文）**
+- 刷新：`scripts/refresh_recommend.py --max-papers 4 --limit 6` →
+  `库内论文：39 篇；候选：50 条；推荐：6 条`，首条 `[0.402] Map-Distribution Mixture-of-Experts…`
+  理由「将 Switch Transformers 的稀疏专家路由思想迁移到多智能体路径规划…」。
+- CDP（1440×900）「发现」面板：`{"rows": 6, "updated": "上次刷新：2026-10-27 11:23:16",
+  "offlineHidden": true, "first": {"score": "0.402", "arxiv": "2610.25991", "votes": 2,
+  "getBtn": true}, "refSelect": 39}`；点 👍 后 `{"cls": "vote-btn on", "score": "0.552"}`
+  （正好 +0.15），刷新时间标签不再被刷回"还没刷新过"。
+- 回归：`211 passed, 11 warnings in 26.78s`；`ruff check app tests scripts` →
+  `All checks passed!`。
+
+**踩的坑**
+1. 推荐理由 prompt 里是 JSON 示例，用 `str.format` 会 `KeyError: '"arxiv_id"'`，
+   改成 `__LIBRARY__` / `__CANDIDATES__` 占位再 `replace`。
+2. Semantic Scholar 的 `/paper/search` 与 `/search/match` 直接 429（共享 IP 限流），
+   只有按 arXiv ID 的 `/paper/arXiv:x/references|citations` 可用 → 搜索只能走
+   `arxiv.org/search/` 的 HTML 页，单次要 20 秒左右，必须缓存。
+3. 本机 `HTTP_PROXY=127.0.0.1:65532` 是死的，`httpx` 会连带本地请求一起失败；
+   `online.py` 统一 `trust_env=False` 并在客户端里清代理。
+4. 改 `web/index.html` 时用 `<div id="libModal" hidden>` 当锚点替换，把论文库弹窗的
+   开头标签一并删掉了（DOM 结构错乱），补回后已用 CDP 复查两个弹窗都能开。
+5. 点赞后只回 `items`，`updated_at` 为空，标签会退回"还没刷新过"；用
+   `recUpdatedEl.dataset.updated` 记住上次刷新时间。
+
+**已知限制 / 下一步**
+- 只把库里前 6 篇（有 arXiv 号的）当作种子，候选池 50 条左右，覆盖面受限；
+- arXiv 标题搜索不精确（曾把同名词条排在第一），现已用标题相似度 <0.5 拒收；
+- S2 引用数据 3 天过期，长时间不刷新会退化到只剩主题相似度；
+- 下一步：加 `--seed` 参数手动指定种子、定时任务（cron/计划任务）每周跑一次、
+  多用户时把 `feedback.json` 换成带用户 id 的反馈表做协同过滤。

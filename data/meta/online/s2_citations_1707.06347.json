@@ -1,0 +1,2049 @@
+{
+ "saved_at": "2026-10-27T03:22:18+00:00",
+ "data": {
+  "offset": 0,
+  "next": 50,
+  "data": [
+   {
+    "citingPaper": {
+     "paperId": "05c44b2309a299f1127ad25018f4fa50917ad1ec",
+     "externalIds": {
+      "DOI": "10.1016/j.dibe.2026.101053",
+      "CorpusId": 292405220
+     },
+     "title": "An integrated framework based on reinforcement learning for performance-driven residential block generation",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "https://www.sciencedirect.com/science/article/pii/S2666165926002115/pdf",
+      "status": "GOLD",
+      "license": "CCBYNCND",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.dibe.2026.101053?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.dibe.2026.101053, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2253757724",
+       "name": "An-Qi Dai"
+      },
+      {
+       "authorId": "2505054377",
+       "name": "Wen-Zhong Shi"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "78d13c86b0cf729c601e58e084c415d8cb36aebb",
+     "externalIds": {
+      "DOI": "10.1016/j.engappai.2026.116586",
+      "CorpusId": 293875679
+     },
+     "title": "Optimal control-guided reinforcement learning for turbojet engine speed regulation",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.engappai.2026.116586?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.engappai.2026.116586, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2146073266",
+       "name": "Lei Chen"
+      },
+      {
+       "authorId": "2267514545",
+       "name": "Dong-Mei Wu"
+      },
+      {
+       "authorId": "24125018",
+       "name": "Kun-Peng Bai"
+      },
+      {
+       "authorId": "2347630064",
+       "name": "Yu-Tian Chi"
+      },
+      {
+       "authorId": "2507038145",
+       "name": "Yuan-Song Zhang"
+      },
+      {
+       "authorId": "2248270046",
+       "name": "Bi-Yuan Nie"
+      },
+      {
+       "authorId": "2323318169",
+       "name": "Wei Dong"
+      },
+      {
+       "authorId": "2397443492",
+       "name": "Hui Dong"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "8f431ea6a466b5b248bdff3bc06f74a65d2609f2",
+     "externalIds": {
+      "DOI": "10.1109/LRA.2026.3728367",
+      "CorpusId": 291496995
+     },
+     "title": "Rationality Randomization With Maximum Entropy for Robust Dynamic Obstacle Avoidance on Legged Robots",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/LRA.2026.3728367?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/LRA.2026.3728367, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2468475385",
+       "name": "Jose-Luis Holgado-Alvarez"
+      },
+      {
+       "authorId": "2150912081",
+       "name": "Gabriele Tiboni"
+      },
+      {
+       "authorId": "2265381449",
+       "name": "Aryaman Reddi"
+      },
+      {
+       "authorId": "1399348619",
+       "name": "Carlo D'Eramo"
+      }
+     ],
+     "abstract": "Reinforcement learning (RL) for legged robots has recently gained significant attention due to its ability to enable traversal of complex terrains and navigation in cluttered environments. However, most existing approaches focus on static or predictably moving obstacles and rely on handcrafted curricula or manual task design, which may limit robustness to diverse obstacle behaviors. In this letter, we propose a method to automatically generate rich and dynamic obstacle-avoidance scenarios for learning robust navigation policies. Inspired by adversarial RL, we model obstacles as agents that induce challenging interactions for a protagonist policy. To improve robustness, we vary obstacle behavior by modulating their rationality, defined as the level of stochasticity in their actions. This is controlled via a temperature parameter that interpolates between deterministic, goal-directed motion and random behavior. We implement this through a domain randomization framework that samples rationality coefficients from a probability distribution, exposing the policy to a diverse range of obstacle behaviors during training. Crucially, this distribution is adapted online via a maximum entropy objective, which expands behavioral diversity while maintaining task performance. We demonstrate that the proposed method, RAtionality randomization with Maximum ENtropy (RAMEN), enables the learning of navigation policies that generalize across a wide range of simulated dynamic environments. Furthermore, we show successful zero-shot deployment on a legged robot operating in dynamic real-world scenarios using only onboard sensory inputs."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "d948bea1437e7c61538b8786b114af275aad82cf",
+     "externalIds": {
+      "DOI": "10.1016/j.jhydrol.2026.136465",
+      "CorpusId": 292320045
+     },
+     "title": "Multi-objective optimization of best management practices in agricultural watersheds using single-step deep reinforcement learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.jhydrol.2026.136465?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.jhydrol.2026.136465, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2161955960",
+       "name": "Jinuk Kim"
+      },
+      {
+       "authorId": "2312490290",
+       "name": "Byeongchan Yun"
+      },
+      {
+       "authorId": "23598644",
+       "name": "J. Pyo"
+      },
+      {
+       "authorId": "2239025390",
+       "name": "Li-Chi Chiang"
+      },
+      {
+       "authorId": "2157224000",
+       "name": "Jin Hwi Kim"
+      },
+      {
+       "authorId": "2503397770",
+       "name": "Kyeong Hwa Cho"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "866427d5683100516e802d00f5067133694f99a8",
+     "externalIds": {
+      "DOI": "10.1109/JIOT.2026.3719179",
+      "CorpusId": 290897530
+     },
+     "title": "Coupled Target Assignment and Path Planning for Underwater Glider Fleets in a Marine IoT System Under Multisource Disturbances",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/JIOT.2026.3719179?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/JIOT.2026.3719179, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2372491147",
+       "name": "Peng-Fei Yang"
+      },
+      {
+       "authorId": "2385791777",
+       "name": "Wei Ma"
+      },
+      {
+       "authorId": "2375930507",
+       "name": "Tong-Cheng Du"
+      },
+      {
+       "authorId": "2456383799",
+       "name": "Sheng Gao"
+      },
+      {
+       "authorId": "2459845366",
+       "name": "Chen-Yang Wang"
+      },
+      {
+       "authorId": "2377505438",
+       "name": "Yu-Hong Ma"
+      },
+      {
+       "authorId": "2322736312",
+       "name": "Jie-Ru Song"
+      }
+     ],
+     "abstract": "Currently, the use of marine Internet of Things (IoT) systems comprising multiple underwater gliders (UGs) for large-scale marine observation is becoming increasingly prevalent in marine survey and oceanographic research. Nevertheless, the highly complex and uncertain marine environment, with multisource disturbances and stochastic variability, poses formidable challenges to reliable multivehicle coordination. Based on deep reinforcement learning, we propose a robust multiagent proximal policy optimization (RMAPPO) method to coordinate the target assignment and path planning of UG fleets under multisource environmental disturbances. The dynamic model of single UGs is established according to net buoyancy loss caused by marine disturbances, and the kinematic model is constructed by incorporating the time-varying ocean currents. Then, a novel reward function that incorporates a potential-based reward shaping mechanism with a dynamic redundancy penalty is proposed to address the coupled target assignment and path planning for UG fleets under multisource disturbances. Finally, an adversarial training framework is designed to account for the uncertainty of the ocean currents in real marine environments. The qualitative and quantitative results demonstrate that our RMAPPO outperforms the competing methods. A sea trial was conducted to validate the robustness and transferability of our method. In brief, the proposed method can achieve excellent performance under multisource disturbances to enable effective mission completion of IoT systems, proving the feasibility of multiagent reinforcement learning (MARL) methods in real marine environments."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "0ffef3c0edcd99c82d06c1b4310b63af9f36fa99",
+     "externalIds": {
+      "DOI": "10.1109/TSG.2026.3702856",
+      "CorpusId": 289245110
+     },
+     "title": "Charging Station Pricing and Scheduling With Localized Personal Information via Offloading Computation to EVs",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TSG.2026.3702856?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TSG.2026.3702856, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2200708617",
+       "name": "Hong-Yi Wu"
+      },
+      {
+       "authorId": "2118487494",
+       "name": "Xiao-Ying Tang"
+      },
+      {
+       "authorId": "2238130257",
+       "name": "Y. Zhang"
+      }
+     ],
+     "abstract": "Rapid electric vehicle (EV) adoption has fueled the swift growth of charging station (CS) networks. Nevertheless, these stations encounter challenges in managing unpredictable user behavior while safeguarding EV owners’ privacy. This study introduces a Master-Follower Collaborative Reinforcement Learning (MFCRL) approach to facilitate the cooperative operation of multiple charging stations (CSs). Within the MFCRL framework, cooperative CSs assume the role of master, while EVs operate as followers. The master offloads training tasks involving private internal states to the followers and conducts training using a globally collected dataset, which remains resilient to unpredictable CS occupancy and aggregates local model updates from the followers. Consequently, RL models trained under this framework demonstrate robust performance by effectively adapting to dynamic electricity prices and variable station occupancy. Experimental results confirm the algorithm’s convergence and effectiveness in maximizing cumulative reward."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7d62bcfd261c85837adc2518424512b89a54a1d5",
+     "externalIds": {
+      "DOI": "10.1109/TVLSI.2026.3722739",
+      "CorpusId": 291202960
+     },
+     "title": "SPACE: Safety-Critical Performance-Counter Adaptive Control Engine for Anomaly Mitigation via Deep Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TVLSI.2026.3722739?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TVLSI.2026.3722739, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2313969476",
+       "name": "Elio Vinciguerra"
+      },
+      {
+       "authorId": "2458263874",
+       "name": "Nooshin Nosrati"
+      },
+      {
+       "authorId": "1679923",
+       "name": "G. Ascia"
+      },
+      {
+       "authorId": "2247811515",
+       "name": "Maurizio Palesi"
+      },
+      {
+       "authorId": "2282981399",
+       "name": "Ahmed Hemani"
+      }
+     ],
+     "abstract": "Modern automotive systems require adaptive mechanisms to handle both accidental faults and security threats at runtime. While hardware performance counter (HPC)-based anomaly detection has shown promise in RISC-V platforms, detection alone is insufficient; identifying anomalies without an effective response cannot prevent system failures or security breaches. In safety-critical environments, timely mitigation is essential to preserve system reliability and safety. To bridge this gap, this article proposes a deep reinforcement learning (DRL)-based anomaly mitigation approach that learns adaptive recovery policies from HPC observations, building on prior HPC-based anomaly detection for RISC-V platforms. The problem is formulated as a Markov decision process (MDP) where the DRL agent selects among three recovery actions: advance, restart, or backtrack. The DRL agent is trained on benchmarks running in FreeRTOS with injected faults and subsequently deployed as the safety-critical performance-counter adaptive control engine (SPACE). To satisfy hard real-time constraints, SPACE implements the trained DRL agent on a dedicated SiLago dynamically reconfigurable resource array (DRRA) fabric. Compared to software-based execution on general-purpose RISC-V processors, which severely violates system deadlines, the hardware-accelerated SPACE framework achieves strictly deterministic inference that is over three orders of magnitude faster. Furthermore, it provides critical physical and temporal isolation from the main CPU workloads while maintaining a minimal silicon footprint up to $17\\times $ smaller than high-performance out-of-order (O3) cores."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "6464b9031bcc11d6c718e52339d2aac633528c5a",
+     "externalIds": {
+      "DOI": "10.1109/TSG.2026.3721318",
+      "CorpusId": 290918681
+     },
+     "title": "World-Model-Based Deep Reinforcement Learning for Real-Time Microgrid Energy Management",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TSG.2026.3721318?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TSG.2026.3721318, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2314918608",
+       "name": "Kajal Pokharel"
+      },
+      {
+       "authorId": "1684830857",
+       "name": "He-Peng Li"
+      },
+      {
+       "authorId": "2151219745",
+       "name": "Hai-Bo He"
+      }
+     ],
+     "abstract": "This paper proposes a model-based deep reinforcement learning (DRL) framework for microgrid energy management built on a Dreamer-style world model. The approach jointly learns a latent dynamics model of the microgrid and a continuous control policy, and uses multi-step imagination rollouts for prediction-based decision making under AC power-flow and operational constraints. Since actions are evaluated inside the learned model before being applied, operators can inspect predicted trajectories to see how decisions affect future costs and network states. The method is tested on three distribution-level microgrids. Across all cases, the proposed method achieves substantially higher sample efficiency than widely adopted model-free RL benchmarks, reaching near-asymptotic performance within a few thousand environment steps while these benchmarks require tens of thousands or fail to converge. The learned policies further achieve a favorable balance between operating cost and safety violations relative to state-of-the-art model-free and model-based RL baselines, approaching the performance of an idealized mixed integer programming-based benchmark with perfect foresight."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "449fb6ab000dd5d5132e27fcbc2fb95c73d25ac9",
+     "externalIds": {
+      "DOI": "10.1109/JIOT.2026.3722234",
+      "CorpusId": 291067317
+     },
+     "title": "A DRL-Based Multimodel Adaptive Inference Framework With Model-Switching Overhead",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/JIOT.2026.3722234?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/JIOT.2026.3722234, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2308139659",
+       "name": "Xuan-Long Wu"
+      },
+      {
+       "authorId": "2382985325",
+       "name": "Hao-Jie Zhou"
+      },
+      {
+       "authorId": "2290752728",
+       "name": "Ning Wang"
+      },
+      {
+       "authorId": "2457302352",
+       "name": "Jun-Jie Xu"
+      },
+      {
+       "authorId": "2457205707",
+       "name": "Zhi-Kang Liu"
+      },
+      {
+       "authorId": "2301224329",
+       "name": "Peng Gao"
+      }
+     ],
+     "abstract": "As deep neural networks (DNNs) are being applied to a wide range of edge intelligent applications, there is an increasing demand for fast and accurate inference services, particularly on edge inference platforms. To satisfy user service level objectives (SLOs) and optimize system performance under dynamic workloads, it is important to select the appropriate DNN model configuration (model variants, concurrent instances, and batch size). However, this co-optimization process presents a considerable challenge due to the expansive combined space. To find the optimal configuration in this huge space, we propose a hierarchical deep Q-network (HL-DQN), which incorporates the model-switching overhead into the optimization evaluation and takes SLOs and resources as optimization objectives to determine the most suitable model configuration under dynamic workloads. We validate the proposed algorithm against other algorithms, and the results show that it converges the fastest and improves the utility by up to 25.5%. Our prototype system has been implemented on different edge platforms. Compared with state-of-the-art solutions, our framework achieves a maximum effective accuracy improvement of 14.6%, reduces graphics processing unit (GPU) memory consumption by more than 20%, and consistently maintains the lowest GPU utilization."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "c5ff0ebf021ef80f473ee0609a0d15116de04197",
+     "externalIds": {
+      "DOI": "10.1109/TSG.2026.3716944",
+      "CorpusId": 290593146
+     },
+     "title": "Trustworthy Reinforcement Learning for Renewable Base Energy Management Against Communication Failures",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TSG.2026.3716944?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TSG.2026.3716944, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2465422015",
+       "name": "Jian Di"
+      },
+      {
+       "authorId": "2265111766",
+       "name": "Qiu-Shi Cui"
+      },
+      {
+       "authorId": "2256380294",
+       "name": "Jian-Yu Pan"
+      },
+      {
+       "authorId": "2247684581",
+       "name": "Yang Weng"
+      },
+      {
+       "authorId": "2453697744",
+       "name": "Da Yang"
+      },
+      {
+       "authorId": "40228761",
+       "name": "Jian Li"
+      },
+      {
+       "authorId": "2240274381",
+       "name": "Wen-Yuan Li"
+      }
+     ],
+     "abstract": "Renewable energy integration introduces volatility, posing significant challenges to power systems energy management. Conventional methods struggle to handle the volatility relying on high-fidelity models. Recently, reinforcement learning (RL) offers an alternative by learning control policies based on environment interaction. However, communication failures and MW-scale renewable volatility cause delayed state perception and cascaded constraint violations, threatening both system reliability and economic efficiency, and limiting RL deployment. We formulate a communication-failure-tolerant DRL (CFT-DRL) framework that considers the grid-consistent belief state and physically operational envelopes simultaneously. A state belief estimation module is designed to alleviate state perception bias caused by communication failures. An operational-envelope-embedded mechanism is developed to incorporate operational envelopes into policy updates, complemented by a security execution layer to ensure strict constraint satisfaction. Considering the efficient learning and deployment feasibility, we align the policy exploration with physical state transitions. Comparative studies demonstrate superior robustness, operational feasibility, and readiness for practical deployment of the proposed method."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "d93c02f3676dff612e6eeb7dda41d7cba4fc5c95",
+     "externalIds": {
+      "DOI": "10.1109/TSG.2026.3707150",
+      "CorpusId": 289588909
+     },
+     "title": "Federated Heterogeneous-Agent Reinforcement Learning for the Flexible Dispatch of Energy Hubs",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TSG.2026.3707150?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TSG.2026.3707150, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2347000331",
+       "name": "Hao-Yuan Deng"
+      },
+      {
+       "authorId": "2362475235",
+       "name": "Ling-Yu Chen"
+      },
+      {
+       "authorId": "150341052",
+       "name": "Wen-Bo Zeng"
+      },
+      {
+       "authorId": "2114345299",
+       "name": "Xue-Yuan Cui"
+      },
+      {
+       "authorId": "2154459922",
+       "name": "Yi Wang"
+      }
+     ],
+     "abstract": "Energy hubs (EHs) are important district multi-energy systems that integrate various carriers for energy conversion and storage. For the flexible dispatch of EHs, reinforcement learning (RL) has been a promising solution, capable of effectively and efficiently handling inherent uncertainties within EHs. However, the sample inefficiency issue of RL could lead to computational burden and suboptimal policies. More recently, federated reinforcement learning (FRL) has emerged as a new paradigm that improves sample efficiency by coordinating the learning processes of multiple agents. In this work, we introduce FRL for flexible dispatch of EHs and, specifically, propose a federated heterogeneous-agent reinforcement learning (FHRL) framework to overcome the challenges posed by inter-agent heterogeneity, which could lead to training instability and performance degradation in FRL. Our framework features an adaptive model aggregation method that extracts generalized knowledge of dispatch policies to generate the global model. Furthermore, it incorporates a knowledge transfer mechanism that leverages the generalized knowledge to guide the optimization of each local policy. Extensive experiments confirm our framework outperforms traditional RL and FRL in dispatch costs while demonstrating scalability in a large-scale scenario involving 50 heterogeneous EHs."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "95df20135d955dd18bd284f49d1093530e45e3dd",
+     "externalIds": {
+      "DOI": "10.1109/TPWRS.2026.3702687",
+      "CorpusId": 289243417
+     },
+     "title": "Training a Reasoning Large Language Model for Improving Power Flow Convergence",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "https://www.techrxiv.org/doi/pdf/10.36227/techrxiv.175493660.02041809",
+      "status": "GOLD",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TPWRS.2026.3702687?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TPWRS.2026.3702687, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2267015461",
+       "name": "Yun-Qi Yan"
+      },
+      {
+       "authorId": "2267105757",
+       "name": "Ying Chen"
+      },
+      {
+       "authorId": "50259885",
+       "name": "Tan-Nan Xiao"
+      }
+     ],
+     "abstract": "Power flow convergence is a critical and long-standing challenge in power system operations, where “black-box” data-driven approaches often lack the generalization and interpretability required for critical applications. This paper explores a new paradigm by leveraging the advanced reasoning capabilities of Large Language Models (LLMs) to address complex power system control problems, using power flow convergence as a key demonstration. We introduce a reinforcement learning framework to train a specialized LLM agent that makes sequential adjustments to system parameters. By employing a Chain-of-Thought (CoT) process, the agent emulates an expert’s analytical steps, navigating the system from a non-convergent to a convergent state while providing a transparent decision-making trail. The framework features a two-stage training process: Supervised Fine-Tuning (SFT) to instill the desired reasoning format, followed by Reinforcement Learning with Verifiable Rewards (RLVR) to refine the decision-making policy. Case studies demonstrate that the trained LLM not only successfully guides non-convergent cases to a solution but also offers a high degree of interpretability by explicitly articulating its logic. Furthermore, the model exhibits strong zero-shot generalization to unseen power system topologies, showcasing the potential of reasoning-augmented LLMs as a more transparent, adaptable, and generalizable tool for power system control."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "26e8d7f87b3c26b9333cd0524cc3f6701648b1c8",
+     "externalIds": {
+      "DOI": "10.1109/JIOT.2026.3727547",
+      "CorpusId": 291444907
+     },
+     "title": "Cross-Domain Routing and Resource Allocation for Computing Power Network",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/JIOT.2026.3727547?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/JIOT.2026.3727547, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2373731029",
+       "name": "Man-Jun Zhang"
+      },
+      {
+       "authorId": "2285773273",
+       "name": "Ying Wang"
+      },
+      {
+       "authorId": "2281350675",
+       "name": "Tian-Tian Cai"
+      },
+      {
+       "authorId": "2116461082",
+       "name": "Zi-Hao Zhang"
+      },
+      {
+       "authorId": "2397340918",
+       "name": "Shao-Yong Guo"
+      },
+      {
+       "authorId": "2264637028",
+       "name": "Peng Yu"
+      },
+      {
+       "authorId": "2247617467",
+       "name": "Xue-Song Qiu"
+      }
+     ],
+     "abstract": "The cross-domain computing power networks (CPNs) require joint optimization of request routing and computing resource allocation under dynamic conditions and administrative isolation. To this end, we formulate the problem as a partially observable Markov decision process and propose a privacy-preserving Transformer-MAPPO framework operating under the centralized-training-decentralized-execution (CTDE) paradigm. The proposed method jointly determines compute-domain selection, interdomain skeleton routing, intradomain refinement, and computing resource allocation, while guaranteeing runtime feasibility through candidate filtering and projection-based action correction. A segment routing over IPv6 (SRv6)-compatible realization is further developed to map the learned decisions into executable segment lists. Experimental results show that, compared with MAPPO, DDPG, and Greedy, Transformer-MAPPO achieves 4.16% reduction in average delay, 32.81% reduction in energy consumption, 13.38% reduction in maximum link utilization (MLU), and 44.89% reduction in SLA violation rate."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "82d59f81ecef725c68e6354866c77298c7cb0d60",
+     "externalIds": {
+      "DOI": "10.1038/s41467-026-78533-6",
+      "CorpusId": 293942378
+     },
+     "title": "Multiproperty optimization of therapeutic antibodies through sequence editing via large language model and reinforcement learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1038/s41467-026-78533-6?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1038/s41467-026-78533-6, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2344822447",
+       "name": "Min-Yao Qiu"
+      },
+      {
+       "authorId": "2283977124",
+       "name": "Zhi-Wei Wang"
+      },
+      {
+       "authorId": "2144511505",
+       "name": "Xuan Liu"
+      },
+      {
+       "authorId": "2406417197",
+       "name": "Hong-Zhun Wang"
+      },
+      {
+       "authorId": "2066175447",
+       "name": "Q. Hua"
+      },
+      {
+       "authorId": "2517388172",
+       "name": "Qin Shu"
+      },
+      {
+       "authorId": "2269126537",
+       "name": "Shao-Xiang Luo"
+      },
+      {
+       "authorId": "2517384848",
+       "name": "Meng-Xi Niu"
+      },
+      {
+       "authorId": "2517386912",
+       "name": "Feng Ma"
+      },
+      {
+       "authorId": "2117426221",
+       "name": "Feng Huang"
+      },
+      {
+       "authorId": "2276451248",
+       "name": "Yong-Kang Wang"
+      },
+      {
+       "authorId": "1406075049",
+       "name": "Zhan-Kun Xiong"
+      },
+      {
+       "authorId": "2261894421",
+       "name": "Wen Zhang"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7d05674aee2f1d73c69e41c43ac8205e6f83075c",
+     "externalIds": {
+      "DOI": "10.1038/s41598-026-46111-x",
+      "CorpusId": 293942738
+     },
+     "title": "Characterization of a fixed reinforcement learning policy for aerial robot with suspended payload under variable flight conditions",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1038/s41598-026-46111-x?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1038/s41598-026-46111-x, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2169066125",
+       "name": "Ali Tahir Karasahin"
+      },
+      {
+       "authorId": "2348304003",
+       "name": "Zi-Niu Wu"
+      },
+      {
+       "authorId": "2777690",
+       "name": "B. B. Kocer"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7e9191927909790504561e4ae44e473aee333f9d",
+     "externalIds": {
+      "DOI": "10.1007/s13042-026-03349-1",
+      "CorpusId": 293917990
+     },
+     "title": "An autonomous obstacle-avoidance method for unmanned aerial vehicles based on FA-PPO",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1007/s13042-026-03349-1?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1007/s13042-026-03349-1, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2212101886",
+       "name": "Jian-Bin Zheng"
+      },
+      {
+       "authorId": "2517095628",
+       "name": "Mu-Yuan Ma"
+      },
+      {
+       "authorId": "2281415361",
+       "name": "Zi-Yao Chen"
+      },
+      {
+       "authorId": "2307643646",
+       "name": "Yang Gao"
+      },
+      {
+       "authorId": "2517094218",
+       "name": "Yang-Xing Ou"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f386021f6793f1f0d20833b87d85682fbead6361",
+     "externalIds": {
+      "ArXiv": "2610.32966",
+      "CorpusId": 293940714
+     },
+     "title": "ViT-H: Generative Video-To-Humanoid Control with Motion Tracking Feedback",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32966, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": null,
+       "name": "Zi-Mo He"
+      },
+      {
+       "authorId": "2517367705",
+       "name": "Tian-Yi Bian"
+      },
+      {
+       "authorId": "2517978525",
+       "name": "Zi-Zhong Yang"
+      },
+      {
+       "authorId": null,
+       "name": "Hong-Jie Li"
+      },
+      {
+       "authorId": "2075423631",
+       "name": "Nan Jiang"
+      },
+      {
+       "authorId": "2217941702",
+       "name": "Jie-Ming Cui"
+      },
+      {
+       "authorId": "26663607",
+       "name": "Baoxiong Jia"
+      },
+      {
+       "authorId": "2296748836",
+       "name": "Yi-Zhou Wang"
+      },
+      {
+       "authorId": "2264375840",
+       "name": "Si-Yuan Huang"
+      },
+      {
+       "authorId": "2261513442",
+       "name": "Yi-Xin Zhu"
+      }
+     ],
+     "abstract": "Learning humanoid control from monocular human videos offers a scalable way to acquire diverse whole-body behaviors. Yet, existing reconstruction-retargeting-tracking pipelines are limited in system-level scalability by separately optimized intermediate stages and cannot directly optimize reference motion executability using downstream tracking feedback. We present ViT-H, a video-to-humanoid control framework following a generation-and-tracking paradigm. ViT-H directly generates humanoid reference motions from videos with a diffusion model, bypassing human motion reconstruction and retargeting, and uses motion-tracking outcomes to post-train the generator with direct preference optimization. We further introduce an autoregressive variant that enables real-time humanoid video teleoperation with sub-400 ms latency. Extensive experiments on the Unitree G1 demonstrate that ViT-H outperforms state-of-the-art reconstruction-retargeting-tracking pipelines in both motion quality and executability. We further show that ViT-H scales favorably with model size and with both pre-training and post-training data scale, while motion-tracking feedback consistently improves executability across different motion trackers."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "9ea1bbedb81f4e4916b94c03ccf269395b817745",
+     "externalIds": {
+      "ArXiv": "2610.32237",
+      "CorpusId": 293936143
+     },
+     "title": "Financial Context-Rich Strategy for Actor-Critic based Agents: A Deep Reinforcement Learning Approach for Stock Trading",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32237, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2318291674",
+       "name": "Hrishikesh Singh"
+      },
+      {
+       "authorId": "2317196086",
+       "name": "Aarti Sharma"
+      },
+      {
+       "authorId": "2317113795",
+       "name": "Millie Pant"
+      }
+     ],
+     "abstract": "In modern financial markets, more than 3/4th of the large volume trade is executed by algorithmic trading based on advanced trading strategies to attain higher precision and speed than traditional human traders. The conventional strategies focused on price-based indicators are inadequate in capturing the market dynamism arising from real-world events such as social sentiments, political instability, or sudden economic shifts. With the rise of Deep Reinforcement Learning (DRL) and data availability, there is a requirement for more efficient algorithms that can incorporate these external factors in trading strategies. DRL has shown potential in simulating real-world scenarios and in simplifying complex decision-making since DRL agents can automate the trading process i.e. executing trades in a manner comparable to human traders. They have shown reliable performance since they can update their policies based on risk and quantitative factors. In this paper, we propose a DRL approach based on partial and deep-infusion of sentimental analysis. It features distinct policy designs of actor-critic-based agents: only policy optimization (A2C&PPO) and policy optimization along with Q-learning principles (DDPG, TD3&SAC). Our findings reveal, that the agents based on policy optimization combined with Q-learning, significantly and consistently demonstrate improved performance upon sentiment deep-infusion in profit maximization as well as risk-averse trading."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "530a01b90eddd90db7df2906098a3bb351fea709",
+     "externalIds": {
+      "ArXiv": "2610.32971",
+      "CorpusId": 293940243
+     },
+     "title": "RobustRLlib: A Unified Library and Benchmark for Robust Reinforcement Learning Algorithms",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32971, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2279311839",
+       "name": "Xi Chen"
+      },
+      {
+       "authorId": "2517366508",
+       "name": "Feng-Qi Hu"
+      },
+      {
+       "authorId": "2392228153",
+       "name": "Ze-Yu Shen"
+      },
+      {
+       "authorId": "2517867851",
+       "name": "Jia-Ying Xu"
+      },
+      {
+       "authorId": "2279337566",
+       "name": "Shangding Gu"
+      },
+      {
+       "authorId": "2307405854",
+       "name": "Pan Xu"
+      },
+      {
+       "authorId": "2331681245",
+       "name": "An-Qi Liu"
+      },
+      {
+       "authorId": "2307555702",
+       "name": "Lai-Xi Shi"
+      }
+     ],
+     "abstract": "Robust reinforcement learning (RL) is critical for reliable real-world deployment, where policies may fail under diverse shifts and disruptions. Existing robust RL algorithms offer a rich set of mechanisms and principles, yet two major barriers limit their broader potential: limited algorithm reusability and an unclear empirical capability boundary. We introduce RobustRLlib, an algorithm-centric library and benchmark that addresses both challenges. It integrates 17 representative robust online, offline, and safe RL algorithms under a unified interface for substantially improved reusability, together with an enhanced evaluation platform spanning diverse real-world shifts and advanced humanoid and vision-language-action tasks. Systematic evaluation over 273 perturbation configurations provides an up-to-date capability map of current robust RL algorithms, revealing where they remain effective and where substantial robustness gaps persist. As an open-source, user-friendly platform, RobustRLlib offers a reproducible and extensible codebase for applying existing methods to new problems and developing new robust RL algorithms."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "91eee5515aca0fb9786d8525ed8a217b8ff0cd97",
+     "externalIds": {
+      "ArXiv": "2610.32855",
+      "CorpusId": 293940629
+     },
+     "title": "Regularised RL improves sim-to-real transfer",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32855, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2253655066",
+       "name": "Danilo Vucetic"
+      },
+      {
+       "authorId": "1739750274",
+       "name": "Mohamad H. Danesh"
+      },
+      {
+       "authorId": "153139070",
+       "name": "Florence Clerc"
+      },
+      {
+       "authorId": "38637273",
+       "name": "Hsiu-Chin Lin"
+      },
+      {
+       "authorId": "2294175839",
+       "name": "Jonathan Tremblay"
+      }
+     ],
+     "abstract": "Regularised reinforcement learning (RL) has provable robustness guarantees that should ease the transfer of policies from simulation to robots, known as sim-to-real. Yet, weakly regularised algorithms like Proximal Policy Optimisation (PPO) remain the de facto choice in sim-to-real pipelines, while the practical benefits of regularisation for transfer remain poorly characterised. In this work, we study the sim-to-real performance of commonly used RL algorithms, with the aim of characterising the effects of regularisation on robotic performance. To that end, we derive Soft MellowMax Actor-Critic (SMM-AC), a novel regularised RL algorithm based on the soft mellowmax value function, which carries strong robustness guarantees. On MuJoCo continuous control benchmarks, SMM-AC is competitive with baselines like Soft Actor-Critic (SAC). On real robots, SMM-AC achieves higher return, while exhibiting greater robustness to perturbations in observations, the environment, and dynamics than baselines. Together, these results demonstrate that regularised RL improves real-world policy deployment through better robustness to the sim-to-real gap, and changing real-world conditions."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "a2288e8001ae52561cce44fefa136f87b7e1498f",
+     "externalIds": {
+      "ArXiv": "2610.32143",
+      "CorpusId": 293936297
+     },
+     "title": "Geometry-Aware Reinforcement Learning for Close-Fitting Wearable Insertion",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32143, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2359252004",
+       "name": "Takuma Tsukakoshi"
+      },
+      {
+       "authorId": "2374141328",
+       "name": "Elle Miller"
+      },
+      {
+       "authorId": "19469689",
+       "name": "Tamon Miyake"
+      },
+      {
+       "authorId": "49590764",
+       "name": "Namiko Saito"
+      },
+      {
+       "authorId": "2143416452",
+       "name": "Yu-Shi Wang"
+      },
+      {
+       "authorId": "2337107075",
+       "name": "Shigeki Sugano"
+      },
+      {
+       "authorId": "2238476192",
+       "name": "Tetsuya Ogata"
+      },
+      {
+       "authorId": "144575699",
+       "name": "S. Vijayakumar"
+      }
+     ],
+     "abstract": "Robot-assisted dressing is particularly challenging due to narrow openings and articulated body parts. Even small errors in the relative pose between the body part and garment opening can cause snagging, missed insertion, or incomplete dressing. To address these challenges, we formulate dressing as a geometry-aware insertion problem that represents task-relevant spatial relationships between the body part and object opening, rather than relying on the full deformable-object state. Based on this formulation, we propose a Reinforcement Learning (RL) framework combining a staged curriculum, which progressively guides the policy from coarse alignment to insertion and final placement, with a finger-wise insertion soft gate that provides continuous feedback on individual finger insertion progress and helps suppress premature insertion. We evaluate the framework on rigid and deformable bracelet dressing tasks through component ablations, systematic variations in the initial hand pose, and closed-loop execution of the learned policies on a real robotic system. On the post-training deformable evaluation, the full method reaches 84.7 +- 1.2% success. The insertion gate accounts for the largest gain, and adding the curriculum on top of that gate reaches the top score. On a mannequin hand the same full policy succeeds on 15/20 real-robot trials."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "d72b0d8633341c6c7513a5d7118128554abac95c",
+     "externalIds": {
+      "ArXiv": "2610.32034",
+      "CorpusId": 293936313
+     },
+     "title": "PPO vs. SAC: A Comparative Study for Cooperative Motion Control of Dual-Arm Space Robots",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32034, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2358695580",
+       "name": "Nasim Fallahiarezoodar"
+      },
+      {
+       "authorId": "2141396181",
+       "name": "Zheng-Hong Zhu"
+      }
+     ],
+     "abstract": "The growing population of orbital debris has intensified interest in active debris removal and on-orbit servicing, for which dual-arm space manipulators offer improved grasping stability and load distribution relative to single-arm systems. However, coordinating two manipulators under inter-arm collision avoidance, orientation alignment, and sensing uncertainty remains challenging. This paper develops a coordinated reinforcement learning framework for cooperative motion planning of a dual-arm space manipulator in a target-reaching task with inter-arm collision-avoidance constraints. A centralized state representation combines joint-space, end-effector, and target-relative information, while a multi-objective reward function promotes target-reaching accuracy, orientation alignment, motion smoothness, synchronized task completion, and collision avoidance. Within this framework, Proximal Policy Optimization (PPO) and Soft Actor-Critic (SAC) are compared as representative on-policy and off-policy algorithms, and the learned policies are further evaluated for generalization to previously unseen target configurations. Across five random seeds, SAC substantially outperforms PPO within the considered fixed-base simulation scenarios: it reaches an 80% success threshold in every seed (median 1.6M environment steps) whereas PPO does not reach it within a 4M-step budget, and it attains a higher mean success rate (78.6% versus 7.4%) with lower position and orientation errors and tighter bimanual synchronization. Both algorithms degrade on unseen boundary targets, but SAC retains most of its performance while PPO's collapses. The results also expose a failure mode of PPO: under the two-phase shaped reward, it tends to converge to a reward-loitering local optimum rather than committing to the precision task. This behavior highlights the sensitivity of on-policy learning to reward shaping."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "1ca4a41652dd7698cc91e81dc11979310b872eb3",
+     "externalIds": {
+      "ArXiv": "2610.32103",
+      "CorpusId": 293936320
+     },
+     "title": "ReMedI: Inference-Time Refinement and Self-Distillation for Controllable Molecular Optimization",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32103, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2335218907",
+       "name": "Jia-Yi Zhang"
+      },
+      {
+       "authorId": "2185282852",
+       "name": "Shivanshu Shekhar"
+      },
+      {
+       "authorId": "2517307489",
+       "name": "Allison McLevige"
+      },
+      {
+       "authorId": "2329704828",
+       "name": "Tong Zhang"
+      }
+     ],
+     "abstract": "In drug development, lead optimization must improve competing properties, such as increasing permeability and reducing toxicity, while limiting scaffold changes that could compromise the lead's potency. RL-based post-training, such as C-MORAL, addresses this problem by fine-tuning molecular language models to directly optimize molecular leads for objectives of interest, which relies on expensive task-specific datasets and faces challenges in achieving multi-objective optimization (MOO). We argue a pre-trained model may already contain useful molecular edits that zero-shot generation cannot efficiently reach. Motivated by the limited search capabilities of zero-shot generation, we develop an efficient Metropolis-Hastings search strategy to better explore the proposal distribution. We propose ReMedI, which uses the molecular language model as a base proposer for inference-time alignment. Given a lead and a set of multi-objective tasks, the model proposes edits conditioned on the current molecule, while Metropolis--Hastings refinement guides sequential edits under an objective for property improvement, preservation, and lead similarity. On both C-MuMOInstruct and SMDD benchmarks, refinement improves frozen base models across three backbones, reaching significantly higher multi-objective optimization success rates compared to baselines. These search traces can then distilled into the base model which improves zero-shot generation and subsequent search using approximately 7.8 times less training molecular leads than that of C-MORAL. ReMedI achieves approximately 2.8 times the strict-success coverage of RL baseline C-MORAL, including on out-of-distribution tasks, with matched lead-relative similarity."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "4bfaa11cb339c32b87782eec603447a3f6548b81",
+     "externalIds": {
+      "ArXiv": "2610.32277",
+      "CorpusId": 293936376
+     },
+     "title": "Delay Randomization Widens the Delay Margin of Learned Humanoid Motion Trackers",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32277, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2517993957",
+       "name": "Shao-Qin Li"
+      },
+      {
+       "authorId": "2518428903",
+       "name": "Yi Sun"
+      }
+     ],
+     "abstract": "Learned humanoid controllers are usually trained in one simulator and then checked in a second one before they go near hardware. We ask what that check says about command delay. We train motion-tracking policies for a 24-joint humanoid on five motions taken from monocular video and test them in an independent CPU MuJoCo harness, which we first verify against the training model. Every policy completes its motion in at least 26 of 30 episodes under the training randomization. With 40 ms of constant command delay, however, survival drops to 15% on average (0% - 45%), and the delay margin is only 20 - 30 ms. Randomizing the delay during training (0 - 50 ms) lifts survival at 40 ms to 95% on average (75% - 100%) and moves the margin to 50 - 70 ms. A control arm trained for the same number of extra iterations without delay does not improve, so the gain comes from the randomization itself. This holds for all five motions with three training seeds each, and a policy trained in PhysX behaves the same way. The price is slightly looser tracking (0.02 - 0.06 rad on four motions) and, for the most dynamic motion, less robustness to other perturbations. We also show that the first sim-to-sim gap we saw came from the harness, a missing floor and a wrong timestep, and not from the physics engines. The 0 - 20 ms delay ranges common in locomotion training lie inside the margin an unrandomized tracker already has. The benefit comes from randomizing beyond it, so the range should be set from the robot's measured latency, and delay margin belongs next to other sim-to-sim metrics."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "54155bb45e1999a5600c32892d86fb61ea1d3d99",
+     "externalIds": {
+      "ArXiv": "2610.32572",
+      "CorpusId": 293940268
+     },
+     "title": "Pseudo-Labels as Rewards, Not Targets: Group-Relative Policy Optimization for Semi-Supervised ASR",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32572, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2292787982",
+       "name": "Shashi Kumar"
+      },
+      {
+       "authorId": "2139767217",
+       "name": "Yanis Labrak"
+      },
+      {
+       "authorId": "144540933",
+       "name": "Sergio Burdisso"
+      },
+      {
+       "authorId": "1398324221",
+       "name": "Esaú Villatoro-Tello"
+      },
+      {
+       "authorId": "2324575397",
+       "name": "Petr Motlícek"
+      },
+      {
+       "authorId": "2338276048",
+       "name": "Kadri Hacioglu"
+      },
+      {
+       "authorId": "2306165476",
+       "name": "A. Stolcke"
+      }
+     ],
+     "abstract": "Adapting ASR to a domain with only untranscribed audio typically relies on pseudo-labeling, a strong teacher transcribes the audio and a student is fine-tuned on it. Because supervised fine-tuning (SFT) treats every pseudo-label token as a target, the student inherits the teacher's errors. We show that using the same pseudo-labels as a reward reference for Group Relative Policy Optimization (GRPO) is more robust to label noise. In the banking domain, GRPO yields 29.3% to 56.2% relative WER improvements over SFT on Whisper-generated labels, and the advantage holds across four Whisper sizes, four teacher families, three domains and four languages. While SFT reproduces almost 100% of teacher errors verbatim, GRPO passes through only 27%. Rollout statistics explain why, erroneous pseudo-label words rarely appear in on-policy rollouts, so group-relative advantages stay aligned with the clean transcript, whereas SFT forces them into the policy's support and collapses the reward variance GRPO relies on."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "588fd6eece364f1d5a7e7456e6d4ed1caaa5c068",
+     "externalIds": {
+      "ArXiv": "2610.32881",
+      "CorpusId": 293940238
+     },
+     "title": "NgramRL: Accelerating RL Post-Training for Structured Generation via Rollout-Aware N-gram Speculative Decoding",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32881, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2176129067",
+       "name": "N. Pandey"
+      },
+      {
+       "authorId": "2329413603",
+       "name": "Jangseon Park"
+      },
+      {
+       "authorId": "2072805867",
+       "name": "Jason Kong"
+      },
+      {
+       "authorId": "2034286602",
+       "name": "Onat Gungor"
+      },
+      {
+       "authorId": "2339272137",
+       "name": "T. Rosing"
+      }
+     ],
+     "abstract": "Reinforcement learning (RL) post-training improves the reasoning capabilities of large language models, but its cost is dominated by autoregressive rollout generation, which can exceed 70% of training time. Existing speculative-decoding methods are poorly suited to this setting: model-based drafters consume scarce GPU memory and may become misaligned as the policy evolves, while existing model-free methods do not explicitly exploit repetition across training epochs. We observe that recent rollouts of the same prompt provide a high-quality, self-updating draft source. Based on this insight, we propose NgramRL, a per-prompt n-gram drafter constructed from bounded recent rollout history. NgramRL requires no auxiliary model, drafter training, or persistent GPU-resident drafter state, while target-model verification preserves the rollout distribution. To hide CPU cache lookup and scheduling, we further introduce an adaptive fan-out prefetcher that predicts likely verification outcomes (j, b), consisting of the accepted draft length j and target-emitted continuation token b. A causal budget allocator concentrates prefetches on high-probability outcomes, while uncovered outcomes fall back to sequential lookup without changing committed tokens. Across two model families and three reasoning and structured-generation workloads, NgramRL commits 3.60-7.77 tokens per target-model forward in the warm-cache regime, up to 1.99x more than SuffixDecoding and 7.0x more than prompt-lookup decoding. On Spider, the prefetcher covers 96.6% of Qwen3-8B outcomes at a candidate budget of 16 and improves measured rollout throughput by 1.38x over synchronous NgramRL, approaching its 1.40x overlap ceiling."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f863196c88b1c094213f7f15ada7c6184bcc88d8",
+     "externalIds": {
+      "ArXiv": "2610.32389",
+      "CorpusId": 293940277
+     },
+     "title": "KnitTrans: Coordinated Trajectory Transfer for Effective and Efficient LLM Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32389, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2292177829",
+       "name": "Bang-Jun Xiao"
+      },
+      {
+       "authorId": "2297297270",
+       "name": "Chiheng Lou"
+      },
+      {
+       "authorId": "2312342587",
+       "name": "Xiao-Dong Ji"
+      },
+      {
+       "authorId": "2299473132",
+       "name": "Xiang-Wei Deng"
+      },
+      {
+       "authorId": "7637576",
+       "name": "Yi-Kai Zhao"
+      },
+      {
+       "authorId": "2258319623",
+       "name": "Gang Huang"
+      },
+      {
+       "authorId": "2404021460",
+       "name": "Hai-Lin Zhang"
+      }
+     ],
+     "abstract": "Trajectory transfer from rollout to training affects both learning quality and system efficiency in large language model reinforcement learning (RL). Enforcing batch-wide training requirements can delay the admission of completed trajectories, resulting in higher architectural staleness: the additional parameter-version gap from disaggregated pipelining relative to colocated execution. Beyond admission, misalignment between data access and training consumption causes redundant movement and unnecessary waiting when transferring large trajectory payloads. We present KnitTrans, a system that coordinates the rollout-to-training path through three designs. First, constraint-preserving mini-batch admission allows flexibility in early mini-batch composition, while checking that enough capacity remains to satisfy the remaining quotas. Second, on-demand trajectory data access matches storage units to consumer assignments and overlaps micro-batch data preparation with computation. Third, multimodal encoding deduplication supports reuse across a mini-batch while preserving gradient contributions from all backbone micro-batches. Experiments show up to 93% lower architectural staleness than with train-batch admission, narrowing the learning-quality gap between disaggregated execution and colocated execution. On multimodal workloads, KnitTrans reduces transfer latency by two orders of magnitude and achieves a speedup of up to 5.8 times in transfer plus training over the baseline."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "898ba81723db54c74f05ff151fc5d0cd44cbe8a1",
+     "externalIds": {
+      "ArXiv": "2610.32435",
+      "CorpusId": 293940303
+     },
+     "title": "Profile-Driven User Simulation via Reinforcement Learning with Hierarchical Rewards for Task-Oriented Dialogues",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32435, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2457770594",
+       "name": "Juan Li"
+      },
+      {
+       "authorId": "2517365836",
+       "name": "Fang-Shu Chang"
+      },
+      {
+       "authorId": null,
+       "name": "Xin-Yi Jiang"
+      },
+      {
+       "authorId": "2505386517",
+       "name": "Ling Huang"
+      },
+      {
+       "authorId": "2426300421",
+       "name": "Yun-Zhang Chen"
+      }
+     ],
+     "abstract": "Building Task-Oriented Dialogue (TOD) systems for high-value scenarios such as financial marketing requires large volumes of domain-specific dialogue data, which privacy regulations, annotation costs, and the need for expert labor make hard to obtain. User simulation offers a remedy, but existing methods target general-domain dialogue and exhibit two key limitations: insufficient modeling of domain-specific business processes and compliance constraints, and inadequate capture of the colloquial, spoken-language character of voice interactions. We propose ProfileSim, a profile-driven user simulation framework for financial marketing outbound calls. It jointly models user profiles---demographics and Big Five personality traits---and business profiles---intents reverse-engineered from real call logs---enabling fine-grained control over simulated behavior. The base model is fine-tuned on real voice dialogue data and refined by Group Relative Policy Optimization (GRPO) with hierarchical rewards at the dialogue and utterance levels. Paired with a customer service agent integrating Standard Operating Procedure (SOP) constraints and Retrieval-Augmented Generation (RAG), ProfileSim achieves the highest colloquial naturalness, the strongest user profile adherence and the lowest agent score on long-tail intents among all evaluated user generators, while producing substantially shorter user utterances at comparable business compliance. The generated dialogue data is designed to support intent recognition training, agent evaluation, and rapid cold-start deployment."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "57658da8a0736aa4e245f836516a96eb8233288e",
+     "externalIds": {
+      "ArXiv": "2610.32969",
+      "CorpusId": 293940382
+     },
+     "title": "DexPort: A Hand-Held Skill Interface for Dexterous Hand Data Collection",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32969, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2318979160",
+       "name": "Amber Xie"
+      },
+      {
+       "authorId": "2378213165",
+       "name": "Jia-Wei Fu"
+      },
+      {
+       "authorId": "2256638517",
+       "name": "Xiao-Feng Guo"
+      },
+      {
+       "authorId": "47218071",
+       "name": "Carmelo Sferrazza"
+      },
+      {
+       "authorId": "2384824402",
+       "name": "Guan-Ya Shi"
+      },
+      {
+       "authorId": "7217794",
+       "name": "Haozhi Qi"
+      }
+     ],
+     "abstract": "Collecting high-quality demonstrations remains a central bottleneck for learning dexterous manipulation. Teleoperation records executable robot actions, but it requires a complete robot setup and places the burden of coordinating many finger joints on the operator. Human demonstrations are easier to collect, but their motions must be estimated and retargeted to the robot, and they do not directly provide robot actions. In this paper, we introduce DexPort, a portable data-collection interface for high-DoF robot hands. It uses the same hand hardware for collection and deployment, avoiding a hand embodiment gap, and records both commanded joint targets and measured joint states. Our key observation is that a small set of skills can support a wide range of dexterous tasks. During collection, the operator moves the hand-held interface to specify the robot wrist motion and selects or adjusts skills that coordinate the finger motion. This removes the need to control each joint independently while retaining behaviors such as precise grasping and in-hand manipulation. We collect demonstrations across several real-world tasks and in unstructured environments without a robot arm. We then use behavior cloning to train visuomotor policies directly on the recorded wrist motions and hand commands, without skill labels. We evaluate across 4 tasks: pick-and-place with diverse objects, screwing with in-hand tool use, drawer stowage which requires simultaneous grasp and pulling, and a bimanual scanning task. We collect over 2,500 demonstrations with our portable device, in both laboratory and in-the-wild settings. Across our tasks, we see an improvement from 11% to 64% when using recorded robot commands instead of states, and an improvement from 36% to 78% for task success when using in-the-wild data."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "3ec1d77a4787b4e4378be9430843ee7a05253129",
+     "externalIds": {
+      "ArXiv": "2610.32978",
+      "CorpusId": 293940662
+     },
+     "title": "SceneBloom: Agentic Indoor Environment Generation with Realistic and Diverse Layouts for Embodied Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32978, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2352399144",
+       "name": "Yuhan Liu"
+      },
+      {
+       "authorId": "2284028441",
+       "name": "Lian-Hui Qin"
+      },
+      {
+       "authorId": "2395769789",
+       "name": "Shen-Ji Wan"
+      }
+     ],
+     "abstract": "Training generalizable embodied agents requires realistic, varied, and simulation-ready indoor environments. Language-guided methods support semantic planning and object-level reasoning, but precise spatial grounding remains difficult. Visual generative models offer rich priors over plausible arrangements, yet their outputs require geometric reasoning to become physically valid 3D scenes. We introduce SceneBloom, an agentic framework that combines visual layout sampling with contract-guided 3D compilation. A hierarchical sampler uses diffusion priors to generate furniture arrangements within functional zones. A compiler then uses relations extracted from each proposal to guide geometric fitting and local pose correction. Across five room types, SceneBloom attains the highest visual quality and physical stability among the compared methods and is the only method with no detected mesh collisions and out-of-bounds objects. Its layouts are also closer to the distribution of real rooms than those of all compared baselines. Object navigation policies trained in these realistic scenes achieve a higher success rate in held-out real scans than those trained on an equal number of real training scans. Code is available at https://github.com/Tinaliu0123/scenebloom."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "9542955325ef4c75fe77bece2f37b8754167ee21",
+     "externalIds": {
+      "ArXiv": "2610.32431",
+      "CorpusId": 293940749
+     },
+     "title": "When to Stop Penalizing Actions? Martingale GRPO for VLA Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32431, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2107288294",
+       "name": "Zong-Yao Zhao"
+      },
+      {
+       "authorId": null,
+       "name": "Cheng-Jie Zhao"
+      },
+      {
+       "authorId": "2517368145",
+       "name": "Rui-Hang Jiang"
+      },
+      {
+       "authorId": "2242949633",
+       "name": "Bing Zheng"
+      },
+      {
+       "authorId": null,
+       "name": "Zhao-Lin Wang"
+      },
+      {
+       "authorId": "2510687153",
+       "name": "Yuan-Wei Liu"
+      }
+     ],
+     "abstract": "A failed vision-language-action (VLA) rollout does not imply that every action contributed to failure. Yet in group-relative policy optimization (GRPO), a single trajectory-level advantage is assigned to all actions in a rollout. Potentially useful recovery attempts can thus be penalized alongside the errors they aim to correct. Ideal stopping conditions for failure feedback are characterized using success-probability and policy-score martingales. At these stops, the removed gradient contribution has zero conditional expectation given the retained information. Truncation therefore preserves the expectation of a reference GRPO group-gradient estimator and can reduce its covariance. One such stop occurs when the conditional probability of success is zero, motivating error and recovery cues for selecting candidate feedback boundaries. Martingale GRPO (MART-GRPO) is introduced with a vision-language model (VLM) for event-guided truncation. The VLM is fine-tuned on our annotated training set using low-rank adaptation (LoRA). The last visible error without observed recovery is localized by the frozen VLM in complete rollout videos. Failure feedback is retained through the selected error interval and removed afterward, while successful-rollout loss terms and original loss normalization are preserved. For retrospective boundaries, changes in expectation and variance are analyzed to assess departures from ideal stopping. Experiments with OpenVLA-OFT on RoboTwin 2.0 show that MART-GRPO improves success rates over full-trajectory GRPO across multiple tasks."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "8fb4c37af8a708cdcf8d7a580cf7fa81a212383e",
+     "externalIds": {
+      "ArXiv": "2610.32909",
+      "CorpusId": 293940272
+     },
+     "title": "HoloBoxing: A Simple Recipe for Humanoid Boxing with 7 Minutes of Single-GPU Training",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32909, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2482678160",
+       "name": "Xi-Han Ma"
+      },
+      {
+       "authorId": "2354113552",
+       "name": "Bo Zhang"
+      },
+      {
+       "authorId": "2518339379",
+       "name": "Bo-Xiong Li"
+      },
+      {
+       "authorId": "2517366814",
+       "name": "Yu-Han Bao"
+      },
+      {
+       "authorId": "2518070571",
+       "name": "Zi-Yue Liu"
+      },
+      {
+       "authorId": null,
+       "name": "Yu-Cheng Wang"
+      }
+     ],
+     "abstract": "HoloBoxing presents a simple recipe for learning humanoid boxing by building on a pretrained whole-body controller. The recipe separates reusable motor skills from task decisions: a compact planner requests future body-point targets, while the frozen controller handles joint-level execution. A learned decoder maps 32-dimensional actions to structured target windows, and measured-state imitation initializes the planner before reinforcement learning. Task learning then refines interaction behavior while reusing the decoder and controller, avoiding the need to relearn whole-body control. This combination keeps task optimization focused on a compact upper policy and supplies an initial behavior before reward-driven exploration. Starting from that available controller, the recipe accounts for about seven minutes of additional training, including reused representation fitting and a single-GPU task run. This excludes controller pretraining, data preparation, evaluation, and search. Simulated boxing experiments and component controls evaluate the resulting behavior and the roles of imitation initialization and the target representation."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "c267c87cdc01dd0069fd486920223023cd8c2873",
+     "externalIds": {
+      "ArXiv": "2610.32439",
+      "CorpusId": 293940588
+     },
+     "title": "$R^2E:$ A Role-driven Reward Evolutionary Framework for Automated Reward Function Design",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32439, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2463361258",
+       "name": "Shou-Hao Chang"
+      },
+      {
+       "authorId": "2144511530",
+       "name": "Xuan Liu"
+      },
+      {
+       "authorId": "2395538723",
+       "name": "Hong-Ye Zhu"
+      },
+      {
+       "authorId": "2051700177",
+       "name": "Xin-Ning Chen"
+      },
+      {
+       "authorId": "2145400129",
+       "name": "Shi-Geng Zhang"
+      }
+     ],
+     "abstract": "Designing effective reward functions is a critical challenge in Reinforcement Learning (RL), which traditionally requires costly manual trial-and-error. While Large Language Model (LLM)-based methods have shown promise in reward design, undifferentiated sampling and limited use of historical feedback often lead to insufficient exploration of the reward space and optimization instability. To address these challenges, we propose $R^2E$, a Role-driven Reward Evolutionary framework for automated reward function design that structures the process through explicit role specialization. $R^2E$ employs multiple LLM roles with complementary objectives: an Explorer that promotes novelty to expand the search space, a Guardian that performs conservative refinements to improve training stability, and an Evolver that recombines high-performing rewards via crossover and mutation to integrate effective structures. A dynamic scheduling strategy coordinates these roles, progressively shifting the search from broad exploration to focused exploitation. To mitigate optimization instability and provide a medium for cross-role collaboration, $R^2E$ incorporates a Global Elite Pool that retains the best-performing rewards to guide subsequent generations, thereby enabling coordinated interaction among roles and ensuring a reliable and consistent refinement process. Extensive experiments on multiple robotic tasks demonstrate the effectiveness of our method."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "9cd5133671e6f8547672ee89567433fa98fd3ead",
+     "externalIds": {
+      "ArXiv": "2610.32951",
+      "CorpusId": 293940254
+     },
+     "title": "Where Rounding Happens Matters: Rounding-Location Alignment Stabilizes LLM Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32951, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2421615431",
+       "name": "Y. Ke"
+      },
+      {
+       "authorId": "2344748320",
+       "name": "Tian-Le Cai"
+      },
+      {
+       "authorId": "3437308",
+       "name": "Ruosong Wang"
+      }
+     ],
+     "abstract": "Reinforcement learning for large language models often uses separate systems for inference and training. Even with identical weights and BF16 tensors, implementation differences can make an intended on-policy update off-policy and destabilize training. Existing remedies align the entire inference and training stacks, change global precision, or modify the learning algorithm. We ask whether aligning selected parts of the execution stack can stabilize BF16 RL while other implementation differences remain. We align training-side rounding locations with inference in three regions---RoPE, SwiGLU, and residual RMSNorm---by retaining selected intermediates in FP32 until their BF16 outputs. Across four Qwen-family models, aligning all three regions prevents the collapse observed under the default BF16 baseline; RoPE-path alignment alone also suffices in the studied runs, despite remaining numerical discrepancies. The interventions keep the inference engine, matrix-multiplication and attention kernels, and learning objective unchanged."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "cd628ce34a4309877bc74788d1b8ce4a58732bd2",
+     "externalIds": {
+      "ArXiv": "2610.31544",
+      "CorpusId": 293893956
+     },
+     "title": "Same Luck, Different Choice: Twin-World Credit Assignment for Agentic Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31544, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2459116399",
+       "name": "Zeropy Surio"
+      },
+      {
+       "authorId": "2516886935",
+       "name": "Tobias Engel"
+      },
+      {
+       "authorId": "2516886217",
+       "name": "Mei-Lin Chou"
+      },
+      {
+       "authorId": "2516888045",
+       "name": "Anika Raman"
+      },
+      {
+       "authorId": "2516886183",
+       "name": "Samuel Okafor"
+      }
+     ],
+     "abstract": "Agentic reinforcement learning rewards a complete episode, yet the policy needs credit for every decision inside it. Counterfactual branching estimates this credit by re-running the episode after an alternative decision, but the branch draws its sampling noise independently of the factual episode, so the outcome difference mixes the effect of the decision with the luck of everything that follows. We observe that in agentic search the retriever, the corpus, and the grader are deterministic, so an episode is a deterministic function of the policy's decisions and its sampling noise. Twin worlds are therefore realizable: the same noise, a different decision. We introduce TWICE (TWIn-world Credit Estimation), which keys the Gumbel noise of every token by turn and line, rolls out counterfactual twins that inherit the factual episode's downstream noise, and turns their paired outcome differences into turn-level advantages for policy-gradient updates on actor-sampled trajectories; only the actor is deployed. Twin credit is unbiased for any coupling quality, its variance is that of an independent counterfactual scaled by $1-\\rho$, where $\\rho$ is the twins'outcome correlation, and under coupling the number of rollouts needed to resolve an advantage of size $\\Delta$ falls from $\\Theta(\\Delta^{-2})$ to $\\Theta(\\Delta^{-1})$. A square-root rule spends the twin budget where outcomes are predicted to disagree per unit cost. On seven question-answering benchmarks, TWICE improves the average exact match of GRPO by 5.3 and 4.5 points on Qwen2.5-3B and 7B, outperforms tree-search and counterfactual-branching baselines, and uses 68% fewer auxiliary tokens than VinePPO."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f1635943ea41c80644f12548b8ff99849c21a518",
+     "externalIds": {
+      "ArXiv": "2610.31820",
+      "CorpusId": 293936024
+     },
+     "title": "Free Lunch for LLMs Confidence: The RL Critic Already Knows",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31820, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2307634199",
+       "name": "Shu-Jin Wu"
+      },
+      {
+       "authorId": "2307771313",
+       "name": "Heng Ji"
+      }
+     ],
+     "abstract": "Reliable confidence estimation is essential for trustworthy deployment of large language models (LLMs), but dedicated confidence training stage requires additional data and compute. We ask a fundamental question: what prediction problem does confidence training actually solve? Inspired by prior work on external confidence estimation, we compare self- and external estimators of comparable capacity trained on the same (question, response, correctness) triples. We show that an external model trained solely on a policy's behavioral traces can estimate the policy's confidence as accurately as the policy itself, without accessing the policy's internal representations. This points to a deeper connection with value function learning in reinforcement learning (RL): under a correctness-based outcome, we prove that confidence estimation and critic training are equivalent, both predicting the likelihood that a policy's response will be correct from its trajectory. A simple consequence follows: for LLMs trained with value-based RL, the existing critic can be reused as an off-the-shelf confidence estimator with no additional training or data. The policy remains unchanged, so its task performance is preserved, and the critic provides confidence throughout generation, including intermediate reasoning steps. Across math, code, tool calling, and general reasoning spanning a dozen domains, the reused critic is the best confidence estimator on every in-distribution split and the best-calibrated on 14 of 16, without hurting the task performance."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "3359b331717199a3fdbfcb6701711f9cb803532f",
+     "externalIds": {
+      "ArXiv": "2610.31656",
+      "CorpusId": 293894139
+     },
+     "title": "METTA: Memory-Enhanced Test-Time Adaptation for Meta-Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31656, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2390397854",
+       "name": "Ali Najar"
+      },
+      {
+       "authorId": "2301082920",
+       "name": "Hosein Hasani"
+      },
+      {
+       "authorId": "2516887628",
+       "name": "Amir Kooshan Fattah"
+      },
+      {
+       "authorId": "2516887655",
+       "name": "Yasamin Rajabi"
+      },
+      {
+       "authorId": "1799503",
+       "name": "Mahdieh Soleymani Baghshah"
+      }
+     ],
+     "abstract": "Meta-reinforcement learning aims to train agents that adapt quickly to unseen tasks from limited interaction, but this requires representing task evidence over long interaction histories. Classical recurrent agents compress experience into hidden states, while transformer-based agents retrieve from past trajectories at quadratic memory and computation cost. In this work, we propose Memory-Enhanced Test-Time Adaptation (METTA) for meta-reinforcement learning. It decomposes the fast adaptation phase into two temporal scales: a causal neural memory performs fine-grained within-episode adaptation with linear sequence complexity, while compact episode-level summaries support long-range cross-episode task inference without attending over the full interaction history. Moreover, equipping agents with neural memory provides sufficient expressive capacity and test-time training capability, enabling effective adaptation to unseen held-out tasks and task families at meta-test time. On unseen held-out Meta-World ML10/45 test environments, METTA achieves a success rate over $50\\%$ while maintaining a low training budget and short wall-clock time. On long-context sparse-reward PointMaze tasks, it outperforms transformer-based baselines by exhibiting more structured exploration behavior. These results show that METTA provides an efficient path toward more adaptive and scalable long-context meta-RL."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "187de9bcaee863ea164e16c5696c810bdaf9a310",
+     "externalIds": {
+      "ArXiv": "2610.31299",
+      "CorpusId": 293893734
+     },
+     "title": "PiHand: Latent Hand-Object Interaction Priors for Physics-Based Policy Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31299, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2516885303",
+       "name": "Niklas Berndt"
+      },
+      {
+       "authorId": "50980272",
+       "name": "Xiang-Hui Xie"
+      },
+      {
+       "authorId": "2276609195",
+       "name": "Enes Duran"
+      },
+      {
+       "authorId": "2294387767",
+       "name": "Yi-Xiao Wang"
+      },
+      {
+       "authorId": "1403428213",
+       "name": "G. Pons-Moll"
+      }
+     ],
+     "abstract": "Synthesizing physically grounded dexterous hand-object interactions is important for VR/AR, gaming, and robotics, yet remains challenging because subtle contact dynamics, diverse object geometries, and target trajectories must be jointly respected while maintaining natural grasps. Existing methods either track mocap trajectories with limited transfer to novel objects, or rely on hand-only generative priors that fail to capture coupled hand-object motion, sacrificing contact fidelity and sample efficiency. To tackle these challenges, we introduce PiHand, a Physically grounded Interaction-aware Hand motion synthesis framework. PiHand first trains expert policies that track mocap demonstrations in simulation, distills them into a unified hand-object interaction prior using a goal-conditioned VAE, and finally solve diverse dexterous manipulation tasks through bounded residual exploration in its latent space. With only a single reward and no complex curriculum training, this yields general tabletop manipulation policies that generalize to unseen objects and trajectories on GRAB and DexYCB. The same prior transfers to object catching and bimanual handover, two tasks that are rarely seen in its training data. Across all tasks, PiHand consistently outperforms baselines in all metrics. We will release the processed data and model checkpoints."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "8bb7fbbcb0f6fac28d1cde37522e1d36312af9a4",
+     "externalIds": {
+      "ArXiv": "2610.31253",
+      "CorpusId": 293894424
+     },
+     "title": "Reinforcing intra-operative tumour localisation with weak supervision from pre-operative appearances",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31253, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2516889693",
+       "name": "Sidhart Sami"
+      },
+      {
+       "authorId": "2516889415",
+       "name": "Ali Sharjeel"
+      },
+      {
+       "authorId": "2423275320",
+       "name": "Sriram Atluri"
+      },
+      {
+       "authorId": "2504303935",
+       "name": "Miao Zhao"
+      },
+      {
+       "authorId": "1741464",
+       "name": "C. Roney"
+      },
+      {
+       "authorId": "49465263",
+       "name": "E. Marouli"
+      },
+      {
+       "authorId": "1802257196",
+       "name": "Shaheer U. Saeed"
+      }
+     ],
+     "abstract": "Limited tumour visibility on intra-operative images complicates surgical navigation, including liver hepatocellular carcinoma (HCC) targeting on computed tomography (CT) imaging. This makes labelled datasets difficult to curate for deep learning, and transferring pre-operative delineations through registration remains challenging due to intra-operative deformation and lack of paired pre- and intra-operative data. We propose to transfer tumour appearances learned from pre-operative magnetic resonance (MR) images to guide localisation on intra-operative CT through weak supervision. A classifier is trained to classify tumour presence on pre-operative images. This is applied to windows on intra-operative images, and despite the domain gap, it assigns higher tumour-presence probabilities on average to tumour-containing windows. These weak cross-domain signals guide a reinforcement learning agent to localise tumours on intra-operative images. We compare direct transfer, few-shot adaptation and synthetic transfer (trained using unpaired MR and CT), which translates CT into synthetic MR before localisation. On an external HCC cohort, synthetic transfer outperformed other tested methods and CT-only baselines. Our framework enables cross-modality tumour localisation without paired MR-CT training images."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "37ed4e4060a7ee324f7ebe12bb8779b3b9a672d1",
+     "externalIds": {
+      "DOI": "10.1007/s12293-026-00532-3",
+      "CorpusId": 293863898
+     },
+     "title": "Mitigating Think-Answer Mismatch in large language model reasoning through noise-aware advantage reweighting",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1007/s12293-026-00532-3?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1007/s12293-026-00532-3, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2283097884",
+       "name": "Dan-Hao Zhu"
+      },
+      {
+       "authorId": "2282963502",
+       "name": "Pei-Jun Shen"
+      },
+      {
+       "authorId": "2283092321",
+       "name": "Si Shen"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7fdacdfa236b074cabce0db3b2c1b62468087587",
+     "externalIds": {
+      "DOI": "10.1007/s44163-026-02490-8",
+      "CorpusId": 293864507
+     },
+     "title": "Weannet enables parameter-efficient transfer through decaying lateral connections in progressive networks",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "https://link.springer.com/content/pdf/10.1007/s44163-026-02490-8.pdf",
+      "status": "GOLD",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1007/s44163-026-02490-8?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1007/s44163-026-02490-8, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2516662465",
+       "name": "Max Vorachart"
+      }
+     ],
+     "abstract": "Progressive Neural Networks (PNNs) transfer knowledge by connecting each new column to frozen earlier columns, but retained state and inference work grow across generations. I propose WeanNet, a bounded alternative in which one frozen parent supplies layer-wise features to a freshly initialized student while a scalar gain decays during training; the parent is then removed. The primary schedule decays to zero, making removal exactly lossless. Evaluation includes a controlled concept-drift task across entropy settings and three multilayer-perceptron architectures, a sequential-gravity CartPole stress test, and a five-seed Roblox obstacle course. On concept drift, WeanNet had higher mean drift-found accuracy than the architecturally matched PNN-Reset control at every tested entropy setting, although it was comparable to Reset rather than uniformly best. A tuned full PNN remained weak when the direct parent-logit pathway was enabled, but had substantially higher mean reward when that pathway was disabled, showing that its poor performance was configuration-dependent. CartPole favored Distillation and Regular, and Roblox showed overlapping seed variability, delimiting the generality of the concept-drift result. With a zero terminal gain, parent removal caused no return, logit, or action change and reduced deployed resident parameters. Positive terminal gains could improve attached performance but introduced a measurable pruning gap. These results support bounded temporary feature transfer, not universal performance superiority."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "77f39061726490e8bfaa65149b88302a3c696b24",
+     "externalIds": {
+      "DOI": "10.1007/s11740-026-01478-8",
+      "CorpusId": 293864143
+     },
+     "title": "A novel dynamic flexible job shop scheduling mechanism with carbon emission considering",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1007/s11740-026-01478-8?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1007/s11740-026-01478-8, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2503906634",
+       "name": "Kuo-Feng Huang"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "88b17a6b5c12de2531f87ac7b7998144acda913c",
+     "externalIds": {
+      "ArXiv": "2610.30810",
+      "CorpusId": 293893461
+     },
+     "title": "Adaptive Aerial Loco-Manipulation Policy Learning via LLM-Assisted Proactive Task Generation",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30810, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "16565453",
+       "name": "Jing-Yu Ru"
+      },
+      {
+       "authorId": "2293203153",
+       "name": "Xia Xie"
+      },
+      {
+       "authorId": "2362057948",
+       "name": "Li-Xuan Jin"
+      },
+      {
+       "authorId": "2516888857",
+       "name": "Jian An"
+      },
+      {
+       "authorId": "2516995779",
+       "name": "Xing-Ming Zhang"
+      },
+      {
+       "authorId": "2516990373",
+       "name": "Bing-Hao Li"
+      },
+      {
+       "authorId": "2516979690",
+       "name": "Si-Yue Wang"
+      },
+      {
+       "authorId": "2476716226",
+       "name": "Xiang-Dong Zhou"
+      },
+      {
+       "authorId": "49785134",
+       "name": "Lei Yuan"
+      },
+      {
+       "authorId": "2146236785",
+       "name": "Hong-Li Xu"
+      },
+      {
+       "authorId": "2264002365",
+       "name": "Yang Yu"
+      }
+     ],
+     "abstract": "Loco-manipulation extends the workspace of conventional manipulation by combining mobility with physical interaction, while aerial loco-manipulation further expands this capability into three-dimensional space, enabling robots to reach environments inaccessible to ground-based systems. Moving to an aerial platform, however, gives rise to a demanding control problem, since the vehicle must track trajectories accurately in three dimensions while the motion of the arm and its interaction with the environment continuously shift the center of mass, alter the inertia, and impose force and moment disturbances on the body. Conventional controllers address these effects through explicit models and estimation, whereas learning-based controllers infer dynamics from experience, yet control rewards provide no direct target for the response information retained from history, and fixed task sampling can leave persistent tracking difficulties insufficiently explored. We present ALMA, an aerial loco-manipulation framework for adaptive flight control under external arm commands. ALMA employs a contextual flight policy that adapts from recent measurements and actions, using action-conditioned prediction of future measurement representations to train its context to retain response information relevant to flight control. To expand the experience available for this adaptation, an evolutionary process uses a large language model (LLM) to analyze observed control difficulties and propose new structures of arm motion for subsequent training. In simulation, ALMA reduces position root-mean-square error (RMSE) by up to 24.7% relative to the strongest baseline, while the same policy transfers zero-shot to the aerial manipulator and reduces hover position RMSE by 79.6% during periodic arm motion relative to the real-world baseline."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "05eeed72bf177ee2c12d5d25b2213fd06b413274",
+     "externalIds": {
+      "ArXiv": "2610.30911",
+      "CorpusId": 293893365
+     },
+     "title": "Energy-Efficient Risk-Constrained Adaptive Semantic Communications Under Uncertain Adversarial Threats",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30911, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2175107919",
+       "name": "Maedeh Fallahreyhani"
+      },
+      {
+       "authorId": "9120765",
+       "name": "P. Azmi"
+      },
+      {
+       "authorId": "2520784",
+       "name": "N. Mokari"
+      },
+      {
+       "authorId": "40947335",
+       "name": "M. Abedi"
+      }
+     ],
+     "abstract": "Semantic communication systems based on deep joint source-channel coding can provide task-oriented wireless transmission, but adversarial robustness may require substantial radio and receiver-side defensive-computation energy. This paper develops an energy-efficient, risk-constrained semantic communication framework under source-domain, over-the-air (OTA), and potentially composite adversarial conditions. Long-term total energy, including communication and diffusion-purification energy, is minimized subject to average semantic-loss, trajectory-level tail-risk, and end-to-end latency constraints. A recurrent primal-dual proximal policy optimization controller jointly adapts transmit power, semantic/channel bandwidth ratio, and purification complexity using causal channel observations, semantic confidence, imperfect attack-belief estimates, and recurrent history. A conditional value-at-risk (CVaR) constraint explicitly limits severe semantic failures. On CIFAR-100, at the unseen source-domain level $\\epsilon=12/255$, the proposed controller achieves approximately $61\\%$ robust Top-1 accuracy with $\\mathrm{CVaR}_{0.9}\\approx0.36$ while using about $9\\%$ less total energy than diffusion-only defense. At the unseen OTA level $\\Gamma_A=-5$ dB, it achieves approximately $52\\%$ robust Top-1 accuracy, reduces semantic tail risk by $40\\%$, and consumes about $8\\%$ less total energy than diffusion-only defense. These results demonstrate energy-efficient semantic defense under partially observable adversarial conditions."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "86abab68501999a370084bb7da7f0778c27d7f62",
+     "externalIds": {
+      "ArXiv": "2610.30876",
+      "CorpusId": 293894092
+     },
+     "title": "LocoManiLab: A Unified Testbed for Data, Policies, Controllers, and Deployment in Humanoid Loco-Manipulation",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30876, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2356684323",
+       "name": "De-Wei Wang"
+      },
+      {
+       "authorId": "2367281642",
+       "name": "Jin-Rui Han"
+      },
+      {
+       "authorId": "2197674561",
+       "name": "Ji-Yuan Shi"
+      },
+      {
+       "authorId": "2257101610",
+       "name": "Chen-Yun Zhang"
+      },
+      {
+       "authorId": "2516987382",
+       "name": "Xian-Bo Lu"
+      },
+      {
+       "authorId": "2513217787",
+       "name": "Jia-Bao Wu"
+      },
+      {
+       "authorId": "2516995402",
+       "name": "Ji-Qin Feng"
+      },
+      {
+       "authorId": "2314117415",
+       "name": "Ji-Peng Kong"
+      },
+      {
+       "authorId": "2331652093",
+       "name": "Ping Luo"
+      },
+      {
+       "authorId": "2320302313",
+       "name": "Chen-Jia Bai"
+      },
+      {
+       "authorId": "2295686463",
+       "name": "Xue-Long Li"
+      }
+     ],
+     "abstract": "Humanoid robots must coordinate locomotion and manipulation in everyday environments, yet progress is difficult to assess across differing policies, controllers, and task settings. LocoManiLab provides an integrated testbed spanning data collection and generation, policy training, evaluation, and physical deployment. Its task suite covers 234 atomic and compositional tasks across five household scene categories, supported by 51.5 hours of simulated teleoperation. The evaluation covers twelve policies with a shared controller across task and scene splits and perturbation levels, two policies across five controllers, and studies of demonstration scale and data-source mixtures. Success rates fall on unseen tasks and scenes and generally decline as visual perturbations increase, with differences in generalization and robustness across policies. For data generation, a humanoid motion generation model is fine-tuned for loco-manipulation to study the alignment of its outputs with task execution requirements and its integration into the data generation pipeline. Three simulated loco-manipulation tasks closely match real-world setups, enabling evaluation of three policies in both domains. Similar policy rankings support the reliability of simulation-based evaluation."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "fadac7a2700b4feadc940a8eea1494b7f20ba07c",
+     "externalIds": {
+      "ArXiv": "2610.30667",
+      "CorpusId": 293893306
+     },
+     "title": "Fast Iterative Combinatorial Auctions via Deep Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30667, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2516884575",
+       "name": "Luis F. Paul Tosta"
+      },
+      {
+       "authorId": "2516884583",
+       "name": "Quinn Arnold"
+      },
+      {
+       "authorId": "3251778",
+       "name": "Gianluca Brero"
+      }
+     ],
+     "abstract": "Iterative combinatorial auctions are used in spectrum allocation, transportation, and industrial procurement, but rounds are costly. We introduce FastCombo, a deep reinforcement learning approach to sequential price discovery. Bayesian pricing has sharply reduced auction rounds even against subgradient benchmarks tuned with hindsight for each instance, but relies on a one-step objective and repeated online inference and optimization. We prove that greedily maximizing immediate clearing probability can require arbitrarily more rounds in expectation than an informative policy, even with the true valuation distribution known. FastCombo learns price policies offline, assigning credit to queries for the future decisions they enable and producing each online price update with a single neural-network forward pass. We formulate the objective of minimizing expected rounds to clearing in single-minded auctions as a partially observable Markov decision process and train a recurrent bidder-item graph policy over complete auction trajectories. In a one-item experiment, all five trained policies learn an informative opening, reducing expected rounds from 1.85 to 1.65 relative to the tested Bayesian one-step rule. Across four domains from the Combinatorial Auction Test Suite, FastCombo achieves competitive clearing while reducing measured online price-selection time per auction by a factor of roughly 300-900 relative to the standard Bayesian baseline. These results demonstrate the value of learning sequential price policies for both information acquisition and online computational efficiency."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f0a926d28b20abcdb80523b72d2d91fac800e4ee",
+     "externalIds": {
+      "ArXiv": "2610.31563",
+      "CorpusId": 293894380
+     },
+     "title": "When to Follow the Teacher: Advantage-Based On-Policy Distillation",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31563, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2304551653",
+       "name": "Mahdi Sabbaghi"
+      },
+      {
+       "authorId": "2254286806",
+       "name": "George Pappas"
+      },
+      {
+       "authorId": "2298755250",
+       "name": "H. Hassani"
+      },
+      {
+       "authorId": "2300646487",
+       "name": "Adel Javanmard"
+      }
+     ],
+     "abstract": "Online Policy Distillation (OPD) often outperforms offline methods such as Supervised Fine-Tuning (SFT) by training on trajectories sampled directly from the student. However, standard OPD trains the student to follow the teacher at every state of the trajectory, assuming that teacher guidance is always beneficial. We instead distinguish between what the teacher prefers and what actually helps the current student succeed. We introduce Advantage-Based On-Policy Distillation (AOPD), which weights teacher actions by their counterfactual advantage under the student. Teacher actions that improve the student's expected outcome are reinforced, while those that do not are downweighted. Directly computing these advantages requires trying alternative teacher actions at each step and running new rollouts from each. Instead, we show that the AOPD objective can be estimated using only standard student rollouts and their terminal rewards. Our estimator uses teacher importance weights on the student-sampled actions to provide unbiased advantage-weighted supervision, without any additional rollouts or reward evaluations. This allows AOPD to focus teacher supervision on actions that help the current student while preserving the rollout efficiency of standard OPD. Experiments on math, coding, and Medqa show gains over distillation and RL baselines in both external-teacher and self-distillation settings."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f69a74b60ac21d2dffe71f9defe8ae072d413eab",
+     "externalIds": {
+      "ArXiv": "2610.30933",
+      "CorpusId": 293894705
+     },
+     "title": "ReflectPO: Reflection-Guided Policy Optimization for Long-Horizon LLM Agents",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30933, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2363680027",
+       "name": "Ru-Mei Li"
+      },
+      {
+       "authorId": "2368485152",
+       "name": "Xun-Liang Cai"
+      }
+     ],
+     "abstract": "With external tools, large language models (LLMs) can tackle complex tasks through sustained environmental interaction. LLM-based agents are therefore increasingly used to tackle complex long-horizon tasks in real-world environments. However, these tasks involve sequential, interdependent decisions and changes in environmental states. Early execution errors affect subsequent interaction histories and environmental states, and their effects accumulate along the decision chain. To address this challenge, we propose Reflection-Guided Policy Optimization (ReflectPO), a reinforcement learning framework for autonomous error recovery in long-horizon tasks. ReflectPO comprises two core components. The first is Reflection-Guided Sampling. We use branch differences and repeated visits in interaction trajectories to construct hints for error recovery. The second is Tree-Structured Credit Assignment. We organize sampled trajectories into trees and assign action-level credit using parent--child reward differences and recovery gains. Experiments over two long-horizon tool-use benchmarks show that ReflectPO outperforms multiple existing baselines in most domains. It also achieves the best overall performance on average. Further analyses show that ReflectPO effectively improves agents'ability to recognize their own deviations, recover from erroneous states, and continue making progress toward task completion."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "22cee3f451c5de8a257149af5f436ab13665d3f3",
+     "externalIds": {
+      "ArXiv": "2610.31608",
+      "CorpusId": 293894223
+     },
+     "title": "Humanoid Mobility via Attention-based Contacts",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31608, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2249076206",
+       "name": "Jun-Zhe He"
+      },
+      {
+       "authorId": "2292399697",
+       "name": "Ke-Han Wen"
+      },
+      {
+       "authorId": "2254275727",
+       "name": "Chong Zhang"
+      },
+      {
+       "authorId": "2284772421",
+       "name": "Clemens Schwarke"
+      },
+      {
+       "authorId": "2237587688",
+       "name": "Ze-Wei Zhang"
+      },
+      {
+       "authorId": "2233836595",
+       "name": "Kai-Xian Qu"
+      },
+      {
+       "authorId": "2293557920",
+       "name": "Si-Yuan Hu"
+      },
+      {
+       "authorId": "2498502891",
+       "name": "Matthias Müller"
+      },
+      {
+       "authorId": "145231047",
+       "name": "V. Koltun"
+      },
+      {
+       "authorId": "2340685198",
+       "name": "Marco Hutter"
+      }
+     ],
+     "abstract": "Humanoid mobility over complex terrain requires accurate foot placement and coordinated whole-body motion capable of robust adaptation. Reinforcement learning (RL) policies trained without motion references generalize well across terrains, yet eliciting effective whole-body coordination through reward design and exploration alone remains challenging. In contrast, reference-based methods yield natural motions but struggle to adapt beyond the predefined trajectories in their training data. We introduce a learning framework that bridges these two approaches by using motion data strictly as a training prior. An explicit, self-supervised, attention-based contact planner predicts future body-environment contacts, while a contact-conditioned tracker translates these plans into coordinated whole-body motion. Together, they establish contact as an interface between sensory observations and control actions. This abstraction allows the policy to internalize the contact-aware structure of locomotion rather than directly replicating kinematics. Consequently, a single policy can exploit data-driven motion priors for natural whole-body coordination while retaining the flexibility to discover environment-dependent behaviors through reinforcement learning. Building on the learned contact planner and tracker, a subsequent fine-tuning stage bootstraps their acquired capabilities to explore environment variations beyond those covered by the original motion data. Operating entirely from onboard observations without any reference inputs at deployment, this framework enables versatile humanoid mobility in challenging environments."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "b8d80973a8e05583ec7d0ecbc53d1a84a7502941",
+     "externalIds": {
+      "ArXiv": "2610.30873",
+      "CorpusId": 293894393
+     },
+     "title": "MOER: Mix-Policy Optimization under Expert Prefix Guidance with Selective Rollback",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30873, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2238931401",
+       "name": "Xu-Yang Zhong"
+      },
+      {
+       "authorId": "2132071865",
+       "name": "Jiu-Ding Yang"
+      },
+      {
+       "authorId": "2318303849",
+       "name": "Yi-Wen Guo"
+      },
+      {
+       "authorId": "2238605590",
+       "name": "Chen Liu"
+      }
+     ],
+     "abstract": "Mix-policy optimization incorporates off-policy expert data into the reinforcement learning (RL) loop to transcend the capability boundary of on-policy RL. However, existing methods either provide static full-trace guidance that suppresses self-exploration, or adopt expert prefix guidance without correctness guarantees, leading to suboptimal performance or even training collapse. In this paper, we propose MOER, a mix-policy optimization framework that harmonizes expert guidance with self-exploration. MOER injects a decaying expert chain-of-thought prefix into the prompt and lets the model complete the remaining reasoning, with the prefix length progressively annealed to encourage self-exploration. A selective rollback mechanism replaces failed completions with the original full expert trace, guaranteeing the correctness of every off-policy trajectory. Furthermore, a harmonized mix-policy objective optimizes on-policy tokens with a GRPO loss while supervising both expert prefix and completion tokens with a trust-region SFT loss, substantially stabilizing training. Extensive experiments show that MOER achieves the highest average scores in mathematical and general domain reasoning tasks, outperforming all basic and mix-policy baselines, and generalizes consistently across diverse tasks, model scales, and base model categories. Codes are available at https://github.com/CityU-MLO/MOER."
+    }
+   }
+  ]
+ }
+}

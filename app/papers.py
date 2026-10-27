@@ -421,6 +421,20 @@ def get_structure(paper_id: str) -> dict | None:
         return None
 
 
+def merge_structure(filename: str, structure: dict) -> bool:
+    """把一篇论文的结构写进总表（阅读页按文件名查，所以键是文件名）。
+
+    新下载/新上传的论文只有旁挂 JSON，不合并进 structures.json 的话，
+    阅读页查不到章节树（``reader_meta`` 就是按文件名查的总表）。
+    """
+    if not structure:
+        return False
+    data = load_structures()
+    data[filename] = structure
+    save_structures(data)
+    return True
+
+
 def save_paper(
     filename: str,
     content: bytes,
