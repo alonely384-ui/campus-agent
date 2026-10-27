@@ -15,7 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.reader import PAPERS_DIR, list_reader_papers, safe_paper_path
+from app.reader import PAPERS_DIR, list_reader_papers, reader_meta, safe_paper_path
 
 client = TestClient(app)
 
@@ -50,6 +50,24 @@ def test_reader_page_served_by_ui_mount():
     resp = client.get("/ui/reader.html")
     assert resp.status_code == 200
     assert "reader" in resp.text.lower()
+
+
+def test_reader_html_supports_author_year_citations():
+    """作者-年份引用（[Ioffe and Szegedy, 2015]）也要能点：逻辑必须在页面里。
+
+    这类引用没有编号，和 [38] 的跳转是两条路径，所以单独立个用例盯着，
+    免得以后改正则时被顺手删掉。
+    """
+    html = (WEB_DIR / "reader.html").read_text(encoding="utf-8")
+    for needle in ("CITE_ANY_RE", "parseAuthorCite", "jumpToAuthorCitation", "cite-a"):
+        assert needle in html, f"阅读页里找不到 {needle}，作者-年份引用又断了"
+
+
+def test_reader_html_marks_borrowed_section_tree():
+    """扫描件借用别篇的章节树时，侧栏要注明来源，不能假装是自己解析的。"""
+    html = (WEB_DIR / "reader.html").read_text(encoding="utf-8")
+    assert "sections_borrowed_from" in html
+    assert "tocNote" in html
 
 
 # ---------------- 第 2 层：论文数据（无数据时跳过） ----------------
@@ -97,6 +115,24 @@ def test_structure_endpoint_returns_sections_with_1based_pages():
         assert 1 <= sec["level"] <= 3
     refs = meta["references"]
     assert refs["page"] is None or refs["page"] >= 1, "参考文献页码同样必须是 1 基"
+
+
+def test_borrowed_section_tree_exposes_source():
+    """扫描件抽不出标题时，章节树借自同篇文本版——接口要把来源带出来。
+
+    前端据此在侧栏提示「页码以文本版为准」，避免用户以为扫描件自己解析出了目录。
+    """
+    papers = _papers()
+    borrowed = next(
+        (p for p in papers if reader_meta(p["filename"]).get("sections_borrowed_from")),
+        None,
+    )
+    if borrowed is None:
+        pytest.skip("当前数据里没有被借树的论文（structures.json 可能刚被整体重算过）")
+
+    meta = reader_meta(borrowed["filename"])
+    assert meta["sections"], "标了借树却没有章节"
+    assert meta["sections_borrowed_from"].endswith(".pdf")
 
 
 def test_structure_endpoint_404_for_unknown_paper():

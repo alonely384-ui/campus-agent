@@ -23,7 +23,7 @@ import re
 from collections import Counter
 
 # "3.2 Model Architecture" / "1 Introduction" 这类章节标题
-_SECTION_RE = re.compile(r"^(\d+(?:\.\d+)*)\s+([A-Z][A-Za-z0-9 ,:\-]{2,70})$")
+_SECTION_RE = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+([A-Z][A-Za-z0-9 ,:\-]{2,70})$")
 # 机构关键词：带这些词的行走人不算作者行
 _AFFIL_WORDS = (
     "university", "institute", "department", "google", "brain", "research",
@@ -197,7 +197,7 @@ def _keywords(first_page: list[dict]) -> list[str]:
 
 
 # 章节编号单独一行的版面（NeurIPS 模板就是这样）："1" 一行、"Introduction" 另一行
-_NUMBER_ONLY_RE = re.compile(r"^(\d+(?:\.\d+)*)$")
+_NUMBER_ONLY_RE = re.compile(r"^(\d+(?:\.\d+)*)\.?$")
 # 目录页的点引导："Model and Architectures . . . . . . . . 8"
 _TOC_LEADER_RE = re.compile(r"(?:\.\s){4,}|…{3,}")
 # 目录标题行
@@ -243,30 +243,60 @@ def _runin_title(t: str) -> str | None:
 _UNIT_WORDS = frozenset({"mwh", "kwh", "wh", "mw", "kw", "gb", "tb", "ms", "kg", "tonnes", "tons"})
 
 
+# 表格单元格 / 公式片段冒充标题：带括号、等号、绝对值、比例符号，或干脆没有英文单词
+_TABLE_TITLE_RE = re.compile(r"[()=|%×≥≤∝∂]|ℒ|𝑃|𝑁")
+_HAS_WORD_RE = re.compile(r"[a-z]{3,}")
+# 题注不是标题："Table 4: Fine-tuning …"、"Figure 1.12 Multiple images …"
+_CAPTION_TITLE_RE = re.compile(r"(?i)^(table|figure|fig\.|algorithm|listing)\s*\d")
+
+
 def _title_ok(t: str) -> bool:
-    """标题得像标题：长度 3–80，且不是"36 MWh"这种数量+单位。"""
+    """标题得像标题：长度 3–80、不是"36 MWh"这种数量+单位、也不是表格单元格/公式片段。"""
     if not 3 <= len(t) <= 80:
         return False
     words = t.split()
-    return not (len(words) == 1 and words[0].lower() in _UNIT_WORDS)
+    if len(words) == 1 and words[0].lower() in _UNIT_WORDS:
+        return False
+    if _CAPTION_TITLE_RE.match(t):
+        return False
+    if _TABLE_TITLE_RE.search(t):
+        return False
+    if _HAS_WORD_RE.search(t):
+        return True
+    # ICLR/ICML 爱用全大写标题（"INTRODUCTION"、"AREN'T EXISTING SOLUTIONS GOOD ENOUGH?"）
+    letters = "".join(ch for ch in t if ch.isalpha())
+    return len(letters) >= 4 and letters.isupper()
 
 
-def _left_margin(lines: list[dict], body: float) -> float:
-    """正文左边界：正文长行里 x 出现次数够多的最小那一档。
+def _left_margins(lines: list[dict], body: float) -> list[float]:
+    """正文左边界，可能有多个：单栏论文回来一档，双栏（CLIP/Codex）回来两档。
 
     不能直接取 min(x)：有的 PDF 会冒出一两条 x≈10 的怪行（GPT-3 就有），
-    一取最小值整个判定就全歪了。所以按整数 x 聚类，取"够常见"的最左一档。
+    一取最小值整个判定就全歪了。所以按整数 x 聚类，只取"够常见"的几档。
     """
     xs = sorted(ln["x"] for ln in lines if ln["size"] >= body * 0.95 and len(ln["text"]) >= 40)
     if not xs:
-        return 0.0
+        return [0.0]
     counts: dict[int, int] = {}
     for x in xs:
         k = round(x)
         counts[k] = counts.get(k, 0) + 1
     need = max(3, int(len(xs) * 0.03))
     common = sorted(k for k, c in counts.items() if c >= need)
-    return float(common[0]) if common else float(xs[0])
+    if not common:
+        return [float(xs[0])]
+    # 两栏之间会撒一些短行（题注/公式），间隔 < 40px 的并成一档
+    merged: list[int] = []
+    for k in common:
+        if merged and k - merged[-1] < 40:
+            continue
+        merged.append(k)
+    return [float(k) for k in merged[:3]]
+
+
+def _left_margin(lines: list[dict], body: float) -> float:
+    """最左边的正文边界（旧接口，保留给只需要一档的地方）。"""
+    return _left_margins(lines, body)[0]
 
 
 def _num_ok(number: str) -> bool:
@@ -324,7 +354,13 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
     out: list[dict] = []
     prev_number = ""
     prev_x = 0.0
-    left = _left_margin(lines, body)
+    lefts = _left_margins(lines, body)
+    left = lefts[0]
+
+    def near_left(x: float) -> bool:
+        """是不是贴着某一栏的正文左边（双栏论文有左右两档）。"""
+        return any(abs(x - m) <= 8 for m in lefts)
+
     last: dict[int, int] = {}          # level -> 最近一次的编号数字
     toc_page = -1
     in_toc = False                     # 目录标题之后、真正标题之前的那一坨都跳过
@@ -351,7 +387,15 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
             continue
 
         m = _SECTION_RE.match(t)
-        if m and _num_ok(m.group(1)) and _title_ok(m.group(2).strip()):
+        # 同一行的编号 + 标题必须是「标题样式」（字号更大或加粗）：
+        # 双栏论文的正文行也常以数字开头（LLaMA2 的 "4 To complement the human evaluation, we"），
+        # 不加这条会被当成一级标题。
+        if (
+            m
+            and _num_ok(m.group(1))
+            and _title_ok(m.group(2).strip())
+            and (ln["size"] >= body * 1.05 or ln.get("bold"))
+        ):
             num = m.group(1)
             out.append({"number": num, "title": m.group(2).strip(),
                         "level": num.count(".") + 1, "page": ln["page"]})
@@ -375,7 +419,7 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
             if (
                 ln.get("bold")
                 and _num_ok(num)
-                and abs(ln["x"] - left) <= 8
+                and near_left(ln["x"])
                 and _number_follows(num, last)
             ):
                 prev_number = num
@@ -385,7 +429,9 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
         # 上一行是纯编号，这一行就是标题（标题可能相对编号缩进几十像素）
         if prev_number and _title_ok(t) and (t[:1].isupper() or ln.get("bold")):
             indented = left - 4 <= ln["x"] <= prev_x + 46
-            if indented or ln["size"] >= body * 1.05:
+            # 标题也得贴着某一栏的左边：表格单元格里的 "Switch-Base" 缩在中间，不算标题
+            column_ok = near_left(ln["x"]) or ln["x"] <= left + 60
+            if column_ok and (indented or ln["size"] >= body * 1.05):
                 out.append({"number": prev_number, "title": t,
                             "level": prev_number.count(".") + 1, "page": ln["page"]})
                 _number_bump(prev_number, last)
@@ -395,7 +441,7 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
             continue
 
         # ICLR/ACL 的 run-in 小标题：加粗的 "Datasets." 后面直接接正文，没有编号
-        if out and not seen_refs and ln.get("bold") and abs(ln["x"] - left) <= 8:
+        if out and not seen_refs and ln.get("bold") and near_left(ln["x"]):
             runin = _runin_title(t)
             if runin:
                 out.append({"number": "", "title": runin, "level": 2, "page": ln["page"]})

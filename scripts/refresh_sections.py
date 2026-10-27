@@ -31,7 +31,7 @@ sys.path.insert(0, str(BASE_DIR))
 
 import pymupdf  # noqa: E402
 
-from app.papers import PAPERS_DIR, STRUCTURES_FILE  # noqa: E402
+from app.papers import PAPERS_DIR, load_structures, save_structures, structures_file  # noqa: E402
 from app.structure import _appendix, _body_size, _lines, _sections  # noqa: E402
 
 MAX_PAGES = 25      # 正文/目录的"真正文"判断沿用 parse_structure 的 25 页
@@ -73,7 +73,10 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="只打印，不写文件")
     args = ap.parse_args()
 
-    data = json.loads(STRUCTURES_FILE.read_text(encoding="utf-8"))
+    data = load_structures()
+    if not data:
+        print("structures.json 不存在或为空，先跑 scripts/build_structure.py")
+        return 1
     targets = []
     for name, meta in data.items():
         secs = meta.get("sections") or []
@@ -107,19 +110,18 @@ def main() -> int:
         print(f"[dry-run] 会改 {changed} 篇，未写文件")
         return 0
 
-    backup = STRUCTURES_FILE.with_suffix(".json.bak")
+    target = structures_file()
+    backup = target.with_suffix(".json.bak")
     if not backup.exists():
-        shutil.copy2(STRUCTURES_FILE, backup)
+        shutil.copy2(target, backup)
         print(f"已备份 -> {backup.name}")
     else:
         print(f"备份已存在，保留原备份 -> {backup.name}")
 
-    STRUCTURES_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    written = save_structures(data)
 
     # 写回后解析校验 + 回显统计，确认没有写坏
-    again = json.loads(STRUCTURES_FILE.read_text(encoding="utf-8"))
+    again = json.loads(written.read_text(encoding="utf-8"))
     total2 = sum(level_counts(m.get("sections") or []).get(2, 0) for m in again.values())
     total3 = sum(level_counts(m.get("sections") or []).get(3, 0) for m in again.values())
     no2 = sum(1 for m in again.values() if level_counts(m.get("sections") or []).get(2, 0) == 0)
