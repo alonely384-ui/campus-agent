@@ -110,6 +110,48 @@
     padding: 5px 8px; margin: 0 0 6px; line-height: 1.5;
   }
 
+  /* ---------- 1.3.1 版式：徽章 + 面板 + 表格/公式清单 ---------- */
+  #layoutBadge { font-size: 11px; }
+  #layoutBadge.two { border-color: #7c3aed; color: #7c3aed; }
+  #layoutBadge.one { border-color: #0f9d58; color: #0f9d58; }
+  #layoutPanel {
+    position: fixed; top: 52px; right: 12px; z-index: 60; width: 230px;
+    max-height: 60vh; overflow-y: auto; background: #fff; border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.16); padding: 8px;
+  }
+  #layoutPanel[hidden] { display: none; }
+  #layoutPanel .hint { color: var(--muted); font-size: 11px; line-height: 1.5; padding: 2px 6px 6px; }
+  #layoutPanel .row {
+    display: flex; justify-content: space-between; gap: 8px; padding: 4px 6px;
+    border-radius: 6px; cursor: pointer; font-size: 12px; color: #374151;
+  }
+  #layoutPanel .row:hover { background: #f4f7fb; }
+  #layoutPanel .row .lab { color: #7c3aed; font-size: 11px; }
+  #layoutPanel .row .lab.one { color: #0f9d58; }
+  #sidebar .list-head { display: flex; align-items: baseline; justify-content: space-between; }
+  #sidebar .list-head .cnt {
+    font-size: 11px; color: #9aa3af; font-weight: 400; letter-spacing: 0; text-transform: none;
+  }
+  #sidebar .rlist { display: flex; flex-direction: column; margin-bottom: 14px; }
+  #sidebar .rlist a {
+    display: flex; gap: 6px; align-items: baseline; text-decoration: none; color: #374151;
+    font-size: 12px; line-height: 1.45; padding: 4px 8px; border-radius: 6px;
+  }
+  #sidebar .rlist a:hover { background: #f4f7fb; }
+  #sidebar .rlist a .tag { color: #7c3aed; font-size: 11px; flex: 0 0 auto; }
+  #sidebar .rlist a .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #sidebar .rlist a .pg { margin-left: auto; color: #9aa3af; font-size: 11px; flex: 0 0 auto; }
+  #sidebar .rlist .empty { font-size: 11.5px; color: #9aa3af; padding: 2px 8px 6px; }
+  /* 摘要下面的一行快捷入口：章节树很长，表格/公式清单在侧栏底部，先给个"有 7 张表"的提示 */
+  #miniLists { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 10px; }
+  #miniLists a {
+    font-size: 11px; color: #7c3aed; background: #f5f3ff; border: 1px solid #ddd6fe;
+    border-radius: 999px; padding: 2px 9px; text-decoration: none;
+  }
+  #miniLists a:hover { background: #ede9fe; }
+  /* 从表格/公式清单跳过去：把整页圈一下，眼睛能立刻找到 */
+  .page.land { box-shadow: 0 0 0 3px rgba(26,115,232,.5), 0 1px 4px rgba(0,0,0,.14); }
+
   main#viewer {
     flex: 1 1 auto; padding: 18px 16px 40px;
     /* overflow-y: scroll 而不是 auto：竖滚动条一开始就占位，
@@ -277,6 +319,9 @@
     .tools select { display: none; }
     header.topbar { gap: 6px; padding: 0 8px; }
     .tools input { width: 44px; }
+    /* 390px 宽时顶栏塞不下"100%"和版式徽章，两个都压缩：徽章只留图形式短标签 */
+    #zoomLabel { display: none; }
+    #layoutBadge { font-size: 10px; padding: 5px 6px; }
   }
 </style>
 </head>
@@ -293,10 +338,12 @@
       <button class="icon-btn" id="transToggle" title="中文翻译 / 中英对比（1.3.3）">译</button>
       <input id="pageInput" type="number" min="1" value="1" title="跳到指定页，回车确认" />
       <span class="pager" id="pageTotal">/ 0</span>
+      <button class="icon-btn" id="layoutBadge" title="原文版式：单栏 / 双栏（赛题 1.3.1）">版式</button>
       <div class="viewmodes" role="group" aria-label="视图模式">
         <button class="icon-btn on" id="viewFit" data-mode="fit" title="适合宽度（整栏铺满）">宽</button>
         <button class="icon-btn" id="viewActual" data-mode="actual" title="实际大小 100%（公式/表格看原尺寸）">1:1</button>
         <button class="icon-btn" id="viewTwo" data-mode="two" title="双页并排（对照图表用）">双页</button>
+        <button class="icon-btn" id="viewCol" data-mode="col" title="按栏看：双栏页放大到一栏宽，再点一次换栏">按栏</button>
       </div>
       <button class="icon-btn" id="zoomOut" title="缩小">−</button>
       <span class="pager" id="zoomLabel">100%</span>
@@ -308,8 +355,14 @@
     <aside id="sidebar">
       <h2>这篇论文</h2>
       <div class="abs" id="absBox" title="点击展开/收起摘要"></div>
+      <div id="miniLists"></div>
       <h2>章节</h2>
       <nav id="toc"></nav>
+      <!-- 1.3.1「公式和表格的排版」：表格/公式分别是原文排好的，这里只做清单 + 一键定位 -->
+      <h2 class="list-head">表格 <span class="cnt" id="tblCount"></span></h2>
+      <div class="rlist" id="tblList"></div>
+      <h2 class="list-head">公式 <span class="cnt" id="fmlCount"></span></h2>
+      <div class="rlist" id="fmlList"></div>
     </aside>
     <main id="viewer">
       <div id="pages"></div>
@@ -329,6 +382,7 @@
       <div id="transBody"></div>
     </section>
   </div>
+  <div id="layoutPanel" hidden></div>
   <div id="scrim"></div>
   <button id="backJump" hidden>↩ 返回第 <b id="backJumpPage">1</b> 页</button>
   <button id="selBtn" hidden>译</button>
@@ -369,13 +423,22 @@ const transSyncBtnEl = document.getElementById('transSyncBtn');
 const transStopBtnEl = document.getElementById('transStopBtn');
 const transCloseBtnEl = document.getElementById('transCloseBtn');
 const selBtnEl = document.getElementById('selBtn');
+const layoutBadgeEl = document.getElementById('layoutBadge');
+const layoutPanelEl = document.getElementById('layoutPanel');
+const tblListEl = document.getElementById('tblList');
+const fmlListEl = document.getElementById('fmlList');
+const tblCountEl = document.getElementById('tblCount');
+const fmlCountEl = document.getElementById('fmlCount');
+const miniListsEl = document.getElementById('miniLists');
 
 const state = {
   pdf: null,
   numPages: 0,
   baseScale: 1,      // 按容器宽度算出来的"适合宽度"比例
   zoom: 1,           // 用户缩放倍数
-  viewMode: 'fit',   // fit=适合宽度 / actual=实际大小(100%) / two=双页并排
+  viewMode: 'fit',   // fit=适合宽度 / actual=实际大小(100%) / two=双页并排 / col=按栏看
+  layout: null,      // 后端 /paper/{f}/layout 的版式判定（单栏/双栏/混合 + 逐页栏范围）
+  colSide: 'left',   // 按栏看时在看左栏还是右栏
   dims: [],          // 每页在 scale=1 时的宽高
   rendered: new Map(), // pageNo -> {canvas, textLayer, task}
   currentPage: 1,
@@ -458,6 +521,8 @@ async function openPaper(filename, page) {
   state.paperMeta = meta;
   renderHeader(meta, filename);
   renderSidebar(meta);
+  // 版式判定（单栏/双栏）要在算"适合宽度/按栏看"之前拿到，否则按栏看会先按整页宽渲染一次
+  await loadLayout(filename);
 
   // 换论文时把译文状态清空：A 篇的译文不能留在 B 篇的栏里
   state.paperName = filename;
@@ -504,9 +569,40 @@ function computeBaseScale() {
     state.baseScale = 1;                       // 100%：公式/表格看原尺寸
   } else if (state.viewMode === 'two') {
     state.baseScale = Math.max(0.2, (avail - 14) / (2 * w));  // 双页：两页 + 中间 14px 缝
+  } else if (state.viewMode === 'col') {
+    // 按栏看（赛题 1.3.1）：把一栏放大到容器宽度，像读单栏一样顺着读，
+    // 不用左右来回扫。栏的横向范围来自后端版式判定；单栏页没有栏范围，退回适合宽度。
+    const geo = colGeo(state.currentPage);
+    state.baseScale = geo ? avail / Math.max(120, geo[1] - geo[0]) : avail / w;
   } else {
     state.baseScale = avail / w;               // 适合宽度
   }
+}
+
+/** 当前页、当前栏的横向范围 [x0, x1]（PDF 坐标，scale=1）；不是双栏页就返回 null。 */
+function colGeo(pageNo) {
+  const info = pageColumns(pageNo);
+  if (!info || info.columns !== 2 || !info.cols || info.cols.length < 2) return null;
+  return state.colSide === 'right' ? info.cols[1] : info.cols[0];
+}
+
+/** 当前页的栏数信息：{columns, split}；不在判定结果里就返回 null。 */
+function pageColumns(pageNo) {
+  const pages = state.layout && state.layout.pages;
+  if (!pages) return null;
+  return pages[String(pageNo)] || null;
+}
+
+/** 按栏看时把视口横向挪到左栏/右栏；其余模式回到最左。 */
+function applyColSide() {
+  if (state.viewMode !== 'col') { viewerEl.scrollLeft = 0; return; }
+  const holder = pagesEl.querySelector(`.page[data-page="${state.currentPage}"]`) ||
+                 pagesEl.querySelector('.page');
+  if (!holder) return;
+  const geo = colGeo(state.currentPage);
+  if (!geo) { viewerEl.scrollLeft = 0; return; }
+  // 把这一栏的左边界对到视口左侧；-6px 留一点呼吸，别把首字母压到边框上
+  viewerEl.scrollLeft = Math.max(0, Math.round(geo[0] * scaleNow()) - 6);
 }
 
 function scaleNow() {
@@ -514,7 +610,7 @@ function scaleNow() {
   return state.viewMode === 'actual' ? state.zoom : state.baseScale * state.zoom;
 }
 
-/** 页面容器的排列方式：单页竖排 / 双页横向并排自动换行。 */
+/** 页面容器的排列方式：单页竖排 / 双页横向并排自动换行 / 按栏看时左对齐。 */
 function applyPagesLayout() {
   pagesEl.style.display = 'flex';
   pagesEl.style.gap = state.viewMode === 'two' ? '14px' : '16px';
@@ -526,9 +622,13 @@ function applyPagesLayout() {
   } else {
     pagesEl.style.flexDirection = 'column';
     pagesEl.style.flexWrap = 'nowrap';
-    pagesEl.style.alignItems = 'center';
+    // 按栏看时页面比容器宽一倍多：必须左对齐。用 align-items:center 时
+    // flexbox 会把超出容器的部分"左右均分"，左半边永远滚不到（scrollWidth 也只算一半）
+    pagesEl.style.alignItems = state.viewMode === 'col' ? 'flex-start' : 'center';
     pagesEl.style.justifyContent = 'flex-start';
   }
+  // #viewer 自己也是 flex 容器：按栏看时页面比它宽，居中对齐同样会把左半边藏到滚不到的地方
+  viewerEl.style.alignItems = state.viewMode === 'col' ? 'flex-start' : 'center';
 }
 
 // ---------- 顶栏 / 侧栏 ----------
@@ -647,7 +747,110 @@ function renderSidebar(meta) {
     }
   }
   state.tocAnchors = [...tocEl.querySelectorAll('a')];
+  renderLists(meta);
 }
+
+// ---------- 1.3.1 版式：徽章 / 逐页面板 / 表格与公式清单 ----------
+const LAYOUT_LABEL = { 'two-column': '双栏', 'single-column': '单栏', mixed: '混合', unknown: '未知' };
+
+async function loadLayout(filename) {
+  state.layout = null;
+  layoutBadgeEl.textContent = '版式';
+  layoutBadgeEl.className = 'icon-btn';
+  layoutPanelEl.hidden = true;
+  try {
+    const r = await fetch(`/paper/${encodeURIComponent(filename)}/layout`);
+    if (!r.ok) return;
+    state.layout = await r.json();
+  } catch (e) {
+    return;   // 版式判定挂了不影响阅读，徽章停在"版式"
+  }
+  const mode = state.layout.mode;
+  layoutBadgeEl.textContent = `版式·${LAYOUT_LABEL[mode] || '未知'}`;
+  layoutBadgeEl.classList.add(mode === 'single-column' ? 'one' : 'two');
+  layoutBadgeEl.title =
+    `原文版式：${LAYOUT_LABEL[mode] || '未知'}（采样 ${state.layout.sampled_pages}/${state.layout.total_pages} 页），点开看逐页判定`;
+  renderLayoutPanel();
+}
+
+function renderLayoutPanel() {
+  layoutPanelEl.innerHTML = '';
+  const lay = state.layout;
+  if (!lay) {
+    layoutPanelEl.innerHTML = '<div class="hint">还没拿到版式判定。</div>';
+    return;
+  }
+  const switches = (lay.switches || []).join('、');
+  const hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.textContent = `${LAYOUT_LABEL[lay.mode] || '未知'} · 采样 ${lay.sampled_pages}/${lay.total_pages} 页` +
+    (switches ? ` · 第 ${switches} 页起版式切换` : '');
+  layoutPanelEl.appendChild(hint);
+  Object.keys(lay.pages || {}).map(Number).sort((a, b) => a - b).forEach(p => {
+    const c = lay.pages[String(p)];
+    if (!c) return;
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<span class="lab ${c.columns === 1 ? 'one' : ''}">${c.columns === 2 ? '双栏' : '单栏'}</span>` +
+                    `<span>第 ${p} 页</span>`;
+    row.addEventListener('click', () => {
+      layoutPanelEl.hidden = true;
+      jumpToPage(p, { land: true });
+    });
+    layoutPanelEl.appendChild(row);
+  });
+}
+
+/** 侧栏的表格 / 公式清单：原文里的公式和表格保持 PDF 原样，这里只负责"点一下就定位到那页"。 */
+function renderLists(meta) {
+  const tables = (meta && meta.tables) || [];
+  const formulas = (meta && meta.formula_pages) || [];
+  tblCountEl.textContent = tables.length ? `${tables.length} 张` : '';
+  fmlCountEl.textContent = formulas.length ? `${formulas.length} 页` : '';
+  tblListEl.innerHTML = tables.length
+    ? tables.map(t =>
+        `<a href="#" data-page="${t.page}">` +
+        `<span class="tag">表${escapeHtml(t.number || '')}</span>` +
+        `<span class="txt">${escapeHtml(t.caption)}</span>` +
+        `<span class="pg">p${t.page}</span></a>`).join('')
+    : '<div class="empty">没有检测到表格</div>';
+  fmlListEl.innerHTML = formulas.length
+    ? formulas.map(f =>
+        `<a href="#" data-page="${f.page}">` +
+        `<span class="tag">∑</span><span class="txt">第 ${f.page} 页</span>` +
+        `<span class="pg">${f.count} 个</span></a>`).join('')
+    : '<div class="empty">没有检测到公式</div>';
+
+  // 侧栏顶部的快捷入口：章节树可能几十行，把"有没有表/公式"提前说一声，
+  // 点一下滚到对应清单（清单本身不跳页，点条目才跳）
+  miniListsEl.innerHTML = [
+    tables.length ? `<a href="#" data-goto="tbl">表 ${tables.length} 张</a>` : '',
+    formulas.length ? `<a href="#" data-goto="fml">公式 ${formulas.length} 页</a>` : '',
+  ].filter(Boolean).join('');
+}
+
+for (const listEl of [tblListEl, fmlListEl]) {
+  listEl.addEventListener('click', e => {
+    const a = e.target.closest('a[data-page]');
+    if (!a) return;
+    e.preventDefault();
+    jumpToPage(parseInt(a.dataset.page, 10) || 1, { land: true });
+  });
+}
+miniListsEl.addEventListener('click', e => {
+  const a = e.target.closest('a[data-goto]');
+  if (!a) return;
+  e.preventDefault();
+  // 清单上面那个 <h2>（表格/公式）就是滚动目标；清单本身可能很长，滚到标题更好认
+  const list = a.dataset.goto === 'tbl' ? tblListEl : fmlListEl;
+  (list.previousElementSibling || list).scrollIntoView({ block: 'start', behavior: 'smooth' });
+});
+layoutBadgeEl.addEventListener('click', () => { layoutPanelEl.hidden = !layoutPanelEl.hidden; });
+document.addEventListener('click', e => {
+  if (layoutPanelEl.hidden) return;
+  if (layoutPanelEl.contains(e.target) || e.target === layoutBadgeEl) return;
+  layoutPanelEl.hidden = true;
+});
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => (
@@ -884,6 +1087,16 @@ function jumpToPage(pageNo, opts = {}) {
   markActiveSection(n);
   // 目标页可能还没渲染（懒加载），滚过去后立刻补渲染
   requestAnimationFrame(() => renderPage(n));
+  if (opts.land) {
+    // 从表格/公式清单跳过来：把整页圈一下，否则满屏公式分不清点到哪了
+    const holder = pagesEl.querySelector(`.page[data-page="${n}"]`);
+    if (holder) {
+      holder.classList.add('land');
+      clearTimeout(holder._landT);
+      holder._landT = setTimeout(() => holder.classList.remove('land'), 2600);
+    }
+  }
+  if (state.viewMode === 'col') requestAnimationFrame(applyColSide);
   if (!opts.silent) closeDrawer();
 }
 
@@ -1256,6 +1469,7 @@ function relayout() {
       renderPage(i);
     }
   }
+  applyColSide();
 }
 
 function setZoom(z) {
@@ -1264,20 +1478,39 @@ function setZoom(z) {
   relayout();
 }
 
-/** 视图开关：适合宽度 / 实际大小(100%) / 双页并排（赛题 1.3.1 排版那一条）。 */
+/** 视图开关：适合宽度 / 实际大小(100%) / 双页并排 / 按栏看（赛题 1.3.1 排版那一条）。 */
 function setViewMode(mode) {
-  if (!['fit', 'actual', 'two'].includes(mode)) return;
+  if (!['fit', 'actual', 'two', 'col'].includes(mode)) return;
+  if (mode === 'col' && state.viewMode === 'col') {
+    state.colSide = state.colSide === 'left' ? 'right' : 'left';   // 再点一次换栏
+    syncColBtn();
+    applyColSide();
+    return;
+  }
   state.viewMode = mode;
+  if (mode === 'col' && !colGeo(state.currentPage)) {
+    toast('这篇没判定出双栏版式，按栏看等同适合宽度');
+  }
   state.zoom = 1;   // 换模式从基准比例重新开始，避免"1:1 → 双页"叠成 300%
   zoomLabelEl.textContent = '100%';
   document.querySelectorAll('.viewmodes .icon-btn').forEach(b => {
     b.classList.toggle('on', b.dataset.mode === mode);
   });
+  syncColBtn();
   relayout();
+  applyColSide();
+}
+
+/** 按栏按钮上显示"按栏·左/右"，让人一眼知道现在看的是哪一栏。 */
+function syncColBtn() {
+  const btn = document.getElementById('viewCol');
+  if (!btn) return;
+  btn.textContent = state.viewMode === 'col' ? `按栏·${state.colSide === 'left' ? '左' : '右'}` : '按栏';
 }
 document.getElementById('viewFit').addEventListener('click', () => setViewMode('fit'));
 document.getElementById('viewActual').addEventListener('click', () => setViewMode('actual'));
 document.getElementById('viewTwo').addEventListener('click', () => setViewMode('two'));
+document.getElementById('viewCol').addEventListener('click', () => setViewMode('col'));
 document.getElementById('zoomIn').addEventListener('click', () => setZoom(state.zoom + 0.1));
 document.getElementById('zoomOut').addEventListener('click', () => setZoom(state.zoom - 0.1));
 

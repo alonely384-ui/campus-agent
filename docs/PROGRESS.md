@@ -293,3 +293,25 @@ uff 全绿；提交 8b0908 已 push。
   - 划词要挑最长的 span（第一个 span 常是 `3.1` 这类短串，长度 <4 会被浮钮逻辑忽略）；
   - PowerShell 的 here-string 传给 `python -c` 会吃掉引号（`SyntaxError: invalid decimal literal`）→ 一律写临时 `.py` 文件跑。
 - 下一步：1.3.1 的公式/表格排版体验（题注定位、表格行高亮）、1.4.2 arXiv 每日推荐（可选）、1.6.3 CSV→图（可选）。
+
+## 2026-10-28（周三·凌晨二轮）1.3.1 基本阅读功能：单/双栏判定 + 按栏看 + 表格公式清单
+
+赛题 1.3.1 原文：「基本阅读功能：要考虑原文的排版(双栏/单栏)，公式和表格的排版。」PDF 本身不记录栏数，只能从正文块的横向分布推断；表格/公式则靠 `structures.json` 里已有的条目反查页码。
+
+- 交付：
+  - `app/layout.py`：`detect_layout(pdf_path)` / `layout_summary(pdf_path)`。取前 40 页，每页把长度 ≥20 的正文行按 `x0` 排序后**按空隙聚类**（间隔 > `max(12, 0.05*页宽)` 起新簇），只留 ≥6 行的簇；不足 2 簇 → 单栏；首尾两簇中心距 < 0.32 页宽 → 单栏；右簇行占比不在 20%~80% → 单栏（挡"单栏 + 右侧图注"）。返回 `mode`（two-column / single-column / mixed / unknown）、逐页 `cols`（两栏的 `[x0, x1]`，`x0` 取 10 分位、`x1` 取 80 分位以避开跨栏题注）、`switches`（连续页栏数变化的页码）。
+  - `GET /paper/{filename}/layout`：透传 `detect_layout`，路由里做路径穿越防护（`safe_paper_path`）。
+  - `reader_meta()` 新增 `layout`（`layout_summary`）、`tables`（题注+页码，页码 `+1` 成 1 基）、`formula_pages`（按页计数）。
+  - `web/reader.html`：顶栏「版式·双栏/单栏/混合/未知」徽章（点开列逐页判定与切换页）；第四种视图「按栏·左 / 按栏·右」（把一栏宽度铺满视口，`scrollLeft` 对到该栏左边界）；侧栏新增「表格」「公式」清单，点条目跳页并给整页套 `.land` 蓝圈；摘要下方两枚胶囊「表 N 张 / 公式 M 页」滚到对应清单。
+- 证据（CDP，1440x900）：
+  - CLIP `2103.00020v1.pdf` p5：`badge {"text":"版式·混合","cls":"icon-btn two"}`、`cols [[55.1,290.1],[307.4,543.1]]`、`panel {"rows":["双栏第 1 页",…],"hint":"混合 · 采样 40/48 页 · 第 36、37、40 页起版式切换"}`、`fit {"pageW":1120,"viewerW":1153,"scrollW":1153}`、`col_left {"label":"按栏·左","pageW":2916,"scrollLeft":257,"scrollW":2948}`、`col_right {"scrollLeft":1457}`、`tables {"cnt":"7 张","first":"7"}`、`landed {"page":7,"landed":["7"]}`。
+  - 单栏 Attention `1706.03762v7.pdf`：`{"badge":"版式·单栏","mode":"single-column","tables":"4 张","first":"6","formulas":"7 页"}`，点第一条题注落到第 6 页并高亮。
+  - 390x844 窄屏：`{"docScrollW":390,"docClientW":390,"viewerScrollW":390,"viewerClientW":390,"badgeShown":true}`，无横向溢出。
+  - 全量回归：`178 passed, 11 warnings in 29.43s`；`ruff check app tests scripts` → `All checks passed!`。新增 `tests/test_layout.py` 10 例（合成行判双栏/单栏/页码行不成簇/行数不足、`layout_summary` 字段、路由 200/404/路径穿越、`reader_meta` 的 tables 与 formula_pages 页码 ≥1、fitz 合成双栏 PDF）。
+- 坑：
+  - 第一版用「x<45% 左簇 / x>55% 右簇」判双栏，**39 篇全判成单栏**：双栏右栏的 `x0` 落在两阈值之间，且跨栏题注把 `max x1` 拉到页尾；改「按空隙聚类 + 首尾簇中心距 + 右簇占比」后，T5/CLIP/Codex/GPT-4/ACL/N19-1423 都判成双栏，Attention/LayerNorm/LLaMA2/GPT-3 仍是单栏。
+  - `applyPagesLayout()` 在「按栏」时必须 `alignItems: flex-start`（页面在 flex 容器里 `center` 会把溢出部分左右均分，左半边永远滚不到：实测 `scrollW 2058` 而 `pageW 2930`）。
+  - `structures.json` 的 `tables[].page`、`formulas[].page` 是 **0 基**，与 `references.page` 一致；前端展示统一 `+1`（Attention 表 1 记 5 → 实际第 6 页）。
+  - `_captions()` 会把正文里以 "Table 1 …" 开头的句子也当题注，所以表格清单要求 `rows` 非空。
+  - CDP 脚本：`cdp.wait()` 的表达式返回 DOM 元素时 `returnByValue` 得到 `{}`（falsy），必须写 `!!document.querySelector(...)`；`start_edge()` 每端口要独立 `--user-data-dir`，否则新实例把命令行转给老实例后自己退出。
+- 下一步：1.4.2 arXiv 每日推荐（可选）、1.6.3 CSV→图（可选）、评分硬线（10/31 15:00 前缴费）、演示视频与技术文档。

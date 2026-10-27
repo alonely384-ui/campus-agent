@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.layout import layout_summary
 from app.papers import PAPERS_DIR, load_structures
 
 # 摘要只返回前 1200 字：阅读页侧栏只当"这篇讲什么"的提示，不承担全文展示
@@ -104,7 +105,47 @@ def reader_meta(filename: str) -> dict | None:
         # 扫描件抽不出标题时，章节树是借用同一篇论文的文本版（页码按文本版算）；
         # 前端据此在侧栏注明来源，别让人以为扫描件自己解析出了目录。
         "sections_borrowed_from": str(meta.get("sections_borrowed_from") or ""),
+        # 赛题 1.3.1「公式和表格的排版」：表格给"表 N + 标题 + 页码"清单，
+        # 公式只给页码（结构里公式的 text 是碎片，展示出来没意义）。
+        "tables": _table_list(meta),
+        "formula_pages": _formula_pages(meta),
+        # 版式摘要（单栏/双栏 + 版式切换页），明细走 /paper/{f}/layout
+        "layout": layout_summary(path),
     }
+
+
+def _table_list(meta: dict, limit: int = 40) -> list[dict]:
+    """表格清单。只留真有表格行（rows 非空）的条目：
+    `_captions()` 会把正文里以 "Table 1 …" 开头的句子也当题注，那些没有表格行。
+    """
+    items: list[dict] = []
+    for tab in (meta.get("tables") or []):
+        if not tab.get("rows"):
+            continue
+        caption = str(tab.get("caption") or "").strip()
+        if not caption:
+            continue
+        items.append(
+            {
+                "number": str(tab.get("number") or ""),
+                "caption": caption[:80],
+                # json 里 0 基，和章节/参考文献一个口径
+                "page": int(tab.get("page") or 0) + 1,
+            }
+        )
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _formula_pages(meta: dict, limit: int = 40) -> list[dict]:
+    """公式按页汇总：只报"第几页有几个公式"，点进去还要靠 PDF 自己渲染。"""
+    counts: dict[int, int] = {}
+    for item in (meta.get("formulas") or []):
+        page = int(item.get("page") or 0) + 1
+        counts[page] = counts.get(page, 0) + 1
+    rows = [{"page": p, "count": c} for p, c in sorted(counts.items()) if p > 0]
+    return rows[:limit]
 
 
 def _section_page_of(sections: list[dict], title: str) -> int | None:
