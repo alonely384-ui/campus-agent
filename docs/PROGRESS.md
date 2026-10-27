@@ -175,7 +175,8 @@
 
 ## 2026-10-27（周二·上午）去重与类别容错
 
-- 删除重复论文 209_Emergent_Abilities_of_Larg.pdf（与 2206.07682v2.pdf 同为 Wei et al.《Emergent Abilities of LLM》，TMLR 2022）：emove_source 清掉 401 块，docs/dense 25995→25594；catalog/cards/structures 同步删，现共 39 篇（38 篇已建索引）。
+- 删除重复论文 209_Emergent_Abilities_of_Larg.pdf（与 2206.07682v2.pdf 同为 Wei et al.《Emergent Abilities of LLM》，TMLR 2022）：
+emove_source 清掉 401 块，docs/dense 25995→25594；catalog/cards/structures 同步删，现共 39 篇（38 篇已建索引）。
 - 类别名容错：用户把「能力评测与规模」写成「能力测评与规模」，旧的精确匹配锁不到篇、卡片为 0；改为最长公共子串兜底（≥max(3, len/2)），	ests/test_category_match.py 3 例。
 - 章节定位：问「第 3 节」时按 structures.json 的章节表补该页正文（	ests/test_section.py 3 例）；指代上一轮论文时给显式上下文映射。
 - 验收：107 passed、ruff 全绿；e2e「共 39 篇（38 已索引）」「能力评测 3 篇」；提交 1380bc3、0d8be5、ce61ae1、db43b28 已 push。
@@ -185,7 +186,8 @@
 - pp/structure.py：_table_rows 改为「PyMuPDF 线框 bbox 裁剪页面 → pdfplumber 文本策略 → 质量校验（≥2 行/≥3 列/宽度一致≥70%/单字符≤35%）」，_pymupdf_table_boxes 做位置交叉验证，剔掉正文误检。39 篇重建 256s：**34/39 篇有数据行，共 2651 行**（表题覆盖 36/39）。
 - pp/agent.py：_table_rows_text() 把结构化行渲染进上下文，数量题优先按「点名论文」取表（新增 _PAPER_ALIASES：GPT-3/PPO/DPO/LoRA/BERT/LLaMA 等口语名 → 文件名），证据新增 	able-rows 通道。
 - 端到端：GPT-3 一共训了几个不同规模的模型？ → 「8 个规模，125M 到 175B」，证据 #5 p8 table-rows；总结一下 1707.06347v2.pdf → 走精华卡，#1 p1 card。
-- 123 passed、uff 全绿；提交 8b0908 已 push。
+- 123 passed、
+uff 全绿；提交 8b0908 已 push。
 
 ## 2026-10-27（周二·深夜）阅读页 1.3.2：章节树 + PDF 渲染 + [n] 跳 References
 
@@ -206,3 +208,29 @@
   - 论文的章节树里本来就有 `References` 一节，再追加一条"§ References"入口会出现两个同名条目；改为先找已有条目并打上 refs 样式，找不到才追加。
   - 老论文（LayerNorm）用的是 `[Ioffe and Szegedy, 2015]` 作者-年份式引用，`[n]` 正则识别不到——这类论文只能靠左栏 References 手动跳，属已知限制。
 - 下一步：题注/图表的定位入口、阅读页里"引用图谱"（谁引用了这篇 / 这篇引用了谁），以及移动端手势（双击缩放）。
+
+## 2026-10-27（周二·深夜二轮）1.3.2 精确化：可折叠章节树 + [n]↔References 双向跳转 + 视图开关
+
+- 章节树数据：`structures.json` 原有 28/39 篇只有一级标题（Attention、LayerNorm、LLaMA2 都在内）。改 `app/structure.py` 的 `_sections`，现在认三类版式——
+  - 编号与标题同一行：`3.2 Model Architecture`；
+  - 编号单独一行、字号与正文相同、只加粗：Attention 的 `3.2.2` + `Multi-Head Attention`（旧规则只认"字号 ≥ 正文 ×1.05"，全漏）；
+  - ICLR/ACL 的 run-in 小标题：加粗的 `Datasets.` 后面直接接正文。
+  同时压掉三类误判：目录页（GPT-3 的目录与正文同字号，会伪造出重复的 L1）、表格单元格（`36 MWh`、`68.0 T5-11B`）、图内标注（`Encoder:` / `Decoder:`）。
+- 新增 `scripts/refresh_sections.py`（前 25 页估字号基线、正文扫到 200 页；`--all` 全量、`--dry-run` 预览、写前备份 `structures.json.bak`）。重算结果：**二级标题 721 个、三级 174 个**（原先二级 35 个），39 篇里仍有 3 篇扫描件抽不出二级。
+- 阅读页 `web/reader.html`：
+  - 左栏改成**可折叠嵌套树**（父级带 ▾，点击折叠子级；当前章节自动展开祖先）；
+  - 正文 `[n]` 精确跳到 References 的**第 n 条**并高亮，条目上的 `[n]` 点回正文原处，浮出「↩ 返回第 N 页」；
+  - 顶栏加 **宽 / 1:1 / 双页** 三个视图开关（1.3.1 的排版考虑：双页用来核对双栏版式）。
+- 证据（原文）：
+  - `145 passed, 10 warnings in 32.14s`；`ruff check app tests scripts` → `All checks passed!`
+  - CDP 实测（Attention 第 3 页）：`tree {"secs":27,"withKids":4,"carets":4,"nested":["▾3Model Architecturep2","▾3.2Attentionp3","▾5Trainingp7","▾6Resultsp8"]}`
+  - 折叠：`{"title":"▾3.2Attentionp3","before":false,"after":true,"kidsVisible":false,"leafCount":3}`
+  - 引用：`{"n":"38","beforePage":"3","afterPage":"12","found":true,"hit":true,"backBtnShown":true,"backPage":"2","bodyHit":true}`
+  - 视图：`two {"a":{"l":289,"w":553},"b":{"l":856,"w":553},"sameRow":true,"overflow":0}`、`actual {"pageW":612,"natural":612}`、`fit {"pageW":1120,"viewerW":1153}`
+  - 390×844：`{"innerW":390,"scrollW":390,"viewerScrollW":390,"viewerClientW":390,"toggleVisible":true}`
+- 坑：
+  - 懒加载会同时渲染相邻页，点击到的 `.cite-n` 不一定在当前页——记「原处」必须取 `span.closest('.page')` 的页号，否则回跳落到别的页；
+  - `ensureRendered` 只看 `dataset.ready` 会在重排后拿到空文本层，要额外检查 `.textLayer span`；
+  - 无头 Edge 会缓存旧 HTML，CDP 里必须 `Network.setCacheDisabled`，否则改了看不到；
+  - `_left_margin` 用 `min(x)` 会被一条 x≈10 的怪行带偏，改成"按整数 x 聚类取最左一档"。
+- 下一步：1.3.3 翻译（部分 / 整篇 / 中英对照）。

@@ -198,8 +198,122 @@ def _keywords(first_page: list[dict]) -> list[str]:
 
 # 章节编号单独一行的版面（NeurIPS 模板就是这样）："1" 一行、"Introduction" 另一行
 _NUMBER_ONLY_RE = re.compile(r"^(\d+(?:\.\d+)*)$")
+# 目录页的点引导："Model and Architectures . . . . . . . . 8"
+_TOC_LEADER_RE = re.compile(r"(?:\.\s){4,}|…{3,}")
+# 目录标题行
+_TOC_TITLE_RE = re.compile(r"(?i)^(table of )?contents$")
 # 无编号的特殊章节
 _SPECIAL_SECTIONS = ("Abstract", "Introduction", "Conclusion", "References", "Appendix", "Acknowledgments", "Acknowledgements")
+# ICLR/ACL 常见的 run-in 小标题：加粗的 "Datasets." 直接接正文，没有编号
+_RUNIN_RE = re.compile(r"^([A-Z][A-Za-z0-9 &’'\-/]{2,40})\.(?:\s+|$)")
+# run-in 标题里不能当成小节的词（它们是大标题或题注）
+_RUNIN_STOP = frozenset({
+    "abstract", "introduction", "conclusion", "conclusions", "references",
+    "acknowledgements", "acknowledgments", "appendix", "figure", "fig", "table",
+})
+# Title Case 判断时允许的小写虚词
+_RUNIN_SMALL = frozenset({"of", "and", "the", "in", "on", "for", "with", "to", "a", "an", "or", "at", "by", "via", "vs"})
+
+
+def _runin_title(t: str) -> str | None:
+    """把加粗的 "Datasets." / "Terminologies and Conventions" 认成二级小标题。
+
+    要求 Title Case（虚词可小写）+ 不超过 6 个词，否则 "WikiSQL is introduced in
+    Zhong et al." 这种加粗句子也会被当成标题。
+    """
+    core = t.rstrip()
+    if core.endswith(":"):            # 图里的 "Encoder:" / "Decoder:" 是标注，不是标题
+        return None
+    m = _RUNIN_RE.match(core)
+    if m and not core[: m.end()].endswith("),"):
+        core = m.group(1).strip()
+    elif "." in core:
+        return None
+    words = core.split()
+    if not 1 <= len(words) <= 6:
+        return None
+    if len(words) == 1 and len(core) < 4:      # "Rd"、"Fig" 这种不成标题
+        return None
+    if not all(w.strip("()[]:,")[:1].isupper() or w.lower() in _RUNIN_SMALL for w in words):
+        return None
+    if core.lower() in _RUNIN_STOP:
+        return None
+    return core
+# 纯单位/表头的"标题"（LLaMA 碳排表的 "36 MWh" 会被 _SECTION_RE 当成章节）
+_UNIT_WORDS = frozenset({"mwh", "kwh", "wh", "mw", "kw", "gb", "tb", "ms", "kg", "tonnes", "tons"})
+
+
+def _title_ok(t: str) -> bool:
+    """标题得像标题：长度 3–80，且不是"36 MWh"这种数量+单位。"""
+    if not 3 <= len(t) <= 80:
+        return False
+    words = t.split()
+    return not (len(words) == 1 and words[0].lower() in _UNIT_WORDS)
+
+
+def _left_margin(lines: list[dict], body: float) -> float:
+    """正文左边界：正文长行里 x 出现次数够多的最小那一档。
+
+    不能直接取 min(x)：有的 PDF 会冒出一两条 x≈10 的怪行（GPT-3 就有），
+    一取最小值整个判定就全歪了。所以按整数 x 聚类，取"够常见"的最左一档。
+    """
+    xs = sorted(ln["x"] for ln in lines if ln["size"] >= body * 0.95 and len(ln["text"]) >= 40)
+    if not xs:
+        return 0.0
+    counts: dict[int, int] = {}
+    for x in xs:
+        k = round(x)
+        counts[k] = counts.get(k, 0) + 1
+    need = max(3, int(len(xs) * 0.03))
+    common = sorted(k for k, c in counts.items() if c >= need)
+    return float(common[0]) if common else float(xs[0])
+
+
+def _num_ok(number: str) -> bool:
+    """编号得像章节：每段 ≤2 位，首段 1–40。
+
+    表格里的 "68.0"、"356"（LLaMA 的碳排表）靠这一条排除。
+    """
+    parts = number.split(".")
+    if not 1 <= len(parts) <= 3:
+        return False
+    if not all(p.isdigit() and 1 <= len(p) <= 2 for p in parts):  # noqa: SIM103
+        return False
+    return 1 <= int(parts[0]) <= 40
+
+
+def _number_follows(number: str, last: dict[int, int]) -> bool:
+    """编号连续性：一级 1、2、3…；二级必须挂在最近的一级下面且末位递增。
+
+    加粗的纯编号行（字号等于正文）只有满足连续性才认，避免正文里的 "11"、"68.0" 被当标题。
+    """
+    parts = [int(p) for p in number.split(".")]
+    if len(parts) == 1:
+        prev = last.get(1)
+        return prev is None or parts[0] == prev + 1
+    if last.get(1) != parts[0]:
+        return False
+    if len(parts) == 2:
+        prev = last.get(2)
+        return prev is None or parts[1] == prev + 1
+    if last.get(2) != parts[1]:
+        return False
+    prev = last.get(3)
+    return prev is None or parts[2] == prev + 1
+
+
+def _number_bump(number: str, last: dict[int, int]) -> None:
+    """记住这个编号，供下一条做连续性判断；上层换了就把更深的层清空。"""
+    parts = [int(p) for p in number.split(".")]
+    last[1] = parts[0]
+    if len(parts) >= 2:
+        last[2] = parts[1]
+    else:
+        last.pop(2, None)
+    if len(parts) >= 3:
+        last[3] = parts[2]
+    else:
+        last.pop(3, None)
 
 
 def _sections(lines: list[dict], body: float) -> list[dict]:
@@ -209,30 +323,84 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
     """
     out: list[dict] = []
     prev_number = ""
+    prev_x = 0.0
+    left = _left_margin(lines, body)
+    last: dict[int, int] = {}          # level -> 最近一次的编号数字
+    toc_page = -1
+    in_toc = False                     # 目录标题之后、真正标题之前的那一坨都跳过
+    seen_refs = False                  # 进了参考文献之后不再抽 run-in 小标题（那里全是正文条目）
     for ln in lines:
         t = ln["text"].strip()
-        if ln["size"] < body * 0.95:      # 页脚、脚注直接排除
+        if ln["page"] != toc_page:     # 目录只影响它所在那一页
+            toc_page = ln["page"]
+            in_toc = False
+        if not seen_refs and t.lower() in ("references", "bibliography"):
+            seen_refs = True
+        if _TOC_TITLE_RE.match(t):
+            in_toc = True
+            prev_number = ""
+            continue
+        if in_toc:
+            if ln["size"] >= body * 1.05:   # 字号回到标题级，说明真正文开始了
+                in_toc = False
+            else:
+                prev_number = ""
+                continue
+        if ln["size"] < body * 0.95 or _TOC_LEADER_RE.search(t):   # 页脚、脚注、目录行
             prev_number = ""
             continue
 
         m = _SECTION_RE.match(t)
-        if m:
-            out.append({"number": m.group(1), "title": m.group(2).strip(),
-                        "level": m.group(1).count(".") + 1, "page": ln["page"]})
+        if m and _num_ok(m.group(1)) and _title_ok(m.group(2).strip()):
+            num = m.group(1)
+            out.append({"number": num, "title": m.group(2).strip(),
+                        "level": num.count(".") + 1, "page": ln["page"]})
+            _number_bump(num, last)
             prev_number = ""
             continue
 
         n = _NUMBER_ONLY_RE.match(t)
-        if n and ln["size"] >= body * 1.05:
-            prev_number = n.group(1)
+        # 二级/三级标题常和正文同字号、只是加粗（Attention 论文的 "3.2.2" 就单独一行、
+        # 字号 10.0 = 正文），所以除了"字号明显更大"，加粗的纯编号行也认作标题编号。
+        if n:
+            num = n.group(1)
+            big = ln["size"] >= body * 1.05
+            if big:
+                # 大字号也要挡住表格里的数字（LLaMA 碳排表是 "[356] MWh" 这种）
+                if _num_ok(num):
+                    prev_number = num
+                    prev_x = ln["x"]
+                continue
+            # 加粗但同字号：要求编号合理、左对齐、且编号连续，三重条件才认
+            if (
+                ln.get("bold")
+                and _num_ok(num)
+                and abs(ln["x"] - left) <= 8
+                and _number_follows(num, last)
+            ):
+                prev_number = num
+                prev_x = ln["x"]
+                continue
+
+        # 上一行是纯编号，这一行就是标题（标题可能相对编号缩进几十像素）
+        if prev_number and _title_ok(t) and (t[:1].isupper() or ln.get("bold")):
+            indented = left - 4 <= ln["x"] <= prev_x + 46
+            if indented or ln["size"] >= body * 1.05:
+                out.append({"number": prev_number, "title": t,
+                            "level": prev_number.count(".") + 1, "page": ln["page"]})
+                _number_bump(prev_number, last)
+                prev_number = ""
+                continue
+            prev_number = ""    # 编号行下跟了一段缩进正文，说明不是标题
             continue
 
-        # 上一行是纯编号，这一行就是标题
-        if prev_number and t[:1].isupper() and 3 <= len(t) <= 80:
-            out.append({"number": prev_number, "title": t,
-                        "level": prev_number.count(".") + 1, "page": ln["page"]})
-            prev_number = ""
-            continue
+        # ICLR/ACL 的 run-in 小标题：加粗的 "Datasets." 后面直接接正文，没有编号
+        if out and not seen_refs and ln.get("bold") and abs(ln["x"] - left) <= 8:
+            runin = _runin_title(t)
+            if runin:
+                out.append({"number": "", "title": runin, "level": 2, "page": ln["page"]})
+                prev_number = ""
+                continue
 
         if t in _SPECIAL_SECTIONS:
             out.append({"number": "", "title": t, "level": 1, "page": ln["page"]})

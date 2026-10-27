@@ -57,6 +57,10 @@
   }
   .icon-btn:hover { border-color: var(--blue); color: var(--blue); }
   .icon-btn:active { background: var(--blue-soft); }
+  /* 视图模式（适合宽度 / 100% / 双页）：当前那档高亮 */
+  .icon-btn.on { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
+  .viewmodes { display: flex; gap: 4px; }
+  .viewmodes .icon-btn { font-size: 11px; padding: 5px 7px; }
   .pager { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
   /* ---------- 主体：左侧章节树 + 右侧正文 ---------- */
@@ -90,6 +94,16 @@
   nav#toc a.lvl2 { padding-left: 22px; font-size: 12.5px; }
   nav#toc a.lvl3 { padding-left: 36px; font-size: 12px; }
   nav#toc a.refs { color: #7c3aed; }
+  /* 章节树改成可折叠的嵌套树：一级带 ▾，收起时只留一级（赛题 1.3.2 第 1 条） */
+  nav#toc .sec { display: flex; flex-direction: column; }
+  nav#toc .sec > .kids { display: flex; flex-direction: column; }
+  nav#toc .sec.collapsed > .kids { display: none; }
+  nav#toc .caret {
+    border: none; background: transparent; color: #9aa3af; cursor: pointer;
+    font-size: 10px; line-height: 1; padding: 2px 3px; margin-right: 1px;
+    border-radius: 4px; flex: 0 0 auto;
+  }
+  nav#toc .caret:hover { background: #eef1f6; color: var(--blue); }
   #tocEmpty { font-size: 12px; color: #9aa3af; padding: 6px 8px; line-height: 1.6; }
 
   main#viewer {
@@ -123,6 +137,24 @@
     cursor: pointer;
   }
   .textLayer span.cite:hover { background: rgba(26,115,232,.34); }
+  /* [38, 24, 15] 这种组合引用：每个数字各自可点，点谁跳谁 */
+  .textLayer span.cite-n {
+    color: transparent; background: rgba(26,115,232,.16); border-radius: 2px;
+    cursor: pointer;
+  }
+  .textLayer span.cite-n:hover { background: rgba(26,115,232,.42); }
+  /* References 页上每条条目的 [n] 编号：点它跳回正文里第一次引用它的位置 */
+  .textLayer span.ref-link {
+    color: transparent; background: rgba(124,58,237,.16); border-radius: 2px;
+    cursor: pointer;
+  }
+  .textLayer span.ref-link:hover { background: rgba(124,58,237,.36); }
+  /* 跳过去之后把目标行闪一下，眼睛才跟得上 */
+  .textLayer span.hit {
+    background: rgba(26,115,232,.28);
+    box-shadow: 0 0 0 2px rgba(26,115,232,.35);
+    border-radius: 2px;
+  }
 
   /* 返回原位置：从引用跳转跳到 References 后浮出来 */
   #backJump {
@@ -179,6 +211,7 @@
     .tools select { max-width: 120px; }
   }
   @media (max-width: 620px) {
+    .viewmodes { display: none; }
     .tools select { display: none; }
     header.topbar { gap: 6px; padding: 0 8px; }
     .tools input { width: 44px; }
@@ -197,6 +230,11 @@
       <select id="paperSelect" title="换一篇论文"></select>
       <input id="pageInput" type="number" min="1" value="1" title="跳到指定页，回车确认" />
       <span class="pager" id="pageTotal">/ 0</span>
+      <div class="viewmodes" role="group" aria-label="视图模式">
+        <button class="icon-btn on" id="viewFit" data-mode="fit" title="适合宽度（整栏铺满）">宽</button>
+        <button class="icon-btn" id="viewActual" data-mode="actual" title="实际大小 100%（公式/表格看原尺寸）">1:1</button>
+        <button class="icon-btn" id="viewTwo" data-mode="two" title="双页并排（对照图表用）">双页</button>
+      </div>
       <button class="icon-btn" id="zoomOut" title="缩小">−</button>
       <span class="pager" id="zoomLabel">100%</span>
       <button class="icon-btn" id="zoomIn" title="放大">+</button>
@@ -250,6 +288,7 @@ const state = {
   numPages: 0,
   baseScale: 1,      // 按容器宽度算出来的"适合宽度"比例
   zoom: 1,           // 用户缩放倍数
+  viewMode: 'fit',   // fit=适合宽度 / actual=实际大小(100%) / two=双页并排
   dims: [],          // 每页在 scale=1 时的宽高
   rendered: new Map(), // pageNo -> {canvas, textLayer, task}
   currentPage: 1,
@@ -257,6 +296,8 @@ const state = {
   backTo: null,      // 引用跳转前的 {page, top}
   tocAnchors: [],
   paperMeta: null,
+  citeIndex: new Map(),  // 引用编号 n -> 正文里第一次出现它的页码（惰性扫描后缓存）
+  citeOrigin: null,      // 最近一次从正文点进来的引用：{n, page, top}，供 References 条目跳回
 };
 
 // ---------- 小工具 ----------
@@ -275,6 +316,9 @@ function pageUrl(name, page) {
 
 // 引用编号：[11] / [11, 12] / [11-13] / [11; 12]（正文里这几种写法都常见）
 const CITE_RE = /\[\s*\d{1,3}(?:\s*[,;–\-]\s*\d{1,3})*\s*\]/g;
+// References 页上一条条目的开头："[11] 作者…"；有的论文写成 "11. 作者…"，用两个正则兜住
+const REF_ENTRY_RE = /^\s*\[(\d{1,3})\]/;
+const REF_ENTRY_PLAIN_RE = /^\s*(\d{1,3})\.\s+\S/;
 
 // ---------- 打开一篇论文 ----------
 async function openPaper(filename, page) {
@@ -285,6 +329,8 @@ async function openPaper(filename, page) {
   state.tocAnchors = [];
   state.refPage = null;
   state.backTo = null;
+  state.citeIndex = new Map();
+  state.citeOrigin = null;
   backJumpEl.hidden = true;
 
   if (!window.pdfjsLib) {
@@ -340,10 +386,36 @@ function computeBaseScale() {
   // -32 是左右 padding；再 -1 兜住 canvas 取整误差，避免多出 1px 横向滚动条
   const avail = Math.max(200, viewerEl.clientWidth - 32 - 1);
   const w = state.dims.length ? state.dims[0].w : 612;
-  state.baseScale = avail / w;
+  if (state.viewMode === 'actual') {
+    state.baseScale = 1;                       // 100%：公式/表格看原尺寸
+  } else if (state.viewMode === 'two') {
+    state.baseScale = Math.max(0.2, (avail - 14) / (2 * w));  // 双页：两页 + 中间 14px 缝
+  } else {
+    state.baseScale = avail / w;               // 适合宽度
+  }
 }
 
-function scaleNow() { return state.baseScale * state.zoom; }
+function scaleNow() {
+  // 100% 模式下 zoom 就是字面倍率；其余两档 zoom 是在基准比例上再乘
+  return state.viewMode === 'actual' ? state.zoom : state.baseScale * state.zoom;
+}
+
+/** 页面容器的排列方式：单页竖排 / 双页横向并排自动换行。 */
+function applyPagesLayout() {
+  pagesEl.style.display = 'flex';
+  pagesEl.style.gap = state.viewMode === 'two' ? '14px' : '16px';
+  if (state.viewMode === 'two') {
+    pagesEl.style.flexDirection = 'row';
+    pagesEl.style.flexWrap = 'wrap';
+    pagesEl.style.alignItems = 'flex-start';
+    pagesEl.style.justifyContent = 'center';
+  } else {
+    pagesEl.style.flexDirection = 'column';
+    pagesEl.style.flexWrap = 'nowrap';
+    pagesEl.style.alignItems = 'center';
+    pagesEl.style.justifyContent = 'flex-start';
+  }
+}
 
 // ---------- 顶栏 / 侧栏 ----------
 function renderHeader(meta, filename) {
@@ -374,9 +446,14 @@ function renderSidebar(meta) {
     tocEl.innerHTML = '<div id="tocEmpty">这篇没有解析到章节结构（可能是扫描件）。<br>可以用上面的页码框手动跳页，正文里的 [n] 引用仍可点击。</div>';
   }
 
+  // 章节树按 level 嵌套：一级标题带 ▾ 折叠箭头，二级/三级挂在下面
+  // （赛题 1.3.2 第 1 条：一级和二级标题做成树状导航，能快速跳到 3.2.2 这种小节）
+  const stack = [];   // [{level, kidsEl}]
   secs.forEach((s, idx) => {
-    const a = document.createElement('a');
     const lvl = clamp(parseInt(s.level || 1, 10), 1, 3);
+    const wrap = document.createElement('div');
+    wrap.className = 'sec';
+    const a = document.createElement('a');
     a.className = `lvl${lvl}`;
     a.href = '#';
     a.dataset.page = String(s.page || 1);
@@ -391,7 +468,40 @@ function renderSidebar(meta) {
       if (s.page) jumpToPage(s.page);
       closeDrawer();
     });
-    tocEl.appendChild(a);
+    wrap.appendChild(a);
+
+    // 找到最近的上级，把这一条塞进它的 kids；没有上级就挂到 toc 根上
+    let parent = null;
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (stack[i].level < lvl) { parent = stack[i]; break; }
+    }
+    (parent ? parent.kidsEl : tocEl).appendChild(wrap);
+
+    while (stack.length && stack[stack.length - 1].level >= lvl) stack.pop();
+    const kidsEl = document.createElement('div');
+    kidsEl.className = 'kids';
+    wrap.appendChild(kidsEl);
+    stack.push({ level: lvl, kidsEl });
+  });
+
+  // 有下级的条目补一个折叠箭头
+  tocEl.querySelectorAll('.sec').forEach(sec => {
+    const kids = sec.querySelector(':scope > .kids');
+    const a = sec.querySelector(':scope > a');
+    if (!kids || !a) return;
+    if (!kids.children.length) { kids.remove(); return; }
+    const caret = document.createElement('button');
+    caret.type = 'button';
+    caret.className = 'caret';
+    caret.textContent = '▾';
+    caret.title = '展开/收起小节';
+    caret.addEventListener('click', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const collapsed = sec.classList.toggle('collapsed');
+      caret.textContent = collapsed ? '▸' : '▾';
+    });
+    a.insertBefore(caret, a.firstChild);
   });
 
   // 参考文献单独一个醒目入口：正文 [n] 点击默认跳这里。
@@ -439,10 +549,7 @@ function buildPagePlaceholders() {
   });
   pagesEl.innerHTML = '';
   pagesEl.appendChild(frag);
-  pagesEl.style.display = 'flex';
-  pagesEl.style.flexDirection = 'column';
-  pagesEl.style.alignItems = 'center';
-  pagesEl.style.gap = '16px';
+  applyPagesLayout();
 }
 
 let observer = null;
@@ -522,8 +629,9 @@ async function renderPage(pageNo) {
 function buildTextLayer(items, viewport, layer, pageNo) {
   const frag = document.createDocumentFragment();
   const util = pdfjsLib.Util;
-  // 参考文献页自己的 "[11] Author..." 不该再跳到 References（已经在看了），只当普通文字
-  const noCite = state.refPage != null && pageNo === state.refPage;
+  // 参考文献页（含其后连续几页）自己不该再生成引用链接：已经在看源头了。
+  // 反过来，这些页上的 "[12]" 条目编号是"反向跳转"的入口。
+  const isRefRegion = state.refPage != null && pageNo >= state.refPage;
 
   for (const item of items) {
     if (!item.str || !item.str.trim()) continue;
@@ -539,13 +647,32 @@ function buildTextLayer(items, viewport, layer, pageNo) {
     span.style.fontSize = `${fontHeight.toFixed(2)}px`;
     span.style.fontFamily = 'sans-serif';
 
+    // References 条目行："[12] 作者. 标题. …" —— 把编号单独做成可点入口
+    const mRef = isRefRegion ? (REF_ENTRY_RE.exec(item.str) || REF_ENTRY_PLAIN_RE.exec(item.str)) : null;
+    if (mRef) {
+      const n = parseInt(mRef[1], 10);
+      span.dataset.refn = String(n);
+      const link = document.createElement('span');
+      link.className = 'ref-link';
+      link.textContent = mRef[0].trim();
+      link.title = `跳回正文里引用 [${n}] 的位置`;
+      link.addEventListener('click', ev => {
+        ev.stopPropagation();
+        jumpToBodyCitation(n);
+      });
+      span.appendChild(link);
+      span.appendChild(document.createTextNode(item.str.slice(mRef[0].length)));
+      frag.appendChild(span);
+      continue;
+    }
+
     const parts = [];
     let last = 0;
     let m;
     CITE_RE.lastIndex = 0;
-    while (!noCite && (m = CITE_RE.exec(item.str)) !== null) {
+    while (!isRefRegion && (m = CITE_RE.exec(item.str)) !== null) {
       if (m.index > last) parts.push({ text: item.str.slice(last, m.index), cite: false });
-      parts.push({ text: m[0], cite: true, n: m[0] });
+      parts.push({ text: m[0], cite: true });
       last = m.index + m[0].length;
     }
     if (last < item.str.length) parts.push({ text: item.str.slice(last), cite: false });
@@ -558,14 +685,34 @@ function buildTextLayer(items, viewport, layer, pageNo) {
           span.appendChild(document.createTextNode(p.text));
           return;
         }
+        // "[38]" 整体可点；"[38, 24, 15]" 拆成三个数字各自可点
         const c = document.createElement('span');
         c.className = 'cite';
-        c.textContent = p.text;
-        c.title = '跳到参考文献';
-        c.addEventListener('click', ev => {
-          ev.stopPropagation();
-          jumpToReferences();
-        });
+        let cursor = 0;
+        for (const mt of p.text.matchAll(/\d{1,3}/g)) {
+          if (mt.index > cursor) c.appendChild(document.createTextNode(p.text.slice(cursor, mt.index)));
+          const num = document.createElement('span');
+          num.className = 'cite-n';
+          num.dataset.n = mt[0];
+          num.textContent = mt[0];
+          num.title = `跳到参考文献第 ${mt[0]} 条`;
+          num.addEventListener('click', ev => {
+            ev.stopPropagation();
+            // 记住"从正文哪一处点进来的"，References 里的 [n] 才能跳回这个确切位置。
+            // 页码要取 span 所在的那一页，不能取 state.currentPage：懒加载下先渲染的
+            // 相邻页（比如第 2 页）也在视口里，它的引用编号会被点到。
+            const host = num.closest('.page');
+            state.citeOrigin = {
+              n: mt[0],
+              page: parseInt((host && host.dataset.page) || '', 10) || state.currentPage,
+              top: viewerEl.scrollTop,
+            };
+            jumpToCitation(parseInt(mt[0], 10));
+          });
+          c.appendChild(num);
+          cursor = mt.index + mt[0].length;
+        }
+        if (cursor < p.text.length) c.appendChild(document.createTextNode(p.text.slice(cursor)));
         span.appendChild(c);
       });
     }
@@ -613,6 +760,151 @@ function jumpToReferences() {
   backJumpEl.hidden = false;
 }
 
+/** 等某一页渲染完：懒加载是异步的，跳过去要等文本层出来才能精确定位。 */
+async function ensureRendered(pageNo, timeoutMs = 2500) {
+  const holder = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
+  if (!holder) return false;
+  // 有过 relayout 后 canvas 还在但文本层被重建的情况：光看 ready 标记不够
+  if (holder.dataset.ready === '1' && holder.querySelector('.textLayer span')) return true;
+  if (holder.dataset.ready === '1') delete holder.dataset.ready;
+  await renderPage(pageNo);
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    if (holder.dataset.ready === '1') return true;
+    await new Promise(r => setTimeout(r, 60));
+  }
+  return holder.dataset.ready === '1';
+}
+
+function refEntryEls(n) {
+  return [...pagesEl.querySelectorAll('.textLayer span[data-refn]')]
+    .filter(el => el.dataset.refn === String(n));
+}
+
+function pageHasRefEntries(pageNo) {
+  return !!pagesEl.querySelector(`.page[data-page="${pageNo}"] .textLayer span[data-refn]`);
+}
+
+function citeEls(n) {
+  return [...pagesEl.querySelectorAll('.textLayer span.cite-n')]
+    .filter(el => el.dataset.n === String(n));
+}
+
+/** 只看某一页里的引用 span（回跳时不能用全文档第一个，它可能在别的页上）。 */
+function citeElsIn(pageNo, n) {
+  return [...pagesEl.querySelectorAll(`.page[data-page="${pageNo}"] .textLayer span.cite-n`)]
+    .filter(el => el.dataset.n === String(n));
+}
+
+/** 把某个文本层 span 滚到视口上部 1/4 处，别让它贴在窗口最顶上。 */
+function scrollElIntoView(el) {
+  const vr = viewerEl.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  const target = viewerEl.scrollTop + (r.top - vr.top) - Math.min(110, viewerEl.clientHeight * 0.24);
+  viewerEl.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
+}
+
+/** 命中高亮 2.6 秒，让人看清跳到哪一行了。 */
+function flashEl(el) {
+  el.classList.add('hit');
+  clearTimeout(el._hitT);
+  el._hitT = setTimeout(() => el.classList.remove('hit'), 2600);
+}
+
+function rememberBack() {
+  state.backTo = { page: state.currentPage, top: viewerEl.scrollTop };
+  backJumpPageEl.textContent = String(state.currentPage);
+  backJumpEl.hidden = false;
+}
+
+/**
+ * 正文 [n] → References 第 n 条（赛题 1.3.2 第 2 条的前半段）。
+ * 条目在 References 起始页之后的几页里也常见，所以往下最多翻 12 页找；
+ * 一页上一条编号都没有，说明已经离开 References 区，就不再往下翻。
+ */
+async function jumpToCitation(n) {
+  if (!state.refPage) {
+    toast('这篇没有解析到 References 章节');
+    return;
+  }
+  const before = { page: state.currentPage, top: viewerEl.scrollTop };
+  const last = Math.min(state.refPage + 12, state.numPages);
+  let foundPage = null;
+  for (let p = state.refPage; p <= last; p++) {
+    await ensureRendered(p);
+    if (refEntryEls(n).length) { foundPage = p; break; }
+    if (p > state.refPage && !pageHasRefEntries(p)) break;
+  }
+  if (!foundPage) {
+    // 优雅降级：找不到条目就退回粗粒度（跳 References 章节页），不白屏
+    toast(`没定位到第 ${n} 条条目，已跳到 References 起始页`);
+    state.backTo = before;
+    backJumpPageEl.textContent = String(before.page);
+    jumpToPage(state.refPage, { silent: true });
+    backJumpEl.hidden = false;
+    return;
+  }
+  jumpToPage(foundPage, { silent: true });
+  await ensureRendered(foundPage);
+  const el = refEntryEls(n)[0];
+  if (el) { scrollElIntoView(el); flashEl(el); }
+  state.backTo = before;
+  backJumpPageEl.textContent = String(before.page);
+  backJumpEl.hidden = false;
+}
+
+/** 扫正文页（References 之前），找编号 n 第一次被引用的页码；结果缓存。 */
+async function findFirstBodyCitation(n) {
+  if (state.citeIndex.has(n)) return state.citeIndex.get(n);
+  const pdf = state.pdf;
+  if (!pdf) return null;
+  const stop = state.refPage ? state.refPage - 1 : state.numPages;
+  for (let p = 1; p <= stop; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent({ normalizeWhitespace: false });
+    for (const item of tc.items) {
+      if (!item.str) continue;
+      CITE_RE.lastIndex = 0;
+      let m;
+      while ((m = CITE_RE.exec(item.str)) !== null) {
+        const nums = (m[0].match(/\d{1,3}/g) || []).map(Number);
+        if (nums.includes(n)) { state.citeIndex.set(n, p); return p; }
+      }
+    }
+  }
+  state.citeIndex.set(n, null);
+  return null;
+}
+
+/** References 条目编号 → 正文里引用它的位置（赛题 1.3.2 第 2 条的后半段）。 */
+async function jumpToBodyCitation(n) {
+  const before = { page: state.currentPage, top: viewerEl.scrollTop };
+  const origin = state.citeOrigin && state.citeOrigin.n === String(n) ? state.citeOrigin : null;
+  let pageNo = origin ? origin.page : null;   // 优先回到"当初点进来的那一页"
+  if (!pageNo) pageNo = await findFirstBodyCitation(n);
+  if (!pageNo) {
+    toast(`正文里没找到 [${n}]，可能只在参考文献里出现`);
+    return;
+  }
+  jumpToPage(pageNo, { silent: true });
+  await ensureRendered(pageNo);
+  // 只在这一页里找：全文档第一个 .cite-n 可能落在别的页上，会把视口又带偏
+  let el = citeElsIn(pageNo, n)[0];
+  if (!el && origin) {                 // 这一页的文本层可能被重建过，强制再来一次
+    const holder = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
+    if (holder && holder.dataset.ready === '1') {
+      delete holder.dataset.ready;
+      await ensureRendered(pageNo);
+      el = citeElsIn(pageNo, n)[0];
+    }
+  }
+  if (el) { scrollElIntoView(el); flashEl(el); }
+  else if (origin) viewerEl.scrollTo({ top: Math.max(0, origin.top), behavior: 'auto' });
+  state.backTo = before;
+  backJumpPageEl.textContent = String(before.page);
+  backJumpEl.hidden = false;
+}
+
 backJumpEl.addEventListener('click', () => {
   if (!state.backTo) return;
   viewerEl.scrollTop = state.backTo.top;
@@ -637,6 +929,16 @@ function markActiveSection(pageNo) {
   });
   state.tocAnchors.forEach(a => a.classList.toggle('active', a === active));
   if (active) {
+    // 当前小节被折叠在收起的一级标题里时，自动展开祖先，不然高亮看不见
+    let host = active.closest('.sec');
+    while (host) {
+      if (host.classList.contains('collapsed')) {
+        host.classList.remove('collapsed');
+        const caret = host.querySelector(':scope > a > .caret');
+        if (caret) caret.textContent = '▾';
+      }
+      host = host.parentElement ? host.parentElement.closest('.sec') : null;
+    }
     const r = active.getBoundingClientRect();
     const box = sidebarEl.getBoundingClientRect();
     if (r.top < box.top + 40 || r.bottom > box.bottom - 40) {
@@ -678,19 +980,21 @@ pageInputEl.addEventListener('blur', () => {
   pageInputEl.value = String(state.currentPage || 1);
 });
 
-function setZoom(z) {
-  state.zoom = clamp(z, 0.5, 3);
-  zoomLabelEl.textContent = `${Math.round(state.zoom * 100)}%`;
-  if (!state.pdf) return;
+/** 按当前 viewMode/zoom 重新布局所有占位页，并补渲染视口附近的页。 */
+function relayout() {
+  if (!state.pdf || !state.dims.length) return;
+  computeBaseScale();
   const scale = scaleNow();
   state.rendered.clear();
   pagesEl.querySelectorAll('.page').forEach((el, i) => {
     const d = state.dims[i];
+    if (!d) return;
     el.dataset.ready = '';
     el.innerHTML = '';
     el.style.width = `${Math.floor(d.w * scale)}px`;
     el.style.height = `${Math.floor(d.h * scale)}px`;
   });
+  applyPagesLayout();
   // 重新按当前视口渲染可见页
   const top = viewerEl.scrollTop;
   for (let i = 1; i <= state.numPages; i++) {
@@ -703,6 +1007,27 @@ function setZoom(z) {
     }
   }
 }
+
+function setZoom(z) {
+  state.zoom = clamp(z, 0.5, 3);
+  zoomLabelEl.textContent = `${Math.round(state.zoom * 100)}%`;
+  relayout();
+}
+
+/** 视图开关：适合宽度 / 实际大小(100%) / 双页并排（赛题 1.3.1 排版那一条）。 */
+function setViewMode(mode) {
+  if (!['fit', 'actual', 'two'].includes(mode)) return;
+  state.viewMode = mode;
+  state.zoom = 1;   // 换模式从基准比例重新开始，避免"1:1 → 双页"叠成 300%
+  zoomLabelEl.textContent = '100%';
+  document.querySelectorAll('.viewmodes .icon-btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+  });
+  relayout();
+}
+document.getElementById('viewFit').addEventListener('click', () => setViewMode('fit'));
+document.getElementById('viewActual').addEventListener('click', () => setViewMode('actual'));
+document.getElementById('viewTwo').addEventListener('click', () => setViewMode('two'));
 document.getElementById('zoomIn').addEventListener('click', () => setZoom(state.zoom + 0.1));
 document.getElementById('zoomOut').addEventListener('click', () => setZoom(state.zoom - 0.1));
 
@@ -727,8 +1052,7 @@ window.addEventListener('resize', () => {
   clearTimeout(resizeTick);
   resizeTick = setTimeout(() => {
     if (!state.pdf || !state.dims.length) return;
-    computeBaseScale();
-    setZoom(state.zoom);
+    relayout();
   }, 220);
 });
 
