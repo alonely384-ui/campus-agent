@@ -3,7 +3,7 @@
 对应赛题 1.3.2 第 1 条（一级/二级标题做成树状导航），这批 PDF 里三种版式都要认：
 1. 编号与标题同一行；2. 编号单独一行（加粗、与正文同字号）；3. 无编号的 run-in 小标题。
 """
-from app.structure import _appendix, _sections
+from app.structure import _appendix, _captions, _sections
 
 BODY = 10.0
 LEFT = 108.0
@@ -129,3 +129,41 @@ def test_appendix_marks_late_numbered_sections():
         ("A", "Appendix"),
         ("A.1", "Details"),
     ]
+
+
+# ---------------- 题注 vs 正文引用 ----------------
+# 实测坑：LayerNorm 第 7 页正文写着 "Figure 1 illustrates the validation curves…"，
+# 正则会把 "1" 当编号、把 "illustrates …" 当题注，图表清单里就多一条假条目。
+
+
+def test_body_sentence_referencing_figure_is_not_caption():
+    lines = [
+        line("Figure 1 illustrates the validation curves of the models, with and without layer normalization."),
+    ]
+    tables, figures = _captions(lines)
+    assert tables == []
+    assert figures == []
+
+
+def test_real_caption_is_kept():
+    lines = [
+        line("Figure 1: Recall@K curves using order-embeddings with and without layer normalization."),
+        line("Table 2 shows the test variational bound for the first 100 steps"),  # 正文引用
+        line("Table 2. Test variational bound for the first 100 steps"),          # 真题注
+    ]
+    tables, figures = _captions(lines)
+    assert [f["caption"].split()[0] for f in figures] == ["Recall@K"]
+    assert [t["caption"].split()[0] for t in tables] == ["Test"]
+
+
+def test_caption_with_pipe_separator_is_normalized():
+    """有的 PDF 题注写成 "Figure 3 | Our model"，竖线不该留在标题里。"""
+    lines = [line("Figure 3 | Our model architecture and training pipeline")]
+    _tables, figures = _captions(lines)
+    assert figures and figures[0]["caption"].startswith("Our model")
+
+
+def test_caption_starting_with_paren_is_kept():
+    lines = [line("Figure 5 (a) Encoder only (b) Decoder only")]
+    _tables, figures = _captions(lines)
+    assert figures and figures[0]["caption"].startswith("(a)")

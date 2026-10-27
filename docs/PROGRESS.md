@@ -358,3 +358,66 @@ uff 全绿；提交 8b0908 已 push。
 - `_captions()` 会把正文里以「Figure N …」开头的句子当题注（LayerNorm 有一条），图表清单可能多出一两条假条目。
 - 历史上传的 38 篇论文没有 `.txt` 文字缓存，首次查重时会读 PDF 抽一次（之后缓存）。
 - 扫描件（`1706.03762v1_img.pdf`）没有可抽取文字，查重只能靠 arXiv 编号。
+
+## 2026-10-28（周三）修图表题注误判：正文引用不再当题注
+
+### 问题
+
+阅读页侧栏的图表清单里混进了正文句子。根因在 `app/structure.py::_captions()`：正则只要求
+「Table/Figure + 编号开头」，于是正文里的
+
+    "Figure 1 illustrates the validation curves of the models, with and without layer normalization."
+
+也被收成题注，清单里显示成「图1：illustrates the validation curves…」（LayerNorm 那篇最明显）。
+
+### 改法
+
+新增 `_caption_text()` 与 `_looks_like_caption()` 两个判据，正则命中后还要过一遍：
+
+- 题注是**名词短语、首词大写**；正文引用是句子成分、首词是**小写动词/连词/介词**（shows / illustrates / reports / from the paper / and Table 4 …）；
+- 长度 4–200 字（实测 624 条题注最长 127 字）；
+- 去掉开头的分隔符（`Figure 3 | Our model` → `Our model`），首字符允许大写/数字/括号/引号。
+
+`_captions()` 里 tables 与 figures 两条分支都过这个判据。
+
+### 数据重算（39 篇，只动 figures/tables，保留 rows 等字段）
+
+```
+figures: 319 -> 287
+tables : 305 -> 282
+删掉 55 条：全部是正文引用（逐条已打印核对）
+与重算不一致的篇数：0        # 用真实 PDF 重跑 _captions() 核对，条数一致
+```
+
+三篇抽查（清单里已无小写开头的假题注）：
+
+```
+1607.06450v1.pdf figures 6 tables 3
+   fig 1 p 6 Recall@K curves using order-embeddings with and with
+   fig 2 p 7 Validation curves for the attentive reader model. BN
+1706.03762v7.pdf figures 5 tables 4
+   fig 1 p 3 The Transformer - model architecture.
+2103.00020v1.pdf figures 18 tables 7
+   fig 1 p 2 Summary of our approach. While standard image models
+```
+
+### 测试与证据
+
+- `tests/test_structure_sections.py` 新增 4 例：正文引用不入清单、真题注保留（同时验证表/图两条分支）、竖线分隔符归一化、括号开头的题注保留。
+- 全量：`196 passed, 11 warnings in 27.06s`；`ruff check app tests scripts` → `All checks passed!`。
+- CDP 实测（LayerNorm，1440×900）：
+
+```json
+{"figCount":"6 张","tblCount":"3 张","figs":[
+ {"t":"图1 Recall@K curves using order-embeddings with an","p":"6","ok":true},
+ {"t":"图2 Validation curves for the attentive reader mod","p":"7","ok":true},
+ {"t":"图3 Performance of skip-thought vectors with and w","p":"8","ok":true},
+ {"t":"图5 Handwriting sequence generation model negative","p":"9","ok":true},
+ {"t":"图4 DRAW model test nega-","p":"9","ok":true},
+ {"t":"图6 Permutation invariant MNIST 784-1000-1000-10 m","p":"10","ok":true}]}
+```
+
+### 已知残留
+
+- 图题注里跨行被截断的（如「图4 DRAW model test nega-」）仍带着断字连字符，属于 `_lines()` 不做换行合并的老问题，不在本次范围。
+- 清单顺序按题注在 PDF 里出现的先后排，同一页内可能 图5 在 图4 前面。
