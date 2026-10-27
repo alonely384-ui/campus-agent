@@ -535,3 +535,40 @@ CDP：`{"rows":8,"recentCount":4,"citedCount":4,"bgRecent":"rgb(231,247,238)",
 - 被保留的那份显示 `主版本`（蓝色），
 - 同名文件（样例 `1706.03762v7.pdf` 与上传副本都叫这个名字）在行内额外显示 `paper_id` 区分。
 实测 CDP：`{"rows":39,"keep":1,"dup":3,"onTarget":[{"name":"1706.03762v7.pdf","id":"bdfaa68d8984","badge":"重复 · 留 1706.03762v7.pdf"},{"name":"1706.03762v7.pdf","id":"1706.03762v7","badge":"主版本"}]}`
+
+## 2026-10-27（周二）1.4.2 / 1.4.3 对照赛题补齐：定时刷新 + 对比式理由 + 多用户反馈 + 协同过滤
+
+赛题这两条的具体要求：1.4.2「定期刷新 arXiv 列表」；1.4.3「① 相关性与推荐理由 ② 是否含
+GitHub 代码、有代码优先 ③ 用户反馈（点击/点赞/踩）④ 多用户可协同过滤」。逐条对照后的改动：
+
+- **1.4.2 定期**：新增 `app/scheduler.py`（进程内定时线程，无新依赖）。`DISCOVER_SCHEDULE=daily|weekly|off`
+  （默认 daily）、`DISCOVER_HOUR`（默认 8）；`GET /recommendations/schedule` 看状态，
+  `?enable=true&mode=daily` 现场启动。`pytest` 进程里 `autostart()` 不会起线程。
+  实测：`{"mode":"daily","running":true,"next_run":"2026-10-28T08:00:00","hour":8}`。
+- **1.4.3 ① 理由**：提示词与模板兜底都改成**对照式**——「在《库内最相近论文》的基础上……，
+  区别在于……」；命中不到锚点时才退回「主体相似度」的说法。实测理由示例：
+  「在《Switch Transformers…》的稀疏专家路由基础上，区别在于将 MoE 用于多智能体路径规划」。
+- **1.4.3 ② 代码**：新增 `app/online.github_repo(title)`（GitHub Search API + 磁盘缓存），
+  加了精度门槛（关键词 <3 个不查；要求关键词覆盖 ≥80%、仓库名覆盖 ≥50%），
+  因此 `Layer Normalization` 不会误配到 `bzhangGo/rmsnorm`；只给前 `limit*2` 条补代码。
+- **1.4.3 ③ 反馈**：新增 `POST /recommendations/{key}/event`（`kind=view|download`）记录
+  点击/下载；`GET /recommendations` 返回 `stats={votes,events,collab_keys}`；前端点标题记 view、
+  点「下载入库」记 download，条目上显示 `🔥` 热度与「同好」徽章。
+- **1.4.3 ④ 多用户**：`data/meta/feedback.json` 从扁平结构迁到 `{"users": {...}}`（旧文件自动迁移），
+  接口与前端都带 `user`（前端 `localStorage.recUser`，随机 `u` + 6 位）；
+  `collaborative_scores(user)` 按「与你点赞重合度」给同好赞过的条目加分，冷启动退化成全站热度。
+
+数据口径：`base = 0.35*overlap + 0.35*topic + 0.15*code + 0.15*fresh`，
+`score = base + vote + 0.10*collab + 0.05*event`；排序统一「有 arXiv 号的在前，同组按分数」
+（修过一个坑：点赞重排原来只按分数排，会把没有 arXiv 号的条目顶到第一，和刷新时的顺序打架）。
+
+验证：
+- `pytest tests/test_discover_extra.py tests/test_recommend.py` → `29 passed`
+- 全量 `pytest -q -p no:cacheprovider --basetemp=.pytest_tmp` → `232 passed, 11 warnings`
+- `ruff check app tests scripts` → `All checks passed!`
+- 真跑一轮刷新（13.9s）：`sources {'cited': 23, 'recent': 6, 'github': 0}`，`period daily`
+- CDP 面板：`{"rows":12,"period":"daily","sched":"定时刷新：每日 08:00，下次 10-28 08:00",
+  "badges":[["引用扩展"],["引用扩展"]],"firstTitle":"Map-Distribution Mixture-of-Experts…"}`
+
+已知限制：GitHub 搜索受未认证限流（10 次/分钟），候选多时会只补前几条；
+`github: 0` 是精度门槛收紧的结果，不是接口失败。

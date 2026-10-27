@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from app import scheduler
 from app.agent import run_agent, run_agent_stream
 from app.config import settings
 from app.figures import figure_bytes, page_png
@@ -51,10 +52,15 @@ from app.rag.pipeline import index_paper, remove_source
 from app.reader import list_reader_papers, reader_meta, safe_paper_path
 from app.recommend import (
     CACHE_KEY,
+    DEFAULT_USER,
     RECOMMEND_FILE,
     build_recommendations,
     cached_recommendations,
+    collaborative_scores,
     library_rows,
+    load_events,
+    load_feedback,
+    record_event,
     rerank_with_feedback,
     save_feedback,
 )
@@ -520,6 +526,15 @@ class FeedbackRequest(BaseModel):
     """推荐反馈：up / down，传空串表示取消。"""
 
     vote: str = Field(default="", max_length=8)
+    # 1.4.3 ④：不同人各记各的反馈，协同过滤才有输入
+    user: str = Field(default=DEFAULT_USER, max_length=40)
+
+
+class EventRequest(BaseModel):
+    """点击/下载事件（1.4.3 ③）：kind=view|download。"""
+
+    kind: str = Field(default="view", max_length=12)
+    user: str = Field(default=DEFAULT_USER, max_length=40)
 
 
 def _pick_search_result(query: str, results: list[dict]) -> dict | None:
@@ -710,22 +725,42 @@ async def paper_references_download(filename: str, req: ReferenceDownloadRequest
 
 
 @app.get("/recommendations", summary="新论文推荐（读缓存，1.4.3）")
-async def recommendations() -> dict:
-    """读上次刷新出来的推荐；没刷新过就返回空列表 + offline=true。"""
-    return await run_in_threadpool(cached_recommendations)
+async def recommendations(user: str = DEFAULT_USER) -> dict:
+    """读上次刷新出来的推荐；没刷新过就返回空列表 + offline=true。
+
+    ``user`` 只影响"这条我点过赞没"的投票状态与协同画像，不改动已算好的 base 分。
+    """
+    payload = await run_in_threadpool(cached_recommendations)
+    items = await run_in_threadpool(rerank_with_feedback, list(payload.get("items") or []), load_feedback(user))
+    payload["items"] = items
+    payload["user"] = user
+    payload["stats"] = {
+        "votes": load_feedback(user),
+        "events": load_events(),
+        "collab_keys": len(collaborative_scores(user)),
+    }
+    return payload
 
 
 @app.post("/recommendations/refresh", summary="刷新推荐（扫 arXiv 引用关系 + 近期上架，1.4.3）")
-async def recommendations_refresh(max_papers: int = 6, include_recent: bool = True) -> dict:
+async def recommendations_refresh(
+    max_papers: int = 6,
+    include_recent: bool = True,
+    user: str = DEFAULT_USER,
+    period: str = "daily",
+) -> dict:
     """实时抓一轮候选并重算推荐；抓取失败时退回过期缓存（offline=true）。
 
     两路候选：``cited``（别人引用了库里的论文）+ ``recent``（arXiv 近期上架，
-    ``include_recent=false`` 可关掉）。这一步会串行请求 Semantic Scholar 与 arXiv，
-    通常 20~60 秒。
+    ``include_recent=false`` 可关掉）。``period=daily|weekly`` 只影响新上架的时间窗。
+    这一步会串行请求 Semantic Scholar 与 arXiv，通常 20~60 秒。
     """
     try:
         return await build_recommendations(
-            max_papers=max(1, min(max_papers, 12)), include_recent=include_recent
+            max_papers=max(1, min(max_papers, 12)),
+            include_recent=include_recent,
+            user=user,
+            period=period,
         )
     except OnlineError as exc:
         payload = await run_in_threadpool(cached_recommendations)
@@ -739,29 +774,66 @@ async def recommendation_feedback(key: str, req: FeedbackRequest) -> dict:
     """记一条反馈，并立刻按新票重排缓存里的列表（不用重新抓网）。
 
     `key` 是推荐条目里的 `key` 字段（有 arXiv 号就用号，没有就用标题哈希）。
+    `user` 让不同人各记各的（1.4.3 ④ 多用户）。
     """
     if not key.strip():
         raise HTTPException(status_code=400, detail="缺少推荐条目标识")
+    user = (req.user or DEFAULT_USER).strip() or DEFAULT_USER
     try:
-        feedback = await run_in_threadpool(save_feedback, key, req.vote)
+        feedback = await run_in_threadpool(save_feedback, key, req.vote, user)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     payload = await run_in_threadpool(cached_recommendations)
     items = rerank_with_feedback(list(payload.get("items") or []), feedback)
     payload["items"] = items
+    payload["user"] = user
     payload["offline"] = False
     write_cache(CACHE_KEY, payload)
     try:
         RECOMMEND_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
     except OSError:
         logger.warning("写推荐缓存文件失败（不影响本次响应）")
-    return {"vote": req.vote, "feedback": feedback, "items": items}
+    return {"vote": req.vote, "user": user, "feedback": feedback, "items": items}
+
+
+@app.post("/recommendations/{key}/event", summary="记录点击/下载（1.4.3 ③）")
+async def recommendation_event(key: str, req: EventRequest) -> dict:
+    """记一次点击或下载；返回累计计数。
+
+    ``key.download`` 只在用户真的点了"下载 PDF"时记，页面渲染记 ``view``。
+    计数参与排序（权重 0.05，影响很小，只当微调）。
+    """
+    if not key.strip():
+        raise HTTPException(status_code=400, detail="缺少推荐条目标识")
+    try:
+        row = await run_in_threadpool(record_event, key, req.kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return {"key": key, "kind": req.kind, "events": row}
+
+
+@app.get("/recommendations/schedule", summary="定时刷新状态（1.4.2）")
+async def recommendations_schedule(enable: bool = False, mode: str = "") -> dict:
+    """看定时器状态；``?enable=true`` 可现场启动（``mode=daily|weekly|off``）。"""
+    if enable:
+        return await run_in_threadpool(scheduler.start, mode or None)
+    return scheduler.status()
 
 
 # ---------------- 前端页面 ----------------
 # 把 web/ 目录挂到 /ui，这样访问 http://127.0.0.1:8000/ui/ 就能看到聊天页面
 if Path("web").exists():
     app.mount("/ui", StaticFiles(directory="web", html=True), name="web")
+
+# ---------------- 定时刷新推荐（1.4.2） ----------------
+# 默认每天跑一次；`DISCOVER_SCHEDULE=off` 可关掉，`weekly` 改每周一。
+# pytest 运行时不会启动（见 app/scheduler.py 的 autostart）。
+try:
+    _SCHEDULE_INFO = scheduler.autostart()
+    if _SCHEDULE_INFO:
+        logger.info("定时推荐刷新：%s，下次 %s", _SCHEDULE_INFO["mode"], _SCHEDULE_INFO["next_run"])
+except Exception as _exc:  # 定时器起不来不影响主服务
+    logger.warning("定时推荐刷新启动失败：%s", _exc)
 
 
 # 直接 `python -m app.main` 时走这里

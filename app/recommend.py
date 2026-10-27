@@ -27,6 +27,7 @@ from app.online import (
     arxiv_id_of,
     citations,
     find_github,
+    github_repo,
     paper_meta,
     read_cache_any_age,
     recent_papers,
@@ -39,8 +40,10 @@ logger = get_logger(__name__)
 
 META_DIR = BASE_DIR / "data" / "meta"
 FEEDBACK_FILE = META_DIR / "feedback.json"
+EVENTS_FILE = META_DIR / "events.json"
 RECOMMEND_FILE = META_DIR / "recommendations.json"
 CACHE_KEY = "recommendations_latest"
+DEFAULT_USER = "default"
 
 RANK_LIMIT = 12
 MAX_SOURCE_PAPERS = 6
@@ -59,39 +62,151 @@ WEIGHT_CODE = 0.15
 WEIGHT_FRESH = 0.15
 VOTE_UP = 0.15
 VOTE_DOWN = -0.35
+# 1.4.3 ③④：点击/下载信号与"别人的口味"作为附加分（不改变主信号权重，加在 score 上）
+WEIGHT_COLLAB = 0.10
+WEIGHT_EVENT = 0.05
 
 
 # --------------------------------------------------------------------------- 反馈
 
 
-def load_feedback() -> dict[str, str]:
-    """读用户反馈：{arxiv_id: "up"|"down"}。"""
-    if not FEEDBACK_FILE.exists():
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
         return {}
     try:
-        payload = json.loads(FEEDBACK_FILE.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    if not isinstance(payload, dict):
-        return {}
-    return {str(k): str(v) for k, v in payload.items() if str(v) in {"up", "down"}}
+    return payload if isinstance(payload, dict) else {}
 
 
-def save_feedback(arxiv_id: str, vote: str) -> dict[str, str]:
-    """记一条反馈（up/down，传空串表示取消）。"""
+def load_all_feedback() -> dict[str, dict[str, str]]:
+    """读所有人的反馈：``{user: {arxiv_id: "up"|"down"}}``。
+
+    兼容老格式（扁平 ``{arxiv_id: vote}``）：老数据全部记在 ``DEFAULT_USER`` 名下，
+    这样升级到"多用户"之后，之前点的赞不会凭空消失。
+    """
+    payload = _read_json(FEEDBACK_FILE)
+    users = payload.get("users")
+    if not isinstance(users, dict):
+        flat = {str(k): str(v) for k, v in payload.items() if str(v) in {"up", "down"}}
+        return {DEFAULT_USER: flat} if flat else {}
+    out: dict[str, dict[str, str]] = {}
+    for user, votes in users.items():
+        if not isinstance(votes, dict):
+            continue
+        clean = {str(k): str(v) for k, v in votes.items() if str(v) in {"up", "down"}}
+        if clean:
+            out[str(user)] = clean
+    return out
+
+
+def load_feedback(user: str = DEFAULT_USER) -> dict[str, str]:
+    """读某个用户自己的反馈：``{arxiv_id: "up"|"down"}``（1.4.3 ④ 多用户）。"""
+    return dict(load_all_feedback().get(user or DEFAULT_USER, {}))
+
+
+def save_feedback(arxiv_id: str, vote: str, user: str = DEFAULT_USER) -> dict[str, str]:
+    """记一条反馈（up/down，传空串表示取消）；返回该用户最新的反馈表。"""
     arxiv_id = arxiv_id.strip()
     if not arxiv_id:
         raise ValueError("缺少 arXiv 编号")
     if vote not in {"up", "down", ""}:
         raise ValueError("vote 只能是 up / down / 空")
-    data = load_feedback()
+    user = (user or DEFAULT_USER).strip() or DEFAULT_USER
+    all_votes = load_all_feedback()
+    mine = all_votes.get(user, {})
     if vote:
-        data[arxiv_id] = vote
+        mine[arxiv_id] = vote
     else:
-        data.pop(arxiv_id, None)
+        mine.pop(arxiv_id, None)
+    if mine:
+        all_votes[user] = mine
+    else:
+        all_votes.pop(user, None)
     FEEDBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    FEEDBACK_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-    return data
+    FEEDBACK_FILE.write_text(
+        json.dumps({"users": all_votes}, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    return dict(mine)
+
+
+def collaborative_scores(user: str = DEFAULT_USER) -> dict[str, float]:
+    """简单协同过滤（1.4.3 ④）：把"跟你口味相近的人点赞过的"抬上来。
+
+    没有用户画像、也没装推荐库，用的就是最朴素的共现：两个人都赞过的条目越多，
+    说明口味越像（权重=共同点赞数/我点赞总数）；他们赞过而我还没看的条目就加分。
+    自己还没赞过任何东西时退化成"全站热度"（有多少人赞过），冷启动也有东西可排。
+    """
+    all_votes = load_all_feedback()
+    mine = all_votes.get(user or DEFAULT_USER, {})
+    my_likes = {key for key, vote in mine.items() if vote == "up"}
+    raw: dict[str, float] = {}
+    if my_likes:
+        for other, votes in all_votes.items():
+            if other == (user or DEFAULT_USER):
+                continue
+            their_likes = {key for key, vote in votes.items() if vote == "up"}
+            shared = len(my_likes & their_likes)
+            if shared == 0:
+                continue
+            weight = shared / max(1, len(my_likes))
+            for key in their_likes - my_likes:
+                raw[key] = raw.get(key, 0.0) + weight
+    else:
+        for votes in all_votes.values():
+            for key, vote in votes.items():
+                if vote == "up":
+                    raw[key] = raw.get(key, 0.0) + 1.0
+    if not raw:
+        return {}
+    top = max(raw.values())
+    return {key: round(value / top, 4) for key, value in raw.items()}
+
+
+# --------------------------------------------------------------------------- 点击/下载
+
+
+def load_events() -> dict[str, dict[str, int]]:
+    """读点击/下载计数：``{arxiv_id: {"view": n, "download": n}}``（1.4.3 ③）。"""
+    payload = _read_json(EVENTS_FILE)
+    out: dict[str, dict[str, int]] = {}
+    for key, value in payload.items():
+        if not isinstance(value, dict):
+            continue
+        out[str(key)] = {
+            "view": int(value.get("view") or 0),
+            "download": int(value.get("download") or 0),
+        }
+    return out
+
+
+def record_event(arxiv_id: str, kind: str) -> dict[str, int]:
+    """记一次"点击（view）"或"下载（download）"；返回该条目的累计计数。"""
+    arxiv_id = (arxiv_id or "").strip()
+    if not arxiv_id:
+        raise ValueError("缺少 arXiv 编号")
+    if kind not in {"view", "download"}:
+        raise ValueError("kind 只能是 view / download")
+    data = load_events()
+    row = data.setdefault(arxiv_id, {"view": 0, "download": 0})
+    row[kind] = int(row.get(kind) or 0) + 1
+    EVENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    EVENTS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    return row
+
+
+def event_scores(events: dict[str, dict[str, int]] | None = None) -> dict[str, float]:
+    """把点击/下载次数压成 0~1：下载算 2 次点击，5 分封顶。
+
+    排序里只占 ``WEIGHT_EVENT = 0.05``，主要是让"大家都点开看过"的论文稍微靠前，
+    不至于让点击量压过相关性。
+    """
+    events = load_events() if events is None else events
+    raw = {key: row.get("view", 0) + 2 * row.get("download", 0) for key, row in events.items()}
+    if not raw:
+        return {}
+    return {key: round(min(1.0, value / 5.0), 4) for key, value in raw.items()}
 
 
 # --------------------------------------------------------------------------- 库内画像
@@ -308,6 +423,8 @@ def score_candidates(
     lib_vecs: list[tuple[str, list[float]]],
     feedback: dict[str, str] | None = None,
     current_year: int | None = None,
+    collab: dict[str, float] | None = None,
+    events: dict[str, dict[str, int]] | None = None,
 ) -> list[dict[str, Any]]:
     """给候选打分并排序（分数 0~1，越高越该推荐）。
 
@@ -315,8 +432,14 @@ def score_candidates(
     - ``source == "cited"``（别人引用了库里的论文）：引用重叠或主题够像都能留；
     - ``source == "recent"``（新上架）：没有引用信号，只能靠主题，所以门槛更高
       （``RECENT_MIN_TOPIC``），否则会塞满"只是词面像"的论文。
+
+    ``collab`` / ``events`` 是 1.4.3 ③④ 的两个附加信号（协同过滤、点击下载），
+    只加在 ``score`` 上，``base`` 仍是四个主信号的加权和，方便"点一下赞就重排"
+    时只换投票项、不用把库重新扫一遍。
     """
     feedback = feedback or {}
+    collab = collab or {}
+    event_map = event_scores(events)
     year_now = current_year or datetime.now(UTC).year
     kept: list[dict[str, Any]] = []
     for item in candidates:
@@ -338,8 +461,11 @@ def score_candidates(
         code_score = 1.0 if github else 0.0
         age = max(0, year_now - int(item.get("year") or 0)) if item.get("year") else 3
         fresh_score = max(0.0, 1.0 - age / 4.0)
-        vote = feedback.get(item.get("key") or "", "")
+        key = item.get("key") or item.get("arxiv_id") or ""
+        vote = feedback.get(key, "")
         vote_score = VOTE_UP if vote == "up" else VOTE_DOWN if vote == "down" else 0.0
+        collab_score = WEIGHT_COLLAB * float(collab.get(key, 0.0))
+        event_score = WEIGHT_EVENT * float(event_map.get(key, 0.0))
         base = (
             WEIGHT_OVERLAP * overlap_score
             + WEIGHT_TOPIC * topic_score
@@ -355,7 +481,10 @@ def score_candidates(
         # base 是"不含用户反馈"的分数；点赞点踩后只要 base + 新票就能重排，
         # 不用把库重新扫一遍（见 rerank_with_feedback）。
         item["base"] = round(base, 4)
-        item["score"] = round(base + vote_score, 4)
+        item["collab"] = round(collab_score, 4)
+        item["event"] = round(event_score, 4)
+        item["events"] = event_map.get(key, {}) or {"view": 0, "download": 0}
+        item["score"] = round(base + vote_score + collab_score + event_score, 4)
         item["vote"] = vote
         kept.append(item)
     return sorted(kept, key=lambda item: item["score"], reverse=True)
@@ -367,24 +496,36 @@ def rerank_with_feedback(
     """按当前反馈重新算分并排序（点完 👍/👎 立刻生效，不必重新抓网）。"""
     feedback = load_feedback() if feedback is None else feedback
     for item in items:
-        vote = feedback.get(item.get("key") or "", "")
+        key = item.get("key") or item.get("arxiv_id") or ""
+        vote = feedback.get(key, "")
         base = float(item.get("base") or item.get("score") or 0.0)
         vote_score = VOTE_UP if vote == "up" else VOTE_DOWN if vote == "down" else 0.0
         item["vote"] = vote
-        item["score"] = round(base + vote_score, 4)
-    return sorted(items, key=lambda item: item["score"], reverse=True)
+        item["score"] = round(
+            base + vote_score + float(item.get("collab") or 0.0) + float(item.get("event") or 0.0),
+            4,
+        )
+    # 排序口径要和 build_recommendations 一致：有 arXiv 号（能直接下载）的排前面，
+    # 同组内再比分数；否则"点赞后重排"会把没 arXiv 号的顶上来，前后两次顺序对不上。
+    return sorted(
+        items,
+        key=lambda item: (bool(item.get("arxiv_id")), item["score"]),
+        reverse=True,
+    )
 
 
 # --------------------------------------------------------------------------- 理由
 
-_REASON_PROMPT = """你是一个学术助理。下面是若干篇候选论文，以及用户的论文库里已有哪些论文。
+_REASON_PROMPT = """你是一个学术助理。下面是若干篇候选论文，以及用户论文库里已有的论文（附摘要片段）。
 
-请为每篇候选写一句中文推荐理由（30~60 字），说清它跟用户库里的哪篇论文相关、新在哪里。
-提到"像库里的哪篇"时，只能用下面给的"最相近的库内论文"或"引用库内"里出现过的篇名，
-不要凭印象编一个库内不存在的标题。只输出 JSON 数组，不要任何解释，格式：
-[{"arxiv_id": "2401.00001", "reason": "..."}]
+请为每篇候选写一句中文推荐理由（35~70 字），要求是**对照式**的：
+- 先点明它在库里的哪一篇**基础上**做（只能用下面给的"最相近的库内论文"或"引用库内"里出现过的篇名，不许编）；
+- 再说它的**区别/新意**是什么（换了任务、数据、方法或规模）；
+- 如果候选摘要里明确写了在某个数据集上提升或超过某个基线，可以点出一句；没写就不要编数字。
+只输出 JSON 数组，不要任何解释，格式：
+[{"arxiv_id": "2401.00001", "reason": "在《Layer Normalization》的基础上……，区别在于……"}]
 
-用户库里的论文：
+用户库里的论文（篇名 — 摘要片段）：
 __LIBRARY__
 
 候选论文：
@@ -392,16 +533,29 @@ __CANDIDATES__
 """
 
 
+def _library_brief(library: list[dict[str, Any]], limit: int = 12) -> str:
+    """库内论文的「篇名 — 摘要片段」，给理由提示词当对照锚点。"""
+    lines: list[str] = []
+    for row in library[:limit]:
+        title = str(row.get("title") or "").strip()
+        if not title:
+            continue
+        abstract = re.sub(r"\s+", " ", str(row.get("abstract") or "")).strip()[:160]
+        lines.append(f"- {title}" + (f" — {abstract}" if abstract else ""))
+    return "\n".join(lines)
+
+
 async def write_reasons(items: list[dict[str, Any]], library: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """用大模型给候选写中文理由；模型不可用时退回模板句。"""
     if not items:
         return items
-    lib_text = "\n".join(f"- {row['title']}" for row in library[:12])
+    lib_text = _library_brief(library)
     cand_text = "\n".join(
         f"- arxiv_id={item['arxiv_id'] or item['key']}；标题={item['title']}；"
         f"来路={'新上架' if item.get('source') == 'recent' else '引用扩展'}；"
         f"引用库内 {len(item['cited_by'])} 篇（{'; '.join(item['cited_by'][:3]) or '无'}）；"
         f"最相近的库内论文={item.get('topic_of') or '无'}（相似度 {item.get('topic', 0):.2f}）；"
+        f"有代码={item.get('github') or '无'}；"
         f"年份={item.get('year') or '未知'}；摘要={item.get('abstract', '')[:300]}"
         for item in items
     )
@@ -415,10 +569,16 @@ async def write_reasons(items: list[dict[str, Any]], library: list[dict[str, Any
     for item in items:
         reason = reasons.get(item["arxiv_id"] or item["key"], "")
         if not reason:
+            anchor = item.get("topic_of") or ""
             if item.get("source") == "recent":
                 reason = (
                     f"arXiv 近两周新上架（{item.get('category') or '未分类'}），"
-                    f"主题与库内《{item.get('topic_of') or '—'}》最接近（相似度 {item['topic']:.2f}）"
+                    f"主题与库内《{anchor or '—'}》最接近（相似度 {item['topic']:.2f}）"
+                )
+            elif anchor:
+                reason = (
+                    f"在库内《{anchor}》的基础上（主题相似度 {item['topic']:.2f}）"
+                    f"又引用了库内 {len(item['cited_by'])} 篇论文，区别是它换了问题设定与实验对象"
                 )
             else:
                 reason = (
@@ -458,30 +618,48 @@ async def build_recommendations(
     limit: int = RANK_LIMIT,
     max_papers: int = MAX_SOURCE_PAPERS,
     include_recent: bool = True,
+    user: str = DEFAULT_USER,
+    period: str = "daily",
+    check_code: bool = True,
 ) -> dict[str, Any]:
     """抓候选 → 打分 → 写理由 → 落缓存。
 
     两路候选合并：``cited``（别人引用了库里的论文）+ ``recent``（arXiv 近期上架）。
     后者让"刚发布、还没人引用"的相关论文也能进榜，见 ``collect_recent()``。
+
+    ``period`` 只影响"新上架"的时间窗（daily=7 天、weekly=14 天），对应赛题
+    1.4.3 的"每日/每周推荐"；``user`` 决定用谁的反馈与协同画像。
     """
+    period = period if period in {"daily", "weekly"} else "daily"
+    recent_days = 7 if period == "daily" else RECENT_DAYS
     rows = library_rows()
     lib_vecs = library_vectors(rows)
     raw, errors = collect_candidates(max_papers=max_papers)
     recent_scanned = 0
     if include_recent:
-        fresh_items, recent_errors = collect_recent(lib_vecs=lib_vecs)
+        fresh_items, recent_errors = collect_recent(lib_vecs=lib_vecs, days=recent_days)
         recent_scanned = len(fresh_items)
         known = {item["arxiv_id"] for item in raw if item.get("arxiv_id")}
         raw.extend(item for item in fresh_items if item["arxiv_id"] not in known)
         errors = errors + recent_errors
-    ranked = score_candidates(raw, lib_vecs, load_feedback())
+    collab = collaborative_scores(user)
+    events = load_events()
+    ranked = score_candidates(
+        raw, lib_vecs, load_feedback(user), collab=collab, events=events
+    )
     # 有 arXiv 号的排前面：推荐出来却下不下来，对用户没意义；
     # 但也不直接丢掉（期刊论文也可能想看），排后面并标出来。
     ranked.sort(key=lambda item: (bool(item.get("arxiv_id")), item["score"]), reverse=True)
+    if check_code:
+        _fill_github(ranked[: max(limit * 2, 8)])
+        # 补到代码的条目分数会变（+WEIGHT_CODE），所以补完要重新排序，
+        # 否则"接口顺序"和"缓存里的顺序"会打架（点赞重排后顺序突变）。
+        ranked.sort(key=lambda item: (bool(item.get("arxiv_id")), item["score"]), reverse=True)
     without_arxiv = sum(1 for item in ranked if not item.get("arxiv_id"))
     sources = {
         "cited": sum(1 for item in ranked if item.get("source") != "recent"),
         "recent": sum(1 for item in ranked if item.get("source") == "recent"),
+        "github": sum(1 for item in ranked if item.get("github")),
     }
     ranked = await write_reasons(ranked[:limit], rows)
     payload = {
@@ -494,11 +672,43 @@ async def build_recommendations(
         "without_arxiv": without_arxiv,
         "sources": sources,
         "recent_scanned": recent_scanned,
+        "user": user,
+        "period": period,
+        "collab_hits": sum(1 for item in ranked[:limit] if item.get("collab")),
+        "event_hits": sum(1 for item in ranked[:limit] if item.get("event")),
     }
     write_cache(CACHE_KEY, payload)
     RECOMMEND_FILE.parent.mkdir(parents=True, exist_ok=True)
     RECOMMEND_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
     return payload
+
+
+def _fill_github(items: list[dict[str, Any]]) -> None:
+    """给摘要里没写仓库的候选补一次 GitHub 搜索（1.4.3 ②「有代码优先」）。
+
+    只对将要展示的前几条做（搜索接口 10 次/分钟），结果 14 天缓存，
+    命中后把 ``WEIGHT_CODE`` 补进 base 与 score。
+    """
+    for item in items:
+        if item.get("github"):
+            continue
+        try:
+            repo = github_repo(str(item.get("title") or ""))
+        except Exception as exc:  # 搜索挂了不影响推荐
+            logger.info("GitHub 兜底查找失败：%s", exc)
+            continue
+        if not repo:
+            continue
+        item["github"] = repo
+        item["base"] = round(float(item.get("base") or 0.0) + WEIGHT_CODE, 4)
+        item["score"] = round(
+            float(item["base"])
+            + float(item.get("collab") or 0.0)
+            + float(item.get("event") or 0.0)
+            + (VOTE_UP if item.get("vote") == "up" else VOTE_DOWN if item.get("vote") == "down" else 0.0),
+            4,
+        )
+
 
 
 def cached_recommendations() -> dict[str, Any]:
