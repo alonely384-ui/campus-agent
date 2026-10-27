@@ -1,0 +1,155 @@
+{
+ "updated_at": "2026-10-27T11:23:16+08:00",
+ "library_size": 39,
+ "items": [
+  {
+   "key": "2610.25991",
+   "arxiv_id": "2610.25991",
+   "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+   "year": 2026,
+   "abstract": "Designing capable neural policies for multi-agent pathfinding (MAPF), which map local observations to action distributions, represents an important challenge in multi-agent learning, with practical relevance to scalable collective automation problems such as warehouse logistics. In contrast to prior studies focusing primarily on individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based MAPF. Specifically, given a collection of compact yet high-performing experts specialised for different map distributions, our architecture learns a router that selectively fuses their outputs according to each agent's local situation. We instantiate and validate this MoE approach with a commonly used graph neural network-based policy as well as a newly developed recursive action-token refinement model. Combined with supervised and reinforcement learning fine-tuning of the experts, our experiments show that MoE generally improves upon the pretrained policy and outperforms existing leading methods. At the same time, our findings reveal that appropriately trained, parameter-matched monolithic models still outperform MoE, highlighting a nuanced role f",
+   "authors": [
+    "Fumimaro Suzuki",
+    "Keisuke Okumura"
+   ],
+   "url": "https://arxiv.org/abs/2610.25991",
+   "cited_by": [
+    "Layer Normalization"
+   ],
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.386,
+   "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+   "base": 0.4017,
+   "score": 0.4017,
+   "vote": "",
+   "reason": "将Switch Transformers的稀疏专家路由思想迁移到多智能体路径规划，用地图分布混合专家替代单一策略，扩展了MoE在决策任务中的应用。"
+  },
+  {
+   "key": "2610.32142",
+   "arxiv_id": "2610.32142",
+   "title": "Rethinking LoRA Initialization for Robust Asymmetric Learning Rates",
+   "year": 2026,
+   "abstract": "Low-Rank Adaptation (LoRA) is often highly sensitive to learning-rate (LR) choices. Recent empirical studies suggest that, once LRs are carefully tuned, vanilla LoRA can remain competitive with many proposed LoRA variants. This shifts the central practical question from designing ever more variants to reducing the cost and brittleness of LR selection. LoRA+ addresses this issue with asymmetric LRs, using a larger LR for the up-projection matrix $B$ than for the down-projection matrix $A$. However, the ratio $\\eta_B / \\eta_A$ itself becomes an additional hyperparameter: large ratios can improve adaptation, but under the standard LoRA initialization they can also cause unstable training and ratio-dependent performance collapse. We identify the source of this brittleness through a signal--noise decomposition of LoRA dynamics. Under standard \\initA, the update contains an initialization-induced noise term whose magnitude can be affected by the LR for $B$, $\\eta_B$, the initialization scale $\\beta$, and the adapter rank $r$. In practical LLM fine-tuning, this non-vanishing noise can limit the performance gains expected from LoRA+ style asymmetric LRs. To suppress this effect, we propose",
+   "authors": [
+    "Di-Sen Liao",
+    "Yao-Liang Yu"
+   ],
+   "url": "https://arxiv.org/abs/2610.32142",
+   "cited_by": [
+    "Layer Normalization"
+   ],
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.279,
+   "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+   "base": 0.3643,
+   "score": 0.3643,
+   "vote": "",
+   "reason": "针对LoRA对学习率敏感的问题重新审视初始化策略，与库中低秩适配工作互补，提出更鲁棒的非对称学习率方案。"
+  },
+  {
+   "key": "2610.28223",
+   "arxiv_id": "2610.28223",
+   "title": "Local Inference of LLMs on Long Contexts: A Data Systems Perspective",
+   "year": 2026,
+   "abstract": "Large language models can solve complex problems across a variety of subjects, such as mathematics and coding. For such complex analytical tasks, models with a long context perform better. Serving models with long context is currently mostly done on powerful systems with multiple GPUs, which are too expensive for most users. An alternative is local inference, or serving a model on a user's own machine, which removes per-token costs and rate limits, besides keeping sensitive data private and giving users full control over the models they run. The common understanding, however, is that local LLMs need compression (e.g., quantization) to run on a single GPU. In this paper, we set out to study the limitations that prevent serving long-context models for single users, besides the capacity issue. Rather than characterizing a single model on one GPU, we analyze how different models behave across several GPU generations. This lets us uncover not just individual bottlenecks but broader trends in where inefficiencies arise. Our analysis confirms that, as expected, self-attention dominates the runtime for long-context inference. More unexpectedly, our evaluation reveals that the current struc",
+   "authors": [
+    "Mattias Dürrmeier",
+    "Alberto Lerner"
+   ],
+   "url": "https://arxiv.org/abs/2610.28223",
+   "cited_by": [
+    "Layer Normalization"
+   ],
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.257,
+   "topic_of": "Training language models to follow instructions with human feedback",
+   "base": 0.3566,
+   "score": 0.3566,
+   "vote": "",
+   "reason": "从数据系统视角研究长上下文LLM的本地推理，与库中缩放定律和指令微调工作呼应，关注长上下文部署的效率瓶颈。"
+  },
+  {
+   "key": "2610.28086",
+   "arxiv_id": "2610.28086",
+   "title": "MoDDiT: Simple Token Routing in Diffusion Transformers",
+   "year": 2026,
+   "abstract": "Real-time video generation, interactive world models, and on-device image synthesis are almost a reality. Diffusion Transformers (DiT) achieve excellent sample quality, shifting the bottleneck to the throughput of the models themselves. Natural images are inherently sparse, as large portions of an image are often background, contribute little to the scene content, and are easy to denoise. DiTs fail to exploit this sparsity, as they process image tokens statically and uniformly. We propose MoDDiT, a simple architecture modification that learns to route tokens through both MLP and self-attention operations. By routing tokens through both blocks independently, MoDDiT allows for dynamic compute allocation in MLPs that varies across tokens, images, and denoising timesteps. Using MoDDiT to train image generation models from scratch significantly reduces computational costs of training and inference, processing as few as 12.5% of the tokens. By increasing sparsity and model depth, MoDDiT reduces costs and improves generation performance over unrouted baselines. The learned allocation is interpretable, revealing how computation varies with visual content and noise level. We also use MoDDiT",
+   "authors": [
+    "Jarek Liesen",
+    "M. Jackson",
+    "Benjamin Ellis",
+    "Shimon Whiteson",
+    "J. Foerster"
+   ],
+   "url": "https://arxiv.org/abs/2610.28086",
+   "cited_by": [
+    "Layer Normalization"
+   ],
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.257,
+   "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+   "base": 0.3565,
+   "score": 0.3565,
+   "vote": "",
+   "reason": "把Switch Transformers的token路由思想引入扩散Transformer，利用图像稀疏性做简单路由以提升生成吞吐，拓展了MoE的应用场景。"
+  },
+  {
+   "key": "2610.29681",
+   "arxiv_id": "2610.29681",
+   "title": "Scaling Multilingual Pretraining of Pixel Language Models",
+   "year": 2026,
+   "abstract": "Pixel language models process text as rendered images instead of a finite vocabulary, which gives them strong cross-lingual transfer abilities. However, not much is known about how these abilities are influenced by larger-scale pretraining. In this paper, we train a family of MPIXEL models along three axes of variation: more languages, more scripts, and larger model capacity under fixed per-language compute. In evaluations on five tasks covering 83 languages, we find that scaling acts locally: each axis improves the added languages and scripts, while increased capacity mitigates the curse of multilinguality from pretraining on more languages. Transfer to unseen scripts improves with multilingual pretraining, but does not further improve with scaling. On typologically distant low-resource languages, our models outperform subword and character-level baselines across many writing systems. We also show that larger pixel models reserve more layers for visual processing, and that cross-lingual alignment weakens as more languages are added. Overall, our findings characterize how multilingual scaling improves pixel language models.",
+   "authors": [
+    "Ilker Kesen",
+    "Jenny Kunz",
+    "Kasra Malihi",
+    "Desmond Elliott"
+   ],
+   "url": "https://arxiv.org/abs/2610.29681",
+   "cited_by": [
+    "Layer Normalization"
+   ],
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.253,
+   "topic_of": "Emergent Abilities of Large Language Models",
+   "base": 0.3554,
+   "score": 0.3554,
+   "vote": "",
+   "reason": "研究像素语言模型的多语言预训练缩放规律，与库中缩放定律及T5工作相呼应，将缩放分析扩展到无词表的像素输入范式。"
+  },
+  {
+   "key": "2610.27619",
+   "arxiv_id": "2610.27619",
+   "title": "Divide-and-Conquer Neural Bayes Estimation for Spatial and Spatiotemporal Point Process Models",
+   "year": 2026,
+   "abstract": "Spatial and spatiotemporal point process models are widely used to analyze event data across many scientific disciplines, but likelihood-based Bayesian inference is often computationally prohibitive due to intractable likelihoods, high-dimensional latent structures, and dependence on event history. Existing approximate and likelihood-free methods mitigate some of these challenges, but often at the cost of reduced statistical efficiency, imperfect uncertainty quantification, or information loss from reliance on predefined summary statistics. A promising recent approach involves neural networks, but it has only been explored in purely spatial or temporal settings and requires a computationally expensive training stage for large domains or dense point patterns. Here, we propose a divide-and-conquer neural Bayes estimation framework for spatial and spatiotemporal point process models. Our method operates directly on raw point pattern realizations using transformer-based architectures on partitions of the spatiotemporal domain, together with an attention mechanism to optimally combine locally extracted summaries. Simulation studies demonstrate reliable inference with improved scalabilit",
+   "authors": [
+    "Bokgyeong Kang",
+    "Andrew Zammit-Mangion",
+    "E. Schliep",
+    "R. S. Schick"
+   ],
+   "url": "https://arxiv.org/abs/2610.27619",
+   "cited_by": [
+    "Layer Normalization"
+   ],
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.224,
+   "topic_of": "Instruction Pre-Training: Language Models are Supervised Multitask Learners",
+   "base": 0.3451,
+   "score": 0.3451,
+   "vote": "",
+   "reason": "提出分治神经贝叶斯估计处理空间点过程，与库中指令预训练的多任务学习思路相关，用神经网络替代不可解似然的贝叶斯推断。"
+  }
+ ],
+ "errors": [],
+ "offline": false,
+ "candidates": 50,
+ "without_arxiv": 19
+}

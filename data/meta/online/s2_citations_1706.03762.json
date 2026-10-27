@@ -1,0 +1,1002 @@
+{
+ "saved_at": "2026-10-27T03:20:50+00:00",
+ "data": {
+  "offset": 0,
+  "next": 25,
+  "data": [
+   {
+    "citingPaper": {
+     "paperId": "abb7e296d5fa7f444929da595a0b867d934583d7",
+     "externalIds": {
+      "DOI": "10.1016/j.radphyschem.2026.114346",
+      "CorpusId": 291016592
+     },
+     "title": "Evaluation of artificial neural network-based dose estimation models for emergency dose assessment in external exposure scenarios",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1016/j.radphyschem.2026.114346",
+      "status": "HYBRID",
+      "license": "CCBYNCND",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.radphyschem.2026.114346?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.radphyschem.2026.114346, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2393453929",
+       "name": "Hyoungtae Kim"
+      },
+      {
+       "authorId": "2331880319",
+       "name": "Yoomi Choi"
+      },
+      {
+       "authorId": "51415209",
+       "name": "Min Chae Kim"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "94c74ab0932c12abd291c9e9451a0b08964dfa86",
+     "externalIds": {
+      "DOI": "10.1016/j.compchemeng.2026.109906",
+      "CorpusId": 292428776
+     },
+     "title": "Physics-Informed Neural Networks for process systems: Estimating the unknown dynamics",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.compchemeng.2026.109906?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.compchemeng.2026.109906, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2204064755",
+       "name": "Farshad Moayedi"
+      },
+      {
+       "authorId": "2154327734",
+       "name": "Aswin Chandrasekar"
+      },
+      {
+       "authorId": "2320002602",
+       "name": "Prashant Mhaskar"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "8f58a4ad03d218d8790a370f02a698cc9906c6ea",
+     "externalIds": {
+      "DOI": "10.1016/j.optlaseng.2026.110154",
+      "CorpusId": 292506814
+     },
+     "title": "Degradation-consistent measurement learning for robust low-sampling single-pixel recognition",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.optlaseng.2026.110154?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.optlaseng.2026.110154, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "5420613",
+       "name": "Ze-Min Zhou"
+      },
+      {
+       "authorId": "2346721927",
+       "name": "Li-Zhen Qin"
+      },
+      {
+       "authorId": "3458362",
+       "name": "Yong-Kai Yin"
+      },
+      {
+       "authorId": "5608623",
+       "name": "Xiu-Lun Yang"
+      },
+      {
+       "authorId": "2150589546",
+       "name": "Xiang-Feng Meng"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "ec376dd5d9b3157ed530caf4d505341007ced207",
+     "externalIds": {
+      "DOI": "10.1016/j.ijmedinf.2026.106741",
+      "CorpusId": 292511963,
+      "PubMed": "42822180"
+     },
+     "title": "Toward a Framework for Assessing Patient-Facing Gen AI Tools in Mental Healthcare.",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "https://www.sciencedirect.com/science/article/pii/S1386505626004818/pdf",
+      "status": "HYBRID",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.ijmedinf.2026.106741?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.ijmedinf.2026.106741, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2357425193",
+       "name": "Polina Durneva"
+      },
+      {
+       "authorId": "2506192457",
+       "name": "Hedieh Ghorbanie"
+      }
+     ],
+     "abstract": "BACKGROUND\nGenerative artificial intelligence (Gen AI) is becoming increasingly used in mental healthcare. While these systems offer scalable, human-like interactions, concerns persist regarding safety, clinical validity, and the absence of systematic assessment frameworks.\n\n\nOBJECTIVES\nThis study systematically reviews existing research on Gen-AI mental-health applications to synthesize current evaluation practices and identify key methodological steps needed for pre-deployment assessment.\n\n\nMETHODS\nA systematic search was conducted across major databases (PubMed, IEEE Xplore, and PsycINFO) following PRISMA guidelines. Studies published between 2017 and 2024 examining Gen-AI tools for mental healthcare were included. The final sample of 72 studies was explored to identify assessment domains.\n\n\nRESULTS\nFour domains of assessment emerged: technical performance, which focuses on model accuracy and reliability on mental-health tasks; clinical validity, which examines alignment with evidence-based guidelines and clinician judgments; expert perceptions, which assess perceived quality and safety of AI-generated outputs; and user perceptions, which capture how end-users experience, interpret, and trust these responses.\n\n\nCONCLUSION\nFindings highlight the need for unified, multilayered frameworks to guide the safe and responsible deployment of patient-facing Gen-AI mental-health tools. The review proposes a high-level pre-deployment assessment framework to support researchers, developers, clinicians, and regulators."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "ebaec77783e89b881c318e73036fdbdec927d159",
+     "externalIds": {
+      "DOI": "10.1016/j.biosystemseng.2026.104604",
+      "CorpusId": 292526890
+     },
+     "title": "Orchard worker detection using spatial-context attention on 2D LiDAR data",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.biosystemseng.2026.104604?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.biosystemseng.2026.104604, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2266513922",
+       "name": "Jintack Jeon"
+      },
+      {
+       "authorId": "2115929316",
+       "name": "H. Chung"
+      },
+      {
+       "authorId": "71993680",
+       "name": "Gookhwan Kim"
+      },
+      {
+       "authorId": "2506420589",
+       "name": "Seungyun Baek"
+      },
+      {
+       "authorId": "3046293",
+       "name": "Dae-Hyun Lee"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f09348252e77f616bae49993bf64eca7799a82ca",
+     "externalIds": {
+      "DOI": "10.1016/j.jcp.2026.115455",
+      "CorpusId": 292550168
+     },
+     "title": "Physics-informed Perceiver IO: Scalable mesh-free solving of partial differential equations without supervision",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://www.sciencedirect.com/science/article/pii/S002199912600803X/pdf",
+      "status": "HYBRID",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.jcp.2026.115455?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.jcp.2026.115455, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "47795814",
+       "name": "Y. Yang"
+      },
+      {
+       "authorId": "2212903426",
+       "name": "E. Lee"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f8c05f97f214b324c05a1b4d52fecbefda76df72",
+     "externalIds": {
+      "DOI": "10.1016/j.apenergy.2026.128913",
+      "CorpusId": 292556514
+     },
+     "title": "An explainable generative machine learning framework for accelerating CO2 methanation catalyst discovery",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.apenergy.2026.128913?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.apenergy.2026.128913, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2260439117",
+       "name": "Xiao-Guo Zhang"
+      },
+      {
+       "authorId": "2300995493",
+       "name": "Zi-Yi He"
+      },
+      {
+       "authorId": "2319087860",
+       "name": "Xin Peng"
+      },
+      {
+       "authorId": "2470135033",
+       "name": "Chun-Qiu Zhang"
+      },
+      {
+       "authorId": "2395206815",
+       "name": "Meng Yang"
+      },
+      {
+       "authorId": "2325090683",
+       "name": "Jin-Bo Yan"
+      },
+      {
+       "authorId": "92849227",
+       "name": "Shen-Fu Yuan"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "1840fc46dda42826e12075041566e51dca938a95",
+     "externalIds": {
+      "DOI": "10.1016/j.autcon.2026.107267",
+      "CorpusId": 292573346
+     },
+     "title": "From natural language to interoperable BIM: Extensible framework for compliance-aware generative design",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://www.sciencedirect.com/science/article/pii/S092658052600508X/pdf",
+      "status": "BRONZE",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.autcon.2026.107267?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.autcon.2026.107267, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2468177352",
+       "name": "Bo Pang"
+      },
+      {
+       "authorId": "2292211088",
+       "name": "Jian-Song Zhang"
+      },
+      {
+       "authorId": "2293354815",
+       "name": "Jing-Yi Lai"
+      },
+      {
+       "authorId": "2506850357",
+       "name": "Bernard Nartey"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "78c8d97686c08ef2695227e87f60bc467bea3038",
+     "externalIds": {
+      "DOI": "10.1016/j.robot.2026.105790",
+      "CorpusId": 292610054
+     },
+     "title": "GADS-SLAM: A robust underground visual slam system integrating grayscale-aware enhancement, deep feature association, and scale-decoupled optimization",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.robot.2026.105790?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.robot.2026.105790, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2116276888",
+       "name": "Dai-Xian Zhu"
+      },
+      {
+       "authorId": "2509357773",
+       "name": "Yi-Min Wu"
+      },
+      {
+       "authorId": "2505578399",
+       "name": "Nan Wu"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "d92d5b1764c01e6d5e1998371111f1a6536f93d6",
+     "externalIds": {
+      "DOI": "10.1016/j.rser.2026.117559",
+      "CorpusId": 292715867
+     },
+     "title": "A comprehensive review of data-driven electrochemical impedance spectroscopy (EIS) approaches for Li-ion battery SoH and RUL estimations",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://www.sciencedirect.com/science/article/pii/S1364032126008610/pdf",
+      "status": "HYBRID",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.rser.2026.117559?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.rser.2026.117559, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2265088700",
+       "name": "Kashif Raza"
+      },
+      {
+       "authorId": "2508791570",
+       "name": "Ouadii Ouledboutaarjia"
+      },
+      {
+       "authorId": "35370857",
+       "name": "R. Rifat"
+      },
+      {
+       "authorId": "2462348",
+       "name": "M. Berecibar"
+      },
+      {
+       "authorId": "123221202",
+       "name": "Md Sazzad Hosen"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "5414e48bf75add557188dade4cb056ccf3b6337f",
+     "externalIds": {
+      "DOI": "10.1016/j.jcp.2026.115457",
+      "CorpusId": 292716976
+     },
+     "title": "Injective attention neural operators for partial differential equations on large-scale problems",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.jcp.2026.115457?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.jcp.2026.115457, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2281108032",
+       "name": "Ming Zhong"
+      },
+      {
+       "authorId": "2149373363",
+       "name": "Lu Lu"
+      },
+      {
+       "authorId": "2120636289",
+       "name": "Wei-Fang Weng"
+      },
+      {
+       "authorId": "2243334116",
+       "name": "Zhen-Ya Yan"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "fcfe8f7e1d27069d141ecb1d8082c6991af3af86",
+     "externalIds": {
+      "DOI": "10.1016/j.aei.2026.105311",
+      "CorpusId": 292753827
+     },
+     "title": "TE-SDNet: Temporally Enhanced Sequential Dependency Network for photovoltaic power forecasting",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.aei.2026.105311?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.aei.2026.105311, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2509370777",
+       "name": "Jie Zhang"
+      },
+      {
+       "authorId": "2449159771",
+       "name": "Jing Wang"
+      },
+      {
+       "authorId": "2509298202",
+       "name": "Shi-Long Ye"
+      },
+      {
+       "authorId": "2509339291",
+       "name": "Ming-Wang Dong"
+      },
+      {
+       "authorId": "2367761269",
+       "name": "Huan Wang"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "0973f1601a1186595eb0b158466dddc37edef326",
+     "externalIds": {
+      "DOI": "10.1016/j.aei.2026.105330",
+      "CorpusId": 292756239
+     },
+     "title": "Using conditional diffusion models for data-driven ground motion identification of structural dynamic systems under uncertainty",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1016/j.aei.2026.105330",
+      "status": "HYBRID",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.aei.2026.105330?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.aei.2026.105330, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2283301829",
+       "name": "Ji-Chuan Tang"
+      },
+      {
+       "authorId": "2331614752",
+       "name": "De-Lin An"
+      },
+      {
+       "authorId": "50878380",
+       "name": "P. Brewick"
+      },
+      {
+       "authorId": "48586275",
+       "name": "Chao-Li Wang"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "e05ef78a6a718b03d05cc639f50fa9375284ed3c",
+     "externalIds": {
+      "DOI": "10.1016/j.jpowsour.2026.241580",
+      "CorpusId": 292782778
+     },
+     "title": "Machine learning-based diagnosis and health monitoring of solid oxide fuel cells using electrochemical impedance spectroscopy under multiple failure modes",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://www.sciencedirect.com/science/article/pii/S037877532602330X/pdf",
+      "status": "HYBRID",
+      "license": "CCBYNCND",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.jpowsour.2026.241580?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.jpowsour.2026.241580, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2298118826",
+       "name": "Z. Salehi"
+      },
+      {
+       "authorId": "73840954",
+       "name": "S. Sobhi"
+      },
+      {
+       "authorId": "2375064637",
+       "name": "Saeed Hanifi"
+      },
+      {
+       "authorId": "2298760556",
+       "name": "Daniel J. Smith"
+      },
+      {
+       "authorId": "4964746",
+       "name": "A. Hanifi"
+      },
+      {
+       "authorId": "2240893018",
+       "name": "Mahdi Shahbakhti"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "a1e6868c04eeab2bc9ab9ea5ef6d597377f23e75",
+     "externalIds": {
+      "DOI": "10.1016/j.jpowsour.2026.241653",
+      "CorpusId": 292790606
+     },
+     "title": "A lightweight dual-stream framework for short-horizon voltage prediction of PEMFC systems",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.jpowsour.2026.241653?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.jpowsour.2026.241653, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "116986751",
+       "name": "Teng-Juan Xu"
+      },
+      {
+       "authorId": "2153281744",
+       "name": "Kai Zhang"
+      },
+      {
+       "authorId": "2254331513",
+       "name": "Yue Kai"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "f59a2a725878ddc75a059d3c21d78af9cd091a94",
+     "externalIds": {
+      "DOI": "10.1016/j.compeleceng.2026.111595",
+      "CorpusId": 292792138
+     },
+     "title": "WaveFusionNet: frequency-gated spatial modulation and Wavelet Energy-Guided Contrastive Learning for dual-branch malaria cell classification",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://www.sciencedirect.com/science/article/pii/S0045790626006658/pdf",
+      "status": "BRONZE",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.compeleceng.2026.111595?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.compeleceng.2026.111595, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2350094987",
+       "name": "Naif Alzahrani"
+      },
+      {
+       "authorId": "2383198489",
+       "name": "S. Thota"
+      },
+      {
+       "authorId": "2329404591",
+       "name": "A. Alarood"
+      },
+      {
+       "authorId": "2334279324",
+       "name": "Kemal Polat"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "de3e0e049d0da862ada30ca1122f0f928a9fd8be",
+     "externalIds": {
+      "DOI": "10.1016/j.autcon.2026.107295",
+      "CorpusId": 292806505
+     },
+     "title": "LLM-based Structured Intermediate Representation for building regulation encoding",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1016/j.autcon.2026.107295",
+      "status": "HYBRID",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.autcon.2026.107295?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.autcon.2026.107295, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2509892213",
+       "name": "Pin-Zhang Wu"
+      },
+      {
+       "authorId": "2040030",
+       "name": "Avinash Malik"
+      },
+      {
+       "authorId": "1737321",
+       "name": "P. Roop"
+      },
+      {
+       "authorId": "144003396",
+       "name": "R. Amor"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "21483a97604e81e9b0943b87179ef888f20a9307",
+     "externalIds": {
+      "DOI": "10.1016/j.apenergy.2026.129024",
+      "CorpusId": 292812525
+     },
+     "title": "Regeneration-aware online SOH estimation framework for liquid metal batteries based on fragmented data",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.apenergy.2026.129024?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.apenergy.2026.129024, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2029337090",
+       "name": "Jia-Qi Qu"
+      },
+      {
+       "authorId": "2465111190",
+       "name": "Meng-Zhao Fang"
+      },
+      {
+       "authorId": "2260437642",
+       "name": "Xiao-Gang Wu"
+      },
+      {
+       "authorId": "2179589620",
+       "name": "Qiong-Lin Shi"
+      },
+      {
+       "authorId": "2255476491",
+       "name": "Kai Jiang"
+      },
+      {
+       "authorId": "153645343",
+       "name": "Wei-Gui Zhang"
+      },
+      {
+       "authorId": "2267193470",
+       "name": "Qiang Sun"
+      },
+      {
+       "authorId": "2509714315",
+       "name": "Zhao-Yang Dong"
+      },
+      {
+       "authorId": "2313468780",
+       "name": "Bin Li"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "70665bff663b010226f3e018fbc147ec146e2f57",
+     "externalIds": {
+      "DOI": "10.1016/j.autcon.2026.107291",
+      "CorpusId": 292847269
+     },
+     "title": "Automated safety interpretation of crack-aperture for concrete dams using mutation-aware visual-sensor fusion and knowledge-augmented reasoning",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1016/j.autcon.2026.107291",
+      "status": "HYBRID",
+      "license": "CCBYNCND",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.autcon.2026.107291?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.autcon.2026.107291, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2363292634",
+       "name": "Hao Gu"
+      },
+      {
+       "authorId": "2507494754",
+       "name": "Jia-Le Wang"
+      },
+      {
+       "authorId": "2305154265",
+       "name": "Yi-Xiang Fang"
+      },
+      {
+       "authorId": "2118918547",
+       "name": "Yi-Fan He"
+      },
+      {
+       "authorId": "2157691823",
+       "name": "Jun Shen"
+      },
+      {
+       "authorId": "52223634",
+       "name": "Chen-Fei Shao"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "11bcb4d82499a44d78bfd27caf1dff390246cba7",
+     "externalIds": {
+      "DOI": "10.1016/j.snb.2026.141071",
+      "CorpusId": 292882072
+     },
+     "title": "Edge-deployable and interpretable KAN-based lightweight neural filter for wavelength modulation spectral denoising",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.snb.2026.141071?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.snb.2026.141071, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2404470869",
+       "name": "Zi-Yi Guo"
+      },
+      {
+       "authorId": "2505781707",
+       "name": "Yu-Ting Lu"
+      },
+      {
+       "authorId": "2509894135",
+       "name": "Xiao-Tian Fan"
+      },
+      {
+       "authorId": "2403967822",
+       "name": "Yuan Du"
+      },
+      {
+       "authorId": "2353031936",
+       "name": "Jia-Cheng Dong"
+      },
+      {
+       "authorId": "2311075261",
+       "name": "Pei-Jie Xu"
+      },
+      {
+       "authorId": "2352834276",
+       "name": "Xi Lan"
+      },
+      {
+       "authorId": "2353107812",
+       "name": "Yi-Cong Jiang"
+      },
+      {
+       "authorId": "2278219359",
+       "name": "Shou-Zheng Zhu"
+      },
+      {
+       "authorId": "2392817838",
+       "name": "Zhao Cui"
+      },
+      {
+       "authorId": "2278164161",
+       "name": "Xin He"
+      },
+      {
+       "authorId": "2274069491",
+       "name": "Chun-Lai Li"
+      },
+      {
+       "authorId": "2278200240",
+       "name": "Sen-Yuan Wang"
+      },
+      {
+       "authorId": "2290732118",
+       "name": "Hong-Xing Qi"
+      },
+      {
+       "authorId": "2352881492",
+       "name": "Yu-Wei Chen"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "ea9284bf22e43518b2e49e99c1b17820d7a87637",
+     "externalIds": {
+      "DOI": "10.1016/j.esp.2026.09.003",
+      "CorpusId": 292909674
+     },
+     "title": "Same meaning, different words: Automated item paraphrasing in ESP reading assessment",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1016/j.esp.2026.09.003",
+      "status": "HYBRID",
+      "license": "CCBYNCND",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.esp.2026.09.003?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.esp.2026.09.003, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2128276955",
+       "name": "S. Yildirim-erbasli"
+      },
+      {
+       "authorId": "116482891",
+       "name": "Münevver Ilgün Dibek"
+      },
+      {
+       "authorId": "51128569",
+       "name": "Okan Bulut"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "c45e35f786a4812493ddf5b76aa09ee97f56e15d",
+     "externalIds": {
+      "DOI": "10.1016/j.compeleceng.2026.111567",
+      "CorpusId": 293016835
+     },
+     "title": "A Hierarchical Spatio-Temporal Refinement Network with residual temporal convolutional networks and closed-form calibration for national-scale short-term load forecasting",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.compeleceng.2026.111567?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.compeleceng.2026.111567, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "119233387",
+       "name": "I. Haq"
+      },
+      {
+       "authorId": "2316050547",
+       "name": "Fang Liu"
+      },
+      {
+       "authorId": "2071215678",
+       "name": "D. Sidorov"
+      },
+      {
+       "authorId": "2506221644",
+       "name": "Su-Zhen Huang"
+      },
+      {
+       "authorId": "1940780",
+       "name": "L. Aslam"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "68ad11d6e3645fb78020ae1939cdb864eb25f7ef",
+     "externalIds": {
+      "DOI": "10.1016/j.aei.2026.105343",
+      "CorpusId": 293031274
+     },
+     "title": "LLM-assisted dynamic graph reconfiguration for post-disaster compute-power collaborative resilience in energy-informatics systems",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.aei.2026.105343?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.aei.2026.105343, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2276980583",
+       "name": "Jun-Qiu Fan"
+      },
+      {
+       "authorId": "2278445960",
+       "name": "Ming-Shun Liu"
+      },
+      {
+       "authorId": "2508866556",
+       "name": "Ming-Yang Wang"
+      },
+      {
+       "authorId": "31339176",
+       "name": "Qin-Feng Ma"
+      },
+      {
+       "authorId": "2502596102",
+       "name": "Qi-Di Wu"
+      },
+      {
+       "authorId": "2512062953",
+       "name": "An Su"
+      },
+      {
+       "authorId": "38184885",
+       "name": "Can-Bing Li"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "d3b4ade23da1b10a48431cfc0115608dd55e83d9",
+     "externalIds": {
+      "DOI": "10.1016/j.autcon.2026.107305",
+      "CorpusId": 293033391
+     },
+     "title": "Review of AI agents in engineering design workflows",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1016/j.autcon.2026.107305",
+      "status": "HYBRID",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.autcon.2026.107305?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.autcon.2026.107305, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2421688273",
+       "name": "Zoie McCreery"
+      },
+      {
+       "authorId": "2378234151",
+       "name": "M. Naser"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7736a7bc95af64d6200525f6f007200bb7a60651",
+     "externalIds": {
+      "DOI": "10.1016/j.aei.2026.105370",
+      "CorpusId": 293566556
+     },
+     "title": "PF-HDiffBEV: Bird’s eye view feature enhancement mechanism based on potential field-guided hierarchical conditional diffusion model for autonomous driving",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.aei.2026.105370?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.aei.2026.105370, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2351815993",
+       "name": "Bing Zhu"
+      },
+      {
+       "authorId": "2515060310",
+       "name": "Wei-Guang Cao"
+      },
+      {
+       "authorId": "1491634246",
+       "name": "Dong-Jian Song"
+      },
+      {
+       "authorId": "4539079",
+       "name": "Jia-Yi Han"
+      },
+      {
+       "authorId": "2375709432",
+       "name": "Jian Zhao"
+      },
+      {
+       "authorId": "2514970064",
+       "name": "Jing-Wei Xue"
+      },
+      {
+       "authorId": "2515136561",
+       "name": "Ming-Hui Yao"
+      }
+     ],
+     "abstract": null
+    }
+   }
+  ]
+ }
+}

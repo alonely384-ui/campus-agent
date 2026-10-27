@@ -1,0 +1,901 @@
+{
+ "saved_at": "2026-10-27T03:20:49+00:00",
+ "data": {
+  "offset": 0,
+  "next": 25,
+  "data": [
+   {
+    "citingPaper": {
+     "paperId": "79a23f319278e0782313cf0466435b71f83d7ba5",
+     "externalIds": {
+      "DOI": "10.1016/j.apenergy.2026.128402",
+      "CorpusId": 290108860
+     },
+     "title": "Physics-informed reinforcement learning for energy-efficient minute-scale control of split-type air-conditioning systems: Experimental validation on real hardware",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.apenergy.2026.128402?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.apenergy.2026.128402, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2278682055",
+       "name": "Haosen Qin"
+      },
+      {
+       "authorId": "2462146374",
+       "name": "Zheng-Wei Li"
+      },
+      {
+       "authorId": "2446376433",
+       "name": "Xiang Gao"
+      },
+      {
+       "authorId": "2449335314",
+       "name": "Minxuan Qi"
+      },
+      {
+       "authorId": "2446301370",
+       "name": "Yiyang Zhang"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "adc872749d9874b0e76bfeac1d87bff0e44940ff",
+     "externalIds": {
+      "DOI": "10.1016/j.enbuild.2026.118139",
+      "CorpusId": 291436144
+     },
+     "title": "Short-term multi-building electricity demand forecasting via a persistence-anchored residual transformer for energy management",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.enbuild.2026.118139?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.enbuild.2026.118139, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2186261875",
+       "name": "A. Mohy"
+      },
+      {
+       "authorId": "2147099590",
+       "name": "E. Elgendi"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "5e75b4ff6088ef9a6b7dd634fd11102bbaa42f8a",
+     "externalIds": {
+      "DOI": "10.1109/TMC.2026.3713047",
+      "CorpusId": 290153807
+     },
+     "title": "mmWave Radar-Based Unsupervised Person ReID via Multi-Level Mutual Signal Contrastive Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TMC.2026.3713047?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TMC.2026.3713047, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2370200284",
+       "name": "Qi-Hua Feng"
+      },
+      {
+       "authorId": "2183483357",
+       "name": "Chun-Hui Duan"
+      },
+      {
+       "authorId": "2292634820",
+       "name": "Li-Tian Zhang"
+      },
+      {
+       "authorId": "2376206321",
+       "name": "Zhi-Quan Liu"
+      },
+      {
+       "authorId": "2265320143",
+       "name": "Fei-Ran Huang"
+      },
+      {
+       "authorId": "2289298409",
+       "name": "Jian Weng"
+      },
+      {
+       "authorId": "2276524693",
+       "name": "Philip S. Yu"
+      }
+     ],
+     "abstract": "Person Re-IDentification (ReID) is vital for public-safety applications, yet camera-based ReID suffers in low-light environments and poses serious visual privacy risks. In contrast, millimeter-wave (mmWave) radar sensing has gained significant attention in ReID due to its ability to perceive human movement patterns by emitting electromagnetic waves, making ReID unaffected by lighting conditions and capable of privacy preserving. However, current radar-based ReID methods are primarily supervised, and radar data is challenging for human eyes to interpret, making annotation extremely difficult and costly. To this end, we propose an unsupervised radar ReID method based on multi-level cross-view mutual signal contrastive learning. First, to drive unsupervised contrastive learning that depends on data augmentations, we utilize signal processing techniques to transform raw radar signals into frequency spectrum and point clouds, and these forms constitute different and complementary augmented versions of the same sample. Second, we construct a multi-level contrastive model between frequency spectrum signals and point clouds through global contrast, cross-view prediction contrast, clustering contrast, and cross-view cluster center contrast, effectively aligning different views and enhancing unsupervised robustness. Additionally, we employ a well-designed local and global graph attention network to learn more discriminative radar point cloud features. Extensive experimental results illustrate that our approach significantly outperforms existing radar-based unsupervised methods."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7d230c514399201b6a2574ef6007d84e00de4025",
+     "externalIds": {
+      "DOI": "10.1145/3795866.3844494",
+      "CorpusId": 291603419
+     },
+     "title": "DeltaAR: Redundancy-Aware Object Detection for Mobile Augmented Reality",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1145/3795866.3844494",
+      "status": "HYBRID",
+      "license": "CCBYNCND",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1145/3795866.3844494?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1145/3795866.3844494, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2117942045",
+       "name": "Zi-Da Liu"
+      },
+      {
+       "authorId": "2280103499",
+       "name": "Rui-Qi Wang"
+      },
+      {
+       "authorId": "2280175663",
+       "name": "Guo-Hong Cao"
+      }
+     ],
+     "abstract": "Real-time object detection is essential for mobile augmented reality (AR) applications; however, modern detectors based on Vision Transformers (ViTs) incur significant computational overhead. Although edge offloading can alleviate the limited compute resources on mobile devices, the inference latency of ViT-based detection on edge servers remains a major bottleneck, causing detection results to arrive after the camera viewpoint has changed and degrading AR experiences. To address this problem, we propose DeltaAR, an edge-assisted AR object detection system that leverages AR geometry (depth maps and 6-DoF camera poses) to reduce the cost of ViT-based detection. Different from existing AR systems, DeltaAR uses sensory data available on modern AR devices to accurately identify newly exposed regions between consecutive frames. Based on this information, we design a region-aware ViT that reduces computation by processing tokens required for detecting objects in newly exposed regions and skipping redundant tokens from old regions. To preserve detection accuracy, we further introduce a lightweight token selector that retains a small set of old-region tokens needed for cross-boundary objects and contextual information. Experiments show that DeltaAR significantly reduces edge inference cost and latency while maintaining high detection accuracy for real-time AR applications."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "92d877419198aaa47924ec337669fff668c81a93",
+     "externalIds": {
+      "ArXiv": "2610.32142",
+      "CorpusId": 293936373
+     },
+     "title": "Rethinking LoRA Initialization for Robust Asymmetric Learning Rates",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32142, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2317079184",
+       "name": "Di-Sen Liao"
+      },
+      {
+       "authorId": "2274963165",
+       "name": "Yao-Liang Yu"
+      }
+     ],
+     "abstract": "Low-Rank Adaptation (LoRA) is often highly sensitive to learning-rate (LR) choices. Recent empirical studies suggest that, once LRs are carefully tuned, vanilla LoRA can remain competitive with many proposed LoRA variants. This shifts the central practical question from designing ever more variants to reducing the cost and brittleness of LR selection. LoRA+ addresses this issue with asymmetric LRs, using a larger LR for the up-projection matrix $B$ than for the down-projection matrix $A$. However, the ratio $\\eta_B / \\eta_A$ itself becomes an additional hyperparameter: large ratios can improve adaptation, but under the standard LoRA initialization they can also cause unstable training and ratio-dependent performance collapse. We identify the source of this brittleness through a signal--noise decomposition of LoRA dynamics. Under standard \\initA, the update contains an initialization-induced noise term whose magnitude can be affected by the LR for $B$, $\\eta_B$, the initialization scale $\\beta$, and the adapter rank $r$. In practical LLM fine-tuning, this non-vanishing noise can limit the performance gains expected from LoRA+ style asymmetric LRs. To suppress this effect, we propose \\initAA, a simple initialization that scales the variance of $A$ as $\\sigma_A^2 \\propto n^{-2}$ while keeping $B_0=0$. Under matched rank and training time for both initializations, this reduces the initialization-noise energy by an additional factor of $1/n$, stabilizing asymmetric LoRA training while preserving zero initial adapter output. Empirically, \\initAA substantially widens the stable LR region across initialization scales, adapter ranks, and LoRA update multipliers. Across tasks and models, \\initAA reduces best-ratio drift, prevents the high-ratio collapse observed with standard \\initA, and makes the width-based guideline $\\eta_B \\approx n \\eta_A$ a useful starting point for finite pretrained models."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "1c3ef896ce631767ff803a4a508e4ad695e7c21f",
+     "externalIds": {
+      "ArXiv": "2610.32650",
+      "CorpusId": 293940734
+     },
+     "title": "WL-SeqVAE: Sequence-Based Graph Generation Using Variational Autoencoders and Weisfeiler-Leman Colors",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.32650, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2072733395",
+       "name": "Iakovos Evdaimon"
+      },
+      {
+       "authorId": "3005882",
+       "name": "Giannis Nikolentzos"
+      },
+      {
+       "authorId": "2517367996",
+       "name": "Achilleas Tsimichodimos"
+      },
+      {
+       "authorId": "40704095",
+       "name": "Christos Xypolopoulos"
+      },
+      {
+       "authorId": "1690383",
+       "name": "M. Vazirgiannis"
+      }
+     ],
+     "abstract": "In this paper, we introduce WL-SeqVAE, a sequence-based variational autoencoder for generating graphs. The key observation behind WL-SeqVAE is that node colors induced by the Weisfeiler-Leman (WL) algorithm provide compact discrete summaries of local graph structure and can therefore serve as structural tokens for generation. Rather than learning a distribution over adjacency matrices directly, our method maps each graph to a sequence of WL colors and employs a variational autoencoder that encodes this sequence into a Gaussian latent distribution, from which an autoregressive decoder reconstructs the graph. During generation, compatibility constraints derived from the WL colors guide node and edge predictions, combining global information from the latent representation with local structural consistency. This formulation turns graph generation into a sequence generation problem and avoids directly parameterizing a quadratic adjacency matrix. We evaluate WL-SeqVAE on molecular and general graph generation tasks. Across the evaluated datasets, WL-SeqVAE is competitive with established baselines on several local structural and molecular quality metrics. Code is available at https://github.com/iakovosevdaimon/WL-SeqVAE"
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "9d4de53b20c0cccb1372f22a4c43c8cfd5da3e94",
+     "externalIds": {
+      "ArXiv": "2610.31908",
+      "CorpusId": 293936358
+     },
+     "title": "PixGR: Pixel-Space Generative Decoding for Fast Feed-Forward 3D Reconstruction",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31908, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2375001167",
+       "name": "Ran-Ran Huang"
+      },
+      {
+       "authorId": "2117589627",
+       "name": "Wen-Jing Bian"
+      },
+      {
+       "authorId": "2346993152",
+       "name": "Wei-Xun Luo"
+      },
+      {
+       "authorId": "2292130840",
+       "name": "Ye Mao"
+      },
+      {
+       "authorId": "1712041",
+       "name": "K. Mikolajczyk"
+      }
+     ],
+     "abstract": "We present PixGR, an efficient framework that integrates lightweight pixel-space generative modeling into feed-forward 3D Gaussian reconstruction to model scene uncertainty. Context observations are encoded once into a scene latent representation, which conditions generative decoding from noisy target views to produce a shared 3D Gaussian representation. We formulate this process using pixel-space flow matching, enabling end-to-end optimization of 3D reconstruction with direct pixel-space generative supervision through differentiable rendering. This avoids VAE-based latent compression and error propagation inherent in previous two-stage pipelines. To preserve feed-forward efficiency, PixGR caches the scene representation and performs iterative inference using a lightweight DiT decoder. Experiments demonstrate that PixGR outperforms regression-based approaches in challenging sparse-view settings, particularly with widely spaced observations and view extrapolation. Meanwhile, it maintains sub-second inference and remains competitive with substantially heavier pretrained generative models. Our project page is available at https://ranrhuang.github.io/pixgr/."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "760fc338f85f0731486351bc1822d2ecf86389be",
+     "externalIds": {
+      "ArXiv": "2610.31979",
+      "CorpusId": 293936169
+     },
+     "title": "Spectra: Multi-Scale Implicit Decomposition for Deepfake Detection",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31979, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2049074914",
+       "name": "D. Jayasundara"
+      },
+      {
+       "authorId": "2292202316",
+       "name": "Kartik Narayan"
+      },
+      {
+       "authorId": "2297965278",
+       "name": "Vishal M. Patel"
+      }
+     ],
+     "abstract": "Deepfakes increasingly undermine trust in digital media, yet existing detectors often struggle to generalize across unseen manipulation techniques, compression levels, and dataset shifts. Most approaches rely on RGB appearance, frequency-domain artifacts, or their combination, learning cues present in the final synthesized image. While effective in-distribution, such cues are frequently generator-specific and can diminish as synthesis models evolve. We argue that a complementary perspective can be obtained through implicit neural representations (INRs), which expose how an image is reconstructed rather than merely how it appears. By fitting an INR to an image and analyzing its internal activations, one can reveal reconstruction dynamics that are difficult to observe in the image domain alone and may capture more intrinsic differences between genuine and synthetic content. To this end, we propose Spectra, a deepfake detection framework that combines semantic visual representations with artifact-aware cues derived from INR reconstruction. Spectra extracts multi-level reconstruction heatmaps from image-specific INRs and jointly models them with semantic features through a bidirectional fusion mechanism. This enables direct interaction between image semantics and reconstruction artifacts, allowing the model to identify forgery cues that are less dependent on specific generation pipelines. Extensive experiments on multiple deepfake benchmarks demonstrate improved robustness and cross-dataset generalization, consistently outperforming detectors based solely on RGB appearance or semantic representations. Furthermore, we show that the proposed representation extends beyond deepfake detection to face presentation attack detection, highlighting its potential as a unified framework for facial attack detection."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "3f1fb10c34a5960cc18751a2867544d117d9c0d5",
+     "externalIds": {
+      "ArXiv": "2610.31932",
+      "CorpusId": 293936727
+     },
+     "title": "MICE to Meet You: From Re-ranking Only to End-to-End Retrieval",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.31932, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2302105337",
+       "name": "Victor Morand"
+      },
+      {
+       "authorId": "2123232619",
+       "name": "Zong Yuxuan"
+      },
+      {
+       "authorId": "2280134732",
+       "name": "Mathias Vast"
+      },
+      {
+       "authorId": "2318563775",
+       "name": "Josiane Mothe"
+      },
+      {
+       "authorId": "2330738643",
+       "name": "Benjamin Piwowarski"
+      }
+     ],
+     "abstract": "Late-interaction models offer state-of-the-art efficiency-effectiveness trade-offs for neural retrieval by enabling document representations to be pre-computed and efficiently indexed. Yet, their relatively simple interaction mechanisms, typically MaxSim, can limit their effectiveness compared to cross-encoders. MICE, a recently introduced re-ranking architecture, aims to combine cross-encoder-like effectiveness through expressive transformer-based scoring with reduced inference-time computation through document-side pre-computation. However, no practical way to store these document representations was explored. We address this limitation here and introduce MICE-P, the first end-to-end retrieval pipeline with MICE, based on PLAID to index the contextualized document token representations. We conduct a controlled comparison of MICE, ColBERT and cross-encoders by training comparable models using the Ettin Family under matched experimental conditions. Our results show that MICE-P defines a new class of retrieval architecture with an efficiency-effectiveness trade-off of its own: it matches late-interaction retrieval throughput while retaining the effectiveness of cross-encoders."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "923cc72ece0b29a63b076d036b8f439636d2d715",
+     "externalIds": {
+      "ArXiv": "2610.29845",
+      "CorpusId": 293856576
+     },
+     "title": "RangeNav: Task-Aligned LiDAR Range-Image Pretraining for Robot Navigation",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.29845, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2516600052",
+       "name": "Samuel Foo Enze"
+      },
+      {
+       "authorId": "2289075975",
+       "name": "Manthan Patel"
+      },
+      {
+       "authorId": "2256810372",
+       "name": "Fan Yang"
+      },
+      {
+       "authorId": "2504680322",
+       "name": "Linus Kramer"
+      },
+      {
+       "authorId": "2253395059",
+       "name": "Pascal Roth"
+      },
+      {
+       "authorId": "2244620561",
+       "name": "Marco Hutter"
+      },
+      {
+       "authorId": "2254273659",
+       "name": "César Cadena"
+      }
+     ],
+     "abstract": "Autonomous mobile robots operating in dense crowds and cluttered sites require $360^\\circ$ perception to react to surrounding hazards. While panoramic LiDAR offers full-surround coverage, learning representations within reinforcement learning (RL) is sample-inefficient under sparse rewards, and existing 3D pretrained point-cloud encoders are too memory-heavy for massively parallel RL simulation. We present RangeNav, a compact (183k parameters) LiDAR range-image encoder pretrained entirely on synthetic data. RangeNav uses anisotropic convolutions and circular padding to handle the extreme aspect ratio and azimuthal seam of range images. We pretrain the network using a navigation-aligned objective combining range reconstruction, semantic segmentation, and bird's-eye-view (BEV) prediction, then freeze it for policy learning. In simulation, adding semantic and BEV supervision increases success rates over a reconstruction-only baseline by an average of 32.03 and 23.73 percentage points (pp) in procedurally generated training and out-of-distribution realistic test environments, respectively. Zero-shot real-world deployments on a Unitree B2-W quadruped demonstrate robust navigation through dense crowds, low-light settings, and construction zones where limited-field-of-view depth policies struggle. Code and models will be open-sourced. Project website: https://rangenav.github.io/."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "c11c93e1fa6f77c266bb3a62ee45eca9e690ee5b",
+     "externalIds": {
+      "ArXiv": "2610.29725",
+      "CorpusId": 293856501
+     },
+     "title": "Structure-Aware Message Passing on Petri Nets through Directed Walks and Incidence Diffusion",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.29725, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2127600715",
+       "name": "G. Skenderi"
+      }
+     ],
+     "abstract": "A common application of the process mining discipline is to connect observed event data with Petri nets, which are bipartite, directed graphical process models with rich formal underpinnings. Recent work learns vector representations of Petri nets to retrieve process models and relate them to event logs, but leaves implicit two key aspects hidden within the net's structure: directed cycles (process loops) and invariants recorded by the net's incidence matrix. We expose both of these to message-passing graph neural networks, through a positional encoding built from return probabilities of directed place-transition walks (PNRWPE), and through same-type messages gated by diffusion kernels of the incidence matrix (DA-PNGNN). Our constructions raise macro balanced accuracy in predicting the generation factors of the 96 Process Discovery Contest 2023 models from 0.751 to 0.796 with PNRWPE, which nearly doubles accuracy on process loops, and to 0.830 with DA-PNGNN, which, without retuning, also improves net-to-tree retrieval top-1 accuracy on the self-supervised ProcRosetta benchmark by 4.1 to 5.9 points."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "d5baa27c5722ff1fef2fab3936fbeb3f598889a7",
+     "externalIds": {
+      "ArXiv": "2610.30121",
+      "CorpusId": 293857263
+     },
+     "title": "Geometric Algebra for Neural Networks: A Survey",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30121, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2300089295",
+       "name": "Tao Zhong"
+      },
+      {
+       "authorId": "2516605012",
+       "name": "Kaison Fong"
+      },
+      {
+       "authorId": "2307975372",
+       "name": "Ke-Qin Wang"
+      },
+      {
+       "authorId": "1405669277",
+       "name": "Christine Allen-Blanchette"
+      }
+     ],
+     "abstract": "Geometric algebra (GA) unifies geometric primitives and transformations in a single algebraic framework. Neural networks designed around this framework often represent features as multivectors and constrain layer operations to respect the algebraic structure, enabling principled treatment of geometric transformations and, in many cases, built-in equivariance. This survey reviews geometric algebra neural networks, including their building blocks, equivariant properties, application domains, empirical performance, and software support. We provide an algebra-selection guide, an empirical comparison of GA-based and other equivariant architectures, and a failure-mode analysis covering training pathologies, deployment constraints, and performance limitations. Across the surveyed literature, the strongest evidence for GA-based architectures appears in settings with explicit geometric symmetries and heterogeneous geometric entities; evidence for broader advantages in parameter efficiency, interpretability, and dense prediction is comparatively limited and uneven. We therefore conclude that geometric algebra neural networks are not universally superior to well-tuned non-GA equivariant baselines, and outline open problems in algebra selection, numerical stability, scalable implementation, and reproducible evaluation."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "6dfbe08fed772ea53029600effedabdaf2fd76db",
+     "externalIds": {
+      "ArXiv": "2610.30068",
+      "CorpusId": 293857032
+     },
+     "title": "Loopholing All the Way: Language Modeling with pure Self-Conditioning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.30068, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2516599467",
+       "name": "Adrien Deschenaux"
+      },
+      {
+       "authorId": "2516604311",
+       "name": "Nadezhda Ilieva"
+      },
+      {
+       "authorId": "2220891901",
+       "name": "Justin Deschenaux"
+      },
+      {
+       "authorId": "2256976171",
+       "name": "Manuel Madeira"
+      },
+      {
+       "authorId": "3333045",
+       "name": "D. Thanou"
+      },
+      {
+       "authorId": "40401747",
+       "name": "Aurélien Lucchi"
+      },
+      {
+       "authorId": "2326112647",
+       "name": "Antonio Orvieto"
+      },
+      {
+       "authorId": "2288101023",
+       "name": "Caglar Gulcehre"
+      },
+      {
+       "authorId": "2256985187",
+       "name": "Pascal Frossard"
+      }
+     ],
+     "abstract": "Recent Diffusion Language Models (DLMs) use Self-Conditioning (SC), or Loopholing, to improve their performance. While SC is traditionally seen as an auxiliary heuristic, its empirical success raises the question: can a continuous generative model be based purely on Self-Conditioning? We answer affirmatively with LAW (``Loopholing All the Way''), which propagates the Expected Embedding under the denoiser's prediction across steps, decoding the tokens once, at the end. On Sudoku, LAW outperforms previous Discrete and Continuous Diffusion Models, including Loopholing Discrete Diffusion. On Maze, LAW is the most accurate from 2 to 64 NFE. After training on TinyGSM and sampling at temperature 1 with 1024 NFE, LAW solves 42.2% of GSM8K problems against 34.5% for uniform Loopholing Discrete Diffusion. Additionally, fine-tuning a pre-trained Uniform Diffusion Model (Duo) with LAW increases its accuracy from 17.2% to 48.1%. Finally, on OpenWebText, LAW pushes the Pareto frontier and approaches Autoregressive Models (ARMs) with 64 NFE. Find our code at https://github.com/ilievanadezhda/law."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "3269ce7798808add134f5f030cce87991b286aaf",
+     "externalIds": {
+      "ArXiv": "2610.29681",
+      "CorpusId": 293856383
+     },
+     "title": "Scaling Multilingual Pretraining of Pixel Language Models",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.29681, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "116865200",
+       "name": "Ilker Kesen"
+      },
+      {
+       "authorId": "2335674700",
+       "name": "Jenny Kunz"
+      },
+      {
+       "authorId": "2421691874",
+       "name": "Kasra Malihi"
+      },
+      {
+       "authorId": "2262445191",
+       "name": "Desmond Elliott"
+      }
+     ],
+     "abstract": "Pixel language models process text as rendered images instead of a finite vocabulary, which gives them strong cross-lingual transfer abilities. However, not much is known about how these abilities are influenced by larger-scale pretraining. In this paper, we train a family of MPIXEL models along three axes of variation: more languages, more scripts, and larger model capacity under fixed per-language compute. In evaluations on five tasks covering 83 languages, we find that scaling acts locally: each axis improves the added languages and scripts, while increased capacity mitigates the curse of multilinguality from pretraining on more languages. Transfer to unseen scripts improves with multilingual pretraining, but does not further improve with scaling. On typologically distant low-resource languages, our models outperform subword and character-level baselines across many writing systems. We also show that larger pixel models reserve more layers for visual processing, and that cross-lingual alignment weakens as more languages are added. Overall, our findings characterize how multilingual scaling improves pixel language models."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7552e9a5e6de61b1b7b49d38332cfd65324c13b4",
+     "externalIds": {
+      "ArXiv": "2610.27570",
+      "CorpusId": 293808903
+     },
+     "title": "Bayesian Neural Networks via Dirichlet Process Priors on the Data-Generating Distribution for Randomized Value Functions in Deep Reinforcement Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.27570, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "66282780",
+       "name": "Sumit Vashishtha"
+      }
+     ],
+     "abstract": "Bayesian neural networks (BNNs) offer a principled framework for quantifying epistemic uncertainty. However, standard weight-space priors yield complex, high-dimensional neural network posteriors that are computationally prohibitive to sample from, and popular approximate inference schemes often fail to capture epistemic uncertainty effectively---a failure mode particularly acute in reinforcement learning (RL) \\citep{osband2018randomized}. To resolve this challenge, we introduce a new class of BNNs that quantify uncertainty by placing Bayesian nonparametric Dirichlet Process (DP) priors directly on the underlying data-generating distribution rather than on network parameters. Building on this foundation, we develop DP-DQN, a reinforcement learning algorithm that leverages DP-BNNs to maintain posterior distributions over value functions and perform efficient Thompson sampling. By grounding randomized value functions in Bayesian nonparametrics, DP-DQN unifies data-driven posterior reweighting (via the Bayesian Bootstrap) with generative prior hypotheses injected directly through the DP base measure, enabling decisive ``deep exploration''with a single neural network without the overhead of multi-network ensembles."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "98febbdbe3dd05d0156eab9ffc89c48ef2b606bc",
+     "externalIds": {
+      "ArXiv": "2610.27619",
+      "CorpusId": 293809221
+     },
+     "title": "Divide-and-Conquer Neural Bayes Estimation for Spatial and Spatiotemporal Point Process Models",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.27619, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2297712269",
+       "name": "Bokgyeong Kang"
+      },
+      {
+       "authorId": "2340223312",
+       "name": "Andrew Zammit-Mangion"
+      },
+      {
+       "authorId": "2026549",
+       "name": "E. Schliep"
+      },
+      {
+       "authorId": "2257348777",
+       "name": "R. S. Schick"
+      }
+     ],
+     "abstract": "Spatial and spatiotemporal point process models are widely used to analyze event data across many scientific disciplines, but likelihood-based Bayesian inference is often computationally prohibitive due to intractable likelihoods, high-dimensional latent structures, and dependence on event history. Existing approximate and likelihood-free methods mitigate some of these challenges, but often at the cost of reduced statistical efficiency, imperfect uncertainty quantification, or information loss from reliance on predefined summary statistics. A promising recent approach involves neural networks, but it has only been explored in purely spatial or temporal settings and requires a computationally expensive training stage for large domains or dense point patterns. Here, we propose a divide-and-conquer neural Bayes estimation framework for spatial and spatiotemporal point process models. Our method operates directly on raw point pattern realizations using transformer-based architectures on partitions of the spatiotemporal domain, together with an attention mechanism to optimally combine locally extracted summaries. Simulation studies demonstrate reliable inference with improved scalability relative to existing general-purpose neural inference approaches and classical likelihood-based methods. We further demonstrate the practical applicability of our approach through an analysis of whale call data in Cape Cod Bay, MA, where, once trained, the estimator yields parameter estimates and credible intervals at negligible computational cost."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "ae3553612fc3adeea23c8af0bc6468e9f15362ed",
+     "externalIds": {
+      "ArXiv": "2610.27418",
+      "CorpusId": 293809156
+     },
+     "title": "TokenFlow: Latent Token Rectified Flow Matching for 3D Point Cloud Generation",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.27418, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2244221790",
+       "name": "Lin-Hao Wang"
+      },
+      {
+       "authorId": "2341686543",
+       "name": "Dong-Jin Huang"
+      }
+     ],
+     "abstract": "3D point clouds generation requires capturing both part-level layout and surface detail while preserving permutation equivariance. Existing latent generative models often encode an entire shape into a single vector, which limits their ability to retain part-level structure. We propose TokenFlow, a hierarchical flow matching framework that represents each shape as a set of latent tokens and couples a rectified flow over these tokens with a conditional flow over points. A bottleneck of $M \\ll N$ learnable tokens aggregates global context through cross-attention at $O(NM)$ cost. On ShapeNet, TokenFlow achieves the best MMD and coverage across airplane, car, and chair, while obtaining 1-NNA comparable to the strongest baselines. On ModelNet, its learned latent set reaches the best reported linear-evaluation accuracy on ModelNet10. These results show that representing a shape as a set of latent tokens, aggregated at $O(NM)$ cost, provides an effective representation for 3D point cloud generation."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "47e8d4f7f1b6fced8dc78742a6c1d5e9a9f384cd",
+     "externalIds": {
+      "ArXiv": "2610.27995",
+      "CorpusId": 293811910
+     },
+     "title": "Learning Tactile-Aware Hand Representations from Human Hand-Object Interaction Data",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.27995, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "83360169",
+       "name": "Yeonguk Yu"
+      },
+      {
+       "authorId": "2327036925",
+       "name": "Jaehong Kim"
+      },
+      {
+       "authorId": "2695251",
+       "name": "Byungok Han"
+      }
+     ],
+     "abstract": "Tactile representation learning for dexterous manipulation often requires substantial robot-side data collection, limiting its scalability across different hands and sensors. We explore whether large-scale human hand-object interaction (HOI) data can provide a useful prior for robotic tactile learning. To this end, we propose HuTact, a framework that pretrains tactile-aware hand representations from human HOI data without requiring real tactile signals during pretraining. HuTact transfers the interaction structure learned from human hand motions to robotic tactile observations and can be further adapted with a small amount of unlabeled robot interaction data. We evaluate HuTact on tactile perception and manipulation tasks, including grasp prediction, slip detection, object classification, and tactile-conditioned policy learning. Across these tasks, human HOI pretraining improves data efficiency and provides a strong initialization for downstream learning. Notably, with HOI pretraining followed by midtraining on unlabeled robot play data, HuTact achieves 88.26% Macro-F1 on grasp prediction using only 25\\% of the labeled downstream data, comparable to training from scratch on the full labeled dataset (88.23%). These results suggest that human interaction data can serve as a scalable complementary source for robotic tactile representation learning."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "8990841a61f2e790c6850fa8f4ac90afcdad8477",
+     "externalIds": {
+      "ArXiv": "2610.28086",
+      "CorpusId": 293812213
+     },
+     "title": "MoDDiT: Simple Token Routing in Diffusion Transformers",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28086, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2307075759",
+       "name": "Jarek Liesen"
+      },
+      {
+       "authorId": "2334760150",
+       "name": "M. Jackson"
+      },
+      {
+       "authorId": "2151859995",
+       "name": "Benjamin Ellis"
+      },
+      {
+       "authorId": "2067203314",
+       "name": "Shimon Whiteson"
+      },
+      {
+       "authorId": "2275156099",
+       "name": "J. Foerster"
+      }
+     ],
+     "abstract": "Real-time video generation, interactive world models, and on-device image synthesis are almost a reality. Diffusion Transformers (DiT) achieve excellent sample quality, shifting the bottleneck to the throughput of the models themselves. Natural images are inherently sparse, as large portions of an image are often background, contribute little to the scene content, and are easy to denoise. DiTs fail to exploit this sparsity, as they process image tokens statically and uniformly. We propose MoDDiT, a simple architecture modification that learns to route tokens through both MLP and self-attention operations. By routing tokens through both blocks independently, MoDDiT allows for dynamic compute allocation in MLPs that varies across tokens, images, and denoising timesteps. Using MoDDiT to train image generation models from scratch significantly reduces computational costs of training and inference, processing as few as 12.5% of the tokens. By increasing sparsity and model depth, MoDDiT reduces costs and improves generation performance over unrouted baselines. The learned allocation is interpretable, revealing how computation varies with visual content and noise level. We also use MoDDiT to train video generation models, where allocation correlates with motion, and to distill a dense bidirectional video model into a sparse autoregressive student."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "81521af96c61f69b43fcb5d21e317a9e33d13334",
+     "externalIds": {
+      "ArXiv": "2610.27960",
+      "CorpusId": 293811968
+     },
+     "title": "Efficient SAM3 Adaptation for Multi-Class Semantic Segmentation via Dense Competitive Representations",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.27960, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2184497497",
+       "name": "Wen-Bin Liao"
+      },
+      {
+       "authorId": "2313687851",
+       "name": "Hao Zhu"
+      },
+      {
+       "authorId": "3193532",
+       "name": "Yike Ma"
+      },
+      {
+       "authorId": "2266552062",
+       "name": "Hao Jiang"
+      },
+      {
+       "authorId": "2175787349",
+       "name": "Feng Dai"
+      }
+     ],
+     "abstract": "The Segment Anything Model 3 (SAM3) has achieved significant progress in Promptable Concept Segmentation (PCS) by processing short noun phrases to generate segmentation masks with unique instance identifiers. While SAM3 excels at single-concept segmentation, it falls short in complex, real-world environments where multiple concepts must be segmented simultaneously. In particular, SAM3 typically fails to simultaneously process concepts with semantic overlap, leading to semantic misclassifications and redundant mask predictions. Moreover, as the number of concepts increases, the independent inference paradigm introduces prohibitive inference latency. To address these limitations, we propose the Dense Competitive Representations SAM (DCR-SAM) framework. By decoupling cross-modal interactions, the proposed method alleviates the inference latency. To resolve semantic misclassifications, DCR-SAM dynamically aligns textual concepts with visual representations and incorporates a dense competition head to enforce explicit inter-class competition. Furthermore, a learnable background token is applied to absorb non-target objects dynamically. These mechanisms effectively suppress overlapping predictions and generate high-fidelity masks. Extensive experimental evaluations across multiple benchmarks demonstrate that the proposed framework: (1) achieves a 2.3% $\\sim$ 10.7% performance improvement over state-of-the-art methods, (2) delivers a 33$\\times$ inference speedup compared to the native SAM3, and (3) exhibits strong robustness across diverse scenarios."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "ed55fe425237e02baa68912f5078e5a11eacb458",
+     "externalIds": {
+      "ArXiv": "2610.28223",
+      "CorpusId": 293812212
+     },
+     "title": "Local Inference of LLMs on Long Contexts: A Data Systems Perspective",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28223, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2516050720",
+       "name": "Mattias Dürrmeier"
+      },
+      {
+       "authorId": "143649662",
+       "name": "Alberto Lerner"
+      }
+     ],
+     "abstract": "Large language models can solve complex problems across a variety of subjects, such as mathematics and coding. For such complex analytical tasks, models with a long context perform better. Serving models with long context is currently mostly done on powerful systems with multiple GPUs, which are too expensive for most users. An alternative is local inference, or serving a model on a user's own machine, which removes per-token costs and rate limits, besides keeping sensitive data private and giving users full control over the models they run. The common understanding, however, is that local LLMs need compression (e.g., quantization) to run on a single GPU. In this paper, we set out to study the limitations that prevent serving long-context models for single users, besides the capacity issue. Rather than characterizing a single model on one GPU, we analyze how different models behave across several GPU generations. This lets us uncover not just individual bottlenecks but broader trends in where inefficiencies arise. Our analysis confirms that, as expected, self-attention dominates the runtime for long-context inference. More unexpectedly, our evaluation reveals that the current structure of self-attention leaves key GPU resources significantly underutilized, and the newest GPU is often the least well served. Many of these findings are fundamentally data management problems, from paging the KV cache to improving cache utilization and synchronization in the GPU, which is why we bring this study to the Data Systems community. To engage this community, we present our findings as a series of experimental observations and formulate recommendations for future work."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "bd8b715ef7e5e7c2ae5ae21daffb39f059579497",
+     "externalIds": {
+      "ArXiv": "2610.28191",
+      "CorpusId": 293812383
+     },
+     "title": "Unified RAW Image Exposure Correction and Restoration via Linear Illumination and Frequency-Adaptive Enhancement",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28191, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2312008285",
+       "name": "Ying-Kai Zhang"
+      },
+      {
+       "authorId": "31218892",
+       "name": "Yun-Hao Zou"
+      },
+      {
+       "authorId": "2238148287",
+       "name": "Ying Fu"
+      }
+     ],
+     "abstract": "Incorrect exposure degrades both image brightness and recoverable scene detail. Existing sRGB-based correction methods are limited by the non-linear image signal processing pipeline, whereas RAW-based methods are usually developed for a single degradation type, such as low-light denoising or high-light recovery. In this paper, we focus on joint exposure correction and restoration directly in the RAW domain and propose a unified RAW Image Exposure Correction and Restoration (RIECR) framework for both under- and over-exposed images. RIECR decomposes the problem into two coupled sub-problems that follow the RAW imaging model: linear illumination correction and residual degradation restoration. First, a Linear Illumination Correction Network (LICN) estimates exposure-aware linear gains by using channel-specific RAW cues. It exploits the high signal-to-noise ratio of Green channels for robust brightening and the relatively unsaturated Red/Blue responses for high-light darkening. Second, a dual-branch Frequency-based Enhancement Network (FEN) restores the remaining degradation with a Frequency Dynamic Convolution (FDC) module. FDC decomposes convolutional responses into low- and high-frequency components and adaptively suppresses amplified noise or recovers clipped textures according to the exposure context. We further build a real paired RAW benchmark containing 223 scenes and 1,784 pairs covering complex multi-exposure errors. Experiments against sixteen state-of-the-art methods show that RIECR achieves state-of-the-art performance on real RAW exposure correction."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "6fcd1a456b8e519a49e13e9c32b2901ae589afbc",
+     "externalIds": {
+      "ArXiv": "2610.28709",
+      "CorpusId": 293845047
+     },
+     "title": "STAR-XPC: Set Transformer for Estimating X-ray Transmission in Polymer Composites",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28709, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2434945922",
+       "name": "Can Erer"
+      },
+      {
+       "authorId": "2357899087",
+       "name": "H. Yilmaz"
+      },
+      {
+       "authorId": "101442123",
+       "name": "Nebahat Aral"
+      }
+     ],
+     "abstract": "Evaluating the energy transmission ratio of an X-ray beam through a polymer composite is a challenging task in radiation shielding studies. The reference solution with Monte Carlo transport simulation is highly accurate but computationally expensive: each of our reference simulations is capped at $4\\times10^9$ photon histories and a 20,000 s (over 5 hours) time limit, while closed-form analytical methods fail to represent such complex scenarios. We present an artificial neural network model that maps the unordered multi-set of molecular constituents, their mass fractions, and four bulk physical descriptors directly to the transmission ratio $I(t)/I_0$ in 1-3 milliseconds. The model is a Set Transformer, which makes it permutation invariant by construction and accepts mixtures of different sizes up to 11 constituents within a fixed-size padded set. Each constituent is embedded with a chemistry-pretrained transformer language model, ChemBERTa. In our proposed method, training data are produced by an automated PENELOPE/penEasy pipeline using the radiation source at 30, 80, 100, and 120 kV tube voltages over polyethylene-based shielding composite slabs of thicknesses spanning 0.15-2.5 mm. After preprocessing, the dataset contains $n = 4697$ simulated configurations on which a leakage-free, jointly stratified 10-fold cross-validation is performed, attaining mean squared error MSE = $(1.12 \\pm 0.56)\\times10^{-4}$, normalized-MSE percentage NMSE% = 0.0294% $\\pm$ 0.0147%, and $R^2 = 0.9988$. The corresponding per-sample percentage errors give an alpha-trimmed ($\\alpha = 0.10$) absolute percentage error (APE) of 1.66% and a median APE of 1.15%. Our model's inference is several orders of magnitude faster than the underlying Monte Carlo simulation (sub-millisecond per query vs. several hours for the reference run) with effective accuracy in predicting $I(t)/I_0$."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "61d2f5d2bf00ac75a5b09de55a9ffccb990fc08f",
+     "externalIds": {
+      "DOI": "10.3389/fnins.2026.1944816",
+      "CorpusId": 293870955
+     },
+     "title": "Anti-correlation time-frequency synergy and dual-granularity fusion for sleep stage classification",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2026.1944816/pdf",
+      "status": "GOLD",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.3389/fnins.2026.1944816?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.3389/fnins.2026.1944816, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "123442161",
+       "name": "Jie-Nan Pan"
+      },
+      {
+       "authorId": "2516797043",
+       "name": "Xing-Xing Zhao"
+      },
+      {
+       "authorId": "2390901185",
+       "name": "Xiao-Yu Zou"
+      },
+      {
+       "authorId": "2319808378",
+       "name": "Peng-Jun Zhao"
+      },
+      {
+       "authorId": "2516785208",
+       "name": "Lei-Lei Wang"
+      },
+      {
+       "authorId": "2364585054",
+       "name": "Cheng-Cheng Li"
+      }
+     ],
+     "abstract": "\n \n Automated sleep stage classification is crucial for diagnosing sleep disorders and evaluating sleep quality. Single-channel EEG sleep staging using central electrodes has garnered significant interest due to its ability to detect a higher number of sleep spindles and its cost-effectiveness. Nevertheless, several challenges remain, such as the neglect of interdependencies among features, reduced model sensitivity to the dispersion across features, potential information leakage during the learning of transition rules, and class imbalance.\n \n \n \n To address these challenges, this study specifically designs an automatic sleep staging network based on single-channel EEG. The network incorporates a multi-branch feature extraction module, which captures negatively correlated frequency features that exhibit significant variations during sleep transitions and promotes synergistic complementarity. Furthermore, a dual-granularity residual attention mechanism is employed to perform adaptive fusion along both temporal and channel dimensions based on statistical measures such as the mean and standard deviation. The causal transition-aware network ensures temporal consistency while facilitating effective learning of transition rules. The focal loss function is utilized to counteract class imbalance.\n \n \n \n Experiments on SleepEDF-20, SleepEDF-78 and SHHS datasets show that our method achieves the best performance with overall accuracy of 87.0%, 83.4% and 84.5%, respectively. For N1 stage classification which is more challenging, it reaches an accuracy of 57.5%, 52.5% and 49.3% on three datasets, respectively.\n \n \n \n The experimental results demonstrate the effectiveness of the proposed approach and its certain advantages over existing methods.\n"
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "1f1d9634abb2cced07eb9b5bd2337492ca2e46b8",
+     "externalIds": {
+      "ArXiv": "2610.25991",
+      "CorpusId": 293802306
+     },
+     "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.25991, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2515955906",
+       "name": "Fumimaro Suzuki"
+      },
+      {
+       "authorId": "2375137066",
+       "name": "Keisuke Okumura"
+      }
+     ],
+     "abstract": "Designing capable neural policies for multi-agent pathfinding (MAPF), which map local observations to action distributions, represents an important challenge in multi-agent learning, with practical relevance to scalable collective automation problems such as warehouse logistics. In contrast to prior studies focusing primarily on individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based MAPF. Specifically, given a collection of compact yet high-performing experts specialised for different map distributions, our architecture learns a router that selectively fuses their outputs according to each agent's local situation. We instantiate and validate this MoE approach with a commonly used graph neural network-based policy as well as a newly developed recursive action-token refinement model. Combined with supervised and reinforcement learning fine-tuning of the experts, our experiments show that MoE generally improves upon the pretrained policy and outperforms existing leading methods. At the same time, our findings reveal that appropriately trained, parameter-matched monolithic models still outperform MoE, highlighting a nuanced role for map-distribution MoE for MAPF."
+    }
+   }
+  ]
+ }
+}

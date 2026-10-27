@@ -7,7 +7,9 @@
 启动后打开 http://127.0.0.1:8000/docs 就能看到自动生成的接口文档。
 """
 
+import difflib
 import json
+import re
 from pathlib import Path
 
 import fitz
@@ -15,24 +17,47 @@ from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from app.agent import run_agent, run_agent_stream
 from app.config import settings
 from app.figures import figure_bytes, page_png
 from app.layout import detect_layout
 from app.logging_config import get_logger, setup_logging
+from app.online import (
+    OnlineError,
+    arxiv_id_of,
+    citation_counts,
+    download_pdf,
+    paper_meta,
+    references,
+    search_papers,
+    write_cache,
+)
 from app.papers import (
+    PAPERS_DIR,
     delete_paper,
     delete_structure,
     get_paper,
+    get_structure,
     list_papers,
     load_structures,
+    merge_structure,
     paper_path,
     save_paper,
     version_of,
 )
 from app.rag.pipeline import index_paper, remove_source
 from app.reader import list_reader_papers, reader_meta, safe_paper_path
+from app.recommend import (
+    CACHE_KEY,
+    RECOMMEND_FILE,
+    build_recommendations,
+    cached_recommendations,
+    library_rows,
+    rerank_with_feedback,
+    save_feedback,
+)
 from app.translate import (
     load_translation,
     references_page_of,
@@ -469,6 +494,264 @@ async def translate_selection(req: TranslateSelectionRequest) -> dict:
         logger.exception("选中翻译失败")
         raise HTTPException(status_code=502, detail="翻译服务暂时不可用") from None
     return {"markdown": markdown}
+
+
+# ---------------- 1.4 下载与推荐 ----------------
+# 赛题 1.4.1 的两个入口：按论文名下载、顺着参考文献批量下载；
+# 1.4.3 的推荐列表与反馈。联网的部分全部丢到线程池（httpx 是同步的），
+# 免得一个 20 秒的 arXiv 搜索把整个事件循环卡住。
+
+
+class DownloadRequest(BaseModel):
+    """按论文名下载：`query` 是标题或"标题 + arXiv 号"。"""
+
+    query: str = Field(..., min_length=1, max_length=300)
+    force: bool = False
+
+
+class ReferenceDownloadRequest(BaseModel):
+    """批量下载参考文献。`min_cites` 就是"去掉为了引用而引用"的阈值。"""
+
+    limit: int = Field(default=3, ge=1, le=20)
+    min_cites: int = Field(default=2, ge=1, le=30)
+
+
+class FeedbackRequest(BaseModel):
+    """推荐反馈：up / down，传空串表示取消。"""
+
+    vote: str = Field(default="", max_length=8)
+
+
+def _pick_search_result(query: str, results: list[dict]) -> dict | None:
+    """从 arXiv 搜索结果里挑最像 query 的那条。
+
+    arXiv 的"按标题搜"并不精确（搜 Layer Normalization 会先给别的论文），
+    所以这里按标题相似度重排，低于 0.5 视为没搜到，宁可报错也不乱下。
+    """
+    if not results:
+        return None
+
+    def ratio(candidate: dict) -> float:
+        left = query.lower().strip()
+        right = str(candidate.get("title") or "").lower().strip()
+        return difflib.SequenceMatcher(None, left, right).ratio()
+
+    best = max(results, key=ratio)
+    if ratio(best) < 0.5:
+        return None
+    return best
+
+
+@app.post("/library/download", summary="按论文名从 arXiv 下载并入库（1.4.1）")
+async def library_download(req: DownloadRequest) -> dict:
+    """给一个论文名 → 在 arXiv 搜 → 下 PDF → 走上传同一条链路（去重/解析/入库）。
+
+    重复时不重复下载：库里已有同一 arXiv 编号就直接告诉前端"已有"，
+    除非显式 `force=true`。
+    """
+    query = req.query.strip()
+    direct = arxiv_id_of(query) if re.fullmatch(r"[\w./:\-]*\d{4}\.\d{4,5}[\w.]*", query) else ""
+    if direct:
+        # 直接给 arXiv 号（推荐卡片上「下载入库」就是这么调的），不用再搜
+        try:
+            meta = await run_in_threadpool(paper_meta, direct)
+        except OnlineError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from None
+        best = {"arxiv_id": direct, "title": meta.get("title") or f"arXiv:{direct}"}
+    else:
+        try:
+            results = await run_in_threadpool(search_papers, query, 6)
+        except OnlineError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from None
+        best = _pick_search_result(query, results)
+        if best is None:
+            raise HTTPException(status_code=404, detail=f"arXiv 上没搜到接近「{query}」的论文")
+    arxiv_id = best["arxiv_id"]
+
+    existing = next((row for row in library_rows() if row["arxiv_id"] == arxiv_id), None)
+    if existing is not None and not req.force:
+        return {
+            "downloaded": False,
+            "detail": "库里已经有这篇论文",
+            "arxiv_id": arxiv_id,
+            "title": existing["title"],
+            "filename": existing["filename"],
+        }
+
+    tmp = PAPERS_DIR / f".download_{arxiv_id}.pdf"
+    try:
+        await run_in_threadpool(download_pdf, arxiv_id, tmp)
+        data = tmp.read_bytes()
+    except OnlineError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    paper, dup, score = await run_in_threadpool(save_paper, f"{arxiv_id}.pdf", data)
+    # 结构写得进总表，阅读页才有章节树（总表是按文件名索引的）
+    structure = get_structure(paper.paper_id)
+    if structure:
+        merge_structure(paper.filename, structure)
+
+    indexed = 0
+    try:
+        path = paper_path(paper.paper_id)
+        if path is not None:
+            indexed = await run_in_threadpool(index_paper, str(path), paper.filename)
+    except Exception:
+        logger.exception("下载成功但入库失败（paper_id=%s）", paper.paper_id)
+
+    return {
+        "downloaded": True,
+        "arxiv_id": arxiv_id,
+        "title": best["title"],
+        "paper": {
+            "paper_id": paper.paper_id,
+            "filename": paper.filename,
+            "pages": paper.pages,
+            "duplicate_of": paper.duplicate_of,
+            "duplicate_reason": paper.duplicate_reason,
+        },
+        "duplicate_score": score,
+        "duplicate_hit": dup.filename if dup else "",
+        "indexed": indexed,
+    }
+
+
+@app.post("/paper/{filename}/references/download", summary="批量下载参考文献入库（1.4.1）")
+async def paper_references_download(filename: str, req: ReferenceDownloadRequest) -> dict:
+    """按正文引用次数挑重点参考文献下载。
+
+    顺序对齐的前提：Semantic Scholar 返回的引用列表顺序 ≈ 论文里的编号顺序，
+    所以用 `[n]` 的计数去给第 n 条加权。对不齐时最坏是"重点挑偏"，不会下错文件
+    （下的是 S2 给的那个 arXiv 号）。
+    """
+    path = safe_paper_path(filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    arxiv_id = arxiv_id_of(filename)
+    if not arxiv_id:
+        raise HTTPException(status_code=400, detail="这篇论文不是 arXiv 来源，取不到参考文献关系")
+
+    try:
+        rows = await run_in_threadpool(references, arxiv_id, 40)
+    except OnlineError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+
+    text = ""
+    try:
+        with fitz.open(str(path)) as doc:
+            text = "\n".join(page.get_text() for page in doc)
+    except Exception:
+        logger.exception("数引用次数时读 PDF 失败：%s", filename)
+    counts = citation_counts(text)
+
+    ranked: list[dict] = []
+    for index, row in enumerate(rows):
+        # S2 列表第 1 条 ≈ 正文 [1]
+        count = counts.get(index + 1, 0)
+        if count < req.min_cites:
+            continue
+        if not row.get("arxiv_id"):
+            continue
+        item = dict(row)
+        item["cites"] = count
+        ranked.append(item)
+    ranked.sort(key=lambda item: item["cites"], reverse=True)
+
+    known = {row["arxiv_id"] for row in library_rows() if row["arxiv_id"]}
+    picked = ranked[: req.limit]
+    results: list[dict] = []
+    for item in picked:
+        ref_id = item["arxiv_id"]
+        if ref_id in known:
+            results.append({"arxiv_id": ref_id, "title": item["title"], "status": "已有", "cites": item["cites"]})
+            continue
+        tmp = PAPERS_DIR / f".download_{ref_id}.pdf"
+        try:
+            await run_in_threadpool(download_pdf, ref_id, tmp)
+            data = tmp.read_bytes()
+            paper, dup, _score = await run_in_threadpool(save_paper, f"{ref_id}.pdf", data)
+            structure = get_structure(paper.paper_id)
+            if structure:
+                merge_structure(paper.filename, structure)
+            indexed = 0
+            try:
+                saved_path = paper_path(paper.paper_id)
+                if saved_path is not None:
+                    indexed = await run_in_threadpool(index_paper, str(saved_path), paper.filename)
+            except Exception:
+                logger.exception("参考文献入库失败：%s", ref_id)
+            results.append(
+                {
+                    "arxiv_id": ref_id,
+                    "title": item["title"],
+                    "status": "已入库",
+                    "cites": item["cites"],
+                    "filename": paper.filename,
+                    "indexed": indexed,
+                    "duplicate_hit": dup.filename if dup else "",
+                }
+            )
+            known.add(ref_id)
+        except (OnlineError, ValueError) as exc:
+            results.append({"arxiv_id": ref_id, "title": item["title"], "status": "失败", "cites": item["cites"], "error": str(exc)})
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    return {
+        "filename": filename,
+        "arxiv_id": arxiv_id,
+        "min_cites": req.min_cites,
+        "candidates": len(ranked),
+        "counts": dict(sorted(counts.items())),
+        "results": results,
+    }
+
+
+@app.get("/recommendations", summary="新论文推荐（读缓存，1.4.3）")
+async def recommendations() -> dict:
+    """读上次刷新出来的推荐；没刷新过就返回空列表 + offline=true。"""
+    return await run_in_threadpool(cached_recommendations)
+
+
+@app.post("/recommendations/refresh", summary="刷新推荐（扫 arXiv 引用关系，1.4.3）")
+async def recommendations_refresh(max_papers: int = 6) -> dict:
+    """实时抓一轮候选并重算推荐；抓取失败时退回过期缓存（offline=true）。
+
+    这一步会串行请求 Semantic Scholar（限流友好），通常 10~40 秒。
+    """
+    try:
+        return await build_recommendations(max_papers=max(1, min(max_papers, 12)))
+    except OnlineError as exc:
+        payload = await run_in_threadpool(cached_recommendations)
+        payload["offline"] = True
+        payload["detail"] = str(exc)
+        return payload
+
+
+@app.post("/recommendations/{key}/feedback", summary="推荐反馈（👍/👎，1.4.3）")
+async def recommendation_feedback(key: str, req: FeedbackRequest) -> dict:
+    """记一条反馈，并立刻按新票重排缓存里的列表（不用重新抓网）。
+
+    `key` 是推荐条目里的 `key` 字段（有 arXiv 号就用号，没有就用标题哈希）。
+    """
+    if not key.strip():
+        raise HTTPException(status_code=400, detail="缺少推荐条目标识")
+    try:
+        feedback = await run_in_threadpool(save_feedback, key, req.vote)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    payload = await run_in_threadpool(cached_recommendations)
+    items = rerank_with_feedback(list(payload.get("items") or []), feedback)
+    payload["items"] = items
+    payload["offline"] = False
+    write_cache(CACHE_KEY, payload)
+    try:
+        RECOMMEND_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        logger.warning("写推荐缓存文件失败（不影响本次响应）")
+    return {"vote": req.vote, "feedback": feedback, "items": items}
 
 
 # ---------------- 前端页面 ----------------
