@@ -139,3 +139,64 @@ def test_feedback_endpoint_requires_known_vote(meta):
     resp = client.post("/recommendations/2401.00001/feedback", json={"vote": "up"})
     assert resp.status_code == 200
     assert resp.json()["feedback"] == {"2401.00001": "up"}
+
+
+def test_topic_profile_blends_best_and_top3():
+    # 候选 [1,0]：与 A 完全一致、与 B 余弦 0.8、与 C 余弦 0
+    lib = [("A", [1.0, 0.0]), ("B", [0.8, 0.6]), ("C", [0.0, 1.0])]
+    topic, best, top3 = rec.topic_profile([1.0, 0.0], lib)
+    assert best == "A"
+    # 0.55*max + 0.45*均值(top3)
+    assert topic == pytest.approx(round(0.55 * 1.0 + 0.45 * (1.0 + 0.8 + 0.0) / 3, 4))
+    assert [row["title"] for row in top3] == ["A", "B", "C"]
+
+
+def test_recent_candidates_gate_on_topic_only(monkeypatch):
+    monkeypatch.setattr(
+        rec, "embed", lambda text: [1.0, 0.0] if "fresh" in text.lower() else [0.15, 0.99]
+    )
+    lib = [("Layer Normalization", [1.0, 0.0])]
+    keep = {
+        "key": "r1",
+        "arxiv_id": "2610.00001",
+        "title": "A fresh paper on normalization",
+        "abstract": "",
+        "cited_by": [],
+        "source": "recent",
+        "year": 2026,
+    }
+    drop = dict(keep, key="r2", arxiv_id="2610.00002", title="Biology matters", source="recent")
+    out = rec.score_candidates([dict(keep), dict(drop)], lib, current_year=2026)
+    assert [item["key"] for item in out] == ["r1"]
+    assert out[0]["source"] == "recent"
+    assert out[0]["score"] == pytest.approx(
+        rec.WEIGHT_TOPIC * out[0]["topic"] + rec.WEIGHT_FRESH * 1.0, abs=1e-6
+    )
+
+
+def test_collect_recent_skips_library_duplicates(monkeypatch):
+    monkeypatch.setattr(
+        rec,
+        "library_rows",
+        lambda: [{"paper_id": "p1", "filename": "a.pdf", "arxiv_id": "2401.00001",
+                  "title": "Attention Is All You Need", "abstract": ""}],
+    )
+    monkeypatch.setattr(
+        rec,
+        "recent_papers",
+        lambda *args, **kwargs: [
+            {"arxiv_id": "2401.00001", "title": "Attention Is All You Need", "posted": "", "url": ""},
+            {"arxiv_id": "2610.00003", "title": "Brand new thing", "posted": "", "url": ""},
+        ],
+    )
+    monkeypatch.setattr(
+        rec,
+        "paper_meta",
+        lambda arxiv_id: {"title": "Brand new thing", "abstract": "摘要", "year": 2026},
+    )
+    # lib_vecs=None：跳过标题粗排，保证两条都进池子（重复的那条要在这里被剔掉）
+    out, errors = rec.collect_recent(max_items=4, lib_vecs=None)
+    assert errors == []
+    assert [item["arxiv_id"] for item in out] == ["2610.00003"]
+    assert out[0]["source"] == "recent"
+    assert out[0]["year"] == 2026

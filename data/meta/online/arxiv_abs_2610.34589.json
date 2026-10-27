@@ -1,0 +1,28 @@
+{
+ "saved_at": "2026-10-27T04:29:33+00:00",
+ "data": {
+  "arxiv_id": "2610.34589",
+  "title": "HARP-LoRA: Hierarchy-Conditioned Rank Projection for Low-Rank Adaptation in Scientific Table Understanding",
+  "authors": [
+   "Hossein Sholehrasa",
+   "Mohammadhossein Amini",
+   "Doina Caragea",
+   "Remya Ampadi Ramachandran",
+   "Dan Wu",
+   "Zihang Shi",
+   "Zelin Li",
+   "Lindsey Hulbert",
+   "Eder Martinez",
+   "Xuan Xu",
+   "Majid Jaberi-Douraki"
+  ],
+  "abstract": "Tabular data is widely used in scientific applications, where complex layouts, including multi-level headers, merged cells, captions, and footnotes, make information extraction difficult. This is particularly important in pharmacokinetics (PK), where values must be correctly associated with the drug, species, dose, administration route, unit, and experimental condition. Parameter-efficient fine-tuning methods such as Low-Rank Adaptation (LoRA) reduce adaptation cost but do not explicitly incorporate relationships between table values and surrounding headers. We introduce HARP-LoRA, a hierarchy-conditioned rank projection method for low-rank adaptation in scientific table understanding. HARP-LoRA extends projected LoRA by constructing token-specific intrinsic representations from the row- and column-header hierarchies of each data token. These representations condition the low-rank down-projection, incorporating hierarchical context while keeping the pretrained model and random projection tensors frozen. We evaluate HARP-LoRA on 950 manually annotated PK tables from 587 scientific articles and on WikiTableQuestions (WikiTQ) using Llama~3.2 3B, Llama~3.1 8B, and Gemma~3 27B. With Llama~3.1 8B, HARP-LoRA achieves a PK F1-score of 57.64\\% and WikiTQ accuracy of 53.15\\%, improving over LoRA by 1.42 and 6.56 points, respectively. With Gemma~3 27B, it achieves the best PK F1-score of 70.63\\% and WikiTQ accuracy of 56.87\\%. These results use only 172K, 197K, and 547K trainable parameters, far fewer than LoRA and TableLoRA. Overall, conditioning lightweight adapters on table-header hierarchies improves extraction from scientific tables and reasoning over flatter general-domain tables while maintaining parameter efficiency. Code is available at: this https URL",
+  "published": "[Submitted on 25 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL) ; Artificial Intelligence (cs.AI); Information Retrieval (cs.IR); Machine Learning (cs.LG)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.34589",
+  "fetched_at": "2026-10-27T04:29:33+00:00"
+ }
+}

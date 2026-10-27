@@ -27,7 +27,9 @@ from app.online import (
     arxiv_id_of,
     citations,
     find_github,
+    paper_meta,
     read_cache_any_age,
+    recent_papers,
     write_cache,
 )
 from app.papers import BASE_DIR, load_structures, sync_index
@@ -44,6 +46,12 @@ RANK_LIMIT = 12
 MAX_SOURCE_PAPERS = 6
 PER_SOURCE = 25
 RECENT_YEARS = 2
+# 新上架通道：扫这几个分类的 recent 列表，最多挑这么多篇补充摘要
+RECENT_CATEGORIES = ("cs.CL", "cs.LG")
+RECENT_DAYS = 14
+RECENT_KEEP = 12
+# 没有引用信号时主题相似度要更严，否则会推荐一堆"只是词面像"的论文
+RECENT_MIN_TOPIC = 0.20  # 没有引用信号只能靠主题；实测同题材新论文 topic 多在 0.20~0.35
 
 WEIGHT_OVERLAP = 0.35
 WEIGHT_TOPIC = 0.35
@@ -203,6 +211,98 @@ def _title_key(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (title or "").lower())[:120]
 
 
+def collect_recent(
+    max_items: int = RECENT_KEEP,
+    days: int = RECENT_DAYS,
+    lib_vecs: list[tuple[str, list[float]]] | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """扫 arXiv 近期上架列表，把新论文也当候选（1.4.3 的另一条来路）。
+
+    只靠引用关系，刚发出来还没人引用的论文永远进不来；这条路补的就是它们。
+    列表页没有摘要，所以先用**标题**粗排（免费、不联网），只给最像库内的少数几篇
+    补 abs 详情页（有 30 天缓存），否则一天 200 篇全抓一遍又慢又没意义。
+    """
+    rows = library_rows()
+    known = {row["arxiv_id"] for row in rows if row["arxiv_id"]}
+    known_titles = {_title_key(row["title"]) for row in rows}
+    try:
+        items = recent_papers(RECENT_CATEGORIES, per_page=100, days=days)
+    except OnlineError as exc:  # 这条路挂了不该拖垮整个推荐
+        return [], [f"新上架：{exc}"]
+
+    pool: list[dict[str, Any]] = []
+    for item in items:
+        arxiv_id = item["arxiv_id"]
+        title = item["title"]
+        if not title or _title_key(title) in known_titles or arxiv_id in known:
+            continue
+        pool.append(item)
+
+    # 标题粗排：只有一个标题时主题相似度偏低，所以先多留几倍，等详情页拿到摘要再精排
+    if lib_vecs and pool:
+        scored = []
+        for item in pool:
+            rough, _, _ = topic_profile(embed(item["title"]), lib_vecs)
+            scored.append((rough, item))
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+        pool = [item for _, item in scored[: max_items * 4]]
+
+    picked = pool[:max_items]
+
+    out: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for item in picked:
+        arxiv_id = item["arxiv_id"]
+        title = item["title"]
+        abstract = ""
+        year = 0
+        try:
+            meta = paper_meta(arxiv_id)
+            abstract = str(meta.get("abstract") or "")[:1200]
+            year = int(meta.get("year") or 0)
+            title = meta.get("title") or title
+        except OnlineError as exc:
+            errors.append(f"新上架 {arxiv_id}：{exc}")
+        out.append(
+            {
+                "key": arxiv_id,
+                "arxiv_id": arxiv_id,
+                "title": title,
+                "year": year,
+                "abstract": abstract,
+                "authors": [],
+                "url": item.get("url") or "",
+                "cited_by": [],
+                "source": "recent",
+                "posted": item.get("posted") or "",
+                "category": item.get("category") or "",
+            }
+        )
+    return out, errors
+
+
+def topic_profile(
+    vec: list[float], lib_vecs: list[tuple[str, list[float]]]
+) -> tuple[float, str, list[dict[str, Any]]]:
+    """算候选与库内论文的"主题相似度"。
+
+    不用"只跟最像那一篇比"：跨领域时最近邻很容易飘（把 RL 论文算成最像 Llama 2），
+    这里把 max 与 top-3 均值混合，既保留"像你库里的 X"，又不被单篇异常值带跑。
+    返回 ``(topic, 最像的标题, top3 明细)``。
+    """
+    sims: list[tuple[str, float]] = []
+    for title, lib_vec in lib_vecs:
+        sims.append((title, max(0.0, _cosine(lib_vec, vec))))
+    if not sims:
+        return 0.0, "", []
+    sims.sort(key=lambda pair: pair[1], reverse=True)
+    top = sims[:3]
+    best = top[0][1]
+    mean_top = sum(value for _, value in top) / len(top)
+    topic = 0.55 * best + 0.45 * mean_top
+    return round(topic, 4), top[0][0], [{"title": title, "sim": round(sim, 3)} for title, sim in top]
+
+
 def score_candidates(
     candidates: list[dict[str, Any]],
     lib_vecs: list[tuple[str, list[float]]],
@@ -211,27 +311,29 @@ def score_candidates(
 ) -> list[dict[str, Any]]:
     """给候选打分并排序（分数 0~1，越高越该推荐）。
 
-    `topic` = 与库内**最相似那一篇**的余弦相似度；`topic_of` 记下是哪一篇，
-    用来写"这篇像你库里的 X"。明显不相关的（既没多少引用重叠、主题也不像的）
-    直接丢掉，否则引用 Transformer 的医学、燃料电池论文都会冒进推荐列表。
+    两路候选的闸门不同：
+    - ``source == "cited"``（别人引用了库里的论文）：引用重叠或主题够像都能留；
+    - ``source == "recent"``（新上架）：没有引用信号，只能靠主题，所以门槛更高
+      （``RECENT_MIN_TOPIC``），否则会塞满"只是词面像"的论文。
     """
     feedback = feedback or {}
     year_now = current_year or datetime.now(UTC).year
     kept: list[dict[str, Any]] = []
     for item in candidates:
+        source = item.get("source") or "cited"
         overlap_score = min(1.0, len(item["cited_by"]) / 3.0)
         text = f"{item['title']}\n{item.get('abstract') or ''}"
         vec = embed(text) if lib_vecs else []
-        topic_score, topic_of = 0.0, ""
-        for title, lib_vec in lib_vecs:
-            sim = max(0.0, _cosine(lib_vec, vec))
-            if sim > topic_score:
-                topic_score, topic_of = sim, title
-        # 相关性闸门：引用重叠够多，或者主题足够像，才留；两个都很弱就是噪声
-        if len(item["cited_by"]) < 2 and topic_score < 0.22:
-            continue
-        if topic_score < 0.10:
-            continue
+        topic_score, topic_of, topic_top = topic_profile(vec, lib_vecs) if lib_vecs else (0.0, "", [])
+        if source == "recent":
+            if topic_score < RECENT_MIN_TOPIC:
+                continue
+        else:
+            # 相关性闸门：引用重叠够多，或者主题足够像，才留；两个都很弱就是噪声
+            if len(item["cited_by"]) < 2 and topic_score < 0.22:
+                continue
+            if topic_score < 0.10:
+                continue
         github = find_github(item.get("abstract") or "", item["title"])
         code_score = 1.0 if github else 0.0
         age = max(0, year_now - int(item.get("year") or 0)) if item.get("year") else 3
@@ -244,10 +346,12 @@ def score_candidates(
             + WEIGHT_CODE * code_score
             + WEIGHT_FRESH * fresh_score
         )
+        item["source"] = source
         item["github"] = github
         item["overlap"] = round(overlap_score, 3)
         item["topic"] = round(topic_score, 3)
         item["topic_of"] = topic_of
+        item["topic_top"] = topic_top
         # base 是"不含用户反馈"的分数；点赞点踩后只要 base + 新票就能重排，
         # 不用把库重新扫一遍（见 rerank_with_feedback）。
         item["base"] = round(base, 4)
@@ -276,7 +380,8 @@ def rerank_with_feedback(
 _REASON_PROMPT = """你是一个学术助理。下面是若干篇候选论文，以及用户的论文库里已有哪些论文。
 
 请为每篇候选写一句中文推荐理由（30~60 字），说清它跟用户库里的哪篇论文相关、新在哪里。
-只输出 JSON 数组，不要任何解释，格式：
+提到"像库里的哪篇"时，只能用下面给的"最相近的库内论文"或"引用库内"里出现过的篇名，
+不要凭印象编一个库内不存在的标题。只输出 JSON 数组，不要任何解释，格式：
 [{"arxiv_id": "2401.00001", "reason": "..."}]
 
 用户库里的论文：
@@ -294,7 +399,8 @@ async def write_reasons(items: list[dict[str, Any]], library: list[dict[str, Any
     lib_text = "\n".join(f"- {row['title']}" for row in library[:12])
     cand_text = "\n".join(
         f"- arxiv_id={item['arxiv_id'] or item['key']}；标题={item['title']}；"
-        f"引用库内 {len(item['cited_by'])} 篇（{'; '.join(item['cited_by'][:3])}）；"
+        f"来路={'新上架' if item.get('source') == 'recent' else '引用扩展'}；"
+        f"引用库内 {len(item['cited_by'])} 篇（{'; '.join(item['cited_by'][:3]) or '无'}）；"
         f"最相近的库内论文={item.get('topic_of') or '无'}（相似度 {item.get('topic', 0):.2f}）；"
         f"年份={item.get('year') or '未知'}；摘要={item.get('abstract', '')[:300]}"
         for item in items
@@ -309,10 +415,16 @@ async def write_reasons(items: list[dict[str, Any]], library: list[dict[str, Any
     for item in items:
         reason = reasons.get(item["arxiv_id"] or item["key"], "")
         if not reason:
-            reason = (
-                f"引用了库内 {len(item['cited_by'])} 篇论文（{item['cited_by'][0]} 等），"
-                f"主题相关度 {item['topic']:.2f}"
-            )
+            if item.get("source") == "recent":
+                reason = (
+                    f"arXiv 近两周新上架（{item.get('category') or '未分类'}），"
+                    f"主题与库内《{item.get('topic_of') or '—'}》最接近（相似度 {item['topic']:.2f}）"
+                )
+            else:
+                reason = (
+                    f"引用了库内 {len(item['cited_by'])} 篇论文（{item['cited_by'][0]} 等），"
+                    f"主题相关度 {item['topic']:.2f}"
+                )
             if item.get("github"):
                 reason += "，且提供了开源代码"
         item["reason"] = reason
@@ -343,17 +455,34 @@ def _parse_reasons(answer: str) -> dict[str, str]:
 
 
 async def build_recommendations(
-    limit: int = RANK_LIMIT, max_papers: int = MAX_SOURCE_PAPERS
+    limit: int = RANK_LIMIT,
+    max_papers: int = MAX_SOURCE_PAPERS,
+    include_recent: bool = True,
 ) -> dict[str, Any]:
-    """抓候选 → 打分 → 写理由 → 落缓存。返回 {updated_at, items, errors, offline}。"""
+    """抓候选 → 打分 → 写理由 → 落缓存。
+
+    两路候选合并：``cited``（别人引用了库里的论文）+ ``recent``（arXiv 近期上架）。
+    后者让"刚发布、还没人引用"的相关论文也能进榜，见 ``collect_recent()``。
+    """
     rows = library_rows()
     lib_vecs = library_vectors(rows)
     raw, errors = collect_candidates(max_papers=max_papers)
+    recent_scanned = 0
+    if include_recent:
+        fresh_items, recent_errors = collect_recent(lib_vecs=lib_vecs)
+        recent_scanned = len(fresh_items)
+        known = {item["arxiv_id"] for item in raw if item.get("arxiv_id")}
+        raw.extend(item for item in fresh_items if item["arxiv_id"] not in known)
+        errors = errors + recent_errors
     ranked = score_candidates(raw, lib_vecs, load_feedback())
     # 有 arXiv 号的排前面：推荐出来却下不下来，对用户没意义；
     # 但也不直接丢掉（期刊论文也可能想看），排后面并标出来。
     ranked.sort(key=lambda item: (bool(item.get("arxiv_id")), item["score"]), reverse=True)
     without_arxiv = sum(1 for item in ranked if not item.get("arxiv_id"))
+    sources = {
+        "cited": sum(1 for item in ranked if item.get("source") != "recent"),
+        "recent": sum(1 for item in ranked if item.get("source") == "recent"),
+    }
     ranked = await write_reasons(ranked[:limit], rows)
     payload = {
         "updated_at": datetime.now(UTC).astimezone().isoformat(timespec="seconds"),
@@ -363,6 +492,8 @@ async def build_recommendations(
         "offline": False,
         "candidates": len(raw),
         "without_arxiv": without_arxiv,
+        "sources": sources,
+        "recent_scanned": recent_scanned,
     }
     write_cache(CACHE_KEY, payload)
     RECOMMEND_FILE.parent.mkdir(parents=True, exist_ok=True)

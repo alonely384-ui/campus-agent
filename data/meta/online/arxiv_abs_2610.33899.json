@@ -1,0 +1,22 @@
+{
+ "saved_at": "2026-10-27T04:29:38+00:00",
+ "data": {
+  "arxiv_id": "2610.33899",
+  "title": "When Personas Become Harmful: Guiding LLMs with Global Citizenship Values Alignment",
+  "authors": [
+   "Siqi Shen",
+   "Lajanugen Logeswaran",
+   "Moontae Lee",
+   "Honglak Lee",
+   "Rada Mihalcea"
+  ],
+  "abstract": "LLMs are increasingly being used by users from diverse demographics with pluralistic values and distinct backgrounds. Maintaining safety while respecting value-laden personas is uniquely challenging because persona-conditioned requests are often not overtly malicious, unlike those in existing safety benchmarks. Alignment methods aimed at adversarial requests therefore may miss the harm that emerges from persona use, leaving models to either refuse legitimate value expression or blindly follow unsafe personas. We construct a dataset of 11k controversial topics paired with value-based personas mapping to value dimensions from the Schwartz Value Survey. Through an agentic pipeline that iteratively refines the topic and persona, we surface and collect harmful responses from well-aligned commercial LLMs with a more than 47% success rate. We use UNESCO&#39;s global citizenship principles as a minimal common ground for distinguishing valid value expressions from harmful behaviors, and introduce a controllable alignment model that lets users balance persona adherence and safety at inference time. The resulting model is safer and more persona-adherent than baselines on most samples.",
+  "published": "[Submitted on 24 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.33899",
+  "fetched_at": "2026-10-27T04:29:38+00:00"
+ }
+}

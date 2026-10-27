@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-27T11:23:16+08:00",
+ "updated_at": "2026-10-27T12:33:51+08:00",
  "library_size": 39,
  "items": [
   {
@@ -16,14 +16,29 @@
    "cited_by": [
     "Layer Normalization"
    ],
+   "source": "cited",
    "github": "",
    "overlap": 0.333,
-   "topic": 0.386,
+   "topic": 0.332,
    "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-   "base": 0.4017,
-   "score": 0.4017,
+   "topic_top": [
+    {
+     "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+     "sim": 0.386
+    },
+    {
+     "title": "DeepSeek-V3 Technical Report",
+     "sim": 0.211
+    },
+    {
+     "title": "Evaluating Large Language Models Trained on Code",
+     "sim": 0.198
+    }
+   ],
+   "base": 0.3827,
+   "score": 0.3827,
    "vote": "",
-   "reason": "将Switch Transformers的稀疏专家路由思想迁移到多智能体路径规划，用地图分布混合专家替代单一策略，扩展了MoE在决策任务中的应用。"
+   "reason": "将混合专家路由用于多智能体路径规划，与库中Switch Transformers的稀疏专家思想呼应，但把路由对象换成地图分布，拓展到多智能体决策场景。"
   },
   {
    "key": "2610.32142",
@@ -39,37 +54,29 @@
    "cited_by": [
     "Layer Normalization"
    ],
+   "source": "cited",
    "github": "",
    "overlap": 0.333,
-   "topic": 0.279,
+   "topic": 0.263,
    "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
-   "base": 0.3643,
-   "score": 0.3643,
-   "vote": "",
-   "reason": "针对LoRA对学习率敏感的问题重新审视初始化策略，与库中低秩适配工作互补，提出更鲁棒的非对称学习率方案。"
-  },
-  {
-   "key": "2610.28223",
-   "arxiv_id": "2610.28223",
-   "title": "Local Inference of LLMs on Long Contexts: A Data Systems Perspective",
-   "year": 2026,
-   "abstract": "Large language models can solve complex problems across a variety of subjects, such as mathematics and coding. For such complex analytical tasks, models with a long context perform better. Serving models with long context is currently mostly done on powerful systems with multiple GPUs, which are too expensive for most users. An alternative is local inference, or serving a model on a user's own machine, which removes per-token costs and rate limits, besides keeping sensitive data private and giving users full control over the models they run. The common understanding, however, is that local LLMs need compression (e.g., quantization) to run on a single GPU. In this paper, we set out to study the limitations that prevent serving long-context models for single users, besides the capacity issue. Rather than characterizing a single model on one GPU, we analyze how different models behave across several GPU generations. This lets us uncover not just individual bottlenecks but broader trends in where inefficiencies arise. Our analysis confirms that, as expected, self-attention dominates the runtime for long-context inference. More unexpectedly, our evaluation reveals that the current struc",
-   "authors": [
-    "Mattias Dürrmeier",
-    "Alberto Lerner"
+   "topic_top": [
+    {
+     "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+     "sim": 0.279
+    },
+    {
+     "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
+     "sim": 0.231
+    },
+    {
+     "title": "Improving Language Understanding by Generative Pre-Training",
+     "sim": 0.219
+    }
    ],
-   "url": "https://arxiv.org/abs/2610.28223",
-   "cited_by": [
-    "Layer Normalization"
-   ],
-   "github": "",
-   "overlap": 0.333,
-   "topic": 0.257,
-   "topic_of": "Training language models to follow instructions with human feedback",
-   "base": 0.3566,
-   "score": 0.3566,
+   "base": 0.3586,
+   "score": 0.3586,
    "vote": "",
-   "reason": "从数据系统视角研究长上下文LLM的本地推理，与库中缩放定律和指令微调工作呼应，关注长上下文部署的效率瓶颈。"
+   "reason": "重新审视LoRA初始化与非对称学习率，与库中LoRA低秩适配工作直接相关，新在指出学习率调好后原版LoRA仍具竞争力。"
   },
   {
    "key": "2610.28086",
@@ -88,14 +95,67 @@
    "cited_by": [
     "Layer Normalization"
    ],
+   "source": "cited",
    "github": "",
    "overlap": 0.333,
-   "topic": 0.257,
+   "topic": 0.251,
    "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-   "base": 0.3565,
-   "score": 0.3565,
+   "topic_top": [
+    {
+     "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+     "sim": 0.257
+    },
+    {
+     "title": "Qwen2.5 Technical Report",
+     "sim": 0.246
+    },
+    {
+     "title": "Training language models to follow instructions with human feedback",
+     "sim": 0.231
+    }
+   ],
+   "base": 0.3546,
+   "score": 0.3546,
    "vote": "",
-   "reason": "把Switch Transformers的token路由思想引入扩散Transformer，利用图像稀疏性做简单路由以提升生成吞吐，拓展了MoE的应用场景。"
+   "reason": "在扩散Transformer中做简单token路由，借鉴库中Switch Transformers的稀疏专家思路，新在面向视频生成吞吐瓶颈的token级路由。"
+  },
+  {
+   "key": "2610.28223",
+   "arxiv_id": "2610.28223",
+   "title": "Local Inference of LLMs on Long Contexts: A Data Systems Perspective",
+   "year": 2026,
+   "abstract": "Large language models can solve complex problems across a variety of subjects, such as mathematics and coding. For such complex analytical tasks, models with a long context perform better. Serving models with long context is currently mostly done on powerful systems with multiple GPUs, which are too expensive for most users. An alternative is local inference, or serving a model on a user's own machine, which removes per-token costs and rate limits, besides keeping sensitive data private and giving users full control over the models they run. The common understanding, however, is that local LLMs need compression (e.g., quantization) to run on a single GPU. In this paper, we set out to study the limitations that prevent serving long-context models for single users, besides the capacity issue. Rather than characterizing a single model on one GPU, we analyze how different models behave across several GPU generations. This lets us uncover not just individual bottlenecks but broader trends in where inefficiencies arise. Our analysis confirms that, as expected, self-attention dominates the runtime for long-context inference. More unexpectedly, our evaluation reveals that the current struc",
+   "authors": [
+    "Mattias Dürrmeier",
+    "Alberto Lerner"
+   ],
+   "url": "https://arxiv.org/abs/2610.28223",
+   "cited_by": [
+    "Layer Normalization"
+   ],
+   "source": "cited",
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.247,
+   "topic_of": "Training language models to follow instructions with human feedback",
+   "topic_top": [
+    {
+     "title": "Training language models to follow instructions with human feedback",
+     "sim": 0.257
+    },
+    {
+     "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+     "sim": 0.227
+    },
+    {
+     "title": "Improving Language Understanding by Generative Pre-Training",
+     "sim": 0.224
+    }
+   ],
+   "base": 0.3533,
+   "score": 0.3533,
+   "vote": "",
+   "reason": "从数据系统视角研究长上下文LLM本地推理，与库中指令微调大模型工作同属LLM应用，新在聚焦长上下文在本地设备上的服务效率。"
   },
   {
    "key": "2610.29681",
@@ -113,43 +173,213 @@
    "cited_by": [
     "Layer Normalization"
    ],
+   "source": "cited",
    "github": "",
    "overlap": 0.333,
-   "topic": 0.253,
+   "topic": 0.24,
    "topic_of": "Emergent Abilities of Large Language Models",
-   "base": 0.3554,
-   "score": 0.3554,
+   "topic_top": [
+    {
+     "title": "Emergent Abilities of Large Language Models",
+     "sim": 0.253
+    },
+    {
+     "title": "Language Models are Few-Shot Learners",
+     "sim": 0.221
+    },
+    {
+     "title": "Qwen2.5 Technical Report",
+     "sim": 0.195
+    }
+   ],
+   "base": 0.3506,
+   "score": 0.3506,
    "vote": "",
-   "reason": "研究像素语言模型的多语言预训练缩放规律，与库中缩放定律及T5工作相呼应，将缩放分析扩展到无词表的像素输入范式。"
+   "reason": "研究像素语言模型的多语言预训练扩展，与库中关于大模型涌现能力的工作相关，新在考察像素式跨语言能力随预训练规模的演化。"
   },
   {
-   "key": "2610.27619",
-   "arxiv_id": "2610.27619",
-   "title": "Divide-and-Conquer Neural Bayes Estimation for Spatial and Spatiotemporal Point Process Models",
+   "key": "2610.33813",
+   "arxiv_id": "2610.33813",
+   "title": "Task Format as a Factor in Adaptation: A Controlled Comparison of LoRA and Full Fine-Tuning for Prompt-Safety Classification",
    "year": 2026,
-   "abstract": "Spatial and spatiotemporal point process models are widely used to analyze event data across many scientific disciplines, but likelihood-based Bayesian inference is often computationally prohibitive due to intractable likelihoods, high-dimensional latent structures, and dependence on event history. Existing approximate and likelihood-free methods mitigate some of these challenges, but often at the cost of reduced statistical efficiency, imperfect uncertainty quantification, or information loss from reliance on predefined summary statistics. A promising recent approach involves neural networks, but it has only been explored in purely spatial or temporal settings and requires a computationally expensive training stage for large domains or dense point patterns. Here, we propose a divide-and-conquer neural Bayes estimation framework for spatial and spatiotemporal point process models. Our method operates directly on raw point pattern realizations using transformer-based architectures on partitions of the spatiotemporal domain, together with an attention mechanism to optimally combine locally extracted summaries. Simulation studies demonstrate reliable inference with improved scalabilit",
-   "authors": [
-    "Bokgyeong Kang",
-    "Andrew Zammit-Mangion",
-    "E. Schliep",
-    "R. S. Schick"
-   ],
-   "url": "https://arxiv.org/abs/2610.27619",
-   "cited_by": [
-    "Layer Normalization"
-   ],
+   "abstract": "Fine-tuning a language model for classification involves many design decisions. Comparisons of low-rank adaptation (LoRA) with full fine-tuning are common but often confounded, and task format is rarely studied. We compare both regimes on prompt-safety classification with a matched 400M encoder-decoder pair (Ettin) across three task formats, with up to 15 seeds per cell and pre-specified analyses. At the pre-specified learning rates, full fine-tuning leads LoRA by 2-3 pp in every architecture and format trained on the label alone. On the encoder, the gap closes once both rates are chosen by the same search. Training LoRA to write a reason after its verdict adds 4.0 pp and closes the gap, but a content-free sentence of equal length does not. Trained models score above a prompted 8B in domain but fall behind it on two of three out-of-distribution corpora, trailing by 8-23 pp on adversarial jailbreaks and flagging 27-66% of benign but harmful-looking prompts as unsafe, against the 8B&#39;s 2-3%. Together, the results suggest that the adaptation regime matters less than how each model is trained, its learning rate, and training target, and that in-domain accuracy alone is an incomplete",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.33813",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Tue, 27 Oct 2026",
+   "category": "cs.CL",
    "github": "",
-   "overlap": 0.333,
-   "topic": 0.224,
-   "topic_of": "Instruction Pre-Training: Language Models are Supervised Multitask Learners",
-   "base": 0.3451,
-   "score": 0.3451,
+   "overlap": 0.0,
+   "topic": 0.293,
+   "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+   "topic_top": [
+    {
+     "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+     "sim": 0.309
+    },
+    {
+     "title": "Improving Language Understanding by Generative Pre-Training",
+     "sim": 0.29
+    },
+    {
+     "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
+     "sim": 0.218
+    }
+   ],
+   "base": 0.2524,
+   "score": 0.2524,
    "vote": "",
-   "reason": "提出分治神经贝叶斯估计处理空间点过程，与库中指令预训练的多任务学习思路相关，用神经网络替代不可解似然的贝叶斯推断。"
+   "reason": "受控比较LoRA与全量微调在提示安全分类上的表现，与库中LoRA工作直接相关，新在把任务格式作为混淆因素单独考察。"
+  },
+  {
+   "key": "2610.34180",
+   "arxiv_id": "2610.34180",
+   "title": "Write What Matters: Disentangling Token Selection from Slot Allocation in Recurrent Memory",
+   "year": 2026,
+   "abstract": "Long-sequence models must retain earlier information. Full attention keeps all past tokens but grows expensive, and recurrent-memory models compress history into fixed slots for linear-time processing. Limited capacity makes writes consequential: distractors can interfere with useful content, while skipped evidence cannot be recalled. Existing multi-slot memories write every token to the same number of slots, merging whether to store it with how many slots to update. We introduce Factorized Write Routing (FWR), which first keeps or skips each token and then chooses a fixed or token-adaptive number of slots. Queries still read all slots. Across ten seeds on two synthetic tasks that query facts after long contexts, we observe a density-dependent reversal. With four slots per write, long-context accuracy favors always writing on dense Feature Recall (0.472 vs 0.337), but learned selective writing on sparse-fact Passkey (0.222 vs 0.048). The tested adaptive rule underperforms fixed allocation under the learned gate on both tasks. A diagnostic oracle given fact labels unavailable at deployment reaches 0.372 on Passkey, showing headroom in filtering distractors. The results suggest avoid",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.34180",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Tue, 27 Oct 2026",
+   "category": "cs.CL",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.279,
+   "topic_of": "Layer Normalization",
+   "topic_top": [
+    {
+     "title": "Layer Normalization",
+     "sim": 0.318
+    },
+    {
+     "title": "RWKV: Reinventing RNNs for the Transformer Era",
+     "sim": 0.213
+    },
+    {
+     "title": "On Layer Normalization in the Transformer Architecture",
+     "sim": 0.161
+    }
+   ],
+   "base": 0.2475,
+   "score": 0.2475,
+   "vote": "",
+   "reason": "在循环记忆中解耦token选择与槽位分配，与库中Layer Normalization同属序列建模基础组件研究，新在提出线性时间记忆的写入策略。"
+  },
+  {
+   "key": "2610.34589",
+   "arxiv_id": "2610.34589",
+   "title": "HARP-LoRA: Hierarchy-Conditioned Rank Projection for Low-Rank Adaptation in Scientific Table Understanding",
+   "year": 2026,
+   "abstract": "Tabular data is widely used in scientific applications, where complex layouts, including multi-level headers, merged cells, captions, and footnotes, make information extraction difficult. This is particularly important in pharmacokinetics (PK), where values must be correctly associated with the drug, species, dose, administration route, unit, and experimental condition. Parameter-efficient fine-tuning methods such as Low-Rank Adaptation (LoRA) reduce adaptation cost but do not explicitly incorporate relationships between table values and surrounding headers. We introduce HARP-LoRA, a hierarchy-conditioned rank projection method for low-rank adaptation in scientific table understanding. HARP-LoRA extends projected LoRA by constructing token-specific intrinsic representations from the row- and column-header hierarchies of each data token. These representations condition the low-rank down-projection, incorporating hierarchical context while keeping the pretrained model and random projection tensors frozen. We evaluate HARP-LoRA on 950 manually annotated PK tables from 587 scientific articles and on WikiTableQuestions (WikiTQ) using Llama~3.2 3B, Llama~3.1 8B, and Gemma~3 27B. With Lla",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.34589",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Tue, 27 Oct 2026",
+   "category": "cs.CL",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.273,
+   "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+   "topic_top": [
+    {
+     "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+     "sim": 0.318
+    },
+    {
+     "title": "QLORA: Efficient Finetuning of Quantized LLMs",
+     "sim": 0.169
+    },
+    {
+     "title": "Improving Language Understanding by Generative Pre-Training",
+     "sim": 0.167
+    }
+   ],
+   "base": 0.2455,
+   "score": 0.2455,
+   "vote": "",
+   "reason": "面向科学表格理解提出层级条件秩投影LoRA，与库中LoRA低秩适配工作相关，新在利用表格层级结构指导秩分配。"
+  },
+  {
+   "key": "2610.35190",
+   "arxiv_id": "2610.35190",
+   "title": "LEAP: a Latent Embedding Anomaly Patch-Transformer for time-series anomaly detection",
+   "year": 2026,
+   "abstract": "Time-series anomaly detection is dominated by reconstruction-based neural detectors, whose objective is structurally flawed. Since the target is also the input, an expressive model can learn to reconstruct anomalies too, leaving uninformative residuals. Recent large-scale benchmarks show that, on curated data, elaborate deep detectors rarely beat simple statistical baselines, while current leaders rely on representation learning. We propose LEAP (Latent Embedding Anomaly Patch-Transformer), which combines masked prediction with latent representation-based anomaly evidence, without relying on reconstruction or attention-based scoring. The model removes patches from a window and predicts them from the remaining temporal and cross-channel context, so prediction errors measure how well learned dynamics explain hidden segments. Deterministic complementary group masking ensures every time step is scored while hidden, with identical visible fractions during training and inference. LEAP adds three label-free evidence sources: latent-embedding novelty calibrated by local density, local temporal contrast, and per-channel novelty pooled over channels selected by six label-free criteria. Under",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.35190",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Tue, 27 Oct 2026",
+   "category": "cs.LG",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.229,
+   "topic_of": "Emergent Abilities of Large Language Models",
+   "topic_top": [
+    {
+     "title": "Emergent Abilities of Large Language Models",
+     "sim": 0.241
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.201
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.201
+    }
+   ],
+   "base": 0.23,
+   "score": 0.23,
+   "vote": "",
+   "reason": "提出潜嵌入异常补丁Transformer做时间序列异常检测，与库中关于大模型能力涌现的研究同属表征学习，新在指出重构式检测目标的结构缺陷。"
+  },
+  {
+   "key": "2610.34336",
+   "arxiv_id": "2610.34336",
+   "title": "Improving the Chain-of-Thought Compressibility of Pruned Reasoning Models via Long--Short Contrastive Pruning",
+   "year": 2026,
+   "abstract": "Large reasoning models are costly to serve because they are large and because they generate long chains of thought (CoT). Weight pruning and CoT compression address these two costs separately, but they interfere in that pruning adds redundant reasoning on problems the model still solves and incomplete reasoning on those it no longer solves, and on harder problems makes the model less compressible by subsequent length-preference optimization. We trace this to a blind spot on each side: pruning criteria do not distinguish necessary from redundant reasoning, and preference-based CoT compression receives no training signal on problems a pruned model always or never solves. We propose Contrastive Set-Difference (CSD), which identifies neurons enriched in redundant reasoning by contrasting their activations on long and short correct solutions of the same problem and prunes them preferentially, and we extend preference pairs to the problems a pruned model always or never solves. Pruning 20\\% of DeepSeek-R1-Distill-Qwen-7B, the combination uses 8--22\\% fewer thinking tokens on four math benchmarks than pruning with reasoning-aware calibration (RAC) followed by the same compression, with ac",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.34336",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Tue, 27 Oct 2026",
+   "category": "cs.CL",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.224,
+   "topic_of": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+   "topic_top": [
+    {
+     "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+     "sim": 0.232
+    },
+    {
+     "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+     "sim": 0.228
+    },
+    {
+     "title": "Evaluating Large Language Models Trained on Code",
+     "sim": 0.186
+    }
+   ],
+   "base": 0.2285,
+   "score": 0.2285,
+   "vote": "",
+   "reason": "用长短对比剪枝提升推理模型思维链可压缩性，与库中DeepSeek-R1的推理强化工作相关，新在联合处理权重剪枝与思维链冗余的相互干扰。"
   }
  ],
  "errors": [],
  "offline": false,
- "candidates": 50,
- "without_arxiv": 19
+ "candidates": 62,
+ "without_arxiv": 18,
+ "sources": {
+  "cited": 23,
+  "recent": 6
+ },
+ "recent_scanned": 12
 }
