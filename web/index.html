@@ -73,9 +73,21 @@
     .pick-list input { margin: 0; }
 
     /* 对比表：模型输出 Markdown 表格时渲染成真正的表格 */
-    table.cmp { border-collapse: collapse; margin: 8px 0; font-size: 13px; width: 100%; }
-    table.cmp th, table.cmp td { border: 1px solid #d9dee5; padding: 6px 8px; text-align: left; vertical-align: top; }
-    table.cmp th { background: #f2f6fc; font-weight: 600; }
+    /* 手机上表格容易挤爆，外面套一层横向滚动，表头吸顶、首列固定，长文自动换行 */
+    .table-wrap { margin: 10px 0; max-width: 100%; overflow-x: auto; border: 1px solid #d9dee5;
+                  border-radius: 8px; background: #fff; }
+    table.cmp { border-collapse: collapse; font-size: 13px; width: 100%; min-width: 520px; }
+    table.cmp th, table.cmp td { border-right: 1px solid #e5eaf1; border-bottom: 1px solid #e5eaf1;
+                                 padding: 8px 10px; text-align: left; vertical-align: top;
+                                 line-height: 1.5; word-break: break-word; max-width: 260px; }
+    table.cmp tr:last-child td { border-bottom: none; }
+    table.cmp th:last-child, table.cmp td:last-child { border-right: none; }
+    table.cmp tr:first-child th { background: #eef4fd; font-weight: 600;
+                                  position: sticky; top: 0; z-index: 2;
+                                  border-bottom: 2px solid #c9d7ea; }
+    table.cmp td:first-child { background: #fafcff; font-weight: 500; }
+    table.cmp tbody tr:nth-child(even) td, table.cmp tr:nth-child(even) td { background: #fbfdff; }
+    table.cmp tr:hover td { background: #f2f7ff; }
   </style>
 </head>
 <body>
@@ -269,7 +281,11 @@ function buildTable(rows) {
     });
     table.appendChild(tr);
   });
-  return table;
+  // 外面套一层：手机上表格可以横向滚动，不把整页撑破
+  const wrap = document.createElement('div');
+  wrap.className = 'table-wrap';
+  wrap.appendChild(table);
+  return wrap;
 }
 
 function renderAnswer(el, text) {
