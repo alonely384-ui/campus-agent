@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>论文阅读页 · 科研小助手</title>
+<!--
+  1.3.2 论文阅读页：左侧章节树 + 右侧 PDF 正文 + 正文 [n] 引用跳转到 References。
+  为什么不用现成的 pdf.js viewer.html：
+    那个整页应用带着工具栏/侧栏/演示页面，改造成本比自写高；我们只要"渲染 + 文本层定位"。
+  为什么 pdf.js 放本地 vendor/（不引 CDN）：
+    评审现场可能断网，CDN 一挂阅读页就白屏。vendor/pdfjs/ 里是 pdfjs-dist 3.11.174 的 legacy 构建，
+    老一点的浏览器也能跑。
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #1a73e8;
+    --blue-soft: #eef4fd;
+    --line: #e3e7ee;
+    --muted: #6b7280;
+    --bg: #f5f6f8;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: #1a1a1a;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header.topbar {
+    flex: 0 0 auto; height: 54px; display: flex; align-items: center; gap: 10px;
+    padding: 0 12px; background: #fff; border-bottom: 1px solid var(--line); z-index: 30;
+  }
+  .back {
+    color: var(--muted); text-decoration: none; font-size: 13px; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; background: #fff;
+  }
+  .back:hover { color: var(--blue); border-color: var(--blue); }
+  .doc { min-width: 0; flex: 1; }
+  .doc .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; }
+  .doc .s { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; margin-top: 2px; }
+  .tools { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .tools select, .tools input {
+    font-size: 12px; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fff; color: #374151; outline: none;
+  }
+  .tools select { max-width: 210px; }
+  .tools input { width: 56px; text-align: center; }
+  .tools input:focus, .tools select:focus { border-color: var(--blue); }
+  .icon-btn {
+    border: 1px solid var(--line); background: #fff; color: #374151; font-size: 13px;
+    border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 1;
+  }
+  .icon-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .icon-btn:active { background: var(--blue-soft); }
+  .pager { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* ---------- 主体：左侧章节树 + 右侧正文 ---------- */
+  #stage { flex: 1 1 auto; display: flex; min-height: 0; position: relative; }
+  aside#sidebar {
+    flex: 0 0 272px; width: 272px; background: #fff; border-right: 1px solid var(--line);
+    overflow-y: auto; padding: 12px; z-index: 20;
+  }
+  #sidebar h2 {
+    font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .04em;
+    margin: 4px 0 8px; text-transform: uppercase;
+  }
+  #sidebar .abs {
+    font-size: 12px; line-height: 1.6; color: #4b5563; background: #fafbfd;
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px;
+    max-height: 96px; overflow: hidden; cursor: pointer;
+  }
+  #sidebar .abs.open { max-height: none; }
+  #sidebar .abs .who { color: var(--blue); font-size: 11px; margin-bottom: 4px; }
+  nav#toc { display: flex; flex-direction: column; }
+  nav#toc a {
+    display: flex; gap: 6px; align-items: baseline; text-decoration: none;
+    color: #374151; font-size: 13px; line-height: 1.45; padding: 5px 8px;
+    border-radius: 6px; border-left: 2px solid transparent;
+  }
+  nav#toc a:hover { background: #f4f7fb; }
+  nav#toc a.active { background: var(--blue-soft); color: var(--blue);
+                     border-left-color: var(--blue); font-weight: 600; }
+  nav#toc a .no { color: var(--muted); font-size: 11px; min-width: 18px; }
+  nav#toc a .pg { margin-left: auto; color: #9aa3af; font-size: 11px; }
+  nav#toc a.lvl2 { padding-left: 22px; font-size: 12.5px; }
+  nav#toc a.lvl3 { padding-left: 36px; font-size: 12px; }
+  nav#toc a.refs { color: #7c3aed; }
+  #tocEmpty { font-size: 12px; color: #9aa3af; padding: 6px 8px; line-height: 1.6; }
+
+  main#viewer {
+    flex: 1 1 auto; padding: 18px 16px 40px;
+    /* overflow-y: scroll 而不是 auto：竖滚动条一开始就占位，
+       否则"先算页宽 → 出现滚动条 → 可用宽度变窄"会多出一条横向溢出 */
+    overflow-y: scroll; overflow-x: auto;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    scroll-behavior: auto;
+  }
+  .page {
+    position: relative; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.14);
+    border-radius: 2px; overflow: hidden; flex: 0 0 auto;
+  }
+  .page > canvas { display: block; }
+  .page .pno {
+    position: absolute; right: 6px; bottom: 4px; font-size: 10px; color: #b9c0c9;
+    background: rgba(255,255,255,.85); padding: 0 4px; border-radius: 3px; pointer-events: none;
+  }
+  /* 文本层：透明文字叠在 canvas 上，只为"选中 + 引用定位"，视觉上不重影 */
+  .textLayer {
+    position: absolute; inset: 0; overflow: hidden; left: 0; top: 0;
+    opacity: 1; line-height: 1; pointer-events: none;
+  }
+  .textLayer span {
+    position: absolute; white-space: pre; transform-origin: 0% 0%;
+    color: transparent; pointer-events: auto; cursor: text;
+  }
+  .textLayer span.cite {
+    color: transparent; background: rgba(26,115,232,.16); border-radius: 2px;
+    cursor: pointer;
+  }
+  .textLayer span.cite:hover { background: rgba(26,115,232,.34); }
+
+  /* 返回原位置：从引用跳转跳到 References 后浮出来 */
+  #backJump {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    background: #111827; color: #fff; border: none; font-size: 13px;
+    padding: 10px 16px; border-radius: 999px; cursor: pointer; z-index: 40;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  }
+  #backJump b { color: #93c5fd; }
+  #backJump[hidden] { display: none; }
+
+  #scrim {
+    position: fixed; inset: 54px 0 0 0; background: rgba(15,23,42,.35); z-index: 15;
+    display: none;
+  }
+  #scrim.show { display: block; }
+
+  /* 浮层提示 */
+  #toast {
+    position: fixed; left: 50%; top: 68px; transform: translateX(-50%);
+    background: rgba(17,24,39,.92); color: #fff; font-size: 13px; padding: 8px 14px;
+    border-radius: 8px; z-index: 50; transition: opacity .25s; pointer-events: none;
+  }
+  #toast[hidden] { display: none; }
+
+  /* 加载 / 空状态 */
+  #overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(245,246,248,.92); z-index: 12; font-size: 13px; color: var(--muted);
+  }
+  #overlay[hidden] { display: none; }
+  .papers {
+    align-self: stretch; max-width: 720px; margin: 0 auto; display: flex;
+    flex-direction: column; gap: 8px;
+  }
+  .papers h2 { font-size: 15px; margin-bottom: 4px; }
+  .papers a {
+    display: flex; justify-content: space-between; gap: 10px; text-decoration: none;
+    color: #374151; font-size: 13px; background: #fff; border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .papers a:hover { border-color: var(--blue); color: var(--blue); }
+  .papers a span.pg { color: #9aa3af; font-size: 12px; white-space: nowrap; }
+
+  /* 窄屏：章节树变抽屉，顶栏减负 */
+  @media (max-width: 900px) {
+    aside#sidebar {
+      position: fixed; top: 54px; bottom: 0; left: 0; transform: translateX(-100%);
+      transition: transform .22s ease; box-shadow: 4px 0 18px rgba(0,0,0,.12);
+    }
+    aside#sidebar.open { transform: translateX(0); }
+    main#viewer { padding: 12px 8px 32px; gap: 12px; }
+    .doc .t { font-size: 13px; }
+    .tools select { max-width: 120px; }
+  }
+  @media (max-width: 620px) {
+    .tools select { display: none; }
+    header.topbar { gap: 6px; padding: 0 8px; }
+    .tools input { width: 44px; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="/ui/" title="回到对话页">← 对话</a>
+    <button id="treeToggle" class="icon-btn" title="展开/收起章节树">☰ 章节</button>
+    <div class="doc">
+      <div class="t" id="paperTitle">加载中…</div>
+      <div class="s" id="paperSub"></div>
+    </div>
+    <div class="tools">
+      <select id="paperSelect" title="换一篇论文"></select>
+      <input id="pageInput" type="number" min="1" value="1" title="跳到指定页，回车确认" />
+      <span class="pager" id="pageTotal">/ 0</span>
+      <button class="icon-btn" id="zoomOut" title="缩小">−</button>
+      <span class="pager" id="zoomLabel">100%</span>
+      <button class="icon-btn" id="zoomIn" title="放大">+</button>
+    </div>
+  </header>
+
+  <div id="stage">
+    <aside id="sidebar">
+      <h2>这篇论文</h2>
+      <div class="abs" id="absBox" title="点击展开/收起摘要"></div>
+      <h2>章节</h2>
+      <nav id="toc"></nav>
+    </aside>
+    <main id="viewer">
+      <div id="pages"></div>
+      <div id="overlay">正在加载 PDF…</div>
+    </main>
+  </div>
+  <div id="scrim"></div>
+  <button id="backJump" hidden>↩ 返回第 <b id="backJumpPage">1</b> 页</button>
+  <div id="toast" hidden></div>
+
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script>
+'use strict';
+
+// ---------- URL 参数：paper=文件名，page=页码（1 基，和聊天证据卡片一致） ----------
+const qs = new URLSearchParams(location.search);
+const PAPER = (qs.get('paper') || '').trim();
+const START_PAGE = Math.max(1, parseInt(qs.get('page') || '1', 10) || 1);
+
+const viewerEl = document.getElementById('viewer');
+const pagesEl = document.getElementById('pages');
+const overlayEl = document.getElementById('overlay');
+const tocEl = document.getElementById('toc');
+const titleEl = document.getElementById('paperTitle');
+const subEl = document.getElementById('paperSub');
+const pageInputEl = document.getElementById('pageInput');
+const pageTotalEl = document.getElementById('pageTotal');
+const zoomLabelEl = document.getElementById('zoomLabel');
+const paperSelectEl = document.getElementById('paperSelect');
+const sidebarEl = document.getElementById('sidebar');
+const scrimEl = document.getElementById('scrim');
+const toastEl = document.getElementById('toast');
+const backJumpEl = document.getElementById('backJump');
+const backJumpPageEl = document.getElementById('backJumpPage');
+const absBoxEl = document.getElementById('absBox');
+
+const state = {
+  pdf: null,
+  numPages: 0,
+  baseScale: 1,      // 按容器宽度算出来的"适合宽度"比例
+  zoom: 1,           // 用户缩放倍数
+  dims: [],          // 每页在 scale=1 时的宽高
+  rendered: new Map(), // pageNo -> {canvas, textLayer, task}
+  currentPage: 1,
+  refPage: null,     // 参考文献起始页（1 基），null = 这篇没解析到
+  backTo: null,      // 引用跳转前的 {page, top}
+  tocAnchors: [],
+  paperMeta: null,
+};
+
+// ---------- 小工具 ----------
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.hidden = false;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toastEl.hidden = true; }, 2200);
+}
+
+function pageUrl(name, page) {
+  return `reader.html?paper=${encodeURIComponent(name)}${page ? `&page=${page}` : ''}`;
+}
+
+// 引用编号：[11] / [11, 12] / [11-13] / [11; 12]（正文里这几种写法都常见）
+const CITE_RE = /\[\s*\d{1,3}(?:\s*[,;–\-]\s*\d{1,3})*\s*\]/g;
+
+// ---------- 打开一篇论文 ----------
+async function openPaper(filename, page) {
+  state.pdf = null;
+  state.rendered.clear();
+  pagesEl.innerHTML = '';
+  tocEl.innerHTML = '';
+  state.tocAnchors = [];
+  state.refPage = null;
+  state.backTo = null;
+  backJumpEl.hidden = true;
+
+  if (!window.pdfjsLib) {
+    overlayEl.hidden = false;
+    overlayEl.textContent = '本地 pdf.js 没加载到（web/vendor/pdfjs/ 缺失）。请运行 scripts/fetch_pdfjs.py 后刷新。';
+    return;
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
+
+  overlayEl.hidden = false;
+  overlayEl.textContent = '正在加载 PDF…';
+
+  // 元数据（标题/作者/章节树）先请求：它比 PDF 小得多，先让左侧栏有内容
+  let meta = null;
+  try {
+    const r = await fetch(`/paper/${encodeURIComponent(filename)}/structure`);
+    if (r.ok) meta = await r.json();
+  } catch (e) { /* 结构接口挂了不影响看 PDF，下面按"没解析"处理 */ }
+  state.paperMeta = meta;
+  renderHeader(meta, filename);
+  renderSidebar(meta);
+
+  try {
+    const task = pdfjsLib.getDocument({ url: `/paper/${encodeURIComponent(filename)}` });
+    const pdf = await task.promise;
+    state.pdf = pdf;
+    state.numPages = pdf.numPages;
+    pageTotalEl.textContent = `/ ${pdf.numPages}`;
+    pageInputEl.max = String(pdf.numPages);
+
+    // 先把每页尺寸拿到（只取 viewport，不渲染），才能生成等高占位，滚动条不会来回跳
+    state.dims = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const p = await pdf.getPage(i);
+      const vp = p.getViewport({ scale: 1 });
+      state.dims.push({ w: vp.width, h: vp.height });
+    }
+    computeBaseScale();
+    buildPagePlaceholders();
+    overlayEl.hidden = true;
+
+    const target = clamp(page || 1, 1, pdf.numPages);
+    // 等一帧让占位 div 完成布局，再滚到目标页
+    requestAnimationFrame(() => jumpToPage(target, { silent: true }));
+    observePages();
+  } catch (e) {
+    overlayEl.hidden = false;
+    overlayEl.textContent = `PDF 加载失败：${e && e.message ? e.message : e}`;
+  }
+}
+
+function computeBaseScale() {
+  // -32 是左右 padding；再 -1 兜住 canvas 取整误差，避免多出 1px 横向滚动条
+  const avail = Math.max(200, viewerEl.clientWidth - 32 - 1);
+  const w = state.dims.length ? state.dims[0].w : 612;
+  state.baseScale = avail / w;
+}
+
+function scaleNow() { return state.baseScale * state.zoom; }
+
+// ---------- 顶栏 / 侧栏 ----------
+function renderHeader(meta, filename) {
+  titleEl.textContent = (meta && meta.title) || filename;
+  const parts = [];
+  if (meta && meta.authors && meta.authors.length) parts.push(meta.authors.join(', '));
+  if (meta && meta.pages) parts.push(`${meta.pages} 页`);
+  parts.push(filename);
+  subEl.textContent = parts.join(' · ');
+  document.title = `${(meta && meta.title) || filename} · 阅读页`;
+}
+
+function renderSidebar(meta) {
+  tocEl.innerHTML = '';
+  const secs = (meta && meta.sections) || [];
+
+  if (meta && (meta.abstract || (meta.authors || []).length)) {
+    absBoxEl.hidden = false;
+    absBoxEl.innerHTML =
+      ((meta.authors || []).length ? `<div class="who">${escapeHtml(meta.authors.join(', '))}</div>` : '') +
+      escapeHtml((meta.abstract || '（这篇没有解析到摘要）').slice(0, 400)) +
+      ((meta.abstract || '').length > 400 ? '…' : '');
+  } else {
+    absBoxEl.hidden = true;
+  }
+
+  if (!secs.length) {
+    tocEl.innerHTML = '<div id="tocEmpty">这篇没有解析到章节结构（可能是扫描件）。<br>可以用上面的页码框手动跳页，正文里的 [n] 引用仍可点击。</div>';
+  }
+
+  secs.forEach((s, idx) => {
+    const a = document.createElement('a');
+    const lvl = clamp(parseInt(s.level || 1, 10), 1, 3);
+    a.className = `lvl${lvl}`;
+    a.href = '#';
+    a.dataset.page = String(s.page || 1);
+    a.dataset.idx = String(idx);
+    a.dataset.title = String(s.title || '');
+    a.innerHTML =
+      `<span class="no">${escapeHtml(s.number || '')}</span>` +
+      `<span class="t">${escapeHtml(s.title || '')}</span>` +
+      (s.page ? `<span class="pg">p${s.page}</span>` : '');
+    a.addEventListener('click', ev => {
+      ev.preventDefault();
+      if (s.page) jumpToPage(s.page);
+      closeDrawer();
+    });
+    tocEl.appendChild(a);
+  });
+
+  // 参考文献单独一个醒目入口：正文 [n] 点击默认跳这里。
+  // 有些论文的章节树里本来就有 "References" 一节，此时把它标成 refs 样式，
+  // 不再追加第二条 —— 否则左栏会出现两个都写 References 的条目。
+  const refPage = (meta && meta.references && meta.references.page) || null;
+  state.refPage = refPage;
+  if (refPage) {
+    const inToc = [...tocEl.querySelectorAll('a')].find(a => {
+      const t = (a.dataset.title || '').trim().toLowerCase();
+      return /^references?\b/.test(t) || t === 'bibliography';
+    });
+    if (inToc) {
+      inToc.classList.add('refs');
+    } else {
+      const a = document.createElement('a');
+      a.className = 'refs';
+      a.href = '#';
+      a.dataset.page = String(refPage);
+      a.innerHTML = `<span class="no">§</span><span class="t">References</span><span class="pg">p${refPage}</span>`;
+      a.addEventListener('click', ev => { ev.preventDefault(); jumpToPage(refPage); closeDrawer(); });
+      tocEl.appendChild(a);
+    }
+  }
+  state.tocAnchors = [...tocEl.querySelectorAll('a')];
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+// ---------- 页面占位 + 懒渲染 ----------
+function buildPagePlaceholders() {
+  const frag = document.createDocumentFragment();
+  const scale = scaleNow();
+  state.dims.forEach((d, i) => {
+    const div = document.createElement('div');
+    div.className = 'page';
+    div.dataset.page = String(i + 1);
+    div.style.width = `${Math.floor(d.w * scale)}px`;
+    div.style.height = `${Math.floor(d.h * scale)}px`;
+    frag.appendChild(div);
+  });
+  pagesEl.innerHTML = '';
+  pagesEl.appendChild(frag);
+  pagesEl.style.display = 'flex';
+  pagesEl.style.flexDirection = 'column';
+  pagesEl.style.alignItems = 'center';
+  pagesEl.style.gap = '16px';
+}
+
+let observer = null;
+function observePages() {
+  if (!('IntersectionObserver' in window)) {
+    // 老浏览器退化为全渲染（39 篇里最长的也就一百来页，能接受）
+    for (let i = 1; i <= state.numPages; i++) renderPage(i);
+    return;
+  }
+  if (observer) observer.disconnect();
+  observer = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (en.isIntersecting) renderPage(Number(en.target.dataset.page));
+    });
+  }, { root: viewerEl, rootMargin: '800px 0px' });
+  pagesEl.querySelectorAll('.page').forEach(p => observer.observe(p));
+}
+
+async function renderPage(pageNo) {
+  const pdf = state.pdf;
+  if (!pdf || pageNo < 1 || pageNo > state.numPages) return;
+  const holder = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
+  if (!holder || holder.dataset.ready === '1' || holder.dataset.rendering === '1') return;
+  holder.dataset.rendering = '1';
+
+  try {
+    const page = await pdf.getPage(pageNo);
+    const scale = scaleNow();
+    const viewport = page.getViewport({ scale });
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    holder.style.width = `${Math.floor(viewport.width)}px`;
+    holder.style.height = `${Math.floor(viewport.height)}px`;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width * dpr);
+    canvas.height = Math.floor(viewport.height * dpr);
+    canvas.style.width = `${Math.floor(viewport.width)}px`;
+    canvas.style.height = `${Math.floor(viewport.height)}px`;
+    holder.innerHTML = '';
+    holder.appendChild(canvas);
+
+    const ctx = canvas.getContext('2d');
+    const task = page.render({
+      canvasContext: ctx,
+      viewport,
+      transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
+    });
+    await task.promise;
+
+    // 文本层：透明文字叠在 canvas 上，用来选中文字 + 定位正文 [n]
+    const textLayer = document.createElement('div');
+    textLayer.className = 'textLayer';
+    holder.appendChild(textLayer);
+    const tc = await page.getTextContent({ normalizeWhitespace: false });
+    buildTextLayer(tc.items, viewport, textLayer, pageNo);
+
+    const tag = document.createElement('div');
+    tag.className = 'pno';
+    tag.textContent = String(pageNo);
+    holder.appendChild(tag);
+
+    holder.dataset.ready = '1';
+    state.rendered.set(pageNo, { canvas, textLayer });
+  } catch (e) {
+    console.warn('page render failed', pageNo, e);
+  } finally {
+    delete holder.dataset.rendering;
+  }
+}
+
+/**
+ * 把 pdf.js 的 text item 摆到页面上（照抄 pdf.js text_layer_builder 的定位算法）。
+ * 每个 item 是一个绝对定位 span；item.str 里若含 [11] 这种引用，就拆成子 span，
+ * 引用部分加 .cite 类 —— 这样"点正文里的 [11]"才点得到。
+ */
+function buildTextLayer(items, viewport, layer, pageNo) {
+  const frag = document.createDocumentFragment();
+  const util = pdfjsLib.Util;
+  // 参考文献页自己的 "[11] Author..." 不该再跳到 References（已经在看了），只当普通文字
+  const noCite = state.refPage != null && pageNo === state.refPage;
+
+  for (const item of items) {
+    if (!item.str || !item.str.trim()) continue;
+    const tx = util.transform(viewport.transform, item.transform);
+    const fontHeight = Math.hypot(tx[2], tx[3]);
+    if (!fontHeight || fontHeight < 1) continue;
+    const left = tx[4];
+    const top = tx[5] - fontHeight;
+
+    const span = document.createElement('span');
+    span.style.left = `${left.toFixed(2)}px`;
+    span.style.top = `${top.toFixed(2)}px`;
+    span.style.fontSize = `${fontHeight.toFixed(2)}px`;
+    span.style.fontFamily = 'sans-serif';
+
+    const parts = [];
+    let last = 0;
+    let m;
+    CITE_RE.lastIndex = 0;
+    while (!noCite && (m = CITE_RE.exec(item.str)) !== null) {
+      if (m.index > last) parts.push({ text: item.str.slice(last, m.index), cite: false });
+      parts.push({ text: m[0], cite: true, n: m[0] });
+      last = m.index + m[0].length;
+    }
+    if (last < item.str.length) parts.push({ text: item.str.slice(last), cite: false });
+
+    if (parts.length === 1 && !parts[0].cite) {
+      span.textContent = item.str;
+    } else {
+      parts.forEach(p => {
+        if (!p.cite) {
+          span.appendChild(document.createTextNode(p.text));
+          return;
+        }
+        const c = document.createElement('span');
+        c.className = 'cite';
+        c.textContent = p.text;
+        c.title = '跳到参考文献';
+        c.addEventListener('click', ev => {
+          ev.stopPropagation();
+          jumpToReferences();
+        });
+        span.appendChild(c);
+      });
+    }
+    frag.appendChild(span);
+  }
+  layer.appendChild(frag);
+}
+
+// ---------- 跳转 ----------
+// 用 getBoundingClientRect 算"这一页在滚动容器里的绝对位置"：
+// 不依赖 offsetParent 是 #pages 还是 body，窗口/内边距变化都不会偏。
+function pageTop(pageNo) {
+  const el = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  const vr = viewerEl.getBoundingClientRect();
+  return r.top - vr.top + viewerEl.scrollTop;
+}
+
+function jumpToPage(pageNo, opts = {}) {
+  const n = clamp(pageNo, 1, state.numPages || 1);
+  const top = pageTop(n);
+  if (top != null) viewerEl.scrollTo({ top: Math.max(0, top - 12), behavior: 'auto' });
+  state.currentPage = n;
+  pageInputEl.value = String(n);
+  markActiveSection(n);
+  // 目标页可能还没渲染（懒加载），滚过去后立刻补渲染
+  requestAnimationFrame(() => renderPage(n));
+  if (!opts.silent) closeDrawer();
+}
+
+function jumpToReferences() {
+  if (!state.refPage) {
+    toast('这篇没有解析到 References 章节');
+    return;
+  }
+  if (state.refPage === state.currentPage) {
+    toast('已经在上文/参考文献页附近了');
+    return;
+  }
+  // 记住当前位置：References 看完能一键回来
+  state.backTo = { page: state.currentPage, top: viewerEl.scrollTop };
+  backJumpPageEl.textContent = String(state.currentPage);
+  jumpToPage(state.refPage);
+  backJumpEl.hidden = false;
+}
+
+backJumpEl.addEventListener('click', () => {
+  if (!state.backTo) return;
+  viewerEl.scrollTop = state.backTo.top;
+  state.currentPage = state.backTo.page;
+  pageInputEl.value = String(state.backTo.page);
+  markActiveSection(state.backTo.page);
+  requestAnimationFrame(() => renderPage(state.backTo.page));
+  backJumpEl.hidden = true;
+  state.backTo = null;
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !backJumpEl.hidden) {
+    backJumpEl.click();
+  }
+});
+
+function markActiveSection(pageNo) {
+  let active = null;
+  state.tocAnchors.forEach(a => {
+    const p = parseInt(a.dataset.page || '0', 10);
+    if (p && p <= pageNo) active = a;
+  });
+  state.tocAnchors.forEach(a => a.classList.toggle('active', a === active));
+  if (active) {
+    const r = active.getBoundingClientRect();
+    const box = sidebarEl.getBoundingClientRect();
+    if (r.top < box.top + 40 || r.bottom > box.bottom - 40) {
+      active.scrollIntoView({ block: 'center' });
+    }
+  }
+}
+
+// 滚动时更新"当前第几页"：以视口中线落在哪一页为准
+let scrollTick = null;
+viewerEl.addEventListener('scroll', () => {
+  if (scrollTick) return;
+  scrollTick = requestAnimationFrame(() => {
+    scrollTick = null;
+    const mid = viewerEl.scrollTop + viewerEl.clientHeight * 0.35;
+    let cur = 1;
+    for (let i = 0; i < state.dims.length; i++) {
+      const top = pageTop(i + 1);
+      if (top == null) break;
+      if (top <= mid) cur = i + 1; else break;
+    }
+    if (cur !== state.currentPage) {
+      state.currentPage = cur;
+      pageInputEl.value = String(cur);
+      markActiveSection(cur);
+    }
+  });
+});
+
+// ---------- 顶栏交互 ----------
+pageInputEl.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const n = parseInt(pageInputEl.value, 10);
+  if (!n) return;
+  jumpToPage(n);
+  pageInputEl.blur();
+});
+pageInputEl.addEventListener('blur', () => {
+  pageInputEl.value = String(state.currentPage || 1);
+});
+
+function setZoom(z) {
+  state.zoom = clamp(z, 0.5, 3);
+  zoomLabelEl.textContent = `${Math.round(state.zoom * 100)}%`;
+  if (!state.pdf) return;
+  const scale = scaleNow();
+  state.rendered.clear();
+  pagesEl.querySelectorAll('.page').forEach((el, i) => {
+    const d = state.dims[i];
+    el.dataset.ready = '';
+    el.innerHTML = '';
+    el.style.width = `${Math.floor(d.w * scale)}px`;
+    el.style.height = `${Math.floor(d.h * scale)}px`;
+  });
+  // 重新按当前视口渲染可见页
+  const top = viewerEl.scrollTop;
+  for (let i = 1; i <= state.numPages; i++) {
+    const el = pagesEl.querySelector(`.page[data-page="${i}"]`);
+    if (!el) continue;
+    const pTop = pageTop(i);
+    if (pTop == null) continue;
+    if (pTop + el.offsetHeight > top - 600 && pTop < top + viewerEl.clientHeight + 900) {
+      renderPage(i);
+    }
+  }
+}
+document.getElementById('zoomIn').addEventListener('click', () => setZoom(state.zoom + 0.1));
+document.getElementById('zoomOut').addEventListener('click', () => setZoom(state.zoom - 0.1));
+
+// 章节树抽屉（窄屏）
+function openDrawer() { sidebarEl.classList.add('open'); scrimEl.classList.add('show'); }
+function closeDrawer() { sidebarEl.classList.remove('open'); scrimEl.classList.remove('show'); }
+document.getElementById('treeToggle').addEventListener('click', () => {
+  if (sidebarEl.classList.contains('open')) closeDrawer(); else openDrawer();
+});
+scrimEl.addEventListener('click', closeDrawer);
+
+absBoxEl.addEventListener('click', () => absBoxEl.classList.toggle('open'));
+
+paperSelectEl.addEventListener('change', () => {
+  const name = paperSelectEl.value;
+  if (name && name !== PAPER) location.href = pageUrl(name, 1);
+});
+
+// 窗口宽度变化：重新算"适合宽度"，否则手机上会横向溢出
+let resizeTick = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTick);
+  resizeTick = setTimeout(() => {
+    if (!state.pdf || !state.dims.length) return;
+    computeBaseScale();
+    setZoom(state.zoom);
+  }, 220);
+});
+
+// ---------- 论文清单（没带 paper 参数时当"目录页"用） ----------
+async function showPaperPicker() {
+  titleEl.textContent = '论文阅读页';
+  subEl.textContent = '选一篇论文开始阅读';
+  overlayEl.hidden = true;
+  let items = [];
+  try {
+    const r = await fetch('/reader/papers');
+    if (r.ok) items = (await r.json()).papers || [];
+  } catch (e) { /* 下面统一提示 */ }
+
+  const box = document.createElement('div');
+  box.className = 'papers';
+  box.innerHTML = `<h2>论文库（${items.length} 篇）</h2>`;
+  items.forEach(it => {
+    const a = document.createElement('a');
+    a.href = pageUrl(it.filename, 1);
+    a.innerHTML = `<span>${escapeHtml(it.title || it.filename)}</span>` +
+      `<span class="pg">${it.pages ? it.pages + ' 页' : ''}</span>`;
+    box.appendChild(a);
+  });
+  pagesEl.innerHTML = '';
+  pagesEl.appendChild(box);
+}
+
+// ---------- 启动 ----------
+(async function boot() {
+  // 换论文下拉：和 paper picker 共用一个接口
+  try {
+    const r = await fetch('/reader/papers');
+    if (r.ok) {
+      const data = await r.json();
+      (data.papers || []).forEach(it => {
+        const o = document.createElement('option');
+        o.value = it.filename;
+        o.textContent = it.title || it.filename;
+        if (it.filename === PAPER) o.selected = true;
+        paperSelectEl.appendChild(o);
+      });
+    }
+  } catch (e) { /* 下拉失败不影响主流程 */ }
+
+  if (!PAPER) { showPaperPicker(); return; }
+  await openPaper(PAPER, START_PAGE);
+})();
+</script>
+</body>
+</html>

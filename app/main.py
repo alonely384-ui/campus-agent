@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,7 @@ from app.papers import (
     save_paper,
 )
 from app.rag.pipeline import index_paper, remove_source
+from app.reader import list_reader_papers, reader_meta, safe_paper_path
 
 setup_logging()
 logger = get_logger(__name__)
@@ -239,6 +240,42 @@ async def papers_delete(paper_id: str) -> dict:
         logger.exception("论文文件已删，但清理索引失败（source=%s）", paper.filename)
 
     return {"deleted": paper_id, "removed_chunks": removed_chunks}
+
+
+# ---------------- 阅读页（1.3.2）----------------
+# 聊天页证据卡片点「打开原文」→ /ui/reader.html?paper=xxx.pdf&page=8
+# 阅读页需要两样东西：PDF 原件（浏览器渲染）和章节树（左侧导航）。
+
+@app.get("/reader/papers", summary="阅读页可选的论文清单")
+async def reader_papers() -> dict:
+    items = list_reader_papers()
+    return {"total": len(items), "papers": items}
+
+
+@app.get("/paper/{filename}/structure", summary="阅读页章节树（标题/作者/章节页码）")
+async def paper_structure(filename: str) -> dict:
+    meta = reader_meta(filename)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    return meta
+
+
+@app.get("/paper/{filename}", summary="论文原文件 PDF（阅读页渲染用）")
+async def paper_file(filename: str) -> FileResponse:
+    """返回 data/papers 下的 PDF。
+
+    安全性交给 safe_paper_path：只认 data/papers 里的裸文件名，
+    `../`、绝对路径、非 .pdf 一律 404（不返回 403，避免暴露目录结构）。
+    FileResponse 自带 Range 支持，PDF.js 可以按需分段加载大文件。
+    """
+    path = safe_paper_path(filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 # ---------------- 前端页面 ----------------

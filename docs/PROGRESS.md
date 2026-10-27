@@ -186,3 +186,23 @@
 - pp/agent.py：_table_rows_text() 把结构化行渲染进上下文，数量题优先按「点名论文」取表（新增 _PAPER_ALIASES：GPT-3/PPO/DPO/LoRA/BERT/LLaMA 等口语名 → 文件名），证据新增 	able-rows 通道。
 - 端到端：GPT-3 一共训了几个不同规模的模型？ → 「8 个规模，125M 到 175B」，证据 #5 p8 table-rows；总结一下 1707.06347v2.pdf → 走精华卡，#1 p1 card。
 - 123 passed、uff 全绿；提交 8b0908 已 push。
+
+## 2026-10-27（周二·深夜）阅读页 1.3.2：章节树 + PDF 渲染 + [n] 跳 References
+
+- 交付：`web/reader.html`，入口 `/ui/reader.html?paper=<文件名>&page=<页>`——左侧章节树（来自 structures.json，Abstract/1..7/References 逐条带页码）、正文连续滚动、页码框、100% 适合宽度、± 缩放、换论文下拉；侧栏顶部是这篇的作者与摘要。
+- 后端 `app/reader.py` + 三条路由：`GET /reader/papers`（39 篇清单）、`GET /paper/{filename}/structure`（标题/作者/摘要/章节/references 页码，页码统一 1 基）、`GET /paper/{filename}`（`FileResponse`，自带 Range，实测 `bytes=0-99` → 206 + `bytes 0-99/612446`）。路径校验 `safe_paper_path()`：拒绝 `..`、子目录、绝对路径、非 `.pdf`（`..%2Fmain.py`、`notes.txt`、`ghost.pdf` 均 404）。
+- 引用跳转走粗粒度：正文里 `[38, 24, 15]` 这类引用被识别成可点区域，点了翻到 References 页并浮出「返回原位置」，Esc 也能退；References 页本身不再叠一层引用高亮。`web/index.html` 证据卡片新增蓝色「打开原文」，直接带 `page=` 定位（`page` 为空时退到第 1 页）。
+- 前端依赖本地 vendor：`web/vendor/pdfjs/pdf.min.js`（377,116 字节）+ `pdf.worker.min.js`（1,133,660 字节），版本 3.11.174 legacy 构建，**不引 CDN**；`scripts/fetch_pdfjs.py` 三个镜像源可重下（会先试系统代理，失败再直连）。
+- 证据：
+  - `pytest -q -p no:cacheprovider` → `137 passed, 10 warnings in 28.35s`；`ruff check app tests scripts` → `All checks passed!`
+  - 无头 Edge（CDP）实测 1706.03762v7.pdf（Attention Is All You Need）：第 3 页识别出 6 处引用（样例 `[38, 24, 15]`），点击后页码 3→10（References），返回按钮浮出，再点回到 3；`state.refPage=10` 与 `structures.json` 一致。
+  - 章节树点「Experimental results」→ 页码 1→6，当前节点高亮。
+  - 390×844：`docScrollWidth=390 = docClientWidth`，无横向溢出；侧栏变抽屉（`position: fixed`），点「三章」按钮 `open` + 遮罩生效。
+  - 证据卡片「打开原文」：`page=8` → `/ui/reader.html?paper=1607.06450v1.pdf&page=8`（可访问 200），`page=null` → `page=1`。
+  - 不带 `paper` 参数进阅读页 → 论文目录页，列出 39 篇。
+- 坑：
+  - `msedge --headless --screenshot/--dump-dom` 是**一次性快照**，pdf.js 的异步渲染还没完成就截图，会看到「正在加载 PDF…」和 `/ 0`，误判成页面卡死；必须走 CDP（`Runtime.evaluate` 等够时间）再判断，布局尺寸也要靠 `Emulation.setDeviceMetricsOverride` 才能量准。
+  - `main#viewer` 用 `overflow: auto` 时，「先按 clientWidth 算页宽 → 页面撑出竖滚动条 → 可用宽度变窄」会多出一条横向滚动条；改 `overflow-y: scroll` 让它一开始就占位，再减 1px 兜住取整误差。
+  - 论文的章节树里本来就有 `References` 一节，再追加一条"§ References"入口会出现两个同名条目；改为先找已有条目并打上 refs 样式，找不到才追加。
+  - 老论文（LayerNorm）用的是 `[Ioffe and Szegedy, 2015]` 作者-年份式引用，`[n]` 正则识别不到——这类论文只能靠左栏 References 手动跳，属已知限制。
+- 下一步：题注/图表的定位入口、阅读页里"引用图谱"（谁引用了这篇 / 这篇引用了谁），以及移动端手势（双击缩放）。

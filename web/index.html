@@ -48,6 +48,9 @@
                max-height: 96px; overflow: hidden; position: relative; cursor: pointer; }
     .ev-text.open { max-height: none; }
     .ev-badge { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #eef1f5; color: #6b7280; }
+    .ev-open { font-size: 11px; padding: 1px 8px; border-radius: 6px; background: #1a73e8;
+               color: #fff; text-decoration: none; white-space: nowrap; }
+    .ev-open:hover { background: #1558b0; }
 
     footer { width: 100%; max-width: 820px; padding: 12px 16px 20px; display: flex; gap: 8px; position: relative; }
     #q { flex: 1; padding: 12px 14px; border: 1px solid #d5d9e0; border-radius: 10px;
@@ -234,6 +237,9 @@ function renderEvidence(botEl, items) {
         `<span>融合分 ${Number(it.score).toFixed(4)}</span>` +
         `<span>命中通道 ${channels}</span>` +
         `<span class="ev-badge">${it.source}</span>` +
+        // 点一下直接翻到原文那一页：paper=文件名，page=1 基页码（阅读页会把该页滚到顶部）
+        `<a class="ev-open" target="_blank" rel="noopener" ` +
+        `href="/ui/reader.html?paper=${encodeURIComponent(it.source)}&page=${it.page == null ? 1 : it.page}">打开原文</a>` +
         '</div>' +
         `<div class="ev-text">${escapeHtml(it.text).slice(0, 400)}${it.text.length > 400 ? '…' : ''}</div>`;
       card.querySelector('.ev-text').addEventListener('click', e => {
