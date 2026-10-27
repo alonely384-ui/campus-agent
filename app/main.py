@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from app.agent import run_agent, run_agent_stream
 from app.config import settings
+from app.layout import detect_layout
 from app.logging_config import get_logger, setup_logging
 from app.papers import (
     delete_paper,
@@ -265,6 +266,19 @@ async def paper_structure(filename: str) -> dict:
     if meta is None:
         raise HTTPException(status_code=404, detail="论文不存在")
     return meta
+
+
+@app.get("/paper/{filename}/layout", summary="原文版式判定（单栏/双栏，赛题 1.3.1）")
+async def paper_layout(filename: str) -> dict:
+    """逐页判定单双栏。
+
+    前端顶栏的版式徽章和「按栏看」视图都靠它：双栏页按一栏宽度放大，
+    才能像读单栏一样顺着往下读，不用横向来回扫。
+    """
+    path = safe_paper_path(filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    return detect_layout(path)
 
 
 @app.get("/paper/{filename}", summary="论文原文件 PDF（阅读页渲染用）")
