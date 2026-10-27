@@ -1,0 +1,605 @@
+{
+ "saved_at": "2026-10-27T04:28:58+00:00",
+ "data": [
+  {
+   "arxiv_id": "2610.35866",
+   "title": "Auto-Research Arena: Benchmarking and Advancing Auto-Research in Language Modeling",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35866"
+  },
+  {
+   "arxiv_id": "2610.35845",
+   "title": "Work Agents: Systems, Capabilities, and Optimization",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35845"
+  },
+  {
+   "arxiv_id": "2610.35801",
+   "title": "FOCUS: Active Critic Learning for Long-Horizon Language Model Agents",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35801"
+  },
+  {
+   "arxiv_id": "2610.35787",
+   "title": "Selective Tie Learning: Mitigating Spurious Correlations in Preference Optimization",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35787"
+  },
+  {
+   "arxiv_id": "2610.35785",
+   "title": "A theory of noisy linear recurrent neural network learning dynamics",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35785"
+  },
+  {
+   "arxiv_id": "2610.35766",
+   "title": "Improving Signals, Declining Encoder: A Known-Answer Test of Label-Free Monitoring in Self-Supervised Learning",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35766"
+  },
+  {
+   "arxiv_id": "2610.35740",
+   "title": "LUCID: Local Understanding of Covariate Importance with Conditional Density Estimation",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35740"
+  },
+  {
+   "arxiv_id": "2610.35733",
+   "title": "Multi-Objective Reinforcement Learning Using Routed Ensembles and Trajectory Attribution",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35733"
+  },
+  {
+   "arxiv_id": "2610.35727",
+   "title": "TRACE: Memory-Efficient Time Series Class-Incremental Learning via Temporal-Spectral Reconstruction",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35727"
+  },
+  {
+   "arxiv_id": "2610.35721",
+   "title": "Can JEV Support Clinical Trial Criteria Assessment?",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35721"
+  },
+  {
+   "arxiv_id": "2610.35720",
+   "title": "Quantifying the failure of symmetry learning in linear diffusion models due to initialization and finite-sample effects",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35720"
+  },
+  {
+   "arxiv_id": "2610.35716",
+   "title": "Audit Where Hacks Pay: Budgeted Strong-Verifier Audits Against Reward Hacking in GRPO",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35716"
+  },
+  {
+   "arxiv_id": "2610.35715",
+   "title": "Quantitative Generalization Bounds for Multi-Layer Transformers: A Few Long Strings can Beat Many Short Ones",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35715"
+  },
+  {
+   "arxiv_id": "2610.35710",
+   "title": "Detecting bus delays and service anomalies in Niterói with autoencoder latent feature representations",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35710"
+  },
+  {
+   "arxiv_id": "2610.35706",
+   "title": "Triage: Skip, Skim, or Refine Attention Tiles in Video Diffusion Transformers",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35706"
+  },
+  {
+   "arxiv_id": "2610.35697",
+   "title": "MiRL: Error-Targeted Reinforcement Learning for Correcting Terminal Agent Misbehaviors",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35697"
+  },
+  {
+   "arxiv_id": "2610.35693",
+   "title": "GNN-VIEW: Visual Inspection and Explanation of Graph-based Earth-System Models",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35693"
+  },
+  {
+   "arxiv_id": "2610.35679",
+   "title": "CounterFlow: Target-Conditioned Flow Matching for Visual Counterfactuals",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35679"
+  },
+  {
+   "arxiv_id": "2610.35663",
+   "title": "SCAFFOLD under Hessian Similarity: Sharp Convergence Rates",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35663"
+  },
+  {
+   "arxiv_id": "2610.35658",
+   "title": "A Hybrid Framework for Explainable Aviation Risk: Causal Chain Extraction from Safety Reports with Physics-Based Failure Quantification and Interventional Analysis",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35658"
+  },
+  {
+   "arxiv_id": "2610.35652",
+   "title": "Active Learning of Conditional Generative Models via the Transport Neural Tangent Kernel",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35652"
+  },
+  {
+   "arxiv_id": "2610.35645",
+   "title": "Proofs of strong forms of the Bovdi--Geche universality conjecture and a complex analogue",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35645"
+  },
+  {
+   "arxiv_id": "2610.35636",
+   "title": "Adapt for Planning, Not just Prediction: Optimistic Test-Time World Model Adaptation",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35636"
+  },
+  {
+   "arxiv_id": "2610.35617",
+   "title": "Distilling neural networks into equations to predict planetary instability",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35617"
+  },
+  {
+   "arxiv_id": "2610.35568",
+   "title": "ExCal: Optimization-Free Multivariate Time Series Anomaly Detection via Excess Calibration",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35568"
+  },
+  {
+   "arxiv_id": "2610.35563",
+   "title": "High-resolution tactile observation makes hidden racket-control mechanisms learnable",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35563"
+  },
+  {
+   "arxiv_id": "2610.35560",
+   "title": "Multi-Fidelity Training Reshapes Uncertainty Decomposition in Atomistic Models",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35560"
+  },
+  {
+   "arxiv_id": "2610.35551",
+   "title": "Balanced Sampling in Stochastic Multi-objective Bandits",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35551"
+  },
+  {
+   "arxiv_id": "2610.35545",
+   "title": "Efficient probabilistic weather forecasting at quarter-degree resolution with two-sided transport attention",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35545"
+  },
+  {
+   "arxiv_id": "2610.35540",
+   "title": "Beyond Modeling Order: Dual-Path Spatiotemporal Representation Learning for Cross-Subject EEG Emotion Recognition",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35540"
+  },
+  {
+   "arxiv_id": "2610.35518",
+   "title": "S3AC: Stabilized, Selective, and Scalable Actor-Critic for LLM Reasoning",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35518"
+  },
+  {
+   "arxiv_id": "2610.35504",
+   "title": "Model reduction in time: Learning flow maps for reducing stochastic dynamical systems in time",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35504"
+  },
+  {
+   "arxiv_id": "2610.35497",
+   "title": "When Fine-Grained Credit Assignment Helps and Hurts: Multimodal Agentic Reinforcement Learning through Video Editing",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35497"
+  },
+  {
+   "arxiv_id": "2610.35484",
+   "title": "Evaluating Bayesian deep learning for robust biomedical time-series classification under distribution shift: A sleep scoring case study",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35484"
+  },
+  {
+   "arxiv_id": "2610.35480",
+   "title": "GPDPO: Learning from Reward Conflicts via Group Pareto-Dominance Policy Optimization",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35480"
+  },
+  {
+   "arxiv_id": "2610.35472",
+   "title": "Amplify, Locate, Estimate (ALE) on Rare-Failure Rates of Fine-Tuned LLMs",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35472"
+  },
+  {
+   "arxiv_id": "2610.35468",
+   "title": "Multi-Horizon Future Discovery for Physics-Informed Exploration",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35468"
+  },
+  {
+   "arxiv_id": "2610.35457",
+   "title": "Prior Predictive Matching for Bayesian LoRA",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35457"
+  },
+  {
+   "arxiv_id": "2610.35426",
+   "title": "Intent-Preserving Adversarial User Simulation for Multi-Turn Agent Evaluation",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35426"
+  },
+  {
+   "arxiv_id": "2610.35378",
+   "title": "TransECG-SSL: Hybrid Self-Supervised Representation Learning for ECG Arrhythmia Classification",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35378"
+  },
+  {
+   "arxiv_id": "2610.35356",
+   "title": "Benchmarking uncertainty quantification for engineering regression under graded distribution shift",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35356"
+  },
+  {
+   "arxiv_id": "2610.35355",
+   "title": "OneEEG: A Unified Signal-Visual Multimodal Language Model with Task-Aware Mixture of Projectors for Multi-Task EEG Understanding",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35355"
+  },
+  {
+   "arxiv_id": "2610.35345",
+   "title": "Should Pseudo-Labels Share Mini-Batches with Labeled Examples? Semi-Supervised Continual Active Learning with Limited Training Cost",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35345"
+  },
+  {
+   "arxiv_id": "2610.35313",
+   "title": "CoPE-CGL: Community-aware Prototype Extraction for Replay-Free Continual Graph Learning",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35313"
+  },
+  {
+   "arxiv_id": "2610.35309",
+   "title": "Shared Context, Separate Engines: Streaming Vision--Language Inference on Edge SoCs",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35309"
+  },
+  {
+   "arxiv_id": "2610.35304",
+   "title": "Inference Latency-Aware Tsetlin Machine Training",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35304"
+  },
+  {
+   "arxiv_id": "2610.35303",
+   "title": "InterQ-RL: Interaction-Aware Correction of Execution Mismatch in Quantized Agentic RL",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35303"
+  },
+  {
+   "arxiv_id": "2610.35262",
+   "title": "Conversational Generalized Linear Bandits with Hybrid Feedback",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35262"
+  },
+  {
+   "arxiv_id": "2610.35246",
+   "title": "NOMAD-EEG: Native Omni-Montage Adaptive Diffusion",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35246"
+  },
+  {
+   "arxiv_id": "2610.35215",
+   "title": "SkillLifeBench: Benchmarking Security Across the Lifecycle of Agent Skills",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35215"
+  },
+  {
+   "arxiv_id": "2610.35212",
+   "title": "One-Shot Federated Model Editing for Device Dynamics at the Edge",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35212"
+  },
+  {
+   "arxiv_id": "2610.35211",
+   "title": "Efficient Exact Unlearning for Federated Zeroth-Order Optimization",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35211"
+  },
+  {
+   "arxiv_id": "2610.35209",
+   "title": "Understanding Practical Optimization in Machine Learning",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35209"
+  },
+  {
+   "arxiv_id": "2610.35190",
+   "title": "LEAP: a Latent Embedding Anomaly Patch-Transformer for time-series anomaly detection",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35190"
+  },
+  {
+   "arxiv_id": "2610.35175",
+   "title": "DAC-Loop: Distillation-Aware Compression for Remote Sensing CNN",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35175"
+  },
+  {
+   "arxiv_id": "2610.35167",
+   "title": "Biology-Guided Context-Aware Residual Propagation for Spatial Gene Expression Prediction from Histology",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35167"
+  },
+  {
+   "arxiv_id": "2610.35164",
+   "title": "Accelerating SO(2)-Equivariant Materials Models through Low-Precision Emulation",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35164"
+  },
+  {
+   "arxiv_id": "2610.35147",
+   "title": "Locked In: Multi-Objective RL for the AI Data Center Build-Out",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35147"
+  },
+  {
+   "arxiv_id": "2610.35130",
+   "title": "TUON: A Tensor-Aware Optimizer Utilizing Tensor-SVD and Polarization for Large Language Model Pretraining",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35130"
+  },
+  {
+   "arxiv_id": "2610.35128",
+   "title": "STeP-TS: Shared Temporal Filters with Pruning for Time Series",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35128"
+  },
+  {
+   "arxiv_id": "2610.35113",
+   "title": "UTA: Universal Training Adaptive Learning Rate Decay",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35113"
+  },
+  {
+   "arxiv_id": "2610.35112",
+   "title": "Subspace Crystallization in Grokking: Rank Compression Tracks the Phase Transition",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35112"
+  },
+  {
+   "arxiv_id": "2610.35108",
+   "title": "FlowGenesis: Representation-Driven Self-Organization of Neural Architectures",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35108"
+  },
+  {
+   "arxiv_id": "2610.35101",
+   "title": "Spherical Brownian Diffusion for Language Modeling",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35101"
+  },
+  {
+   "arxiv_id": "2610.35084",
+   "title": "A JiT-Based Denoising Defense Method Against Adversarial Examples for Radio Signal Automatic Modulation Classification",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35084"
+  },
+  {
+   "arxiv_id": "2610.35059",
+   "title": "Reinforcement Learning Done Right for Explicit Confidence Targets",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35059"
+  },
+  {
+   "arxiv_id": "2610.35052",
+   "title": "Risk-Aware Output Control Should be the Focus of Machine Unlearning",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35052"
+  },
+  {
+   "arxiv_id": "2610.35036",
+   "title": "Mapping the Solution-Set Structure of Grokking on Latin Squares",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35036"
+  },
+  {
+   "arxiv_id": "2610.35032",
+   "title": "AutoPRL: Automated Path Representation Learning via a Learnable View Generator",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35032"
+  },
+  {
+   "arxiv_id": "2610.35023",
+   "title": "BellowsKV: One Latent for Many Layers, Expanded on Demand",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35023"
+  },
+  {
+   "arxiv_id": "2610.35020",
+   "title": "Attention under Bounded Key-Query Similarity: Space Complexity and Transformer Anisotropy",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35020"
+  },
+  {
+   "arxiv_id": "2610.34977",
+   "title": "Adaptive Memory Index Evolution for Agents",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34977"
+  },
+  {
+   "arxiv_id": "2610.34962",
+   "title": "Beyond feature attribution: Recovering latent interaction structures in machine learning models via localized CBFI",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34962"
+  },
+  {
+   "arxiv_id": "2610.34951",
+   "title": "Improving Reasoning with Rollout Agreement for Group-Based Policy Optimization",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34951"
+  },
+  {
+   "arxiv_id": "2610.34950",
+   "title": "MINT: Mitigating Structural Inconsistency via Attentive Message Passing for Financial Anomaly Detection",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34950"
+  },
+  {
+   "arxiv_id": "2610.34949",
+   "title": "Correlation-Aware Exploration for Long-Trace Reasoning",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34949"
+  },
+  {
+   "arxiv_id": "2610.34945",
+   "title": "Relational Composition as Parallel Transport: What Per-Entity Frames Force in Attention",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34945"
+  },
+  {
+   "arxiv_id": "2610.34934",
+   "title": "A Certified Robustness Framework for Backdoor Poisoning Attacks using $f$-Divergences",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34934"
+  },
+  {
+   "arxiv_id": "2610.34915",
+   "title": "End-to-End MXFP8 Reinforcement Learning on Blackwell: What Matching Buys, When It Pays Off, and How It Fails",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34915"
+  },
+  {
+   "arxiv_id": "2610.34891",
+   "title": "Checkpoint Reload Explains Most of the Measured State Gap in Two State Discovery Reproductions",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34891"
+  },
+  {
+   "arxiv_id": "2610.34862",
+   "title": "Priority-Preserving Advantage Aggregation for Multi-Reward Policy Optimization",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34862"
+  },
+  {
+   "arxiv_id": "2610.34861",
+   "title": "AgriDefend: A $205 Offline Edge Device that Detects Crop Stress Before Visible Symptoms via Multimodal AI Fusion",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34861"
+  },
+  {
+   "arxiv_id": "2610.34843",
+   "title": "When Respondents Are Scarce: LLM-Derived Semantic Priors for Bayesian Confirmatory Factor Analysis",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34843"
+  },
+  {
+   "arxiv_id": "2610.34833",
+   "title": "Streaming Recurrent Memory",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34833"
+  },
+  {
+   "arxiv_id": "2610.34828",
+   "title": "Transporting Quantiles to Codebook: Scalable Vector Quantization without Codebook Collapse",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34828"
+  },
+  {
+   "arxiv_id": "2610.34816",
+   "title": "Can System-1-Style Decision Models Replace Dedicated Rerankers in RAG? A Systems Evaluation",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34816"
+  },
+  {
+   "arxiv_id": "2610.34812",
+   "title": "Precedence-Aware Resource Allocation: Extending the AUTOC Framework to Multi-Level Treatments",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34812"
+  },
+  {
+   "arxiv_id": "2610.34801",
+   "title": "When Does Data Value Reduce to Class Balance? A Coverage View of Per-Point Data Valuation",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34801"
+  },
+  {
+   "arxiv_id": "2610.34797",
+   "title": "TimeWorld: Towards Action-Conditioned Multimodal World Models for Time Series Forecasting",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34797"
+  },
+  {
+   "arxiv_id": "2610.34756",
+   "title": "Mechanistic Insights into LoRA: Layer Sparsity for Adaptive Fine-Tuning via Path Patching",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34756"
+  },
+  {
+   "arxiv_id": "2610.34709",
+   "title": "Sparse Reconstruction by Direct Measurement-to-Field Generation in Function Space",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34709"
+  },
+  {
+   "arxiv_id": "2610.34704",
+   "title": "Stable Continuous-Time Consistency Distillation: An Empirical Study with a Multistep Extension",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34704"
+  },
+  {
+   "arxiv_id": "2610.34690",
+   "title": "IsoAct: Geometry-Aware Post-hoc Debiasing via Isometric Actions",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34690"
+  },
+  {
+   "arxiv_id": "2610.34682",
+   "title": "Beyond Deduplication: Sharp Retrieval Limits for Attention with Correlated Distractors",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34682"
+  },
+  {
+   "arxiv_id": "2610.34679",
+   "title": "AT-AT: Automatic Tool Optimization from Agent Traces",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34679"
+  },
+  {
+   "arxiv_id": "2610.34678",
+   "title": "Exploring perceptual straightness in learned visual representations",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34678"
+  },
+  {
+   "arxiv_id": "2610.34663",
+   "title": "Video World Models Need Predictable Latents",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34663"
+  },
+  {
+   "arxiv_id": "2610.34639",
+   "title": "Cross-Loop Query Handoff: How Later Loops Redirect Two-Hop Retrieval in the Ouro Looped Language Models",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34639"
+  },
+  {
+   "arxiv_id": "2610.34617",
+   "title": "Valid Early Detection of Memorization in Diffusion Models",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34617"
+  },
+  {
+   "arxiv_id": "2610.34590",
+   "title": "Sparse Sum-of-Squares Layers for Certified Learning",
+   "posted": "Tue, 27 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.34590"
+  }
+ ]
+}

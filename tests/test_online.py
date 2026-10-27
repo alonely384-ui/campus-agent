@@ -76,3 +76,20 @@ def test_parse_search_extracts_results():
     assert rows[0]["submitted"] == "25 Jul 2016"
     assert rows[1]["title"] == "Another Paper"
     assert rows[1]["url"] == "https://arxiv.org/abs/2401.00001"
+
+
+def test_parse_recent_strips_title_descriptor_and_reads_date():
+    html = (
+        "<h3>Tue, 27 Oct 2026 (showing 1 of 1 entries )</h3>"
+        "<dl id=\"articles\">"
+        "<dt><a name=\"item1\"><a href =\"/abs/2610.35846\" title=\"Abstract\">arXiv:2610.35846</a>"
+        "</a></dt>"
+        "<dd><div class=\"meta\"><div class=\"list-title mathjax\">"
+        "<span class=\"descriptor\">Title:</span> Preserve to Expand: Model Merging</div>"
+        "</div><p class=\"mathjax\">abstract</p></dd></dl>"
+    )
+    rows = on._parse_recent(html)
+    assert [row["arxiv_id"] for row in rows] == ["2610.35846"]
+    assert rows[0]["title"] == "Preserve to Expand: Model Merging"
+    assert rows[0]["posted"] == "Tue, 27 Oct 2026"
+    assert rows[0]["url"] == "https://arxiv.org/abs/2610.35846"

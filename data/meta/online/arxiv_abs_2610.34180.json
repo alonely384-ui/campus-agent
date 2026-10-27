@@ -1,0 +1,19 @@
+{
+ "saved_at": "2026-10-27T04:29:47+00:00",
+ "data": {
+  "arxiv_id": "2610.34180",
+  "title": "Write What Matters: Disentangling Token Selection from Slot Allocation in Recurrent Memory",
+  "authors": [
+   "Chen Chen",
+   "Rui Cheng"
+  ],
+  "abstract": "Long-sequence models must retain earlier information. Full attention keeps all past tokens but grows expensive, and recurrent-memory models compress history into fixed slots for linear-time processing. Limited capacity makes writes consequential: distractors can interfere with useful content, while skipped evidence cannot be recalled. Existing multi-slot memories write every token to the same number of slots, merging whether to store it with how many slots to update. We introduce Factorized Write Routing (FWR), which first keeps or skips each token and then chooses a fixed or token-adaptive number of slots. Queries still read all slots. Across ten seeds on two synthetic tasks that query facts after long contexts, we observe a density-dependent reversal. With four slots per write, long-context accuracy favors always writing on dense Feature Recall (0.472 vs 0.337), but learned selective writing on sparse-fact Passkey (0.222 vs 0.048). The tested adaptive rule underperforms fixed allocation under the learned gate on both tasks. A diagnostic oracle given fact labels unavailable at deployment reaches 0.372 on Passkey, showing headroom in filtering distractors. The results suggest avoiding missed writes in information-dense contexts and filtering distractors when they dominate.",
+  "published": "[Submitted on 25 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL) ; Artificial Intelligence (cs.AI); Computer Vision and Pattern Recognition (cs.CV)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.34180",
+  "fetched_at": "2026-10-27T04:29:47+00:00"
+ }
+}

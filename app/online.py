@@ -38,6 +38,7 @@ TIMEOUT = 30.0
 SEARCH_TTL = timedelta(days=7)
 META_TTL = timedelta(days=30)
 CITE_TTL = timedelta(days=3)
+RECENT_TTL = timedelta(days=1)
 
 _PROXY_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy")
 _ARXIV_ID_RE = re.compile(r"(\d{4}\.\d{4,5})")
@@ -208,6 +209,87 @@ def _parse_search(html: str) -> list[dict[str, Any]]:
     return results
 
 
+def recent_papers(
+    categories: tuple[str, ...] = ("cs.CL", "cs.LG"),
+    per_page: int = 100,
+    days: int = 14,
+) -> list[dict[str, Any]]:
+    """抓 arXiv 各分类的「recent」列表，返回最近 ``days`` 天内上架的论文。
+
+    为什么还要这条路：只靠引用关系，刚发出来、还没人引用的论文永远进不来；
+    但赛题 1.4.3 要的是"可能与库里论文相关的新论文"，所以再扫一遍新上架列表，
+    用主题相似度筛。列表页结构是 ``<dt>编号</dt><dd>标题</dd>``，日期在 ``<h3>``。
+    """
+    out: dict[str, dict[str, Any]] = {}
+    cutoff = datetime.now(UTC) - timedelta(days=max(1, days))
+    for category in categories:
+        key = f"arxiv_recent_{category}"
+        cached = read_cache(key, RECENT_TTL)
+        if cached is None:
+            url = f"{ARXIV_BASE}/list/{category}/recent"
+            try:
+                with _client() as client:
+                    response = client.get(url, params={"skip": "0", "show": str(per_page)})
+                    response.raise_for_status()
+                    items = _parse_recent(response.text)
+            except httpx.HTTPError as exc:
+                fallback = read_cache_any_age(key)
+                if fallback is None:
+                    logger.warning("抓 %s 新上架失败：%s", category, exc)
+                    continue
+                items = list(fallback)
+            else:
+                write_cache(key, items)
+        else:
+            items = list(cached)
+        for item in items:
+            posted = item.get("posted") or ""
+            try:
+                when = datetime.strptime(posted, "%a, %d %b %Y").replace(tzinfo=UTC)
+            except ValueError:
+                when = None
+            if when is not None and when < cutoff:
+                continue
+            row = dict(item)
+            row["category"] = category
+            out.setdefault(row["arxiv_id"], row)
+    return list(out.values())
+
+
+def _parse_recent(html: str) -> list[dict[str, Any]]:
+    """解析 arXiv ``/list/{cat}/recent`` 页面：``<dt>`` 编号 + ``<dd>`` 标题 + ``<h3>`` 日期。"""
+    # 日期段：<h3>Tue, 27 Oct 2026 (showing ...)</h3>，位置在紧跟其后的条目之前
+    marks: list[tuple[int, str]] = []
+    for match in re.finditer(r"<h3>([^<]+)</h3>", html):
+        label = match.group(1).strip()
+        date = label.split("(")[0].strip()
+        marks.append((match.start(), date))
+
+    results: list[dict[str, Any]] = []
+    for match in re.finditer(r"<dt>(.*?)</dt>\s*<dd>(.*?)</dd>", html, re.S):
+        head, body = match.group(1), match.group(2)
+        id_match = re.search(r'href\s*=\s*"/abs/([0-9]{4}\.[0-9]{4,5})"', head)
+        title_match = re.search(r"list-title mathjax['\"]>(.*?)</div>", body, re.S)
+        if not id_match or not title_match:
+            continue
+        title = _strip(title_match.group(1))
+        # 页面上标题前面有个 <span class='descriptor'>Title:</span>，_strip 之后可能带换行/空格
+        title = re.sub(r"^\s*(?:Title|标题)\s*[:：]\s*", "", title, flags=re.I).strip()
+        posted = ""
+        for pos, date in marks:
+            if pos < match.start():
+                posted = date
+        results.append(
+            {
+                "arxiv_id": id_match.group(1),
+                "title": title,
+                "posted": posted,
+                "url": f"{ARXIV_BASE}/abs/{id_match.group(1)}",
+            }
+        )
+    return results
+
+
 def paper_meta(arxiv_id: str) -> dict[str, Any]:  # noqa: C901 - 字段多，拆开反而更难读
     """取 arXiv 详情页的标题/作者/摘要/提交日期/GitHub 地址。"""
     arxiv_id = arxiv_id_of(arxiv_id) or (arxiv_id or "").strip()
@@ -235,6 +317,8 @@ def paper_meta(arxiv_id: str) -> dict[str, Any]:  # noqa: C901 - 字段多，拆
         return _strip(match.group(1)) if match else ""
 
     title = pick(r'<h1 class="title mathjax">(.*?)</h1>')
+    # abs 页标题同样带 <span class="descriptor">Title:</span>
+    title = re.sub(r"^\s*(?:Title|标题)\s*[:：]\s*", "", title, flags=re.I)
     authors_raw = pick(r'<div class="authors">(.*?)</div>')
     authors_raw = re.sub(r"^Authors:\s*", "", authors_raw)
     authors = [a.strip() for a in authors_raw.split(",") if a.strip()]
@@ -244,6 +328,9 @@ def paper_meta(arxiv_id: str) -> dict[str, Any]:  # noqa: C901 - 字段多，拆
     comments = pick(r'Comments:</span>(.*?)</td>') or pick(r"Comments:\s*(.*?)</td>")
     subjects = pick(r'<td class="tablecell subjects">(.*?)</td>')
     github = find_github(abstract, comments, title)
+    # dateline 形如 "Submitted on 27 Oct 2026"；年份用来算新鲜度，解析不到就是 0
+    year_match = re.search(r"(?:19|20)\d{2}", re.sub(r"\[v\d+\].*$", "", dateline))
+    year = int(year_match.group(0)) if year_match else 0
 
     meta = {
         "arxiv_id": arxiv_id,
@@ -251,6 +338,7 @@ def paper_meta(arxiv_id: str) -> dict[str, Any]:  # noqa: C901 - 字段多，拆
         "authors": authors,
         "abstract": abstract,
         "published": dateline,
+        "year": year,
         "comments": comments,
         "subjects": subjects,
         "github": github,

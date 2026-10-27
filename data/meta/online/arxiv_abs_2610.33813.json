@@ -1,0 +1,23 @@
+{
+ "saved_at": "2026-10-27T04:29:36+00:00",
+ "data": {
+  "arxiv_id": "2610.33813",
+  "title": "Task Format as a Factor in Adaptation: A Controlled Comparison of LoRA and Full Fine-Tuning for Prompt-Safety Classification",
+  "authors": [
+   "John Alderete",
+   "Srirakshith Betageri",
+   "Jennifer Flynn",
+   "Alex Greenhalgh",
+   "Josh Rubin",
+   "Yoshita Varma Annam"
+  ],
+  "abstract": "Fine-tuning a language model for classification involves many design decisions. Comparisons of low-rank adaptation (LoRA) with full fine-tuning are common but often confounded, and task format is rarely studied. We compare both regimes on prompt-safety classification with a matched 400M encoder-decoder pair (Ettin) across three task formats, with up to 15 seeds per cell and pre-specified analyses. At the pre-specified learning rates, full fine-tuning leads LoRA by 2-3 pp in every architecture and format trained on the label alone. On the encoder, the gap closes once both rates are chosen by the same search. Training LoRA to write a reason after its verdict adds 4.0 pp and closes the gap, but a content-free sentence of equal length does not. Trained models score above a prompted 8B in domain but fall behind it on two of three out-of-distribution corpora, trailing by 8-23 pp on adversarial jailbreaks and flagging 27-66% of benign but harmful-looking prompts as unsafe, against the 8B&#39;s 2-3%. Together, the results suggest that the adaptation regime matters less than how each model is trained, its learning rate, and training target, and that in-domain accuracy alone is an incomplete guide to robustness.",
+  "published": "[Submitted on 24 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.33813",
+  "fetched_at": "2026-10-27T04:29:36+00:00"
+ }
+}

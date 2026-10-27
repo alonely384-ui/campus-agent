@@ -112,6 +112,10 @@
     .rec-row .rec-title { font-weight: 600; color: #111827; line-height: 1.45; }
     .rec-row .rec-title a { color: #111827; text-decoration: none; }
     .rec-row .rec-title a:hover { color: #1a73e8; }
+    .rec-src { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 5px;
+               font-size: 10.5px; font-weight: 600; vertical-align: 1px; }
+    .rec-src.cited { background: #e8f0fe; color: #1a56c4; }
+    .rec-src.recent { background: #e7f7ee; color: #166534; }
     .rec-row .rec-reason { margin: 6px 0 6px; color: #374151; line-height: 1.6; }
     .rec-row .rec-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
                          font-size: 11.5px; color: #6b7280; }
@@ -864,8 +868,13 @@ function renderRecs(payload) {
     const cited = (item.cited_by || []).join('、');
     const upOn = item.vote === 'up' ? ' on' : '';
     const downOn = item.vote === 'down' ? ' on' : '';
+    // 来路徽章：引用扩展 = 有人引用了你库里的论文；新上架 = arXiv 近两周新发的
+    const isRecent = item.source === 'recent';
+    const srcTag = isRecent
+      ? '<span class="rec-src recent" title="arXiv 近期上架，还没有人引用它，靠主题相似度选出来的">新上架</span>'
+      : '<span class="rec-src cited" title="它引用了你库里的论文">引用扩展</span>';
     return `<div class="rec-row" data-key="${key}" data-arxiv="${escapeHtml(item.arxiv_id || '')}">
-      <div class="rec-title">${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener">${title}</a>` : title}</div>
+      <div class="rec-title">${srcTag}${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener">${title}</a>` : title}</div>
       <div class="rec-reason">${escapeHtml(item.reason || '')}</div>
       <div class="rec-meta">
         <span class="score">${(item.score || 0).toFixed(3)}</span>
@@ -910,7 +919,7 @@ async function loadRecs() {
 async function refreshRecs() {
   recRefreshEl.disabled = true;
   recRefreshEl.textContent = '刷新中…';
-  recUpdatedEl.textContent = '正在抓取，通常 10~40 秒';
+  recUpdatedEl.textContent = '正在抓取：引用关系 + arXiv 近期上架，通常 20~60 秒';
   try {
     const resp = await fetch('/recommendations/refresh?max_papers=6', { method: 'POST' });
     const d = await resp.json();

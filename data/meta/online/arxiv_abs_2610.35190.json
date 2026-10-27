@@ -1,0 +1,21 @@
+{
+ "saved_at": "2026-10-27T04:29:34+00:00",
+ "data": {
+  "arxiv_id": "2610.35190",
+  "title": "LEAP: a Latent Embedding Anomaly Patch-Transformer for time-series anomaly detection",
+  "authors": [
+   "Cristhian Moya-Mota",
+   "Ignacio Aguilera-Martos",
+   "Diego García-Gil",
+   "Julián Luengo"
+  ],
+  "abstract": "Time-series anomaly detection is dominated by reconstruction-based neural detectors, whose objective is structurally flawed. Since the target is also the input, an expressive model can learn to reconstruct anomalies too, leaving uninformative residuals. Recent large-scale benchmarks show that, on curated data, elaborate deep detectors rarely beat simple statistical baselines, while current leaders rely on representation learning. We propose LEAP (Latent Embedding Anomaly Patch-Transformer), which combines masked prediction with latent representation-based anomaly evidence, without relying on reconstruction or attention-based scoring. The model removes patches from a window and predicts them from the remaining temporal and cross-channel context, so prediction errors measure how well learned dynamics explain hidden segments. Deterministic complementary group masking ensures every time step is scored while hidden, with identical visible fractions during training and inference. LEAP adds three label-free evidence sources: latent-embedding novelty calibrated by local density, local temporal contrast, and per-channel novelty pooled over channels selected by six label-free criteria. Under the TSB-AD protocol, the full model achieves a VUS-PR of $0.5179 \\pm 0.0022$ on $180$ held-out multivariate series. On TSB-AD-U, a univariate variant combining multi-scale masked-prediction scoring with latent novelty, without contrast or channel-pool novelty, achieves $0.6194 \\pm 0.0016$ on $350$ held-out series. Both results average three random seeds. A five-stage ablation on TSB-AD-M, supported by paired Wilcoxon signed-rank tests, shows statistically significant gains from each successive component.",
+  "published": "[Submitted on 26 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Machine Learning (cs.LG)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.35190",
+  "fetched_at": "2026-10-27T04:29:34+00:00"
+ }
+}

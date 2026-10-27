@@ -715,14 +715,18 @@ async def recommendations() -> dict:
     return await run_in_threadpool(cached_recommendations)
 
 
-@app.post("/recommendations/refresh", summary="刷新推荐（扫 arXiv 引用关系，1.4.3）")
-async def recommendations_refresh(max_papers: int = 6) -> dict:
+@app.post("/recommendations/refresh", summary="刷新推荐（扫 arXiv 引用关系 + 近期上架，1.4.3）")
+async def recommendations_refresh(max_papers: int = 6, include_recent: bool = True) -> dict:
     """实时抓一轮候选并重算推荐；抓取失败时退回过期缓存（offline=true）。
 
-    这一步会串行请求 Semantic Scholar（限流友好），通常 10~40 秒。
+    两路候选：``cited``（别人引用了库里的论文）+ ``recent``（arXiv 近期上架，
+    ``include_recent=false`` 可关掉）。这一步会串行请求 Semantic Scholar 与 arXiv，
+    通常 20~60 秒。
     """
     try:
-        return await build_recommendations(max_papers=max(1, min(max_papers, 12)))
+        return await build_recommendations(
+            max_papers=max(1, min(max_papers, 12)), include_recent=include_recent
+        )
     except OnlineError as exc:
         payload = await run_in_threadpool(cached_recommendations)
         payload["offline"] = True

@@ -481,3 +481,49 @@ tables : 305 -> 282
 - S2 引用数据 3 天过期，长时间不刷新会退化到只剩主题相似度；
 - 下一步：加 `--seed` 参数手动指定种子、定时任务（cron/计划任务）每周跑一次、
   多用户时把 `feedback.json` 换成带用户 id 的反馈表做协同过滤。
+
+## 2026-10-27（周二）补充：推荐来路拆成两路 + 主题相似度改成簇加权
+
+**这轮补的是什么（两个短板）**
+
+1. 原来只看"谁引用了库里的论文"，刚上架、还没人引用的相关论文永远进不来；
+2. `topic` 只跟"库内最像的那一篇"比，跨领域时最近邻会飘（RL 论文被判最像 Llama 2），
+   导致"最像：Llama 2"和理由里说的 PPO 自相矛盾。
+
+**实现**
+
+- `app/online.py`：新增 `recent_papers()` 抓 `arxiv.org/list/{cat}/recent`（cs.CL + cs.LG，
+  每类 100 条、缓存 1 天）、`_parse_recent()` 解析 `<h3>` 日期 + `<dt>/<dd>` 编号与标题；
+  `paper_meta()` 增加 `year`（从 dateline 里抽），并在 abs 页与列表页都剥掉标题前的
+  `Title:` 前缀（页面上是 `<span class="descriptor">Title:</span>`）。
+- `app/recommend.py`：
+  - `topic_profile()`：`topic = 0.55*最像 + 0.45*top3均值`，返回 top3 明细，理由与"最像"口径一致；
+  - `collect_recent()`：先用**标题**粗排（免费、不联网）留 `max_items*4`，再给最像的少数几篇补
+    abs 摘要，最后按摘要精排；跳过与库内同标题/同 arXiv 号的；
+  - `score_candidates()`：按 `source` 分闸门——`recent` 只要 `topic >= 0.20`，`cited` 保持原两条；
+  - `build_recommendations(include_recent=True)` 合并两路并给出 `sources` / `recent_scanned`。
+- `app/main.py`：`POST /recommendations/refresh` 增加 `include_recent` 参数。
+- `web/index.html`：每条推荐前加来路徽章（蓝「引用扩展」/ 绿「新上架」），刷新文案改「20~60 秒」。
+- `scripts/refresh_recommend.py`：新增 `--no-recent`，打印两路候选分布。
+
+**实测（原文）**
+
+```
+库内论文：39 篇；候选：62 条（引用扩展 23 / 新上架 6，近期上架扫了 12 篇）；推荐：8 条
+ 1. [0.533] Map-Distribution Mixture-of-Experts ... · 引用扩展
+ 5. [0.252] Task Format as a Factor in Adaptation ... · 新上架 · 最像 LORA
+耗时: 9 秒
+```
+
+CDP：`{"rows":8,"recentCount":4,"citedCount":4,"bgRecent":"rgb(231,247,238)",
+"bgCited":"rgb(232,240,254)"}`；刷新接口 `{"status":200,"items":12,
+"sources":{"cited":23,"recent":6},"scanned":12,"errors":0}`。
+
+**坑**
+
+- `recent_papers` 第一次解析出来标题带 `Title:`，原因是 abs 页与列表页都有 descriptor，
+  两处都得剥；旧缓存还会把错误结果一直喂回来，调完要清 `data/meta/online/arxiv_*`。
+- `paper_meta()` 以前没返回 `year`，新上架论文的新鲜度会被当成"3 年前"，补了 `year` 解析。
+- 新上架候选没有引用信号，`topic` 只有 0.2~0.3，闸门从 0.30 放宽到 0.20 才有数量。
+
+**统计** 215 passed / ruff All checks passed

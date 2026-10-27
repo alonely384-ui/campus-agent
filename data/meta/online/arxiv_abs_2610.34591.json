@@ -1,0 +1,18 @@
+{
+ "saved_at": "2026-10-27T04:29:35+00:00",
+ "data": {
+  "arxiv_id": "2610.34591",
+  "title": "Does the Outfit Change the Price? Context Halo in Vision-Language Model Valuation of an Identical Low-Cost Necklace",
+  "authors": [
+   "Brianne Lee"
+  ],
+  "abstract": "A chunky gold-tone chain necklace bought online for 2.43 USD was photographed four ways: worn with formal attire against a wood-panelled wall, worn at a party, worn with casual clothing in a recycling yard, and laid flat with no person present. We asked six frontier language models to estimate its price in 1,164 independent and sequential API sessions (4,604 logged rows) and compared estimates across settings. Among the four models that answered image prompts, the same necklace was priced 1.9 to 3.3 times higher in the formal photograph than in the flat-lay (all p &lt; 0.01). Against the yard photograph, the ratio ranged from 1.23 (Grok 4.5, not significant) to 3.57 (Kimi K3), with Claude Fable 5 at 3.32. A text-only version of the task, in which the setting is described in words, produced formal-to-yard ratios of 2.2 to 3.9 in all six models, so the effect does not require pixels. Flat-lay estimates themselves were 7.8 to 18.7 times the receipt price, so part of any headline &#34;outfit multiplier&#34; computed against the receipt is baseline overestimate, not a context effect. A single instruction to ignore clothing and setting significantly reduced the effect in one model (ratio of ratios 0.77, 95% CI 0.65 to 0.91) and not detectably in the others; telling the model the photo came from a company website or a personal account changed nothing significant. Asked afterward whether a different outfit would have changed their number, Claude Fable 5 said yes in 24 of 24 sessions, GPT-5.6 in 69%, and GPT-4o in 18%, while GPT-4o also refused 79% of image estimation prompts. The study isolates a mechanism with one object and one wearer at about 10 sessions per model and condition; we outline the replication needed next, with multiple objects and a human benchmark. Data, code, and raw outputs are released.",
+  "published": "[Submitted on 25 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.34591",
+  "fetched_at": "2026-10-27T04:29:35+00:00"
+ }
+}
