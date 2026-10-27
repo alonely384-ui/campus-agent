@@ -454,19 +454,57 @@ def _sections(lines: list[dict], body: float) -> list[dict]:
     return out
 
 
+_CAPTION_LEAD = "|｜—–-:："
+
+
+def _caption_text(raw: str) -> str:
+    """去掉题注开头的竖线/破折号之类分隔符：'| Our model' -> 'Our model'。"""
+    return raw.strip().lstrip(_CAPTION_LEAD).strip()
+
+
+def _looks_like_caption(text: str) -> bool:
+    """区分「题注」和「正文里提到图表的那句话」。
+
+    正文引用长这样（实测 LayerNorm 第 7 页）：
+        "Figure 1 illustrates the validation curves of the models, …"
+    题注长这样：
+        "Figure 1: Recall@K curves using order-embeddings with and without …"
+
+    最省事又站得住的判据：**题注是名词短语，首词大写；正文引用是句子成分，
+    首词是小写动词/连词**（shows / illustrates / from the paper / and Table 4 …）。
+    实测 39 篇、624 条题注里，55 条误判的首词全是小写，没有一条真题注是小写开头。
+    另外题注一般不会超过 200 字（实测最长 127 字）。
+    """
+    t = _caption_text(text)
+    if len(t) < 4 or len(t) > 200:
+        return False
+    first = t[0]
+    if first.islower():
+        return False
+    return first.isupper() or first.isdigit() or first in "('\"（“［["
+
+
 def _captions(lines: list[dict]) -> tuple[list[dict], list[dict]]:
-    """表格/图表题注：返回 (tables, figures)，每项 {number, caption, page}。"""
+    """表格/图表题注：返回 (tables, figures)，每项 {number, caption, page}。
+
+    正则只负责"以 Table/Figure + 编号开头"，是不是真题注交给 `_looks_like_caption`：
+    正文里 "Figure 1 illustrates …" 这种句子也会匹配正则，不能当题注收进来。
+    """
     tables: list[dict] = []
     figures: list[dict] = []
     for ln in lines:
         t = ln["text"]
         m = _TABLE_CAPTION_RE.match(t)
         if m:
-            tables.append({"number": m.group(1), "caption": m.group(2).strip(), "page": ln["page"]})
+            caption = _caption_text(m.group(2))
+            if _looks_like_caption(caption):
+                tables.append({"number": m.group(1), "caption": caption, "page": ln["page"]})
             continue
         m = _FIGURE_CAPTION_RE.match(t)
         if m:
-            figures.append({"number": m.group(1), "caption": m.group(2).strip(), "page": ln["page"]})
+            caption = _caption_text(m.group(2))
+            if _looks_like_caption(caption):
+                figures.append({"number": m.group(1), "caption": caption, "page": ln["page"]})
     return tables[:80], figures[:80]
 
 

@@ -206,12 +206,6 @@
         ]
       },
       {
-        "number": "1",
-        "caption": "highlights the following invariance results for three normalization methods.",
-        "page": 3,
-        "rows": []
-      },
-      {
         "number": "2",
         "caption": "Average results across 5 test splits for caption and image retrieval. R@K is Recall@K",
         "page": 5,
@@ -343,11 +337,6 @@
         "page": 6
       },
       {
-        "number": "1",
-        "caption": "illustrates the validation curves of the models, with and without layer normalization. We",
-        "page": 6
-      },
-      {
         "number": "3",
         "caption": "Performance of skip-thought vectors with and without layer normalization on downstream",
         "page": 7
@@ -360,11 +349,6 @@
       {
         "number": "4",
         "caption": "DRAW model test nega-",
-        "page": 8
-      },
-      {
-        "number": "4",
-        "caption": "shows the test variational bound for the ﬁrst 100",
         "page": 8
       },
       {
@@ -935,12 +919,6 @@
             "019"
           ]
         ]
-      },
-      {
-        "number": "2",
-        "caption": "summarizes our results and compares our translation quality and training costs to other model",
-        "page": 7,
-        "rows": []
       },
       {
         "number": "3",
@@ -2033,12 +2011,6 @@
             "019"
           ]
         ]
-      },
-      {
-        "number": "2",
-        "caption": "summarizes our results and compares our translation quality and training costs to other model",
-        "page": 7,
-        "rows": []
       },
       {
         "number": "3",
@@ -3207,11 +3179,6 @@
       },
       {
         "number": "2",
-        "caption": "provides another source of intuition about the surrogate objective LCLIP . It shows how",
-        "page": 2
-      },
-      {
-        "number": "2",
         "caption": "Surrogate objectives, as we interpolate between the initial policy parameter θold, and the updated",
         "page": 3
       },
@@ -3852,12 +3819,6 @@
             "15.6"
           ]
         ]
-      },
-      {
-        "number": "4",
-        "caption": "with a batch size of 32, sequence length of 1024 and a MP degree of 16. If we checkpoint",
-        "page": 11,
-        "rows": []
       },
       {
         "number": "2",
@@ -4738,21 +4699,6 @@
         "number": "6",
         "caption": "Max model size",
         "page": 15
-      },
-      {
-        "number": "6",
-        "caption": "shows the largest trainable model by enabling diﬀerent",
-        "page": 17
-      },
-      {
-        "number": "7",
-        "caption": "shows the maximum memory cached by PyTorch during",
-        "page": 17
-      },
-      {
-        "number": "8",
-        "caption": "shows the best achievable performance for diﬀerent",
-        "page": 18
       }
     ],
     "formulas": [
@@ -5552,11 +5498,6 @@
         "number": "4",
         "caption": "Schematics of the Transformer architecture variants we consider. In this diagram,",
         "page": 16
-      },
-      {
-        "number": "5",
-        "caption": "shows a flow chart of the choices made during our exploration of unsupervised",
-        "page": 23
       },
       {
         "number": "5",
@@ -7348,18 +7289,6 @@
         ]
       },
       {
-        "number": "2.1",
-        "caption": "shows the sizes and architectures of our 8 models. Here nparams is the total number of trainable parameters,",
-        "page": 7,
-        "rows": []
-      },
-      {
-        "number": "2.2",
-        "caption": "shows the ﬁnal mixture of datasets that we used in training. The CommonCrawl data was downloaded from",
-        "page": 7,
-        "rows": []
-      },
-      {
         "number": "2.2",
         "caption": "Datasets used to train GPT-3. “Weight in training mix” refers to the fraction of examples during training",
         "page": 8,
@@ -7980,18 +7909,8 @@
         "page": 4
       },
       {
-        "number": "1.2",
-        "caption": "illustrates the conditions we study, and shows few-shot learning of a simple task requiring the model to",
-        "page": 4
-      },
-      {
         "number": "2.1",
         "caption": "Zero-shot, one-shot and few-shot, contrasted with traditional ﬁne-tuning. The panels above show",
-        "page": 6
-      },
-      {
-        "number": "2.1",
-        "caption": "shows the four methods using the example of translating English to French. In this paper we focus on",
         "page": 6
       },
       {
@@ -8232,12 +8151,6 @@
         ]
       },
       {
-        "number": "2",
-        "caption": "shows the results. The smaller ViT-L/16 model pre-trained on JFT-300M outperforms BiT-L",
-        "page": 4,
-        "rows": []
-      },
-      {
         "number": "3",
         "caption": "Hyperparameters for training. All models are trained with a batch size of 4096 and learn-",
         "page": 12,
@@ -8369,12 +8282,6 @@
             "0.1"
           ]
         ]
-      },
-      {
-        "number": "3",
-        "caption": "summarizes our training setups for our different models. We found strong regularization",
-        "page": 12,
-        "rows": []
       },
       {
         "number": "4",
@@ -8922,18 +8829,6 @@
         ]
       },
       {
-        "number": "8",
-        "caption": "summarizes the results from this ablation study on a ViT-B/16 model. As we can see, while",
-        "page": 17,
-        "rows": []
-      },
-      {
-        "number": "9",
-        "caption": "shows the scores attained on each of the VTAB-1k tasks.",
-        "page": 19,
-        "rows": []
-      },
-      {
         "number": "9",
         "caption": "Breakdown of VTAB-1k performance across tasks.",
         "page": 21,
@@ -8952,11 +8847,6 @@
         "page": 5
       },
       {
-        "number": "2",
-        "caption": "decomposes the VTAB tasks into their respective groups, and compares to previous SOTA",
-        "page": 5
-      },
-      {
         "number": "4",
         "caption": "Linear few-shot evaluation on Ima-",
         "page": 6
@@ -8967,11 +8857,6 @@
         "page": 6
       },
       {
-        "number": "5",
-        "caption": "contains the transfer performance versus total pre-training compute (see Appendix D.5",
-        "page": 7
-      },
-      {
         "number": "6",
         "caption": "Representative ex-",
         "page": 7
@@ -8980,11 +8865,6 @@
         "number": "7",
         "caption": "Left: Filters of the initial linear embedding of RGB values of ViT-L/32. Center: Sim-",
         "page": 8
-      },
-      {
-        "number": "5",
-        "caption": "from the paper and shows the transfer performance of ViT, ResNet, and hybrid models of",
-        "page": 14
       },
       {
         "number": "8",
@@ -10120,18 +10000,8 @@
       },
       {
         "number": "4",
-        "caption": "demonstrates consistent scaling beneﬁts with the number of experts when training",
-        "page": 11
-      },
-      {
-        "number": "4",
         "caption": "Scaling properties of the Switch Transformer. Left Plot: We measure the quality",
         "page": 11
-      },
-      {
-        "number": "4",
-        "caption": "demonstrates that on a step basis, as we increase the number of experts, the",
-        "page": 12
       },
       {
         "number": "5",
@@ -10849,11 +10719,6 @@
       },
       {
         "number": "10",
-        "caption": "summarizes our ﬁndings. To minimize selection",
-        "page": 10
-      },
-      {
-        "number": "10",
         "caption": "Linear probe performance of CLIP models in comparison with state-of-the-art computer vision models, including",
         "page": 11
       },
@@ -10870,11 +10735,6 @@
       {
         "number": "13",
         "caption": "Zero-shot CLIP is much more robust to distribution shift than standard ImageNet models. (Left) An ideal robust model",
-        "page": 14
-      },
-      {
-        "number": "14",
-        "caption": "we see that this improves average effective ro-",
         "page": 14
       },
       {
@@ -11847,12 +11707,6 @@
             "91.4"
           ]
         ]
-      },
-      {
-        "number": "6",
-        "caption": "shows that, surprisingly, LoRA already performs competitively with a very small r (more",
-        "page": 9,
-        "rows": []
       },
       {
         "number": "7",
@@ -16550,28 +16404,13 @@
         "page": 0
       },
       {
-        "number": "1",
-        "caption": "shows an example of a model producing a chain of thought to solve a math word problem",
-        "page": 2
-      },
-      {
         "number": "3",
         "caption": "Examples of ⟨input, chain of thought, output⟩triples for arithmetic, commonsense, and",
         "page": 3
       },
       {
-        "number": "4",
-        "caption": "shows how PaLM 540B uses chain-of-",
-        "page": 4
-      },
-      {
         "number": "6",
         "caption": "Chain-of-thought prompting",
-        "page": 5
-      },
-      {
-        "number": "6",
-        "caption": "shows these results for LaMDA 137B on GSM8K",
         "page": 5
       },
       {
@@ -17814,83 +17653,6 @@
       },
       {
         "number": "5",
-        "caption": "shows that sequence length 16K outperforms length 512 by 4.3 points on MIMIC, and that length",
-        "page": 8,
-        "rows": [
-          [
-            "cro 𝐹1) at different seq",
-            "uence",
-            "leng",
-            "ths",
-            "using",
-            "Model",
-            "Path-X",
-            "Path-256"
-          ],
-          [
-            "FlashAttention.",
-            "",
-            "",
-            "",
-            "",
-            "Transformer",
-            "(cid:55)",
-            "(cid:55)"
-          ],
-          [
-            "",
-            "",
-            "",
-            "",
-            "",
-            "Linformer[84]",
-            "(cid:55)",
-            "(cid:55)"
-          ],
-          [
-            "512 1024 MIMIC-III[47] 52.8 50.7",
-            "2048 51.7",
-            "4096 54.6",
-            "8192 56.4",
-            "16384 57.1",
-            "LinearAttention[50] Performer[12]",
-            "(cid:55) (cid:55)",
-            "(cid:55) (cid:55)"
-          ],
-          [
-            "ECtHR[6] 72.2 74.3",
-            "77.1",
-            "78.6",
-            "80.7",
-            "79.2",
-            "LocalAttention[80] Reformer[51] SMYRF[19]",
-            "(cid:55) (cid:55) (cid:55)",
-            "(cid:55) (cid:55) (cid:55)"
-          ],
-          [
-            "",
-            "",
-            "",
-            "",
-            "",
-            "FlashAttention",
-            "61.4",
-            "(cid:55)"
-          ],
-          [
-            "",
-            "",
-            "",
-            "",
-            "",
-            "Block-sparseFlashAttention",
-            "56.0",
-            "63.1"
-          ]
-        ]
-      },
-      {
-        "number": "5",
         "caption": "Long Document performance (mi-",
         "page": 8,
         "rows": []
@@ -18936,11 +18698,6 @@
         "page": 8
       },
       {
-        "number": "5",
-        "caption": "shows the cross-entropy loss on the three generative BIG-Bench tasks (modiﬁed arithmetic, IPA",
-        "page": 18
-      },
-      {
         "number": "6",
         "caption": "(middle row) shows the cross-entropy loss of the three classiﬁcation BIG-Bench tasks. Similar to the",
         "page": 18
@@ -19470,11 +19227,6 @@
       {
         "number": "7",
         "caption": "BIG-bench-lite evalua-",
-        "page": 7
-      },
-      {
-        "number": "7",
-        "caption": "and Table 4, GLM-130B outperforms GPT-3 175B and even PaLM 540B (4× larger) in",
         "page": 7
       },
       {
@@ -20767,38 +20519,6 @@
             "176B",
             "433 MWh",
             "25 tons"
-          ]
-        ]
-      },
-      {
-        "number": "5",
-        "caption": "shows examples of the resulting prompts used for the WMT’14 task. We also",
-        "page": 24,
-        "rows": [
-          [
-            "Promptname",
-            "Prompt",
-            "Target"
-          ],
-          [
-            "a_good_translation-source+target",
-            "Giventhefollowingsourcetext: [sourcesentence],agoodL2translationis:",
-            "[targetsentence]"
-          ],
-          [
-            "gpt3-target",
-            "WhatistheL2translationofthesentence: [sourcesentence]?",
-            "[targetsentence]"
-          ],
-          [
-            "version-target",
-            "iftheoriginalversionsays[sourcesentence];thentheL2versionshouldsay:",
-            "[targetsentence]"
-          ],
-          [
-            "xglm-source+target",
-            "L1: [sourcesentence]=L2:",
-            "[targetsentence]"
           ]
         ]
       },
@@ -27114,11 +26834,6 @@
         "number": "9",
         "caption": "Rate of incorrect behavior on sensitive and disallowed prompts. Lower values are better.",
         "page": 13
-      },
-      {
-        "number": "10",
-        "caption": "in the System Card for more details) to generate content which violate our usage guidelines.",
-        "page": 13
       }
     ],
     "formulas": [
@@ -28461,11 +28176,6 @@
         "number": "3",
         "caption": "RWKV architecture for language modeling.",
         "page": 3
-      },
-      {
-        "number": "4",
-        "caption": "shows our results for loss as a function of",
-        "page": 5
       },
       {
         "number": "4",
@@ -30164,11 +29874,6 @@
         "page": 5
       },
       {
-        "number": "3",
-        "caption": "and Table 2 we see that NF4 improves per-",
-        "page": 5
-      },
-      {
         "number": "4",
         "caption": "LoRA r for LLaMA 7B models finetuned on Alpaca. Each dot represents a combination of",
         "page": 21
@@ -30613,11 +30318,6 @@
       {
         "number": "3",
         "caption": "Left. Win rates computed by GPT-4 for Anthropic-HH one-step dialogue; DPO is the only method",
-        "page": 7
-      },
-      {
-        "number": "2",
-        "caption": "shows the reward-KL frontier for various algorithms in the sentiment setting. We execute",
         "page": 7
       },
       {
@@ -31461,12 +31161,6 @@
             "539.00"
           ]
         ]
-      },
-      {
-        "number": "2",
-        "caption": "summarizes the carbon emission for pretraining the Llama 2 family of models. A cumulative of",
-        "page": 6,
-        "rows": []
       },
       {
         "number": "3",
@@ -32322,11 +32016,6 @@
         "page": 17
       },
       {
-        "number": "11",
-        "caption": "reports the progress of our different SFT and then RLHF versions for",
-        "page": 17
-      },
-      {
         "number": "12",
         "caption": "Human evaluation results for Llama 2-Chat models compared to open- and closed-source models",
         "page": 18
@@ -32866,24 +32555,6 @@
     ],
     "tables": [
       {
-        "number": "16",
-        "caption": "in Appendix.",
-        "page": 3,
-        "rows": []
-      },
-      {
-        "number": "17",
-        "caption": "and 18 in Appendix.",
-        "page": 3,
-        "rows": []
-      },
-      {
-        "number": "1",
-        "caption": "presents the",
-        "page": 3,
-        "rows": []
-      },
-      {
         "number": "1",
         "caption": "General performance of the pre-trained base models via Vanilla Pre-Training (Vanilla PT), mixing raw",
         "page": 4,
@@ -33203,12 +32874,6 @@
         ]
       },
       {
-        "number": "4",
-        "caption": "presents ablation results for",
-        "page": 5,
-        "rows": []
-      },
-      {
         "number": "5",
         "caption": "Response accuracy and instruction-response",
         "page": 6,
@@ -33255,12 +32920,6 @@
         "number": "8",
         "caption": "Hyper-parameters of fine-tuning the instruc-",
         "page": 14,
-        "rows": []
-      },
-      {
-        "number": "9",
-        "caption": "shows:",
-        "page": 15,
         "rows": []
       },
       {
@@ -33656,11 +33315,6 @@
         "page": 2
       },
       {
-        "number": "4",
-        "caption": "shows the",
-        "page": 4
-      },
-      {
         "number": "5",
         "caption": "Helpfulness on LM generalization mea-",
         "page": 6
@@ -33669,11 +33323,6 @@
         "number": "6",
         "caption": "Distribution of task scenarios of synthe-",
         "page": 7
-      },
-      {
-        "number": "7",
-        "caption": "displays our dataset collection for fine-",
-        "page": 14
       },
       {
         "number": "7",
@@ -38412,7 +38061,7 @@
     "tables": [
       {
         "number": "1",
-        "caption": "| Training costs of DeepSeek-V3, assuming the rental price of H800 is $2 per GPU hour.",
+        "caption": "Training costs of DeepSeek-V3, assuming the rental price of H800 is $2 per GPU hour.",
         "page": 4,
         "rows": [
           [
@@ -38440,7 +38089,7 @@
       },
       {
         "number": "2",
-        "caption": "| Comparison of pipeline bubbles and memory usage across different pipeline parallel",
+        "caption": "Comparison of pipeline bubbles and memory usage across different pipeline parallel",
         "page": 12,
         "rows": [
           [
@@ -38477,7 +38126,7 @@
       },
       {
         "number": "3",
-        "caption": "| Comparison among DeepSeek-V3-Base and other representative open-source base",
+        "caption": "Comparison among DeepSeek-V3-Base and other representative open-source base",
         "page": 24,
         "rows": [
           [
@@ -38855,42 +38504,42 @@
     "figures": [
       {
         "number": "1",
-        "caption": "| Benchmark performance of DeepSeek-V3 and its counterparts.",
+        "caption": "Benchmark performance of DeepSeek-V3 and its counterparts.",
         "page": 0
       },
       {
         "number": "2",
-        "caption": "| Illustration of the basic architecture of DeepSeek-V3. Following DeepSeek-V2, we",
+        "caption": "Illustration of the basic architecture of DeepSeek-V3. Following DeepSeek-V2, we",
         "page": 6
       },
       {
         "number": "3",
-        "caption": "| Illustration of our Multi-Token Prediction (MTP) implementation. We keep the",
+        "caption": "Illustration of our Multi-Token Prediction (MTP) implementation. We keep the",
         "page": 9
       },
       {
         "number": "4",
-        "caption": "| Overlapping strategy for a pair of individual forward and backward chunks (the",
+        "caption": "Overlapping strategy for a pair of individual forward and backward chunks (the",
         "page": 11
       },
       {
         "number": "5",
-        "caption": "| Example DualPipe scheduling for 8 PP ranks and 20 micro-batches in two directions.",
+        "caption": "Example DualPipe scheduling for 8 PP ranks and 20 micro-batches in two directions.",
         "page": 12
       },
       {
         "number": "6",
-        "caption": "| The overall mixed precision framework with FP8 data format. For clarification, only",
+        "caption": "The overall mixed precision framework with FP8 data format. For clarification, only",
         "page": 14
       },
       {
         "number": "7",
-        "caption": "| (a) We propose a fine-grained quantization method to mitigate quantization errors",
+        "caption": "(a) We propose a fine-grained quantization method to mitigate quantization errors",
         "page": 15
       },
       {
         "number": "8",
-        "caption": "| Evaluation results on the ”Needle In A Haystack” (NIAH) tests. DeepSeek-V3",
+        "caption": "Evaluation results on the ”Needle In A Haystack” (NIAH) tests. DeepSeek-V3",
         "page": 22
       }
     ],
@@ -39490,25 +39139,19 @@
     "tables": [
       {
         "number": "1",
-        "caption": "| Template for DeepSeek-R1-Zero. prompt will be replaced with the specific reasoning",
+        "caption": "Template for DeepSeek-R1-Zero. prompt will be replaced with the specific reasoning",
         "page": 2,
         "rows": []
       },
       {
         "number": "2",
-        "caption": "| An interesting “aha moment” of an intermediate version of DeepSeek-R1-Zero. The",
+        "caption": "An interesting “aha moment” of an intermediate version of DeepSeek-R1-Zero. The",
         "page": 4,
         "rows": []
       },
       {
         "number": "3",
-        "caption": "summarizes the performance of DeepSeek-R1 across multiple developmental stages,",
-        "page": 7,
-        "rows": []
-      },
-      {
-        "number": "3",
-        "caption": "| Experimental results at each stage of DeepSeek-R1. Numbers in bold denote the",
+        "caption": "Experimental results at each stage of DeepSeek-R1. Numbers in bold denote the",
         "page": 8,
         "rows": [
           [
@@ -39722,7 +39365,7 @@
       },
       {
         "number": "4",
-        "caption": "| Description of RL Data and Tasks.",
+        "caption": "Description of RL Data and Tasks.",
         "page": 18,
         "rows": [
           [
@@ -39761,32 +39404,27 @@
     "figures": [
       {
         "number": "1",
-        "caption": "| (a) AIME accuracy of DeepSeek-R1-Zero during training. AIME takes a mathematical",
+        "caption": "(a) AIME accuracy of DeepSeek-R1-Zero during training. AIME takes a mathematical",
         "page": 3
       },
       {
         "number": "2",
-        "caption": "| The multi-stage pipeline of DeepSeek-R1. A detailed background on DeepSeek-V3",
+        "caption": "The multi-stage pipeline of DeepSeek-R1. A detailed background on DeepSeek-V3",
         "page": 5
       },
       {
         "number": "3",
-        "caption": "| Demonstration of PPO and our GRPO. GRPO foregoes the value model, instead",
+        "caption": "Demonstration of PPO and our GRPO. GRPO foregoes the value model, instead",
         "page": 14
       },
       {
         "number": "4",
-        "caption": "| Performance of PPO and GRPO on the MATH task.",
-        "page": 15
-      },
-      {
-        "number": "4",
-        "caption": "compares the performance of PPO and GRPO on the MATH task using DeepSeek-",
+        "caption": "Performance of PPO and GRPO on the MATH task.",
         "page": 15
       },
       {
         "number": "5",
-        "caption": "| Overview of our RL framework.",
+        "caption": "Overview of our RL framework.",
         "page": 16
       }
     ],
@@ -42566,12 +42204,6 @@
         ]
       },
       {
-        "number": "2",
-        "caption": "summarizes our results and compares our translation quality and training costs to other model",
-        "page": 7,
-        "rows": []
-      },
-      {
         "number": "3",
         "caption": "Variations on the Transformer architecture. Unlisted values are identical to those of the base",
         "page": 8,
@@ -43327,12 +42959,6 @@
       },
       {
         "number": "2",
-        "caption": "details various results on the different NLI tasks for our model and previous state-of-the-art",
-        "page": 4,
-        "rows": []
-      },
-      {
-        "number": "2",
         "caption": "Experimental results on natural language inference tasks, comparing our model with current",
         "page": 5,
         "rows": [
@@ -43634,11 +43260,6 @@
         "page": 3
       },
       {
-        "number": "1",
-        "caption": "provides a visual illustration. All transformations include adding randomly initialized start",
-        "page": 3
-      },
-      {
         "number": "2",
         "caption": "(left) Effect of transferring increasing number of layers from the pre-trained language",
         "page": 6
@@ -43874,12 +43495,6 @@
             "82.1"
           ]
         ]
-      },
-      {
-        "number": "2",
-        "caption": "shows top leaderboard entries as well",
-        "page": 5,
-        "rows": []
       },
       {
         "number": "3",
@@ -44266,11 +43881,6 @@
         "number": "4",
         "caption": "Illustrations of Fine-tuning BERT on Different Tasks.",
         "page": 14
-      },
-      {
-        "number": "5",
-        "caption": "presents MNLI Dev accuracy after ﬁne-",
-        "page": 15
       },
       {
         "number": "5",
@@ -45397,11 +45007,6 @@
       {
         "number": "1.1",
         "caption": "Machine learning is an area",
-        "page": 15
-      },
-      {
-        "number": "1.2",
-        "caption": "depicts several regression and classification problems. In each case, there is a",
         "page": 15
       },
       {
