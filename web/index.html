@@ -83,6 +83,7 @@
     .pill { font-size: 11px; padding: 1px 7px; border-radius: 999px; }
     .pill.dup { background: #fef3c7; color: #92400e; }
     .pill.ok { background: #dcfce7; color: #166534; }
+    .pill.keep { background: #e8f0fe; color: #1a56c4; font-weight: 600; }
     .dup-box { margin-top: 12px; border: 1px solid #f5d98b; background: #fffdf3; border-radius: 10px; padding: 10px 12px; }
     .dup-box h3 { font-size: 13px; margin: 0 0 8px; color: #92400e; }
     .dup-row { border-top: 1px dashed #f0dca8; padding: 8px 0; font-size: 13px; }
@@ -598,15 +599,31 @@ async function loadLibrary() {
     const items = d.papers || [];
     libCountEl.textContent = `共 ${items.length} 篇`;
     libListEl.innerHTML = '';
+    // 「应保留哪份」：重复项都指到同一篇主版本，先建 id -> 文件名 的索引
+    const nameById = new Map(items.map(p => [p.paper_id, p.filename]));
+    const keeperIds = new Set(items.filter(p => p.duplicate_of).map(p => p.duplicate_of));
+    // 同名文件（比如样例 v7 和上传副本 v7 都叫 1706.03762v7.pdf）靠这个区分
+    const sameName = new Map();
+    items.forEach(p => sameName.set(p.filename, (sameName.get(p.filename) || 0) + 1));
     items.forEach(p => {
       const row = document.createElement('div');
       row.className = 'lib-row';
-      const badge = p.duplicate_of
-        ? `<span class="pill dup" title="${escapeHtml(p.duplicate_reason || '与库中论文重复')}">重复</span>`
-        : '<span class="pill ok">已入库</span>';
+      let badge;
+      if (p.duplicate_of) {
+        const keeper = nameById.get(p.duplicate_of) || p.duplicate_of;
+        badge = `<span class="pill dup" title="${escapeHtml(p.duplicate_reason || '与库中论文重复')}，建议保留《${escapeHtml(keeper)}》">重复 · 留 ${escapeHtml(keeper)}</span>`;
+      } else if (keeperIds.has(p.paper_id)) {
+        badge = '<span class="pill keep" title="同一篇论文的多份拷贝里，这份是要保留的">主版本</span>';
+      } else {
+        badge = '<span class="pill ok">已入库</span>';
+      }
+      const dupName = (sameName.get(p.filename) || 0) > 1
+        ? `<span class="meta" title="库里还有同名文件，用 id 区分">${escapeHtml(p.paper_id)}</span>`
+        : '';
       row.innerHTML = `
         <div class="name" title="${escapeHtml(p.filename)}">${escapeHtml(p.filename)}</div>
         <div class="meta">${p.pages || '?'} 页 · ${fmtSize(p.size)}</div>
+        ${dupName}
         ${badge}
         <div class="act">
           <a href="/ui/reader.html?paper=${encodeURIComponent(p.filename)}&page=1" target="_blank" rel="noopener">阅读</a>
