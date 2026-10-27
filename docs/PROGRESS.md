@@ -234,3 +234,26 @@ uff 全绿；提交 8b0908 已 push。
   - 无头 Edge 会缓存旧 HTML，CDP 里必须 `Network.setCacheDisabled`，否则改了看不到；
   - `_left_margin` 用 `min(x)` 会被一条 x≈10 的怪行带偏，改成"按整数 x 聚类取最左一档"。
 - 下一步：1.3.3 翻译（部分 / 整篇 / 中英对照）。
+
+## 2026-10-27（周二·深夜三轮）1.3.2 三个遗留问题收口：结构文件入库 + 扫描件借树 + 作者-年份引用
+
+- 交付：
+  - **结构文件搬进可提交位置**：`data/meta/structures.json`（原来在 `data/papers/` 里被 .gitignore 排除，换机器就没章节树）。`app/papers.py` 新增 `META_DIR` / `DEFAULT_STRUCTURES_FILE` / `LEGACY_STRUCTURES_FILE` / `structures_file()` / `save_structures()`：新路径优先、旧路径兜底、老环境第一次 save 自动迁移。
+  - **扫描件借树**：新脚本 `scripts/borrow_sections.py`，先按标题、再按 arXiv 编号找同篇文本版；借来的树在侧栏注明「章节树借自同篇论文的文本版（…），页码以它为准」，借不到就明示"没有解析到章节结构"，不静默失败。
+  - **作者-年份引用可点**：`[Ioffe and Szegedy, 2015]` 这类不再是死文字——点它跳到 References 对应条目并高亮，条目上浮出的「↩ 返回第 N 页」回到原页且把原来的引用闪一下（和数字引用 `[38]` 同一套体验）。
+  - 顺带把章节解析压到 39 篇全有二级标题：`_SECTION_RE` / `_NUMBER_ONLY_RE` 支持 `2.1.` 这种带尾点的 ICLR 写法；`_left_margins()` 多栏左边界（CLIP/Codex 的双栏标题）；`_title_ok` 过滤表格行/题注/公式，并给全大写标题留兜底。
+- 证据（原文）：
+  - `scripts/refresh_sections.py --all` → `校验：json.load OK，39 篇；二级标题 786 个，三级 151 个；仍无二级标题 1 篇`
+  - `scripts/borrow_sections.py` → `borrow 1706.03762v1_img.pdf: 27 节 <- 1706.03762v1.pdf（同 arXiv 编号）` / `共借到 1 篇`
+  - `git check-ignore -v data/meta/structures.json` 无输出（可提交）；文件 987,509 字节
+  - `153 passed, 10 warnings in 31.75s`；`ruff check app tests scripts` → `All checks passed!`
+  - CDP 实测（`.tmp_shot/verify3.py`）：
+    - 作者-年份：`{"before":{"page":"3","ref":11},"clicked":{"text":"[Ioffe and Szegedy, 2015]","key":"ioffe|2015"},"after":{"page":"11","hitText":"Sergey Ioffe and Christian Szegedy.","backShown":true,"backLabel":"3"},"back":{"page":"3"}}`
+    - 借树侧栏：`{"note":"章节树借自同篇论文的文本版（1706.03762v1.pdf），页码以它为准","count":27,"empty":false}`
+    - 数字引用回归：`{"before":{"hostPage":"2","cur":3,"ref":10},"at_ref":{"page":"12","hit":"[38]","refLink":true},"back_entry":{"page":"2","citeHit":1,"hitText":"38"},"back_btn":{"page":"2","hitText":"38"}}`
+- 坑：
+  - pdf.js 把一条参考文献切成好几块（`Sergey Ioffe and Christian Szegedy.` / `In ICLR, 2015.`），姓氏和年份**不在同一个文本块**里。按单块同时匹配姓氏+年份会全部落空；改成把整页文本块拼成长串、找姓氏后在后面 420 字内找年份，再映射回 span。
+  - 拼长串时不能取 `.textLayer span`（会把它内部嵌套的 `.ref-link` / `.cite-n` 也数进去，文字重复、位置错位），要用 `.textLayer > span`。
+  - 扫描版 PDF 没有文本层，CDP 等待 `#viewer .textLayer span` 会永久超时——等页面 `.page` 就行。
+  - 日志/输出里的中文在 PowerShell 里会变成乱码（GBK 控制台），要么设 `$env:PYTHONIOENCODING='utf-8'`，要么把结果写进 utf-8 文件再读。
+- 下一步：1.3.3 翻译（部分 / 整篇 / 中英对照），以及 1.3.1 的公式/表格排版体验（题注定位、表格行高亮）。

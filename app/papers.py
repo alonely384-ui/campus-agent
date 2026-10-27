@@ -168,17 +168,45 @@ def structure_path(paper_id: str) -> Path:
     return PAPERS_DIR / f"{paper_id}.structure.json"
 
 
-STRUCTURES_FILE = PAPERS_DIR / "structures.json"
+# 结构化产物（标题/作者/章节树）放 data/meta/ —— 它是要入库的「数据字典」，
+# 不是能随时重下的大文件；data/papers/ 整个目录被 .gitignore 排除，放在那里
+# 换台机器就没有章节树了。旧位置保留成兜底，老环境不用手动搬。
+META_DIR = BASE_DIR / "data" / "meta"
+DEFAULT_STRUCTURES_FILE = META_DIR / "structures.json"
+LEGACY_STRUCTURES_FILE = PAPERS_DIR / "structures.json"
+STRUCTURES_FILE = DEFAULT_STRUCTURES_FILE
+
+
+def structures_file() -> Path:
+    """当前该读/写哪个结构文件：新位置优先，没迁移的老环境读旧位置。
+
+    STRUCTURES_FILE 是模块级变量，测试会 monkeypatch 它；被改过就不是默认路径，
+    必须原样用（不能让测试误读写仓库里的真实数据）。
+    """
+    if STRUCTURES_FILE != DEFAULT_STRUCTURES_FILE or STRUCTURES_FILE.exists():
+        return STRUCTURES_FILE
+    return LEGACY_STRUCTURES_FILE if LEGACY_STRUCTURES_FILE.exists() else STRUCTURES_FILE
 
 
 def load_structures() -> dict[str, dict]:
     """按文件名索引的结构化元数据缓存（由 scripts/build_structure.py 生成）。"""
-    if not STRUCTURES_FILE.exists():
+    path = structures_file()
+    if not path.exists():
         return {}
     try:
-        return json.loads(STRUCTURES_FILE.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         return {}
+
+
+def save_structures(data: dict[str, dict]) -> Path:
+    """写回结构文件；老环境第一次写就顺手迁到新位置，读和写不会分裂成两份。"""
+    path = structures_file()
+    if path == LEGACY_STRUCTURES_FILE:
+        path = DEFAULT_STRUCTURES_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
 
 
 def paper_meta(source: str) -> dict | None:
@@ -313,9 +341,7 @@ def delete_structure(source: str) -> bool:
     if source not in data:
         return False
     data.pop(source)
-    STRUCTURES_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    save_structures(data)
     return True
 
 

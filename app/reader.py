@@ -101,6 +101,9 @@ def reader_meta(filename: str) -> dict | None:
              "page": int(a.get("page") or 0) + 1}
             for a in (meta.get("appendix") or [])
         ],
+        # 扫描件抽不出标题时，章节树是借用同一篇论文的文本版（页码按文本版算）；
+        # 前端据此在侧栏注明来源，别让人以为扫描件自己解析出了目录。
+        "sections_borrowed_from": str(meta.get("sections_borrowed_from") or ""),
     }
 
 

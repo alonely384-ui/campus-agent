@@ -69,13 +69,12 @@ def main(filename: str) -> None:
         p.unlink()
         print(f"已删除文件: {p}")
 
-    import json
+    from app.papers import load_structures, save_structures
 
-    sf = PAPERS_DIR / "structures.json"
-    if sf.exists():
-        data = json.loads(sf.read_text(encoding="utf-8"))
+    data = load_structures()
+    if filename in data:
         data.pop(filename, None)
-        sf.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        save_structures(data)
         print("已清理 structures.json 条目")
 
 

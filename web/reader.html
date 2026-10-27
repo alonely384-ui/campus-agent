@@ -105,6 +105,10 @@
   }
   nav#toc .caret:hover { background: #eef1f6; color: var(--blue); }
   #tocEmpty { font-size: 12px; color: #9aa3af; padding: 6px 8px; line-height: 1.6; }
+  #tocNote {
+    font-size: 11px; color: #6b7280; background: #f3f4f6; border-radius: 6px;
+    padding: 5px 8px; margin: 0 0 6px; line-height: 1.5;
+  }
 
   main#viewer {
     flex: 1 1 auto; padding: 18px 16px 40px;
@@ -143,6 +147,13 @@
     cursor: pointer;
   }
   .textLayer span.cite-n:hover { background: rgba(26,115,232,.42); }
+  /* 作者-年份引用：[Ioffe and Szegedy, 2015]，点它按 姓氏+年份 找 References 条目 */
+  .textLayer span.cite-a {
+    color: transparent; background: rgba(16,145,96,.18); border-radius: 2px;
+    cursor: pointer;
+  }
+  .textLayer span.cite-a:hover { background: rgba(16,145,96,.44); }
+  .textLayer span.cite-a.hit { background: rgba(16,145,96,.34); box-shadow: 0 0 0 2px rgba(16,145,96,.35); }
   /* References 页上每条条目的 [n] 编号：点它跳回正文里第一次引用它的位置 */
   .textLayer span.ref-link {
     color: transparent; background: rgba(124,58,237,.16); border-radius: 2px;
@@ -297,7 +308,8 @@ const state = {
   tocAnchors: [],
   paperMeta: null,
   citeIndex: new Map(),  // 引用编号 n -> 正文里第一次出现它的页码（惰性扫描后缓存）
-  citeOrigin: null,      // 最近一次从正文点进来的引用：{n, page, top}，供 References 条目跳回
+  citeOrigin: null,      // 最近一次从正文点进来的引用：{key, page, top}，供 References 条目跳回
+  authorIndex: new Map(), // "姓氏|年份" -> {page, needle}，作者-年份引用的惰性索引
 };
 
 // ---------- 小工具 ----------
@@ -319,6 +331,16 @@ const CITE_RE = /\[\s*\d{1,3}(?:\s*[,;–\-]\s*\d{1,3})*\s*\]/g;
 // References 页上一条条目的开头："[11] 作者…"；有的论文写成 "11. 作者…"，用两个正则兜住
 const REF_ENTRY_RE = /^\s*\[(\d{1,3})\]/;
 const REF_ENTRY_PLAIN_RE = /^\s*(\d{1,3})\.\s+\S/;
+// 方括号里的两种写法都扫：数字引用，或 "姓氏…, 2015" 这种作者-年份引用
+const CITE_ANY_RE = /\[\s*(?:\d{1,3}(?:\s*[,;–\-]\s*\d{1,3})*|[^\[\]]{2,90}?,\s*(?:19|20)\d{2}[a-z]?)\s*\]/g;
+
+/** "[Ioffe and Szegedy, 2015]" -> {surname:'Ioffe', year:'2015', key:'ioffe|2015'}；不是就返回 null。 */
+function parseAuthorCite(raw) {
+  const body = raw.replace(/^\[\s*/, '').replace(/\s*\]$/, '');
+  const m = /^([A-Z][A-Za-z.'’\-]{1,24})[^,]{0,60}?,\s*((?:19|20)\d{2})[a-z]?$/.exec(body);
+  if (!m) return null;
+  return { surname: m[1], year: m[2], key: `${m[1].toLowerCase()}|${m[2]}` };
+}
 
 // ---------- 打开一篇论文 ----------
 async function openPaper(filename, page) {
@@ -444,6 +466,12 @@ function renderSidebar(meta) {
 
   if (!secs.length) {
     tocEl.innerHTML = '<div id="tocEmpty">这篇没有解析到章节结构（可能是扫描件）。<br>可以用上面的页码框手动跳页，正文里的 [n] 引用仍可点击。</div>';
+  } else if (meta && meta.sections_borrowed_from) {
+    // 借来的树要标来源：页码是同篇论文文本版的分页，扫描件可能有偏移
+    const note = document.createElement('div');
+    note.id = 'tocNote';
+    note.textContent = `章节树借自同篇论文的文本版（${meta.sections_borrowed_from}），页码以它为准`;
+    tocEl.appendChild(note);
   }
 
   // 章节树按 level 嵌套：一级标题带 ▾ 折叠箭头，二级/三级挂在下面
@@ -669,20 +697,43 @@ function buildTextLayer(items, viewport, layer, pageNo) {
     const parts = [];
     let last = 0;
     let m;
-    CITE_RE.lastIndex = 0;
-    while (!isRefRegion && (m = CITE_RE.exec(item.str)) !== null) {
-      if (m.index > last) parts.push({ text: item.str.slice(last, m.index), cite: false });
-      parts.push({ text: m[0], cite: true });
+    CITE_ANY_RE.lastIndex = 0;
+    while (!isRefRegion && (m = CITE_ANY_RE.exec(item.str)) !== null) {
+      const isNum = /^\s*\[\s*\d/.test(m[0]);
+      const ay = isNum ? null : parseAuthorCite(m[0]);
+      if (!isNum && !ay) continue;      // 方括号里既不是编号也不是作者-年份，当普通文字
+      if (m.index > last) parts.push({ text: item.str.slice(last, m.index) });
+      parts.push({ text: m[0], kind: isNum ? 'num' : 'author', ay });
       last = m.index + m[0].length;
     }
-    if (last < item.str.length) parts.push({ text: item.str.slice(last), cite: false });
+    if (last < item.str.length) parts.push({ text: item.str.slice(last) });
 
-    if (parts.length === 1 && !parts[0].cite) {
+    if (parts.length === 1 && !parts[0].kind) {
       span.textContent = item.str;
     } else {
       parts.forEach(p => {
-        if (!p.cite) {
+        if (!p.kind) {
           span.appendChild(document.createTextNode(p.text));
+          return;
+        }
+        // 作者-年份引用整段一起点（"[Ioffe and Szegedy, 2015]"），按 姓氏+年份 去 References 找条目
+        if (p.kind === 'author') {
+          const a = document.createElement('span');
+          a.className = 'cite-a';
+          a.dataset.key = p.ay.key;
+          a.textContent = p.text;
+          a.title = `跳到参考文献里 ${p.ay.surname} ${p.ay.year} 那一条`;
+          a.addEventListener('click', ev => {
+            ev.stopPropagation();
+            const host = a.closest('.page');
+            state.citeOrigin = {
+              key: p.ay.key,
+              page: parseInt((host && host.dataset.page) || '', 10) || state.currentPage,
+              top: viewerEl.scrollTop,
+            };
+            jumpToAuthorCitation(p.ay);
+          });
+          span.appendChild(a);
           return;
         }
         // "[38]" 整体可点；"[38, 24, 15]" 拆成三个数字各自可点
@@ -703,7 +754,7 @@ function buildTextLayer(items, viewport, layer, pageNo) {
             // 相邻页（比如第 2 页）也在视口里，它的引用编号会被点到。
             const host = num.closest('.page');
             state.citeOrigin = {
-              n: mt[0],
+              key: String(mt[0]),
               page: parseInt((host && host.dataset.page) || '', 10) || state.currentPage,
               top: viewerEl.scrollTop,
             };
@@ -817,6 +868,20 @@ function rememberBack() {
   backJumpEl.hidden = false;
 }
 
+/** 找回「当初点进来的那个引用 span」：编号引用看 data-n，作者-年份引用看 data-key。 */
+function originCiteEl() {
+  const o = state.citeOrigin;
+  if (!o) return null;
+  const pageEl = pagesEl.querySelector(`.page[data-page="${o.page}"]`);
+  if (!pageEl) return null;
+  if (/^\d+$/.test(o.key)) {
+    return [...pageEl.querySelectorAll('.textLayer span.cite-n')]
+      .find(el => el.dataset.n === o.key) || null;
+  }
+  return [...pageEl.querySelectorAll('.textLayer span.cite-a')]
+    .find(el => el.dataset.key === o.key) || null;
+}
+
 /**
  * 正文 [n] → References 第 n 条（赛题 1.3.2 第 2 条的前半段）。
  * 条目在 References 起始页之后的几页里也常见，所以往下最多翻 12 页找；
@@ -853,6 +918,89 @@ async function jumpToCitation(n) {
   backJumpEl.hidden = false;
 }
 
+/**
+ * 作者-年份引用 → References 里的条目（赛题 1.3.2 第 2 条的作者-年份版）。
+ * 难点：pdf.js 把一条参考文献切成好几个文本块（"Sergey Ioffe and Christian
+ * Szegedy." / "In ICLR, 2015."），姓氏和年份往往不在同一个块里。所以这里把整页
+ * 文本块按顺序拼成一条长串，先找姓氏，再在它后面 420 字内找年份，最后把字符位置
+ * 映射回具体的 span。命中记成 {page, index, needle}，回 DOM 时按下标取最准。
+ */
+async function findRefEntryByAuthor(ay) {
+  if (state.authorIndex.has(ay.key)) return state.authorIndex.get(ay.key);
+  if (!state.pdf || !state.refPage) return null;
+  const last = Math.min(state.refPage + 15, state.numPages);
+  const surname = ay.surname.toLowerCase();
+  for (let p = state.refPage; p <= last; p++) {
+    await ensureRendered(p);
+    // 只取直接子 span（每个 pdf.js 文本块一个），不要把它内部再嵌的 .ref-link / .cite-n
+    // 也数进来，否则拼出来的整页文字会重复、字符位置映射也会错位
+    const spans = [...pagesEl.querySelectorAll(`.page[data-page="${p}"] .textLayer > span`)];
+    if (!spans.length) continue;
+    let flat = '';
+    const map = [];   // 每段在 flat 里的字符区间，用来把命中位置映射回 span
+    spans.forEach((s, i) => {
+      const t = (s.textContent || '').replace(/\s+/g, ' ');
+      map.push({ start: flat.length, end: flat.length + t.length, i });
+      flat += t + ' ';
+    });
+    const low = flat.toLowerCase();
+    let from = 0;
+    while (true) {
+      const at = low.indexOf(surname, from);
+      if (at < 0) break;
+      from = at + surname.length;
+      // 年份要在同一个条目的可视范围里（姓氏之后 420 字内），否则是同名不同篇
+      if (!flat.slice(at, at + 420).includes(ay.year)) continue;
+      const item = map.find(m => m.start <= at && at < m.end);
+      if (!item) continue;
+      const span = spans[item.i];
+      const hit = {
+        page: p,
+        index: item.i,
+        needle: (span.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24),
+      };
+      state.authorIndex.set(ay.key, hit);
+      return hit;
+    }
+  }
+  state.authorIndex.set(ay.key, null);
+  return null;
+}
+
+/** 在某一页的文本层里找回条目那一行：优先按下标，退化时按开头若干字。 */
+function refSpanByNeedle(pageNo, needle, index) {
+  const spans = [...pagesEl.querySelectorAll(`.page[data-page="${pageNo}"] .textLayer > span`)];
+  if (typeof index === 'number' && spans[index]) return spans[index];
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+  const want = norm(needle).slice(0, 18);
+  return spans.find(s => norm(s.textContent).startsWith(want)) || null;
+}
+
+async function jumpToAuthorCitation(ay) {
+  if (!state.refPage) {
+    toast('这篇没有解析到 References 章节');
+    return;
+  }
+  const before = { page: state.currentPage, top: viewerEl.scrollTop };
+  const hit = await findRefEntryByAuthor(ay);
+  if (!hit) {
+    // 优雅降级：找不到条目就跳 References 起始页，别让点击像没反应
+    toast(`没在 References 里找到 ${ay.surname} ${ay.year}，已跳到起始页`);
+    state.backTo = before;
+    backJumpPageEl.textContent = String(before.page);
+    jumpToPage(state.refPage, { silent: true });
+    backJumpEl.hidden = false;
+    return;
+  }
+  jumpToPage(hit.page, { silent: true });
+  await ensureRendered(hit.page);
+  const el = refSpanByNeedle(hit.page, hit.needle, hit.index);
+  if (el) { scrollElIntoView(el); flashEl(el); }
+  state.backTo = before;
+  backJumpPageEl.textContent = String(before.page);
+  backJumpEl.hidden = false;
+}
+
 /** 扫正文页（References 之前），找编号 n 第一次被引用的页码；结果缓存。 */
 async function findFirstBodyCitation(n) {
   if (state.citeIndex.has(n)) return state.citeIndex.get(n);
@@ -879,7 +1027,7 @@ async function findFirstBodyCitation(n) {
 /** References 条目编号 → 正文里引用它的位置（赛题 1.3.2 第 2 条的后半段）。 */
 async function jumpToBodyCitation(n) {
   const before = { page: state.currentPage, top: viewerEl.scrollTop };
-  const origin = state.citeOrigin && state.citeOrigin.n === String(n) ? state.citeOrigin : null;
+  const origin = state.citeOrigin && state.citeOrigin.key === String(n) ? state.citeOrigin : null;
   let pageNo = origin ? origin.page : null;   // 优先回到"当初点进来的那一页"
   if (!pageNo) pageNo = await findFirstBodyCitation(n);
   if (!pageNo) {
@@ -906,14 +1054,20 @@ async function jumpToBodyCitation(n) {
 }
 
 backJumpEl.addEventListener('click', () => {
-  if (!state.backTo) return;
-  viewerEl.scrollTop = state.backTo.top;
-  state.currentPage = state.backTo.page;
-  pageInputEl.value = String(state.backTo.page);
-  markActiveSection(state.backTo.page);
-  requestAnimationFrame(() => renderPage(state.backTo.page));
+  const back = state.backTo;
+  if (!back) return;
+  viewerEl.scrollTop = back.top;
+  state.currentPage = back.page;
+  pageInputEl.value = String(back.page);
+  markActiveSection(back.page);
   backJumpEl.hidden = true;
   state.backTo = null;
+  requestAnimationFrame(async () => {
+    await renderPage(back.page);
+    // 回到原位后把当初那个引用闪一下：只闪不滚，别把刚恢复的滚动位置又带走
+    const el = originCiteEl();
+    if (el) flashEl(el);
+  });
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !backJumpEl.hidden) {
