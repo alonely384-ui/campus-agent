@@ -46,6 +46,9 @@ class Paper:
     pages: int             # 页数（解析失败记 0）
     uploaded_at: str       # 上传时间（ISO 格式字符串）
     duplicate_of: str = ""  # 若被判重，填库中已存在那篇的 paper_id
+    # 判重的依据：「文本相似度」还是「同一 arXiv 编号」。扫描件抽不出字，
+    # 只能靠编号认亲，所以要把依据也带出去，前端才能解释为什么说它重复。
+    duplicate_reason: str = ""
 
 
 # ---------------------------------------------------------------- 索引读写
@@ -119,20 +122,65 @@ def similarity(text_a: str, text_b: str) -> float:
     return len(a & b) / len(a | b)
 
 
-def _find_duplicate(text: str) -> tuple[Paper | None, float]:
-    """拿新论文的文字，和库里每篇的缓存文字比一遍，返回最像的那篇和分数。"""
+_ARXIV_ID_RE = re.compile(r"(\d{4}\.\d{4,5})")
+_VERSION_RE = re.compile(r"v(\d+)(?:\D|$)")
+
+
+def arxiv_id_of(*texts: str) -> str:
+    """从文件名或正文里找 arXiv 编号（如 1706.03762）。
+
+    为什么需要：扫描件 `1706.03762v1_img.pdf` 抽不出一个字，文本相似度恒为 0，
+    但它和 `1706.03762v1.pdf` 明明是同一篇。编号是这类情况的唯一可靠信号。
+    """
+    for text in texts:
+        match = _ARXIV_ID_RE.search(text or "")
+        if match:
+            return match.group(1)
+    return ""
+
+
+def version_of(*texts: str) -> int:
+    """从文件名 / 编号里取版本号 vN；取不到返回 0。"""
+    for text in texts:
+        match = _VERSION_RE.search(text or "")
+        if match:
+            return int(match.group(1))
+    return 0
+
+
+def _find_duplicate(
+    text: str,
+    filename: str = "",
+    exclude_id: str = "",
+) -> tuple[Paper | None, float, str]:
+    """拿新论文的文字（和文件名）跟库里比一遍，返回 (最像的一篇, 分数, 依据)。
+
+    两条信号：
+    1. 文本相似度 ≥ DUP_THRESHOLD —— 同篇不同版本、改了几个词的重复；
+    2. 同一 arXiv 编号 —— 覆盖扫描件（没有文字）与「v1 和 v7」这种版本关系。
+    第二条命中时把分数抬到阈值之上，保证调用方只需要看分数。
+    """
+    new_arxiv = arxiv_id_of(filename, text[:4000])
     best: Paper | None = None
     best_score = 0.0
+    best_reason = ""
     for paper in _load_index():
-        cached = _cached_text(paper.paper_id)
-        if not cached:
+        if paper.paper_id == exclude_id:
             continue
-        score = similarity(text, cached)
+        cached = _text_for(paper)
+        score = similarity(text, cached) if cached else 0.0
+        reason = "文本相似度" if score >= DUP_THRESHOLD else ""
+        old_arxiv = arxiv_id_of(paper.filename, cached[:4000])
+        if new_arxiv and old_arxiv == new_arxiv:
+            # 编号相同但文字不像（典型是扫描件，抽不出字）：只在这种情况下降级用编号当依据
+            if score < DUP_THRESHOLD:
+                reason = "同一 arXiv 编号的不同版本"
+            score = max(score, DUP_THRESHOLD)
         if score > best_score:
-            best, best_score = paper, score
+            best, best_score, best_reason = paper, score, reason
     if best is not None and best_score >= DUP_THRESHOLD:
-        return best, round(best_score, 3)
-    return None, round(best_score, 3)
+        return best, round(best_score, 3), best_reason
+    return None, round(best_score, 3), ""
 
 
 def _cached_text(paper_id: str) -> str:
@@ -140,28 +188,143 @@ def _cached_text(paper_id: str) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
+def _text_for(paper: Paper) -> str:
+    """取一篇论文的前几页文字，没有缓存就抽一次并存上。
+
+    老数据（直接放进 data/papers 的 39 篇样例）从来没有文字缓存，
+    首次查重时补抽一次，之后就走缓存。
+    """
+    cached = _cached_text(paper.paper_id)
+    if cached:
+        return cached
+    path = PAPERS_DIR / f"{paper.paper_id}.pdf"
+    if not path.exists():
+        path = PAPERS_DIR / paper.filename
+    if not path.exists():
+        return ""
+    text = _extract_text(path)
+    if text:
+        TEXT_DIR.mkdir(parents=True, exist_ok=True)
+        (TEXT_DIR / f"{paper.paper_id}.txt").write_text(text, encoding="utf-8")
+    return text
+
+
+def _page_count(path: Path) -> int:
+    try:
+        from pypdf import PdfReader
+
+        return len(PdfReader(str(path)).pages)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 # ---------------------------------------------------------------- 对外功能
 
 
+def sync_index() -> list[Paper]:
+    """让 index.json 和 data/papers 目录里真实存在的 PDF 一致。
+
+    为什么需要：赛题给的 40 篇样例是直接拷进 data/papers 的，从来没走过上传接口，
+    所以 index.json 里一条都没有。结果 `GET /papers` 只回 1 条、删除接口对它们无效，
+    而 `/papers/files` 和阅读页却能看到 39 篇——三处数字对不上。
+    这里把「磁盘上有、索引里没有」的补进索引，把「索引里有、磁盘上没有」的清掉。
+    """
+    papers = _load_index()
+    known_ids = {p.paper_id for p in papers}
+    structures = load_structures()
+    changed = False
+
+    for path in sorted(PAPERS_DIR.glob("*.pdf")):
+        if path.stem in known_ids:
+            continue
+        meta = structures.get(path.name) or {}
+        pages = _page_count(path) or int(meta.get("pages") or 0)
+        paper = Paper(
+            paper_id=path.stem,
+            filename=path.name,
+            size=path.stat().st_size,
+            pages=pages,
+            uploaded_at=time.strftime(
+                "%Y-%m-%dT%H:%M:%S", time.localtime(path.stat().st_mtime)
+            ),
+        )
+        # 补登记时顺手标一下重复：同 arXiv 编号的另一份拷贝（样例库里那对 v1/v7）
+        arxiv = arxiv_id_of(path.name)
+        if arxiv:
+            for other in papers:
+                if arxiv_id_of(other.filename) == arxiv:
+                    paper.duplicate_of = other.paper_id
+                    paper.duplicate_reason = "同一 arXiv 编号的不同版本"
+                    break
+        papers.append(paper)
+        known_ids.add(path.stem)
+        changed = True
+        logger.info("索引里补上磁盘论文 %s", path.name)
+
+    kept = [
+        p
+        for p in papers
+        if (PAPERS_DIR / f"{p.paper_id}.pdf").exists() or (PAPERS_DIR / p.filename).exists()
+    ]
+    if len(kept) != len(papers):
+        changed = True
+
+    # 历史条目可能是在还没有查重逻辑时登记的（样例库那对 v1/v7 就是），
+    # 这里按 arXiv 编号补一次标记：同编号里挑一个"正版"（文件名就是 paper_id 的、
+    # 或者上传更早的），其余标成重复，前端列表才不会满屏"重复"却不知道重复谁。
+    groups: dict[str, list[Paper]] = {}
+    for paper in kept:
+        arxiv = arxiv_id_of(paper.filename)
+        if arxiv:
+            groups.setdefault(arxiv, []).append(paper)
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        canonical = min(
+            group,
+            key=lambda p: (p.paper_id != Path(p.filename).stem, p.uploaded_at),
+        )
+        for paper in group:
+            desired = "" if paper is canonical else canonical.paper_id
+            if paper.duplicate_of == desired:
+                continue
+            paper.duplicate_of = desired
+            paper.duplicate_reason = "" if not desired else "同一 arXiv 编号的不同版本"
+            changed = True
+
+    if changed:
+        _save_index(kept)
+    return kept
+
+
 def list_papers() -> list[Paper]:
-    """列出所有论文，新的在前。"""
-    return _load_index()
+    """列出所有论文，新的在前。顺手让索引和磁盘对齐。"""
+    return sync_index()
 
 
 def get_paper(paper_id: str) -> Paper | None:
-    for paper in _load_index():
+    for paper in sync_index():
         if paper.paper_id == paper_id:
             return paper
     return None
 
 
 def paper_path(paper_id: str) -> Path | None:
-    """返回论文原件的磁盘路径；索引里有但文件丢了就返回 None。"""
+    """返回论文原件的磁盘路径；索引里有但文件丢了就返回 None。
+
+    两种命名都可能：上传的存成 `<paper_id>.pdf`，样例/手动拷进来的保留原名。
+    """
     paper = get_paper(paper_id)
     if paper is None:
         return None
-    path = PAPERS_DIR / f"{paper_id}{Path(paper.filename).suffix.lower()}"
-    return path if path.exists() else None
+    candidates = [
+        PAPERS_DIR / f"{paper_id}{Path(paper.filename).suffix.lower()}",
+        PAPERS_DIR / paper.filename,
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return None
 
 
 def structure_path(paper_id: str) -> Path:
@@ -300,17 +463,10 @@ def save_paper(
     except Exception:  # noqa: BLE001
         logger.exception("结构化解析失败，跳过（不影响上传）")
 
-    # 先把新内容从索引里排除（同一个文件重复上传时，不该跟自己比）
-    existing = [p for p in _load_index() if p.paper_id != paper_id]
-    best, score = _find_duplicate(text)
+    # 查重时把自己排除掉：同一个文件重复上传，不该跟自己比
+    best, score, reason = _find_duplicate(text, filename=safe_name, exclude_id=paper_id)
 
-    pages = 0
-    try:
-        from pypdf import PdfReader
-
-        pages = len(PdfReader(str(dest)).pages)
-    except Exception:
-        pages = 0
+    pages = _page_count(dest)
 
     paper = Paper(
         paper_id=paper_id,
@@ -319,9 +475,11 @@ def save_paper(
         pages=pages,
         uploaded_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
         duplicate_of=best.paper_id if best else "",
+        duplicate_reason=reason if best else "",
     )
 
-    _save_index([paper, *existing])
+    others = [p for p in _load_index() if p.paper_id != paper_id]
+    _save_index([paper, *others])
     logger.info(
         "保存论文 %s (%s, %d 页, 重复=%s)",
         paper_id,
@@ -351,15 +509,17 @@ def delete_paper(paper_id: str) -> bool:
     注意：这里只删磁盘文件与 index.json；向量库和 BM25 的清理在
     app/rag/pipeline.py 的 remove_source() 里，由 /papers 删除接口一起调用。
     """
-    remaining = [p for p in _load_index() if p.paper_id != paper_id]
-    if len(remaining) == len(_load_index()):
+    papers = _load_index()
+    paper = next((p for p in papers if p.paper_id == paper_id), None)
+    if paper is None:
         return False
 
     for path in (
         PAPERS_DIR / f"{paper_id}.pdf",
+        PAPERS_DIR / paper.filename,
         TEXT_DIR / f"{paper_id}.txt",
         structure_path(paper_id),
     ):
         path.unlink(missing_ok=True)
-    _save_index(remaining)
+    _save_index([p for p in papers if p.paper_id != paper_id])
     return True

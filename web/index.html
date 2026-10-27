@@ -52,6 +52,45 @@
                color: #fff; text-decoration: none; white-space: nowrap; }
     .ev-open:hover { background: #1558b0; }
 
+    /* ---------- 论文库：批量上传 / 去重提示 / 删除 ---------- */
+    button.ghost { background: #eef1f5; color: #374151; }
+    button.ghost:hover { background: #e2e8f0; }
+    #libModal { position: fixed; inset: 0; background: rgba(15,23,42,.42); z-index: 50;
+                display: flex; align-items: center; justify-content: center; padding: 16px; }
+    #libModal[hidden] { display: none; }
+    .lib-panel { width: min(720px, 100%); max-height: 88vh; overflow: auto; background: #fff;
+                 border-radius: 14px; padding: 16px 18px 18px; box-shadow: 0 20px 60px rgba(0,0,0,.24); }
+    .lib-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .lib-head b { font-size: 16px; }
+    .lib-head .lib-count { font-size: 12px; color: #6b7280; }
+    .lib-x { margin-left: auto; padding: 4px 10px; border-radius: 8px; background: #eef1f5;
+             color: #374151; font-size: 16px; line-height: 1; }
+    #dropZone { border: 2px dashed #c9d3e0; border-radius: 12px; padding: 18px; text-align: center;
+                color: #4b5563; font-size: 14px; transition: .15s; }
+    #dropZone.hot { border-color: #1a73e8; background: #f2f7ff; }
+    #dropZone .hint { font-size: 12px; color: #6b7280; margin-top: 8px; }
+    .btn-sm { padding: 7px 14px; border-radius: 8px; font-size: 13px; }
+    .btn-danger { background: #fee2e2; color: #b91c1c; }
+    .btn-danger:hover { background: #fecaca; }
+    .lib-list { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+    .lib-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid #e5eaf1;
+               border-radius: 10px; font-size: 13px; }
+    .lib-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lib-row .meta { font-size: 11px; color: #6b7280; white-space: nowrap; }
+    .lib-row .act { display: flex; gap: 6px; }
+    .lib-row a { font-size: 12px; color: #1a73e8; text-decoration: none; padding: 5px 8px; border-radius: 6px; }
+    .lib-row a:hover { background: #f2f7ff; }
+    .pill { font-size: 11px; padding: 1px 7px; border-radius: 999px; }
+    .pill.dup { background: #fef3c7; color: #92400e; }
+    .pill.ok { background: #dcfce7; color: #166534; }
+    .dup-box { margin-top: 12px; border: 1px solid #f5d98b; background: #fffdf3; border-radius: 10px; padding: 10px 12px; }
+    .dup-box h3 { font-size: 13px; margin: 0 0 8px; color: #92400e; }
+    .dup-row { border-top: 1px dashed #f0dca8; padding: 8px 0; font-size: 13px; }
+    .dup-row:first-of-type { border-top: none; }
+    .dup-row .choices { display: flex; gap: 14px; margin-top: 6px; flex-wrap: wrap; font-size: 12.5px; color: #374151; }
+    .dup-row .choices label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    #upStatus { margin-top: 10px; font-size: 12.5px; color: #374151; white-space: pre-line; }
+
     footer { width: 100%; max-width: 820px; padding: 12px 16px 20px; display: flex; gap: 8px; position: relative; }
     #q { flex: 1; padding: 12px 14px; border: 1px solid #d5d9e0; border-radius: 10px;
          font-size: 15px; outline: none; }
@@ -97,6 +136,7 @@
   <header>
     <div class="hrow">
       <h1>📚 科研小助手</h1>
+      <button id="openLib" class="ghost" title="上传、查看、删除论文（支持批量，自动查重）">论文库</button>
       <button id="newChat" class="ghost" title="清空对话历史，重新开始">新对话</button>
     </div>
     <div class="status" id="status">检查服务状态…</div>
@@ -114,6 +154,25 @@
     <input id="q" placeholder="输入你的问题，回车发送…" autocomplete="off" />
     <button id="send">发送</button>
   </footer>
+
+  <div id="libModal" hidden>
+    <div class="lib-panel">
+      <div class="lib-head">
+        <b>论文库</b>
+        <span class="lib-count" id="libCount"></span>
+        <button class="lib-x" id="libClose" title="关闭">×</button>
+      </div>
+
+      <div id="dropZone">
+        <div>把 PDF 拖到这里，或 <button class="btn-sm" id="pickFiles">选择文件</button>（支持多选）</div>
+        <div class="hint">单篇 ≤ 30MB。上传后自动解析结构并查重；跟库里重复时会问你要保留哪一版。</div>
+        <input type="file" id="fileInput" accept="application/pdf,.pdf" multiple hidden />
+      </div>
+      <div id="upStatus"></div>
+      <div class="dup-box" id="dupBox" hidden></div>
+      <div class="lib-list" id="libList"></div>
+    </div>
+  </div>
 
 <script>
 const chatEl = document.getElementById('chat');
@@ -179,26 +238,32 @@ function refreshPickSummary() {
   else pickSummaryEl.textContent = `已选 ${picked.length} 篇（对比）`;
 }
 
-fetch('/papers/files')
-  .then(r => r.json())
-  .then(d => {
-    const keep = new Set(savedPicks());
-    (d.files || []).forEach(f => {
-      const label = document.createElement('label');
-      const box = document.createElement('input');
-      box.type = 'checkbox';
-      box.value = f;
-      box.checked = keep.has(f);
-      box.addEventListener('change', refreshPickSummary);
-      const name = document.createElement('span');
-      name.textContent = f;
-      label.appendChild(box);
-      label.appendChild(name);
-      pickListEl.appendChild(label);
-    });
-    refreshPickSummary();
-  })
-  .catch(() => {});
+function loadPaperFiles() {
+  // 每次上传/删除后重新拉一遍：勾选列表和论文库面板必须跟磁盘一致
+  return fetch('/papers/files')
+    .then(r => r.json())
+    .then(d => {
+      const keep = new Set(savedPicks());
+      pickListEl.innerHTML = '';
+      (d.files || []).forEach(f => {
+        const label = document.createElement('label');
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.value = f;
+        box.checked = keep.has(f);
+        box.addEventListener('change', refreshPickSummary);
+        const name = document.createElement('span');
+        name.textContent = f;
+        label.appendChild(box);
+        label.appendChild(name);
+        pickListEl.appendChild(label);
+      });
+      refreshPickSummary();
+    })
+    .catch(() => {});
+}
+
+loadPaperFiles();
 
 // ---------- 健康检查：确认后端活着 ----------
 fetch('/health')
@@ -418,6 +483,186 @@ document.getElementById('newChat').addEventListener('click', () => {
 });
 
 inputEl.focus();
+
+// ---------- 论文库：批量上传 / 查重选择 / 删除（1.1） ----------
+// 后端的 /papers/upload 一次收多个文件（表单字段名 files），逐个返回
+// {filename, paper, indexed, duplicate}；有重复时前端弹窗问保留哪一版。
+const libModalEl = document.getElementById('libModal');
+const libListEl = document.getElementById('libList');
+const libCountEl = document.getElementById('libCount');
+const dropZoneEl = document.getElementById('dropZone');
+const fileInputEl = document.getElementById('fileInput');
+const upStatusEl = document.getElementById('upStatus');
+const dupBoxEl = document.getElementById('dupBox');
+
+let pendingDups = [];   // 待用户决定的重复项
+
+function fmtSize(n) {
+  if (!n) return '0 B';
+  if (n > 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+  return Math.round(n / 1024) + ' KB';
+}
+
+async function openLib() {
+  libModalEl.hidden = false;
+  await loadLibrary();
+}
+
+function closeLib() {
+  libModalEl.hidden = true;
+  dupBoxEl.hidden = true;
+  pendingDups = [];
+}
+
+async function loadLibrary() {
+  libListEl.innerHTML = '<div class="meta" style="padding:8px">加载中…</div>';
+  try {
+    const d = await (await fetch('/papers')).json();
+    const items = d.papers || [];
+    libCountEl.textContent = `共 ${items.length} 篇`;
+    libListEl.innerHTML = '';
+    items.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'lib-row';
+      const badge = p.duplicate_of
+        ? `<span class="pill dup" title="${escapeHtml(p.duplicate_reason || '与库中论文重复')}">重复</span>`
+        : '<span class="pill ok">已入库</span>';
+      row.innerHTML = `
+        <div class="name" title="${escapeHtml(p.filename)}">${escapeHtml(p.filename)}</div>
+        <div class="meta">${p.pages || '?'} 页 · ${fmtSize(p.size)}</div>
+        ${badge}
+        <div class="act">
+          <a href="/ui/reader.html?paper=${encodeURIComponent(p.filename)}&page=1" target="_blank" rel="noopener">阅读</a>
+          <button class="btn-sm btn-danger" data-del="${escapeHtml(p.paper_id)}">删除</button>
+        </div>`;
+      libListEl.appendChild(row);
+    });
+    libListEl.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => deletePaper(btn.dataset.del, btn));
+    });
+  } catch (e) {
+    libListEl.innerHTML = `<div class="meta" style="padding:8px">加载失败：${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function deletePaper(paperId, btn) {
+  if (!confirm('确定删除这篇论文？原件、解析结构与检索索引会一起清掉。')) return;
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/papers/' + encodeURIComponent(paperId), { method: 'DELETE' });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+    upStatusEl.textContent = `已删除，清理索引块 ${d.removed_chunks || 0} 个。`;
+    await Promise.all([loadLibrary(), loadPaperFiles()]);
+  } catch (e) {
+    upStatusEl.textContent = '删除失败：' + e.message;
+    btn.disabled = false;
+  }
+}
+
+function pickFiles() { fileInputEl.click(); }
+
+async function uploadFiles(files) {
+  const list = Array.from(files || []).filter(f => /\.pdf$/i.test(f.name));
+  if (!list.length) { upStatusEl.textContent = '只支持 PDF 文件。'; return; }
+
+  const fd = new FormData();
+  list.forEach(f => fd.append('files', f));
+  upStatusEl.textContent = `正在上传 ${list.length} 个文件…`;
+  dupBoxEl.hidden = true;
+  pendingDups = [];
+
+  try {
+    const resp = await fetch('/papers/upload', { method: 'POST', body: fd });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+
+    const lines = [];
+    (d.results || []).forEach(r => {
+      if (r.error) lines.push(`✗ ${r.filename}：${r.error}`);
+      else lines.push(`✓ ${r.filename}（${r.paper.pages} 页，索引 ${r.indexed} 块）`);
+    });
+    upStatusEl.textContent = lines.join('\n');
+    pendingDups = (d.results || []).filter(r => r.duplicate).map(r => ({
+      newName: r.filename,
+      newId: r.paper.paper_id,
+      ...r.duplicate,
+    }));
+    if (pendingDups.length) renderDups();
+    await Promise.all([loadLibrary(), loadPaperFiles()]);
+  } catch (e) {
+    upStatusEl.textContent = '上传失败：' + e.message;
+  }
+}
+
+function renderDups() {
+  dupBoxEl.hidden = false;
+  dupBoxEl.innerHTML = `<h3>发现 ${pendingDups.length} 处重复，请选择保留哪一版</h3>`;
+  pendingDups.forEach((dup, i) => {
+    const verText = dup.old_version && dup.new_version
+      ? `（库中 v${dup.old_version} → 新上传 v${dup.new_version}${dup.newer ? '，新版' : '，旧版'}）`
+      : '';
+    const row = document.createElement('div');
+    row.className = 'dup-row';
+    row.innerHTML = `
+      <div>《${escapeHtml(dup.newName)}》 与库中《${escapeHtml(dup.filename)}》重复
+        —— 依据：${escapeHtml(dup.reason)}，相似度 ${dup.score} ${verText}</div>
+      <div class="choices">
+        <label><input type="radio" name="dup${i}" value="keep-new" ${dup.newer || !dup.old_version ? 'checked' : ''}>保留新版，删除旧版</label>
+        <label><input type="radio" name="dup${i}" value="keep-both" ${dup.newer || !dup.old_version ? '' : 'checked'}>两个都留</label>
+        <label><input type="radio" name="dup${i}" value="keep-old">保留旧版，删除刚上传的</label>
+      </div>`;
+    dupBoxEl.appendChild(row);
+  });
+  const apply = document.createElement('button');
+  apply.className = 'btn-sm';
+  apply.textContent = '按选择处理';
+  apply.addEventListener('click', applyDups);
+  dupBoxEl.appendChild(apply);
+}
+
+async function applyDups() {
+  const done = [];
+  for (let i = 0; i < pendingDups.length; i += 1) {
+    const dup = pendingDups[i];
+    const choice = (dupBoxEl.querySelector(`input[name="dup${i}"]:checked`) || {}).value || 'keep-both';
+    if (choice === 'keep-new') {
+      const r = await fetch('/papers/' + encodeURIComponent(dup.paper_id), { method: 'DELETE' });
+      done.push(r.ok ? `已删除旧版 ${dup.filename}` : `删除旧版失败（HTTP ${r.status}）`);
+    } else if (choice === 'keep-old') {
+      const r = await fetch('/papers/' + encodeURIComponent(dup.newId), { method: 'DELETE' });
+      done.push(r.ok ? `已删除新版 ${dup.newName}` : `删除新版失败（HTTP ${r.status}）`);
+    } else {
+      done.push(`保留两版：${dup.newName} / ${dup.filename}`);
+    }
+  }
+  upStatusEl.textContent = done.join('\n');
+  dupBoxEl.hidden = true;
+  pendingDups = [];
+  await Promise.all([loadLibrary(), loadPaperFiles()]);
+}
+
+document.getElementById('openLib').addEventListener('click', openLib);
+document.getElementById('libClose').addEventListener('click', closeLib);
+document.getElementById('pickFiles').addEventListener('click', pickFiles);
+fileInputEl.addEventListener('change', () => {
+  uploadFiles(fileInputEl.files);
+  fileInputEl.value = '';
+});
+libModalEl.addEventListener('click', e => { if (e.target === libModalEl) closeLib(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !libModalEl.hidden) closeLib();
+});
+
+['dragenter', 'dragover'].forEach(ev => dropZoneEl.addEventListener(ev, e => {
+  e.preventDefault();
+  dropZoneEl.classList.add('hot');
+}));
+['dragleave', 'drop'].forEach(ev => dropZoneEl.addEventListener(ev, e => {
+  e.preventDefault();
+  dropZoneEl.classList.remove('hot');
+}));
+dropZoneEl.addEventListener('drop', e => uploadFiles(e.dataTransfer.files));
 </script>
 </body>
 </html>
