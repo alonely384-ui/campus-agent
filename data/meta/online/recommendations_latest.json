@@ -1,97 +1,46 @@
 {
- "saved_at": "2026-10-28T05:16:43+00:00",
+ "saved_at": "2026-10-28T08:54:52+00:00",
  "data": {
-  "updated_at": "2026-10-28T13:16:43+08:00",
-  "library_size": 43,
+  "updated_at": "2026-10-28T16:54:52+08:00",
+  "library_size": 39,
   "items": [
    {
-    "key": "2605.13373",
-    "arxiv_id": "2605.13373",
-    "title": "Exploiting Pre-trained Encoder-Decoder Transformers for Sequence-to-Sequence Constituent Parsing",
+    "key": "2610.25991",
+    "arxiv_id": "2610.25991",
+    "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
     "year": 2026,
-    "abstract": "To achieve deep natural language understanding, syntactic constituent parsing plays a crucial role and is widely required by many artificial intelligence systems for processing both text and speech. A recent approach involves using standard sequence-to-sequence models to handle constituent parsing as a machine translation problem, moving away from traditional task-specific parsers. These models are typically initialized with pre-trained encoder-only language models like BERT or RoBERTa. However, the use of pre-trained encoder-decoder language models for constituency parsing has not been thoroughly explored. To bridge this gap, we extend the sequence-to-sequence framework by investigating parsers built on pre-trained encoder-decoder architectures, including BART, mBART, and T5. We fine-tune them to generate linearized parse trees and extensively evaluate them on different linearization strategies across both continuous treebanks and more complex discontinuous benchmarks. Our results demonstrate that our approach outperforms all prior sequence-to-sequence models and performs competitively with leading task-specific constituent parsers on continuous constituent parsing.",
+    "abstract": "Designing capable neural policies for multi-agent pathfinding (MAPF), which map local observations to action distributions, represents an important challenge in multi-agent learning, with practical relevance to scalable collective automation problems such as warehouse logistics. In contrast to prior studies focusing primarily on individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based MAPF. Specifically, given a collection of compact yet high-performing experts specialised for different map distributions, our architecture learns a router that selectively fuses their outputs according to each agent's local situation. We instantiate and validate this MoE approach with a commonly used graph neural network-based policy as well as a newly developed recursive action-token refinement model. Combined with supervised and reinforcement learning fine-tuning of the experts, our experiments show that MoE generally improves upon the pretrained policy and outperforms existing leading methods. At the same time, our findings reveal that appropriately trained, parameter-matched monolithic models still outperform MoE, highlighting a nuanced role f",
     "authors": [
-     "D. Fernández-González",
-     "Cristina Outeirino Cid"
+     "Fumimaro Suzuki",
+     "Keisuke Okumura"
     ],
-    "url": "https://arxiv.org/abs/2605.13373",
+    "url": "https://arxiv.org/abs/2610.25991",
     "cited_by": [
-     "Recurrent Neural Network Grammars"
+     "Layer Normalization"
     ],
     "source": "cited",
     "github": "",
     "overlap": 0.333,
-    "topic": 0.298,
-    "topic_of": "Attention Is All You Need",
+    "topic": 0.317,
+    "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
     "topic_top": [
      {
-      "title": "Attention Is All You Need",
-      "sim": 0.298
+      "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+      "sim": 0.361
      },
      {
-      "title": "Attention Is All You Need",
-      "sim": 0.298
+      "title": "DeepSeek-V3 Technical Report",
+      "sim": 0.226
      },
      {
-      "title": "Attention Is All You Need",
-      "sim": 0.296
+      "title": "Training language models to follow instructions with human feedback",
+      "sim": 0.205
      }
     ],
-    "base": 0.371,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.371,
+    "base": 0.3444,
+    "score": 0.3444,
     "vote": "",
-    "reason": "在《Attention Is All You Need》的基础上，将标准序列到序列Transformer用于成分句法分析，区别在于把通用翻译架构迁移到句法解析任务，并利用预训练编码器-解码器。"
-   },
-   {
-    "key": "2603.27938",
-    "arxiv_id": "2603.27938",
-    "title": "Top-down string-to-dependency Neural Machine Translation",
-    "year": 2026,
-    "abstract": "Most of modern neural machine translation (NMT) models are based on an encoder-decoder framework with an attention mechanism. While they perform well on standard datasets, they can have trouble in translation of long inputs that are rare or unseen during training. Incorporating target syntax is one approach to dealing with such length-related problems. We propose a novel syntactic decoder that generates a target-language dependency tree in a top-down, left-to-right order. Experiments show that the proposed top-down string-to-tree decoding generalizes better than conventional sequence-to-sequence decoding in translating long inputs that are not observed in the training data.",
-    "authors": [
-     "Shuhei Kondo",
-     "Katsuhito Sudoh",
-     "Yuji Matsumoto"
-    ],
-    "url": "https://arxiv.org/abs/2603.27938",
-    "cited_by": [
-     "Recurrent Neural Network Grammars"
-    ],
-    "source": "cited",
-    "github": "",
-    "overlap": 0.333,
-    "topic": 0.282,
-    "topic_of": "Attention Is All You Need",
-    "topic_top": [
-     {
-      "title": "Attention Is All You Need",
-      "sim": 0.283
-     },
-     {
-      "title": "Attention Is All You Need",
-      "sim": 0.281
-     },
-     {
-      "title": "Attention Is All You Need",
-      "sim": 0.281
-     }
-    ],
-    "base": 0.3654,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.3654,
-    "vote": "",
-    "reason": "与《Attention Is All You Need》同属注意力编码器-解码器框架，但面向长输入罕见句的机器翻译难题，区别在于引入目标端句法信息构建自顶向下字符串到依存树的翻译。"
+    "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的稀疏专家路由基础上，把MoE用于多智能体路径规划，区别在于按地图分布设计专家而非语言模型扩容。"
    },
    {
     "key": "2610.32142",
@@ -126,64 +75,10 @@
       "sim": 0.22
      }
     ],
-    "base": 0.3589,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.3589,
+    "base": 0.3256,
+    "score": 0.3256,
     "vote": "",
-    "reason": "这篇不属于《Attention Is All You Need》路线，而是研究LoRA低秩适配的初始化与学习率鲁棒性，与库内《Layer Normalization》的归一化训练稳定化思路形成对照。"
-   },
-   {
-    "key": "2502.11469",
-    "arxiv_id": "2502.11469",
-    "title": "If Attention Serves as a Cognitive Model of Human Memory Retrieval, What is the Plausible Memory Representation?",
-    "year": 2025,
-    "abstract": "Recent work in computational psycholinguistics has revealed intriguing parallels between attention mechanisms and human memory retrieval, focusing primarily on vanilla Transformers that operate on token-level representations. However, computational psycholinguistic research has also established that syntactic structures provide compelling explanations for human sentence processing that token-level factors cannot fully account for. In this paper, we investigate whether the attention mechanism of Transformer Grammar (TG), which uniquely operates on syntactic structures as representational units, can serve as a cognitive model of human memory retrieval, using Normalized Attention Entropy (NAE) as a linking hypothesis between models and humans. Our experiments demonstrate that TG's attention achieves superior predictive power for self-paced reading times compared to vanilla Transformer's, with further analyses revealing independent contributions from both models. These findings suggest that human sentence processing involves dual memory representations -- one based on syntactic structures and another on token sequences -- with attention serving as the general memory retrieval algorithm",
-    "authors": [
-     "Ryosuke Yoshida",
-     "Shinnosuke Isono",
-     "Kohei Kajikawa",
-     "Taiga Someya",
-     "Yushi Sugimoto",
-     "Yohei Oseki"
-    ],
-    "url": "https://arxiv.org/abs/2502.11469",
-    "cited_by": [
-     "Recurrent Neural Network Grammars"
-    ],
-    "source": "cited",
-    "github": "",
-    "overlap": 0.333,
-    "topic": 0.285,
-    "topic_of": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
-    "topic_top": [
-     {
-      "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
-      "sim": 0.295
-     },
-     {
-      "title": "Can Active Memory Replace Attention?",
-      "sim": 0.284
-     },
-     {
-      "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
-      "sim": 0.239
-     }
-    ],
-    "base": 0.3289,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.3289,
-    "vote": "",
-    "reason": "这篇不基于库内注意力架构论文，而是从心理语言学角度探讨注意力作为人类记忆提取认知模型时的记忆表示问题，与库内《Can Active Memory Replace Attention?》的机制替换议题相呼应。"
+    "reason": "这篇聚焦LoRA初始化与学习率鲁棒性，属于参数高效微调方向；与库内《Layer Normalization》的归一化训练稳定化思路不同，它针对的是低秩适配的LR敏感问题。"
    },
    {
     "key": "2610.37041",
@@ -215,60 +110,10 @@
       "sim": 0.23
      }
     ],
-    "base": 0.2702,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.2702,
+    "base": 0.2202,
+    "score": 0.2202,
     "vote": "",
-    "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的可验证奖励强化学习基础上，区别在于针对RLVR rollout坍缩到狭窄推理路径的问题引入引导式探索。"
-   },
-   {
-    "key": "1912.11959",
-    "arxiv_id": "1912.11959",
-    "title": "Is Attention All What You Need? - An Empirical Investigation on Convolution-Based Active Memory and Self-Attention",
-    "year": 2019,
-    "abstract": "The key to a Transformer model is the self-attention mechanism, which allows the model to analyze an entire sequence in a computationally efficient manner. Recent work has suggested the possibility that general attention mechanisms used by RNNs could be replaced by active-memory mechanisms. In this work, we evaluate whether various active-memory mechanisms could replace self-attention in a Transformer. Our experiments suggest that active-memory alone achieves comparable results to the self-attention mechanism for language modelling, but optimal results are mostly achieved by using both active-memory and self-attention mechanisms together. We also note that, for some specific algorithmic tasks, active-memory mechanisms alone outperform both self-attention and a combination of the two.",
-    "authors": [
-     "Thomas Dowdell",
-     "Hong-Yu Zhang"
-    ],
-    "url": "https://arxiv.org/abs/1912.11959",
-    "cited_by": [
-     "Can Active Memory Replace Attention?"
-    ],
-    "source": "cited",
-    "github": "",
-    "overlap": 0.333,
-    "topic": 0.434,
-    "topic_of": "Can Active Memory Replace Attention?",
-    "topic_top": [
-     {
-      "title": "Can Active Memory Replace Attention?",
-      "sim": 0.499
-     },
-     {
-      "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
-      "sim": 0.325
-     },
-     {
-      "title": "Attention Is All You Need",
-      "sim": 0.242
-     }
-    ],
-    "base": 0.2686,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.2686,
-    "vote": "",
-    "reason": "在《Can Active Memory Replace Attention?》的基础上，实证检验卷积式主动记忆能否替代自注意力，区别在于系统比较两类机制在Transformer中的实际表现。"
+    "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的RLVR基础上，针对rollout坍缩到狭窄推理路径的问题引入引导式探索，区别在于探索策略设计。"
    },
    {
     "key": "2610.37481",
@@ -300,16 +145,10 @@
       "sim": 0.236
      }
     ],
-    "base": 0.2417,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.2417,
+    "base": 0.1917,
+    "score": 0.1917,
     "vote": "",
-    "reason": "这篇不基于库内稀疏专家论文，而是追踪指令微调中安全退化到训练数据的梯度来源，与《Switch Transformers》的大规模稀疏训练关注点不同，属模型安全方向。"
+    "reason": "这篇从梯度信号追踪微调数据导致的安全退化，属于LLM安全与数据归因方向；与库内《Switch Transformers》的稀疏扩容主题不同，它关注的是良性数据中的隐性风险。"
    },
    {
     "key": "2610.36572",
@@ -341,75 +180,62 @@
       "sim": 0.201
      }
     ],
-    "base": 0.2414,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.2414,
+    "base": 0.1914,
+    "score": 0.1914,
     "vote": "",
-    "reason": "这篇不基于库内大模型技术报告，而是面向异构时间序列预训练，提出点与片段混合注意力Transformer，与《Qwen2.5 Technical Report》的通用语言建模方向形成领域差异。"
+    "reason": "这篇提出预训练混合注意力Transformer用于时间序列分析，属于时序表征学习方向；与库内《Qwen2.5 Technical Report》的语言模型路线不同，它面向异构时序的迁移表示。"
    },
    {
-    "key": "2003.04974",
-    "arxiv_id": "2003.04974",
-    "title": "Transformer++",
-    "year": 2020,
-    "abstract": "Recent advancements in attention mechanisms have replaced recurrent neural networks and its variants for machine translation tasks. Transformer using attention mechanism solely achieved state-of-the-art results in sequence modeling. Neural machine translation based on the attention mechanism is parallelizable and addresses the problem of handling long-range dependencies among words in sentences more effectively than recurrent neural networks. One of the key concepts in attention is to learn three matrices, query, key, and value, where global dependencies among words are learned through linearly projecting word embeddings through these matrices. Multiple query, key, value matrices can be learned simultaneously focusing on a different subspace of the embedded dimension, which is called multi-head in Transformer. We argue that certain dependencies among words could be learned better through an intermediate context than directly modeling word-word dependencies. This could happen due to the nature of certain dependencies or lack of patterns that lend them difficult to be modeled globally using multi-head self-attention. In this work, we propose a new way of learning dependencies through",
+    "key": "trainingareasoninglargelanguagemodelforimprovingpowerflowconvergence",
+    "arxiv_id": "",
+    "title": "Training a Reasoning Large Language Model for Improving Power Flow Convergence",
+    "year": 2026,
+    "abstract": "Power flow convergence is a critical and long-standing challenge in power system operations, where “black-box” data-driven approaches often lack the generalization and interpretability required for critical applications. This paper explores a new paradigm by leveraging the advanced reasoning capabilities of Large Language Models (LLMs) to address complex power system control problems, using power flow convergence as a key demonstration. We introduce a reinforcement learning framework to train a specialized LLM agent that makes sequential adjustments to system parameters. By employing a Chain-of-Thought (CoT) process, the agent emulates an expert’s analytical steps, navigating the system from a non-convergent to a convergent state while providing a transparent decision-making trail. The framework features a two-stage training process: Supervised Fine-Tuning (SFT) to instill the desired reasoning format, followed by Reinforcement Learning with Verifiable Rewards (RLVR) to refine the decision-making policy. Case studies demonstrate that the trained LLM not only successfully guides non-convergent cases to a solution but also offers a high degree of interpretability by explicitly articu",
     "authors": [
-     "Prakhar Thapak",
-     "P. Hore"
+     "Yun-Qi Yan",
+     "Ying Chen",
+     "Tan-Nan Xiao"
     ],
-    "url": "https://arxiv.org/abs/2003.04974",
+    "url": "",
     "cited_by": [
-     "Can Active Memory Replace Attention?"
+     "Proximal Policy Optimization Algorithms"
     ],
     "source": "cited",
     "github": "",
     "overlap": 0.333,
-    "topic": 0.298,
-    "topic_of": "Attention Is All You Need",
+    "topic": 0.286,
+    "topic_of": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
     "topic_top": [
      {
-      "title": "Attention Is All You Need",
-      "sim": 0.299
+      "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+      "sim": 0.311
      },
      {
-      "title": "Attention Is All You Need",
-      "sim": 0.296
+      "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+      "sim": 0.252
      },
      {
-      "title": "Attention Is All You Need",
-      "sim": 0.296
+      "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+      "sim": 0.207
      }
     ],
-    "base": 0.221,
-    "collab": 0.0,
-    "event": 0.0,
-    "events": {
-     "view": 0,
-     "download": 0
-    },
-    "score": 0.221,
+    "base": 0.3335,
+    "score": 0.3335,
     "vote": "",
-    "reason": "在《Attention Is All You Need》的基础上改进纯注意力序列建模，区别在于针对神经机器翻译的并行化与性能做增强，属Transformer变体研究。"
+    "reason": "在《Proximal Policy Optimization Algorithms》的强化学习训练思路上，把推理大模型用于电力潮流收敛，区别在于以可解释推理替代黑盒数据驱动方法。"
    }
   ],
   "errors": [],
   "offline": false,
-  "candidates": 111,
-  "without_arxiv": 0,
+  "candidates": 112,
+  "without_arxiv": 1,
   "sources": {
-   "cited": 6,
+   "cited": 3,
    "recent": 4,
    "github": 0
   },
   "recent_scanned": 12,
   "user": "default",
-  "period": "weekly",
-  "collab_hits": 0,
-  "event_hits": 0
+  "period": "daily"
  }
 }

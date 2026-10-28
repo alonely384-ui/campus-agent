@@ -40,7 +40,6 @@ logger = get_logger(__name__)
 
 META_DIR = BASE_DIR / "data" / "meta"
 FEEDBACK_FILE = META_DIR / "feedback.json"
-EVENTS_FILE = META_DIR / "events.json"
 RECOMMEND_FILE = META_DIR / "recommendations.json"
 CACHE_KEY = "recommendations_latest"
 DEFAULT_USER = "default"
@@ -60,15 +59,12 @@ RECENT_MIN_TOPIC = 0.24
 # 等于 1.4.3 的"每日/每周新论文推荐"形同虚设。
 RECENT_QUOTA = 3
 
-WEIGHT_OVERLAP = 0.35
+WEIGHT_OVERLAP = 0.40
 WEIGHT_TOPIC = 0.35
 WEIGHT_CODE = 0.15
-WEIGHT_FRESH = 0.15
+WEIGHT_FRESH = 0.10
 VOTE_UP = 0.15
 VOTE_DOWN = -0.35
-# 1.4.3 ③④：点击/下载信号与"别人的口味"作为附加分（不改变主信号权重，加在 score 上）
-WEIGHT_COLLAB = 0.10
-WEIGHT_EVENT = 0.05
 
 
 # --------------------------------------------------------------------------- 反馈
@@ -133,84 +129,6 @@ def save_feedback(arxiv_id: str, vote: str, user: str = DEFAULT_USER) -> dict[st
         json.dumps({"users": all_votes}, ensure_ascii=False, indent=1), encoding="utf-8"
     )
     return dict(mine)
-
-
-def collaborative_scores(user: str = DEFAULT_USER) -> dict[str, float]:
-    """简单协同过滤（1.4.3 ④）：把"跟你口味相近的人点赞过的"抬上来。
-
-    没有用户画像、也没装推荐库，用的就是最朴素的共现：两个人都赞过的条目越多，
-    说明口味越像（权重=共同点赞数/我点赞总数）；他们赞过而我还没看的条目就加分。
-    自己还没赞过任何东西时退化成"全站热度"（有多少人赞过），冷启动也有东西可排。
-    """
-    all_votes = load_all_feedback()
-    mine = all_votes.get(user or DEFAULT_USER, {})
-    my_likes = {key for key, vote in mine.items() if vote == "up"}
-    raw: dict[str, float] = {}
-    if my_likes:
-        for other, votes in all_votes.items():
-            if other == (user or DEFAULT_USER):
-                continue
-            their_likes = {key for key, vote in votes.items() if vote == "up"}
-            shared = len(my_likes & their_likes)
-            if shared == 0:
-                continue
-            weight = shared / max(1, len(my_likes))
-            for key in their_likes - my_likes:
-                raw[key] = raw.get(key, 0.0) + weight
-    else:
-        for votes in all_votes.values():
-            for key, vote in votes.items():
-                if vote == "up":
-                    raw[key] = raw.get(key, 0.0) + 1.0
-    if not raw:
-        return {}
-    top = max(raw.values())
-    return {key: round(value / top, 4) for key, value in raw.items()}
-
-
-# --------------------------------------------------------------------------- 点击/下载
-
-
-def load_events() -> dict[str, dict[str, int]]:
-    """读点击/下载计数：``{arxiv_id: {"view": n, "download": n}}``（1.4.3 ③）。"""
-    payload = _read_json(EVENTS_FILE)
-    out: dict[str, dict[str, int]] = {}
-    for key, value in payload.items():
-        if not isinstance(value, dict):
-            continue
-        out[str(key)] = {
-            "view": int(value.get("view") or 0),
-            "download": int(value.get("download") or 0),
-        }
-    return out
-
-
-def record_event(arxiv_id: str, kind: str) -> dict[str, int]:
-    """记一次"点击（view）"或"下载（download）"；返回该条目的累计计数。"""
-    arxiv_id = (arxiv_id or "").strip()
-    if not arxiv_id:
-        raise ValueError("缺少 arXiv 编号")
-    if kind not in {"view", "download"}:
-        raise ValueError("kind 只能是 view / download")
-    data = load_events()
-    row = data.setdefault(arxiv_id, {"view": 0, "download": 0})
-    row[kind] = int(row.get(kind) or 0) + 1
-    EVENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    EVENTS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-    return row
-
-
-def event_scores(events: dict[str, dict[str, int]] | None = None) -> dict[str, float]:
-    """把点击/下载次数压成 0~1：下载算 2 次点击，5 分封顶。
-
-    排序里只占 ``WEIGHT_EVENT = 0.05``，主要是让"大家都点开看过"的论文稍微靠前，
-    不至于让点击量压过相关性。
-    """
-    events = load_events() if events is None else events
-    raw = {key: row.get("view", 0) + 2 * row.get("download", 0) for key, row in events.items()}
-    if not raw:
-        return {}
-    return {key: round(min(1.0, value / 5.0), 4) for key, value in raw.items()}
 
 
 # --------------------------------------------------------------------------- 库内画像
@@ -427,8 +345,6 @@ def score_candidates(
     lib_vecs: list[tuple[str, list[float]]],
     feedback: dict[str, str] | None = None,
     current_year: int | None = None,
-    collab: dict[str, float] | None = None,
-    events: dict[str, dict[str, int]] | None = None,
 ) -> list[dict[str, Any]]:
     """给候选打分并排序（分数 0~1，越高越该推荐）。
 
@@ -436,14 +352,8 @@ def score_candidates(
     - ``source == "cited"``（别人引用了库里的论文）：引用重叠或主题够像都能留；
     - ``source == "recent"``（新上架）：没有引用信号，只能靠主题，所以门槛更高
       （``RECENT_MIN_TOPIC``），否则会塞满"只是词面像"的论文。
-
-    ``collab`` / ``events`` 是 1.4.3 ③④ 的两个附加信号（协同过滤、点击下载），
-    只加在 ``score`` 上，``base`` 仍是四个主信号的加权和，方便"点一下赞就重排"
-    时只换投票项、不用把库重新扫一遍。
     """
     feedback = feedback or {}
-    collab = collab or {}
-    event_map = event_scores(events)
     year_now = current_year or datetime.now(UTC).year
     kept: list[dict[str, Any]] = []
     for item in candidates:
@@ -470,8 +380,6 @@ def score_candidates(
         key = item.get("key") or item.get("arxiv_id") or ""
         vote = feedback.get(key, "")
         vote_score = VOTE_UP if vote == "up" else VOTE_DOWN if vote == "down" else 0.0
-        collab_score = WEIGHT_COLLAB * float(collab.get(key, 0.0))
-        event_score = WEIGHT_EVENT * float(event_map.get(key, 0.0))
         base = (
             WEIGHT_OVERLAP * overlap_score
             + WEIGHT_TOPIC * topic_score
@@ -487,10 +395,7 @@ def score_candidates(
         # base 是"不含用户反馈"的分数；点赞点踩后只要 base + 新票就能重排，
         # 不用把库重新扫一遍（见 rerank_with_feedback）。
         item["base"] = round(base, 4)
-        item["collab"] = round(collab_score, 4)
-        item["event"] = round(event_score, 4)
-        item["events"] = event_map.get(key, {}) or {"view": 0, "download": 0}
-        item["score"] = round(base + vote_score + collab_score + event_score, 4)
+        item["score"] = round(base + vote_score, 4)
         item["vote"] = vote
         kept.append(item)
     return sorted(kept, key=lambda item: item["score"], reverse=True)
@@ -507,10 +412,7 @@ def rerank_with_feedback(
         base = float(item.get("base") or item.get("score") or 0.0)
         vote_score = VOTE_UP if vote == "up" else VOTE_DOWN if vote == "down" else 0.0
         item["vote"] = vote
-        item["score"] = round(
-            base + vote_score + float(item.get("collab") or 0.0) + float(item.get("event") or 0.0),
-            4,
-        )
+        item["score"] = round(base + vote_score, 4)
     # 排序口径要和 build_recommendations 一致：有 arXiv 号（能直接下载）的排前面，
     # 同组内再比分数；否则"点赞后重排"会把没 arXiv 号的顶上来，前后两次顺序对不上。
     return sorted(
@@ -675,10 +577,8 @@ async def build_recommendations(
         known = {item["arxiv_id"] for item in raw if item.get("arxiv_id")}
         raw.extend(item for item in fresh_items if item["arxiv_id"] not in known)
         errors = errors + recent_errors
-    collab = collaborative_scores(user)
-    events = load_events()
     ranked = score_candidates(
-        raw, lib_vecs, load_feedback(user), collab=collab, events=events
+        raw, lib_vecs, load_feedback(user)
     )
     # 有 arXiv 号的排前面：推荐出来却下不下来，对用户没意义；
     # 但也不直接丢掉（期刊论文也可能想看），排后面并标出来。
@@ -707,8 +607,6 @@ async def build_recommendations(
         "recent_scanned": recent_scanned,
         "user": user,
         "period": period,
-        "collab_hits": sum(1 for item in ranked if item.get("collab")),
-        "event_hits": sum(1 for item in ranked if item.get("event")),
     }
     write_cache(CACHE_KEY, payload)
     RECOMMEND_FILE.parent.mkdir(parents=True, exist_ok=True)

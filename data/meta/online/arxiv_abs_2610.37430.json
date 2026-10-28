@@ -1,0 +1,22 @@
+{
+ "saved_at": "2026-10-28T04:50:10+00:00",
+ "data": {
+  "arxiv_id": "2610.37430",
+  "title": "When Visual Evidence Is Insufficient: How Instructions, Post-Training, and Internal Activations Shape Refusal in Multimodal Language Models",
+  "authors": [
+   "Ananth K Suresh",
+   "Aveen Dayal",
+   "Gouthaman KV",
+   "Aditya Pola",
+   "Vineeth N Balasubramanian"
+  ],
+  "abstract": "For reliable deployment, multimodal large language models (MLLMs) should recognize when an image provides insufficient evidence to answer a question and withhold unsupported answers. Yet refusal alone is not necessarily evidence of such recognition: models may refuse because of unrelated safety constraints or without identifying the missing evidence. We study how refusal on visually unanswerable questions is shaped by three sources of control: inference-time instructions, post-training, and internal activation interventions. Across three MLLMs on the MoHoBench benchmark, we systematically manipulate the meaning and placement of refusal instructions, compare supervised and preference-based post-training, and intervene on a refusal-related activation direction derived from naturally answered and refused examples. We find that refusal is highly sensitive to both the meaning and placement of instructions, with model-specific changes at the sample level that are obscured by aggregate refusal rates. Evidence-aware and general refusal instructions have stronger effects than an intentionally mismatched safety instruction. Post-training produces larger increases in refusal, but can also induce responses that combine refusal language with attempted answers. In contrast, activation intervention produces smaller yet transferable changes across prompt conditions, without evidence of indiscriminate refusal on tested visually answerable samples. These findings show that refusal is jointly shaped by external instructions, post-training, and internal representations, highlighting the need to disentangle evidence recognition from a model&#39;s learned propensity to refuse.",
+  "published": "[Submitted on 27 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Machine Learning (cs.LG) ; Computer Vision and Pattern Recognition (cs.CV)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.37430",
+  "fetched_at": "2026-10-28T04:50:10+00:00"
+ }
+}

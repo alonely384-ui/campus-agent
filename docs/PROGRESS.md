@@ -617,3 +617,58 @@ refresh weekly -> sources {'cited':6,'recent':4}; items by source {'cited':6,'re
 ### 遗留
 - 收藏/点击事件 `data/meta/events.json` 与图表缓存 `data/meta/figures/` 是运行期产物，未入库。
 - `web/reader.html` 里另有一份"全篇搜索"改动未提交（不是本轮改动，没动它）。
+
+## 2026-10-28（周三）1.4 推荐简化为「主题 + 引用」两路主信号
+
+按「推荐显示要简单聚焦」的要求，把 1.4.3 里加出来的三路附加信号下线，只留**引用重叠 + 主题相似度 + 代码 + 新鲜度**四个主信号。
+
+### 去掉的东西
+
+| 位置 | 删掉的内容 | 原因 |
+|---|---|---|
+| `app/recommend.py` | `WEIGHT_COLLAB` / `WEIGHT_EVENT` 常量，`collaborative_scores()` / `load_events()` / `record_event()` / `event_scores()` 四个函数，`EVENTS_FILE` | 单用户场景下协同过滤没有第二个人可算，点击事件只是噪声 |
+| `app/recommend.py` | `score_candidates()` 的 `collab` / `events` 参数与 `item["collab"] / ["event"] / ["events"]` 字段 | 分数只剩 `base + vote` |
+| `app/recommend.py` | `rerank_with_feedback()` 里的 collab/event 加成 | 与上一条同口径 |
+| `app/main.py` | `EventRequest` 模型、`POST /recommendations/{key}/event` 路由、`/recommendations` 的 `stats.events` / `stats.collab_keys` | 前端不再上报，接口留着只会误导 |
+| `web/index.html` | `.rec-hot` / `.rec-collab` 样式与渲染、`seenViews` / `trackEvent()` 及三处调用 | 列表里只留「引用扩展 / 新上架」来路徽章 |
+
+权重也随之重配：`overlap 0.35→0.40`、`fresh 0.15→0.10`（腾出的 0.10 补给最能说明相关性的引用重叠），`topic` 仍是 0.35，`code` 仍是 0.15，合计 1.00。
+
+### 决定性输出（原文）
+
+接口层——字段已清干净、旧路由已 404：
+
+```
+items: 6
+sources: {'cited': 3, 'recent': 4, 'github': 0}
+含 collab/event/events 的条目数: 0
+stats: {"votes": {}}
+首条字段: ['abstract', 'arxiv_id', 'authors', 'base', 'cited_by', 'github', 'key', 'overlap', 'reason', 'score', 'source', 'title', 'topic', 'topic_of', 'topic_top', 'url', 'vote', 'year']
+POST /recommendations/2401.00001/event: 404 {"detail":"Not Found"}
+推荐相关路由: ['/recommendations', '/recommendations/refresh', '/recommendations/schedule', '/recommendations/{key}/feedback']
+```
+
+页面层（无头 Edge + CDP 实测「发现」面板）：
+
+```
+modalShown: True
+panel: {"rows": 6, "hot": 0, "collab": 0,
+        "titles": ["引用扩展Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+                   "引用扩展Rethinking LoRA Initialization for Robust Asymmetric Learning Rates",
+                   "新上架Guided-RLVR: Guided Exploration in Reinforcement Learning with Verifiable Rewards"],
+        "firstMeta": ["0.344", "2610.25991", "2026", "引用库内 1 篇",
+                      "最像：Switch Transformers: Scaling to Trilli", "无代码", "👍 👎 下载入库"],
+        "styleGone": true}
+```
+
+回归：`235 passed, 11 warnings in 30.39s`；`All checks passed!`。
+
+### 坑
+
+1. **删多行三元表达式只删一半，整页 JS 全挂**：从 `const collabTag = (item.collab && item.collab > 0)` 开始删时，只删了变量声明行，`.rec-collab` 那条三元分支残留在 `srcTag` 之后，成为悬空 `? ... : ''`。浏览器报 `Uncaught SyntaxError: Unexpected token '?'`，后果是**整块内联脚本都不执行**——页面看着正常（HTML 照渲），但「发现」点了没反应、列表空。定位办法：CDP `Runtime.compileScript` 逐块编译内联脚本，直接拿到行号列号，比看控制台日志快。
+2. **CDP 连错了 target 也会"看起来正常"**：连 `http://127.0.0.1:PORT/json/version` 返回的 **browser 级** ws，`Runtime.evaluate` 能返回但不带页面上下文，`document.getElementById(...)` 全为 null，容易误判成"元素不存在"。正确做法是连 `/json/list` 里 `type == "page"` 的 target。
+3. **历史缓存会把删掉的字段带回来**：改完代码直接 `GET /recommendations` 仍返回 `collab`/`event`（27 条命中），因为读的是 `data/meta/online/recommendations_latest.json` 里的旧 payload。必须重跑一次 `POST /recommendations/refresh` 才会用新逻辑重写缓存。
+
+### 下一步
+
+- 评分端到端复测（38 题 R@1/R@3/R@5）确认这次简化没有拖累检索指标——本次只动推荐，不动检索，理论上无影响，但值得跑一次留底。
