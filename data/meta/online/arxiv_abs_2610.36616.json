@@ -1,0 +1,22 @@
+{
+ "saved_at": "2026-10-28T04:50:15+00:00",
+ "data": {
+  "arxiv_id": "2610.36616",
+  "title": "Normalized Cuts and Data Clustering via Matrix Fractional Programming",
+  "authors": [
+   "Yannan Chen",
+   "Beichen Huang",
+   "Licheng Zhao",
+   "Chris Ding",
+   "Kaiming Shen"
+  ],
+  "abstract": "The normalized cut (NCut) problem is a fundamental one in the area of data clustering. Despite its fractional structure, the NCut problem is seldom considered from a fractional programming (FP) perspective in the existing literature. The main reason is that the conventional FP method is inadequate for this problem case: the classical Dinkelbach&#39;s transform can only handle a single ratio and hence is limited to the two-class clustering, whereas the multi-class clustering involves multiple ratio terms. This work proposes a novel so-called multidimensional quadratic transform that is capable of dealing with the multi-ratio case; it recasts the NCut problem into a bipartite matching problem---which can be immediately solved by linear search. Furthermore, we explore the connection between the proposed FP method and the minorization-maximization (MM) theory, and in turn characterize the convergence behavior of our algorithm. Finally, we conduct experiments to numerically demonstrate the advantages of the proposed FP-based algorithm in a variety of data clustering and image segmentation tasks.",
+  "published": "[Submitted on 27 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Machine Learning (cs.LG) ; Signal Processing (eess.SP)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.36616",
+  "fetched_at": "2026-10-28T04:50:15+00:00"
+ }
+}

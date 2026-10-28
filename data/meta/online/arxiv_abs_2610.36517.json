@@ -1,0 +1,18 @@
+{
+ "saved_at": "2026-10-28T04:50:14+00:00",
+ "data": {
+  "arxiv_id": "2610.36517",
+  "title": "PRISM: Pathology Reliability In Scarce-label Medicine. A Tile-level Benchmark of Pathology Foundation Models",
+  "authors": [
+   "Alicem Koyun"
+  ],
+  "abstract": "Pathology foundation models are typically benchmarked on classification performance at full label availability and on in-distribution test sets, while calibration, behavior at low label budgets, and robustness under cross-institutional shift are seldom evaluated jointly. We introduce PRISM, a tile-level benchmark that measures the reliability of pathology foundation models along four axes: model choice, label fraction, calibration, and out-of-distribution transfer. PRISM evaluates eight foundation models (CLIP, PLIP, CONCH, UNI, Virchow2, GigaPath, H-Optimus-0, Midnight) on six tile-level datasets at six label fractions (1% to 100%) with three seeds (864 linear probe runs), extended with a five-hospital Camelyon17 study of 20 directed transfer pairs. Four phenomena emerge. (i) Under full supervision, AUROC rank predicts post-temperature calibration rank consistently across datasets (Spearman rho = 0.52, I^2 = 0%), whereas at 1% labels the relationship becomes dataset-specific (rho = -0.24, I^2 = 67%). (ii) On harder datasets the linear probe collapses to a single predicted class below a dataset-specific label fraction. (iii) Whether additional source-domain labels help or harm target calibration tracks how well the probe transfers: below a transfer AUROC of roughly 0.85, more labels worsen target ECE in 86-88% of combinations. (iv) Temperature scaling fails to reduce ECE in 49 of 288 cells, miscalibration is predominantly under-confidence, and a source-fitted temperature is harmful under failing transfer. PRISM is released as a pip-installable package with reference results for all 288 cells. Code and data: this https URL",
+  "published": "[Submitted on 27 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Machine Learning (cs.LG) ; Computer Vision and Pattern Recognition (cs.CV)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.36517",
+  "fetched_at": "2026-10-28T04:50:14+00:00"
+ }
+}

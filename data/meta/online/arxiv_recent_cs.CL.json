@@ -1,605 +1,605 @@
 {
- "saved_at": "2026-10-27T04:28:57+00:00",
+ "saved_at": "2026-10-28T04:50:08+00:00",
  "data": [
   {
-   "arxiv_id": "2610.35846",
-   "title": "Preserve to Expand: Source-Aware Adaptation and Model Merging for Multilingual LLM-Based ASR",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35846"
+   "arxiv_id": "2610.37651",
+   "title": "GEPA-Curator: Curated Learning for Self Improving Agents",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37651"
   },
   {
-   "arxiv_id": "2610.35826",
-   "title": "Understanding Jev-Style System One Models: Does Structure Reduce Selection Bias?",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35826"
+   "arxiv_id": "2610.37649",
+   "title": "Can LLMs Uncover Hidden Physical Laws through Free Exploration?",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37649"
   },
   {
-   "arxiv_id": "2610.35804",
-   "title": "Learning When to Commit: Schedule Distillation for Fast Diffusion Language Models",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35804"
+   "arxiv_id": "2610.37645",
+   "title": "Multi-State Linear Attention with Generalized Second-Order Routing",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37645"
   },
   {
-   "arxiv_id": "2610.35793",
-   "title": "Quantifying Claim Smoothing by LLM Research Agents",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35793"
+   "arxiv_id": "2610.37642",
+   "title": "Metacognitive Decoding: Efficient Inference for Diffusion Language Agents",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37642"
   },
   {
-   "arxiv_id": "2610.35743",
-   "title": "SEMA-Auto: Sighted and Efficient Multi-Turn Attack with Autonomy",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35743"
+   "arxiv_id": "2610.37494",
+   "title": "semanticfa: An R Package for Response-Free Semantic Factor Analysis of Psychometric Scales",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37494"
   },
   {
-   "arxiv_id": "2610.35698",
-   "title": "From Self-Confidence to Statistical Accuracy: Scaling Human-in-the-Loop Evaluation with Direct and LLM-Assisted Auditing",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35698"
+   "arxiv_id": "2610.37484",
+   "title": "Teach reality, not ethics: a drop-in continued-pretraining corpus installs coupled human-biosphere-AI welfare dispositions across model families",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37484"
   },
   {
-   "arxiv_id": "2610.35694",
-   "title": "Not One Belief: Answer Payloads, Persistence, and Dissociated Confidence Signals in Conversational Question Answering",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35694"
+   "arxiv_id": "2610.37465",
+   "title": "What Carries Forward? Pretraining Disclosure Across Language Model Releases",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37465"
   },
   {
-   "arxiv_id": "2610.35685",
-   "title": "Adapting LLM-SC to Living Sacred Heritage: Domain-Specific Extraction, Semantic Networks and Human Evaluation on Pashupatinath Temple Reviews",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35685"
+   "arxiv_id": "2610.37443",
+   "title": "ETAMem: Decoupling and Aligning Heterogeneous Memory for Long-Term Conversational Agents",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37443"
   },
   {
-   "arxiv_id": "2610.35671",
-   "title": "Evaluating DeepSeek V4.1 Flash-1017 for loss of control and harmful manipulation risks",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35671"
+   "arxiv_id": "2610.37380",
+   "title": "Same Verdict, Different Readers: Personalizing Fact-Checking Explanations from Relative Preferences",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37380"
   },
   {
-   "arxiv_id": "2610.35654",
-   "title": "Improving JEV Entailment Reranking with Span Readouts and Selective Adaptation",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35654"
+   "arxiv_id": "2610.37323",
+   "title": "UCVE: Graph Structured Retrieval for Compliance Validation",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37323"
   },
   {
-   "arxiv_id": "2610.35635",
-   "title": "Offline Language-Based Support System for Tactical Decision-Making in Air Combat Operations",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35635"
+   "arxiv_id": "2610.37292",
+   "title": "Multi-Label Agreement: A Flexible Framework for Inter-Annotator Reliability",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37292"
   },
   {
-   "arxiv_id": "2610.35616",
-   "title": "Hierarchical Skill Evolution for Coding Agent",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35616"
+   "arxiv_id": "2610.37265",
+   "title": "REGLAT at ArGuard Shared Tasks: An Ensemble-Based Model Integrating NER for Harmful Content Detection in Arabic",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37265"
   },
   {
-   "arxiv_id": "2610.35609",
-   "title": "Making Reasoning Visible: Configuration-Aware Diagnostic Modeling for Adaptive Scaffolding in Structured Reasoning Tasks",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35609"
+   "arxiv_id": "2610.37245",
+   "title": "Aligning Large Language Models for Safety in African Languages: A Case Study of Hausa",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37245"
   },
   {
-   "arxiv_id": "2610.35558",
-   "title": "EXCISE: Locating and Excising Distracting Sentences in Medical Question Answering",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35558"
+   "arxiv_id": "2610.37229",
+   "title": "Decision Models as Judges for Hallucination Detection",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37229"
   },
   {
-   "arxiv_id": "2610.35556",
-   "title": "LoopFold: Parallelizing Recurrent Depth in Looped Transformers",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35556"
+   "arxiv_id": "2610.37157",
+   "title": "What Survives Distillation? A Mechanistic Interpretability Study of GPT-2 and DistilGPT-2",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37157"
   },
   {
-   "arxiv_id": "2610.35544",
-   "title": "StateLoop: Persistent State for Looped Transformers",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35544"
+   "arxiv_id": "2610.37105",
+   "title": "Text Generation in Low-Resource Languages Using Human-Curated Vocabularies",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37105"
   },
   {
-   "arxiv_id": "2610.35533",
-   "title": "An Algorithmic Account of Few-Shot Concept Induction in Language Models",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35533"
+   "arxiv_id": "2610.37068",
+   "title": "Hierarchical Low-Rank Reparameterization for Parameter-Efficient",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37068"
   },
   {
-   "arxiv_id": "2610.35512",
-   "title": "MATCHA: A Chinese Multi-Disorder Mental Health Dataset with Cross-Lingual Analyses on Social Media",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35512"
+   "arxiv_id": "2610.36990",
+   "title": "The State and Fate of Multilingual, Contextual Evaluation in the NLP World",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36990"
   },
   {
-   "arxiv_id": "2610.35482",
-   "title": "Beyond Words Alone: Disentangling Distributed Evidence for Visually Grounded Cultural Translation",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35482"
+   "arxiv_id": "2610.36948",
+   "title": "Self-Keyed In-Parameter Memorization for External Memory-Free Dialogue Recall in Frozen Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36948"
   },
   {
-   "arxiv_id": "2610.35475",
-   "title": "MANTIS: Multi-Axis News Transformations for Instance-Wise Stress Testing and Worst-Case Training in Fake News Detection",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35475"
+   "arxiv_id": "2610.36937",
+   "title": "JevRec: Linguistic Encoding with Jev-like Decision Modeling for LLM-based Generative Recommendation",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36937"
   },
   {
-   "arxiv_id": "2610.35461",
-   "title": "A Contextual Measure of Ambiguity in Prescriptive Text",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35461"
+   "arxiv_id": "2610.36929",
+   "title": "DocXEval: A Systematic Evaluation of Explainability in Multimodal Document Understanding",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36929"
   },
   {
-   "arxiv_id": "2610.35432",
-   "title": "Probing the phon* representations of the Mimi codebooks",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35432"
+   "arxiv_id": "2610.36918",
+   "title": "TrawMem: Reframing Agent Memory as Task-Oriented Role-Adaptive Workspaces",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36918"
   },
   {
-   "arxiv_id": "2610.35423",
-   "title": "INVAR-Agri: Detecting Discrepancies in Multilingual Operator Manuals of Agricultural Implements with a Fine-Tuned LLM",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35423"
+   "arxiv_id": "2610.36915",
+   "title": "Do We Need an LLM to Know Why Sources Conflict? Decision Models for Knowledge-Conflict Typing in RAG",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36915"
   },
   {
-   "arxiv_id": "2610.35416",
-   "title": "ImgMT: Wikipedia-based Dataset For Evaluating Text-in-Image Translation",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35416"
+   "arxiv_id": "2610.36911",
+   "title": "Developing a Speech Language Model for Basque",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36911"
   },
   {
-   "arxiv_id": "2610.35411",
-   "title": "The Geometry of Emotion Representations Across Scale, Depth, and Instruction Tuning",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35411"
+   "arxiv_id": "2610.36910",
+   "title": "Nothing Left Behind: Finding Evidence from a Large Randomized Evaluation Corpus",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36910"
   },
   {
-   "arxiv_id": "2610.35358",
-   "title": "Agreement Between Reconstructed and Native GDELT GKG Records: A Field-Level Baseline",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35358"
+   "arxiv_id": "2610.36813",
+   "title": "Words or Deeds? How LLMs Predict Users&#39; Decisions in Human-Agent Dialogue",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36813"
   },
   {
-   "arxiv_id": "2610.35328",
-   "title": "Constrained Decoding: Harmful or Beneficial? Revisiting Its Impact on LLM Performance",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35328"
+   "arxiv_id": "2610.36811",
+   "title": "Weakness Localization Is Not Enough: State-Aware Recursive Knowledge Improvement for Large Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36811"
   },
   {
-   "arxiv_id": "2610.35295",
-   "title": "Did the Model Use That? Counterfactual Training Boosts Self-Attribution in Language Models",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35295"
+   "arxiv_id": "2610.36805",
+   "title": "Personality Latents: Conditioning Frozen Language Models on Individuals from Their Own Writing",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36805"
   },
   {
-   "arxiv_id": "2610.35269",
-   "title": "MechAlign: Evaluating Semantic Alignment at the Project Level in Mathematical Formalization",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35269"
+   "arxiv_id": "2610.36797",
+   "title": "Language Models Keep Abandoned Analyses: Residue and Adaptation after Garden-Path Sentences",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36797"
   },
   {
-   "arxiv_id": "2610.35261",
-   "title": "The Lay of the Land in Idiom-Translation Quality Estimation",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35261"
+   "arxiv_id": "2610.36759",
+   "title": "DocSkill: Skill-Integrated Agentic Reasoning for Multilingual Multi-Hop Document Question Answering",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36759"
   },
   {
-   "arxiv_id": "2610.35254",
-   "title": "Style over Substance? Linguistic Bias in LLM-based Peer Review Copy title",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35254"
+   "arxiv_id": "2610.36734",
+   "title": "CAMR: Compatibility-Aware Memory Replay for Continual Learning in Large Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36734"
   },
   {
-   "arxiv_id": "2610.35201",
-   "title": "DTCA: Denoising Token Credit Assignment for Reinforcement Learning in Diffusion Language Models",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35201"
+   "arxiv_id": "2610.36717",
+   "title": "A Harness Reducing over-Defensive Writing in Agents by Isolating Objections",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36717"
   },
   {
-   "arxiv_id": "2610.35191",
-   "title": "Lost in Translation: Investigating Systematic Discrepancies between Parallel English and Chinese Names of American Chinese Restaurants",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35191"
+   "arxiv_id": "2610.36709",
+   "title": "Is Token Confidence Just Chain Length? A Signal-Processing Audit of Reasoning Traces",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36709"
   },
   {
-   "arxiv_id": "2610.35179",
-   "title": "High Scores, Hidden Failures: Evaluating Codebook-Based LLM Content Analysis",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35179"
+   "arxiv_id": "2610.36679",
+   "title": "Specialization, Diversity, and Scaling in Child-Scale Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36679"
   },
   {
-   "arxiv_id": "2610.35168",
-   "title": "Do Language Models Understand Igbo Culture? Beyond Multiple Choice",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35168"
+   "arxiv_id": "2610.36668",
+   "title": "A Quantitative Approach to Asch Conformity in Frontier Large Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36668"
   },
   {
-   "arxiv_id": "2610.35142",
-   "title": "CalibraRL: Confidence-Calibrated Reinforcement Learning for Mitigating Hallucinations in RAG",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35142"
+   "arxiv_id": "2610.36667",
+   "title": "Japanese Discourse Structure Analysis Based on Segmented Discourse Representation Theory Using LLMs",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36667"
   },
   {
-   "arxiv_id": "2610.35114",
-   "title": "Quality over Quantity: Rethinking Data and Model Assumptions for Bengali Coreference Resolution",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35114"
+   "arxiv_id": "2610.36582",
+   "title": "Structured Maps for Landmark-Based Route Instructions with LLMs",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36582"
   },
   {
-   "arxiv_id": "2610.35111",
-   "title": "Rethinking Evaluation for Principled Generalization Using a Kripkean Challenge to Meaning as Use",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35111"
+   "arxiv_id": "2610.36538",
+   "title": "Agentic Data Sampling Framework for Multilingual ASR via Linguistic-Aware Error-Driven Optimization",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36538"
   },
   {
-   "arxiv_id": "2610.35102",
-   "title": "Useful Diversity or Hallucinated Variety? Persona-Conditioned Synthetic Query Generation for E-Commerce Search",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35102"
+   "arxiv_id": "2610.36527",
+   "title": "ETC-Bench: A Multilingual Benchmark for Evaluation-Side Transcript Canonicalization",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36527"
   },
   {
-   "arxiv_id": "2610.35094",
-   "title": "RAGing Against Misogyny: Improving Implicit Misogyny Explanations",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35094"
+   "arxiv_id": "2610.36524",
+   "title": "Causal Localization of Evidence Effects in Transformers",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36524"
   },
   {
-   "arxiv_id": "2610.35083",
-   "title": "Ask Before You Answer: A Question-Driven Evidence Reasoning Architecture (QERA) for In-Context Learning",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35083"
+   "arxiv_id": "2610.36523",
+   "title": "Benchmarking Task Takeover Across Agent Handoffs",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36523"
   },
   {
-   "arxiv_id": "2610.35082",
-   "title": "CoSA: The Conflict of Skills Attack in Real-World LLM Agent Ecosystems",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35082"
+   "arxiv_id": "2610.36511",
+   "title": "Do AI Scientists Know What&#39;s New?",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36511"
   },
   {
-   "arxiv_id": "2610.35054",
-   "title": "From Questions to Queries to Insights: A Schema-Grounded Agentic Workflow for Natural-Language Crash Data Analysis",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35054"
+   "arxiv_id": "2610.36437",
+   "title": "CONCUR: Concordant Auxiliary Rewards for Multi-Task, Multi-Reward Reinforcement Learning",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36437"
   },
   {
-   "arxiv_id": "2610.35042",
-   "title": "SimPOTrans: Self-Adaptation for Offline-to-Simultaneous Speech Translation via Reinforcement Learning",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35042"
+   "arxiv_id": "2610.36432",
+   "title": "No Tokenizer, Still a Gap: Cross-Lingual Fairness of Homoglyph and Invisible-Character Watermarking",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36432"
   },
   {
-   "arxiv_id": "2610.35029",
-   "title": "Synthetic Child-Adult Interactions Are Not Developmentally Plausible",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35029"
+   "arxiv_id": "2610.36360",
+   "title": "AK_QMUL at ArGuard Shared Tasks: A Single Fine-Tuned JAIS for Arabic Harmful-Prompt Detection",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36360"
   },
   {
-   "arxiv_id": "2610.35008",
-   "title": "When the Persona Contradicts the Line: Diagnosing Plan-to-Synthesis Failures in Chain-of-Thought TTS",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.35008"
+   "arxiv_id": "2610.36353",
+   "title": "Detect Before You Disambiguate: Perturbation-Based Input Ambiguity Detection in LLMs",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36353"
   },
   {
-   "arxiv_id": "2610.34991",
-   "title": "Diagnosing and Mitigating Long-Session Degradation in Full-Duplex Speech Models",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34991"
+   "arxiv_id": "2610.36230",
+   "title": "Beyond IceBERT: Open-Data ModernBERT Encoders for Icelandic from 12M to 1B Parameters",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36230"
   },
   {
-   "arxiv_id": "2610.34987",
-   "title": "AskGLP1: A Knowledge Graph LLM Agent for Exploring GLP-1 Experience from Online Patient Narratives",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34987"
+   "arxiv_id": "2610.36191",
+   "title": "LLM Hallucination Detection via Low-rank Multilinear Decomposition",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36191"
   },
   {
-   "arxiv_id": "2610.34971",
-   "title": "SVD-Attention: Efficiently Analyzing Attention Blocks in Transformers",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34971"
+   "arxiv_id": "2610.36187",
+   "title": "Frankly Speaking: The Company Election Integrity Keeps in Congressional Communication",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36187"
   },
   {
-   "arxiv_id": "2610.34894",
-   "title": "What Outcome RL Buys: Finishing, Reliability, Rarely Reach",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34894"
+   "arxiv_id": "2610.36184",
+   "title": "Lipi-Ghor: A Large-Scale, Diarized, Multi-Domain Bengali Speech Corpus and a Scalable Pipeline for Building It",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36184"
   },
   {
-   "arxiv_id": "2610.34889",
-   "title": "FATE-5: Faithful Alignment of Trait Expression for Continuous Big Five Personality Control",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34889"
+   "arxiv_id": "2610.36178",
+   "title": "3, 7, 14, 17, 42: Instruction Tuning Installs and Sharpens Number-Choice Heuristics in Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36178"
   },
   {
-   "arxiv_id": "2610.34887",
-   "title": "NumTrace: Auditing the Number Provenance of Financial Analyst Agents",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34887"
+   "arxiv_id": "2610.36083",
+   "title": "FinLLM-KG: Knowledge Graph-Enhanced LLMs for Financial Sentiment Analysis in Algorithmic Trading",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36083"
   },
   {
-   "arxiv_id": "2610.34875",
-   "title": "RubriX: A Fast, Fine-Tunable Non-Autoregressive Rubric Judge",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34875"
+   "arxiv_id": "2610.36013",
+   "title": "OmniBrain-0: A Unified Agentic Model for Embodied Intelligence",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36013"
   },
   {
-   "arxiv_id": "2610.34872",
-   "title": "Adaptive Retrieval, Selective Answers: Evaluating Conformal Factuality in Agentic RAG",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34872"
+   "arxiv_id": "2610.36006",
+   "title": "MedJev: Evaluating Zero-Shot System-One Decision Making in Medicine",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36006"
   },
   {
-   "arxiv_id": "2610.34860",
-   "title": "Semantic Atoms for Scalable Text Analysis in Data Analytics in the Era of LLM-Based Agents",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34860"
+   "arxiv_id": "2610.35925",
+   "title": "ReCoPII: A Relation-Grounded Framework for Building Contextual PII Masking Datasets",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.35925"
   },
   {
-   "arxiv_id": "2610.34809",
-   "title": "Position Matters More Than Channel: Talking a Language Model Out of a Correct Answer",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34809"
+   "arxiv_id": "2610.37657",
+   "title": "Heads of Security: Learned Attention Gates Improve Prompt Injection Robustness",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37657"
   },
   {
-   "arxiv_id": "2610.34791",
-   "title": "Text Is the Bottleneck: A Small-Scale Replication of LLM Game Playing in Riichi Mahjong",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34791"
+   "arxiv_id": "2610.37624",
+   "title": "Rare, Relevant, and Still Wrong: How Memory Fails LLM Group Decisions",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37624"
   },
   {
-   "arxiv_id": "2610.34790",
-   "title": "BehaviorMem: Building and Evaluating User Memory from Real-World E-Commerce Behavior Streams",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34790"
+   "arxiv_id": "2610.37609",
+   "title": "EnvSched: Environment-Aware Scheduling for Rollout-Efficient Agent Reinforcement Learning",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37609"
   },
   {
-   "arxiv_id": "2610.34768",
-   "title": "DynEdit: Dynamic Entropy-Guided Sequential Editing for Large Language Models",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34768"
+   "arxiv_id": "2610.37481",
+   "title": "Follow the Gradient: Tracing Safety Degradation Back to Training Data",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37481"
   },
   {
-   "arxiv_id": "2610.34759",
-   "title": "From Belief Inference to Task Action: A Multi-Level Evaluation of Theory of Mind on Verifiable Tasks",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34759"
+   "arxiv_id": "2610.37448",
+   "title": "Test-Time Communication in Trading Agent Swarms",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37448"
   },
   {
-   "arxiv_id": "2610.34746",
-   "title": "DecisionTraceBench: Tracking Decision-Critical Information in Multi-Party Spoken Conversations",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34746"
+   "arxiv_id": "2610.37437",
+   "title": "Representing the Unseen: Rethinking Visual Imagination for Spatial Reasoning",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37437"
   },
   {
-   "arxiv_id": "2610.34737",
-   "title": "LADDER: Diagnosing Domain-Level Self-Assessment Under Noisy Feedback",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34737"
+   "arxiv_id": "2610.37397",
+   "title": "Game-Theoretic Solvers with Bayesian Opponent Modeling and Moral Rhetoric Framing for GLEE",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37397"
   },
   {
-   "arxiv_id": "2610.34735",
-   "title": "iPrefBench: A User-Centric Benchmark for Personalized Mobile Use Agents",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34735"
+   "arxiv_id": "2610.37390",
+   "title": "LinMix: Data Mixing as Linear Domain Attribution",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37390"
   },
   {
-   "arxiv_id": "2610.34653",
-   "title": "Heard Enough to Act: Early Tool Calling in Spoken Dialogue Systems",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34653"
+   "arxiv_id": "2610.37364",
+   "title": "EmbeddingGemma 2: Unified and Efficient Multimodal Representations",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37364"
   },
   {
-   "arxiv_id": "2610.34626",
-   "title": "Entity Matching using Decision Models",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34626"
+   "arxiv_id": "2610.37280",
+   "title": "Modeling Preference Dependencies with Directed Acyclic Graphs for Narrative-Driven Recommendation",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37280"
   },
   {
-   "arxiv_id": "2610.34591",
-   "title": "Does the Outfit Change the Price? Context Halo in Vision-Language Model Valuation of an Identical Low-Cost Necklace",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34591"
+   "arxiv_id": "2610.37276",
+   "title": "Where Should the Evaluation Budget Go in LLM-Driven Agent Scaffold Evolution?",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37276"
   },
   {
-   "arxiv_id": "2610.34589",
-   "title": "HARP-LoRA: Hierarchy-Conditioned Rank Projection for Low-Rank Adaptation in Scientific Table Understanding",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34589"
+   "arxiv_id": "2610.37266",
+   "title": "Watermark Basins: Black-Box Detection of Distilled LLMs",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37266"
   },
   {
-   "arxiv_id": "2610.34585",
-   "title": "Large Language Models: A Plain-Language Overview for Engineers",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34585"
+   "arxiv_id": "2610.37255",
+   "title": "Your Policy Is Secretly a Harness: The Decision Geometry of Agent Interfaces",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37255"
   },
   {
-   "arxiv_id": "2610.34572",
-   "title": "RefinedGAW: A Refined German Academic Web Dataset",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34572"
+   "arxiv_id": "2610.37211",
+   "title": "Uncovering Shortcut Amplification in Video RLVR through the Lens of Perceptual Uncertainty Collapse",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37211"
   },
   {
-   "arxiv_id": "2610.34537",
-   "title": "STEP: Soft Trajectory Estimation of Prediction Correctness via Per-Step Probability Scoring",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34537"
+   "arxiv_id": "2610.37162",
+   "title": "Coverage Under Contradiction: A Benchmark for Negation-Aware Retrieval",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37162"
   },
   {
-   "arxiv_id": "2610.34507",
-   "title": "The Price of Scale in Proactive Memory Recall",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34507"
+   "arxiv_id": "2610.37126",
+   "title": "Mechanistic Failure Modes of Weight Pruning in Transformer Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37126"
   },
   {
-   "arxiv_id": "2610.34499",
-   "title": "Does the Voynich Manuscript Mean Anything? Calibrated Tests Find Little Trace of Language",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34499"
+   "arxiv_id": "2610.37121",
+   "title": "Prospector: learning a compact graph traversal policy for scientific reasoning",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37121"
   },
   {
-   "arxiv_id": "2610.34490",
-   "title": "Efficient Proof Generation for Lean Statements with Multiple Candidate Answers",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34490"
+   "arxiv_id": "2610.37115",
+   "title": "Self-Regularized Flow Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37115"
   },
   {
-   "arxiv_id": "2610.34350",
-   "title": "Beyond the Opening: Tracing the First Token&#39;s Persistent Influence on Reasoning Length",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34350"
+   "arxiv_id": "2610.37062",
+   "title": "EnergyCal: Taming Loss Spikes in Muon-Family Optimizers for Sparse MoE Training",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37062"
   },
   {
-   "arxiv_id": "2610.34343",
-   "title": "Xing USP: A Cross-Family Semantic Contract for Information Extraction and Intent-Slot Parsing",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34343"
+   "arxiv_id": "2610.37058",
+   "title": "Exploring the Limits of the Delta Learning Hypothesis: Single-Pair Generator Biases in Direct Preference Optimization",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37058"
   },
   {
-   "arxiv_id": "2610.34336",
-   "title": "Improving the Chain-of-Thought Compressibility of Pruned Reasoning Models via Long--Short Contrastive Pruning",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34336"
+   "arxiv_id": "2610.37041",
+   "title": "Guided-RLVR: Guided Exploration in Reinforcement Learning with Verifiable Rewards",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37041"
   },
   {
-   "arxiv_id": "2610.34335",
-   "title": "CoLink: Global Compression and Knowledge Linking for Multi-Turn Dialogue Modeling",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34335"
+   "arxiv_id": "2610.37037",
+   "title": "Zooming without Zooming v2: From Seeing Details to Connecting Evidence for Generalizable Multimodal Perception",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37037"
   },
   {
-   "arxiv_id": "2610.34294",
-   "title": "Factual Yet One-Sided: Stance Poisoning and Evidence Balancing in Retrieval-Augmented Generation",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34294"
+   "arxiv_id": "2610.37019",
+   "title": "V-LUMEN: Visual Lookup Memory for Embedding Scaling in Vision-Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.37019"
   },
   {
-   "arxiv_id": "2610.34281",
-   "title": "Transformer to GPT-5: Advancements, Limitations, and Future Directions in Large Language Model Design",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34281"
+   "arxiv_id": "2610.36991",
+   "title": "SpectRAG: Weighted Chunk Graphs for Token-Budgeted Context Selection in Multi-Hop Retrieval-Augmented Generation",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36991"
   },
   {
-   "arxiv_id": "2610.34278",
-   "title": "A Russian, a Brazilian, and a German Walk into a Bar, Ask the Same Question-- And Get Three Different Answers: Profiling LLM Perspective Diversity on Contested Topics",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34278"
+   "arxiv_id": "2610.36980",
+   "title": "AutoVend: Benchmarking LLM Agents on Long-Horizon Autonomous Vending Operations",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36980"
   },
   {
-   "arxiv_id": "2610.34238",
-   "title": "$Δτ$-Bench: Pushing Agents Toward a Moving Capability",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34238"
+   "arxiv_id": "2610.36956",
+   "title": "Mining the Nineteenth Century for the Thirteenth: Register-Scale Forced Alignment and HTR Bootstrapping via Legacy Regesta and Antiquarian Editions",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36956"
   },
   {
-   "arxiv_id": "2610.34215",
-   "title": "Synthetic linguistic data",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34215"
+   "arxiv_id": "2610.36901",
+   "title": "HiLo-RD: Cross-Budget Self-Distillation for Masked Diffusion Language Models",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36901"
   },
   {
-   "arxiv_id": "2610.34212",
-   "title": "Higher Reasoning Effort Improves Reference Verifiability and Changes Reasoning Summaries in GPT-5.5",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34212"
+   "arxiv_id": "2610.36878",
+   "title": "RubricAtlas: Mining Type-Level Rubrics from Expert Reports to Evaluate Deep Research Agents",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36878"
   },
   {
-   "arxiv_id": "2610.34180",
-   "title": "Write What Matters: Disentangling Token Selection from Slot Allocation in Recurrent Memory",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34180"
+   "arxiv_id": "2610.36877",
+   "title": "GUI-JEPA: Candidate-Conditioned JEPA Latents as a Fast Action Policy for Mobile GUI Agents",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36877"
   },
   {
-   "arxiv_id": "2610.34146",
-   "title": "Rethinking Retrieval in the Long-Context Era: Training-Free Semantic Trees for Adaptive Context Construction",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34146"
+   "arxiv_id": "2610.36874",
+   "title": "AdaGround: Token-Normalized Adaptive Zooming with Verifier-in-the-Loop Refinement for GUI Grounding",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36874"
   },
   {
-   "arxiv_id": "2610.34103",
-   "title": "T2D: Target-to-Draft Model Pruning &amp; Adaptation for Efficient Speculative Decoding",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34103"
+   "arxiv_id": "2610.36809",
+   "title": "Latent Visual Contrastive Reasoning with Multi-Branch Exploration",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36809"
   },
   {
-   "arxiv_id": "2610.34080",
-   "title": "The LALA Benchmark: Evaluating Literary and Linguistic Analysis in LLMs",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34080"
+   "arxiv_id": "2610.36801",
+   "title": "API-TAIL: Detecting Model Substitution in LLM APIs through Temperature-Aligned Likelihood Tails",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36801"
   },
   {
-   "arxiv_id": "2610.34074",
-   "title": "Identically Trained Language Models Break on Different Jailbreaks",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34074"
+   "arxiv_id": "2610.36794",
+   "title": "Select-TTT: Query-Conditioned Selective Fast Weight Updates for In-Place Test-Time Training",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36794"
   },
   {
-   "arxiv_id": "2610.34073",
-   "title": "Memory Tax: Dissecting the Net Value of Agent Memory",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34073"
+   "arxiv_id": "2610.36774",
+   "title": "Batching the Reflective Optimization Loop: Parallel Proposals Make GEPA Faster and Better",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36774"
   },
   {
-   "arxiv_id": "2610.34027",
-   "title": "When Does GEPA Merge Help? A Mechanism-Level Diagnostic",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34027"
+   "arxiv_id": "2610.36617",
+   "title": "Balanced State Subspaces for Mamba-2 State Compression",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36617"
   },
   {
-   "arxiv_id": "2610.34013",
-   "title": "The Patient Is Always Right? Evaluating Sycophancy in Medical Diagnosis with Graded Patient Beliefs",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34013"
+   "arxiv_id": "2610.36569",
+   "title": "Decoupling Consistency and Conflict across MLLM Layers for Fake News Detection",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36569"
   },
   {
-   "arxiv_id": "2610.34012",
-   "title": "Reversible Pseudonymisation of Documents Sent to External LLMs: an Open Bilingual Benchmark and an Engine",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.34012"
+   "arxiv_id": "2610.36557",
+   "title": "QESChunker: A Single Objective Unifies Overlapping and Non-Overlapping Chunking for RAG",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36557"
   },
   {
-   "arxiv_id": "2610.33969",
-   "title": "&#34;High-Quality&#34; Data for Early-Stage Instruction Tuning: An Empirical Study of Data Quality Metrics",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33969"
+   "arxiv_id": "2610.36554",
+   "title": "PRISM-BENCH: Diagnosing Grounded and Faithful Multimodal Reasoning Beyond Final-Answer Accuracy",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36554"
   },
   {
-   "arxiv_id": "2610.33962",
-   "title": "Beyond Belief: Evaluating and Mitigating LLM Susceptibility to Misinformation",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33962"
+   "arxiv_id": "2610.36533",
+   "title": "RoboAuto: Autonomous Robot Program Search through Multi-Level Physical Understanding",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36533"
   },
   {
-   "arxiv_id": "2610.33950",
-   "title": "What Makes a Question Curious? Measuring Model Curiosity in Human-LLM Interactions",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33950"
+   "arxiv_id": "2610.36520",
+   "title": "Folding Attention Biases into Keys Makes Compacted KV Caches Run on Standard Kernels",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36520"
   },
   {
-   "arxiv_id": "2610.33946",
-   "title": "Schema-Free Text-to-SQL: Learning Enterprise Database Structure from Query Logs",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33946"
+   "arxiv_id": "2610.36513",
+   "title": "MedConstBench: Benchmarking How Constitutions Steer LLMs in Medical Ethics",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36513"
   },
   {
-   "arxiv_id": "2610.33931",
-   "title": "HerHealthGPT: An Evidence-Grounded Conversational AI System for Women&#39;s Reproductive Health Copy title",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33931"
+   "arxiv_id": "2610.36493",
+   "title": "AC-JEPA: Anchored Cross-Modal Joint Embedding Predictive Architecture for Visual-to-Symbolic Translation",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36493"
   },
   {
-   "arxiv_id": "2610.33899",
-   "title": "When Personas Become Harmful: Guiding LLMs with Global Citizenship Values Alignment",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33899"
+   "arxiv_id": "2610.36449",
+   "title": "A Heart Means Recursion: Exploring Visual Meaning and Communication in VLMs",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36449"
   },
   {
-   "arxiv_id": "2610.33839",
-   "title": "EdgeDeID: A 0.6B Clinical De-identifier Trained Without Real Patient Data",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33839"
+   "arxiv_id": "2610.36384",
+   "title": "SOMA: A Benchmark for Fine-Grained Egocentric Behavior and Body-Motion Understanding",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36384"
   },
   {
-   "arxiv_id": "2610.33813",
-   "title": "Task Format as a Factor in Adaptation: A Controlled Comparison of LoRA and Full Fine-Tuning for Prompt-Safety Classification",
-   "posted": "Tue, 27 Oct 2026",
-   "url": "https://arxiv.org/abs/2610.33813"
+   "arxiv_id": "2610.36269",
+   "title": "Cross-modal Steering Vectors Exist Across Both Image and Text Generation",
+   "posted": "Wed, 28 Oct 2026",
+   "url": "https://arxiv.org/abs/2610.36269"
   }
  ]
 }

@@ -56,11 +56,8 @@ from app.recommend import (
     RECOMMEND_FILE,
     build_recommendations,
     cached_recommendations,
-    collaborative_scores,
     library_rows,
-    load_events,
     load_feedback,
-    record_event,
     rerank_with_feedback,
     save_feedback,
 )
@@ -529,14 +526,6 @@ class FeedbackRequest(BaseModel):
     # 1.4.3 ④：不同人各记各的反馈，协同过滤才有输入
     user: str = Field(default=DEFAULT_USER, max_length=40)
 
-
-class EventRequest(BaseModel):
-    """点击/下载事件（1.4.3 ③）：kind=view|download。"""
-
-    kind: str = Field(default="view", max_length=12)
-    user: str = Field(default=DEFAULT_USER, max_length=40)
-
-
 def _pick_search_result(query: str, results: list[dict]) -> dict | None:
     """从 arXiv 搜索结果里挑最像 query 的那条。
 
@@ -775,8 +764,6 @@ async def recommendations(user: str = DEFAULT_USER) -> dict:
     payload["user"] = user
     payload["stats"] = {
         "votes": load_feedback(user),
-        "events": load_events(),
-        "collab_keys": len(collaborative_scores(user)),
     }
     return payload
 
@@ -834,21 +821,6 @@ async def recommendation_feedback(key: str, req: FeedbackRequest) -> dict:
         logger.warning("写推荐缓存文件失败（不影响本次响应）")
     return {"vote": req.vote, "user": user, "feedback": feedback, "items": items}
 
-
-@app.post("/recommendations/{key}/event", summary="记录点击/下载（1.4.3 ③）")
-async def recommendation_event(key: str, req: EventRequest) -> dict:
-    """记一次点击或下载；返回累计计数。
-
-    ``key.download`` 只在用户真的点了"下载 PDF"时记，页面渲染记 ``view``。
-    计数参与排序（权重 0.05，影响很小，只当微调）。
-    """
-    if not key.strip():
-        raise HTTPException(status_code=400, detail="缺少推荐条目标识")
-    try:
-        row = await run_in_threadpool(record_event, key, req.kind)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
-    return {"key": key, "kind": req.kind, "events": row}
 
 
 @app.get("/recommendations/schedule", summary="定时刷新状态（1.4.2）")

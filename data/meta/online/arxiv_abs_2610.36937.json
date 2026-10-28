@@ -1,0 +1,21 @@
+{
+ "saved_at": "2026-10-28T04:50:16+00:00",
+ "data": {
+  "arxiv_id": "2610.36937",
+  "title": "JevRec: Linguistic Encoding with Jev-like Decision Modeling for LLM-based Generative Recommendation",
+  "authors": [
+   "Qiyong Zhong",
+   "Jiajie Su",
+   "Ming Yang",
+   "Li Zhang"
+  ],
+  "abstract": "Generative recommendation (GR) represents items as semantic identifiers (SIDs) and autoregressively generates the next item&#39;s SID from interaction history. However, most methods assign the same SID length to all items despite highly unequal interaction frequencies. This uniform design repeatedly incurs the cost of fine-grained codes for popular items, while shortening codes to reduce this cost also compresses the semantic representations of long-tail items. Inspired by the compact forms of frequent expressions in natural language, we propose JevRec to encode items as variable-length words and generate the next item from interaction context. Linguistic encoding retains frequency-dependent semantic prefixes from shared codebooks, producing shorter SIDs for popular items and richer descriptions for long-tail items. Yet predicting a sequence-level length and generating token-level content impose different optimization requirements that may conflict under a shared output head. Our Jev-like decision modeling component therefore predicts a length distribution with a dedicated head and generates content conditioned on length through a separate head while sharing the interaction-history representation. Experiments on three public datasets show that JevRec outperforms all compared baselines across the evaluated recommendation metrics. Further analyses show lower training and inference time than TIGER and reduced gradient conflict between length and content prediction.",
+  "published": "[Submitted on 27 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.36937",
+  "fetched_at": "2026-10-28T04:50:16+00:00"
+ }
+}

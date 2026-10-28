@@ -1,0 +1,27 @@
+{
+ "saved_at": "2026-10-28T04:50:18+00:00",
+ "data": {
+  "arxiv_id": "2610.37365",
+  "title": "TRIDENT-Seq: Profile-Matched Prefix-Future Contrast for Label-Efficient Payment Risk Modeling",
+  "authors": [
+   "Weiyu Han",
+   "Haoyu Jiang",
+   "Jie Sheng",
+   "Ruobing Zuo",
+   "Huilin He",
+   "Ze Zhao",
+   "Xiao Tan",
+   "Nairong Zhang",
+   "Shuai Chen",
+   "Tianyi Zhang"
+  ],
+  "abstract": "Ant International accumulates large volumes of transaction history across users and payment businesses. Confirmed fraud and chargeback outcomes, by contrast, are scarce, delayed, and specific to each business. A single encoder pretrained on unlabeled histories could serve all businesses, but only if pretraining captures the behavior that separates risk. Coarse activity differences can make contrastive pretraining on transaction logs too easy: transaction volume, amount, and timing can distinguish a history&#39;s continuation from arbitrary candidates without modeling how payment resources are used. We present TRIDENT-Seq, a transaction foundation model trained with Prefix-Future Contrast (PFC). PFC matches each prefix to a summary of its subsequent behavior among candidates with similar activity profiles; activity prediction and dispersion regularization act on the encoder output. Across three production payment businesses, the pretrained encoder improves average precision (AP) and recall at a 0.5% intervention budget over architecture-matched scratch training in all six business-budget settings. With a fixed validation set, it exceeds full-label scratch training in mean AP and recall using 10% of the training labels on Wallet and 25% on Shopping and SME. Pretraining only on another business&#39;s histories still helps. Replacing profile-matched candidates with random ones cuts recall from 24.62% to 5.64%. In Ant International&#39;s deployment evaluation, recorded amount-based chargeback and overall loss rates are 37.7% and 37.9% lower than those of the previous XGBoost-based system under the same intervention budget.",
+  "published": "[Submitted on 27 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Machine Learning (cs.LG)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.37365",
+  "fetched_at": "2026-10-28T04:50:18+00:00"
+ }
+}

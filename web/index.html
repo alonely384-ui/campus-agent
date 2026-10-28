@@ -117,11 +117,6 @@
                font-size: 10.5px; font-weight: 600; vertical-align: 1px; }
     .rec-src.cited { background: #e8f0fe; color: #1a56c4; }
     .rec-src.recent { background: #e7f7ee; color: #166534; }
-    /* 1.4.3 ③④：点击热度 / 同好（协同过滤命中） */
-    .rec-hot, .rec-collab { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 5px;
-                             font-size: 10.5px; font-weight: 600; vertical-align: 1px; }
-    .rec-hot { background: #fff4e5; color: #b45309; }
-    .rec-collab { background: #f3e8ff; color: #7c3aed; }
 
     .rec-row .rec-reason { margin: 6px 0 6px; color: #374151; line-height: 1.6; }
     .rec-row .rec-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -800,23 +795,6 @@ const REC_USER = (() => {
   }
   return id;
 })();
-// 1.4.3 ③：一次页面加载里，同一条只记一次"点击"
-const seenViews = new Set();
-
-async function trackEvent(key, kind) {
-  if (!key) return;
-  if (kind === 'view') {
-    if (seenViews.has(key)) return;
-    seenViews.add(key);
-  }
-  try {
-    await fetch(`/recommendations/${encodeURIComponent(key)}/event`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, user: REC_USER }),
-    });
-  } catch (e) { /* 统计失败不影响阅读 */ }
-}
 
 async function loadSchedule() {
   try {
@@ -944,21 +922,13 @@ function renderRecs(payload) {
     const cited = (item.cited_by || []).join('、');
     const upOn = item.vote === 'up' ? ' on' : '';
     const downOn = item.vote === 'down' ? ' on' : '';
-    const ev = item.events || {};
     // 来路徽章：引用扩展 = 有人引用了你库里的论文；新上架 = arXiv 近两周新发的
     const isRecent = item.source === 'recent';
     const srcTag = isRecent
       ? '<span class="rec-src recent" title="arXiv 近期上架，还没有人引用它，靠主题相似度选出来的">新上架</span>'
       : '<span class="rec-src cited" title="它引用了你库里的论文">引用扩展</span>';
-    // 1.4.3 ③④：点击量、别人也赞过（协同过滤命中）各给一个小标记
-    const evTag = (ev.view || ev.download)
-      ? `<span class="rec-hot" title="点击 ${ev.view || 0} 次 / 下载 ${ev.download || 0} 次">🔥 ${ev.view || 0}</span>`
-      : '';
-    const collabTag = (item.collab && item.collab > 0)
-      ? '<span class="rec-collab" title="和你口味相近的用户也赞过这篇">同好</span>'
-      : '';
     return `<div class="rec-row" data-key="${key}" data-arxiv="${escapeHtml(item.arxiv_id || '')}">
-      <div class="rec-title">${srcTag}${evTag}${collabTag}${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" data-open="1">${title}</a>` : title}</div>
+      <div class="rec-title">${srcTag}${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" data-open="1">${title}</a>` : title}</div>
       <div class="rec-reason">${escapeHtml(item.reason || '')}</div>
       <div class="rec-meta">
         <span class="score">${(item.score || 0).toFixed(3)}</span>
@@ -977,10 +947,8 @@ function renderRecs(payload) {
   }).join('');
 
   recListEl.querySelectorAll('.rec-row').forEach(row => {
-    // 进入列表就算"看过"（同一条一次加载里只记一次）
-    trackEvent(row.dataset.key, 'view');
     const openLink = row.querySelector('[data-open]');
-    if (openLink) openLink.addEventListener('click', () => trackEvent(row.dataset.key, 'view'));
+    if (openLink) openLink.addEventListener('click', () => {});
     row.querySelectorAll('[data-vote]').forEach(btn => {
       btn.addEventListener('click', () => voteRec(row.dataset.key, btn.dataset.vote));
     });
@@ -990,7 +958,6 @@ function renderRecs(payload) {
         const target = row.dataset.arxiv || row.querySelector('.rec-title').textContent.trim();
         discQueryEl.value = target;
         await downloadByName();
-        trackEvent(row.dataset.key, 'download');
       });
     }
   });
