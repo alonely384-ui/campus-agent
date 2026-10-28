@@ -59,6 +59,35 @@ def test_arxiv_id_and_version_helpers(library):
     assert library.version_of("plain.pdf") == 0
 
 
+def test_sync_index_ignores_dot_files(library):
+    """下载中途的 `.download_x.pdf` 不能被登记成论文。
+
+    这是真实踩过的坑：临时文件在论文目录里时会先被 glob 登记成一条"幽灵论文"，
+    临时文件删掉后条目残留，真正入库的那份反而被判成重复。
+    """
+    (library.PAPERS_DIR / ".download_1602.07776.pdf").write_bytes(b"%PDF-1.4 part")
+    (library.PAPERS_DIR / "1602.07776.pdf").write_bytes(b"%PDF-1.4 real")
+
+    items = library.list_papers()
+
+    assert [p.paper_id for p in items] == ["1602.07776"]
+    assert items[0].duplicate_of == ""
+
+
+def test_sync_index_clears_dangling_duplicate_of(library):
+    """指向已不存在 paper_id 的 duplicate_of 要清掉，否则界面显示"重复"却删不掉那份。"""
+    (library.PAPERS_DIR / "1602.07776.pdf").write_bytes(b"%PDF-1.4 real")
+    items = library.list_papers()
+    items[0].duplicate_of = ".download_1602.07776"
+    items[0].duplicate_reason = "同一 arXiv 编号的不同版本"
+    library._save_index(items)
+
+    fixed = library.list_papers()
+
+    assert fixed[0].duplicate_of == ""
+    assert fixed[0].duplicate_reason == ""
+
+
 def test_duplicate_detected_by_arxiv_id_without_text(library):
     """扫描件抽不出一个字，也要靠编号认出它是同一篇的另一个版本。"""
     text_v7 = "Attention Is All You Need 提出 Transformer 架构。" * 20

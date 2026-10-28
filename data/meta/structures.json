@@ -45074,5 +45074,2957 @@
     },
     "appendix": [],
     "pages": 541
+  },
+  "1610.08613.pdf": {
+    "title": "Can Active Memory Replace Attention?",
+    "authors": [
+      "Samy Bengio"
+    ],
+    "affiliations": [
+      "Google Brain",
+      "lukaszkaiser@google.com",
+      "bengio@google.com",
+      "Abstract"
+    ],
+    "emails": [
+      "lukaszkaiser@google.com",
+      "bengio@google.com"
+    ],
+    "abstract": "Abstract Several mechanisms to focus attention of a neural network on selected parts of its input or memory have been used successfully in deep learning models in re- cent years. Attention has improved image classiﬁcation, image captioning, speech recognition, generative models, and learning algorithmic tasks, but it had probably the largest impact on neural machine translation. Recently, similar improvements have been obtained using alternative mechanisms that do not focus on a single part of a memory but operate on all of it in parallel, in a uniform way. Such mechanism, which we call active memory, improved over attention in algorithmic tasks, image processing, and in generative modelling. So far, however, active memory has not improved over attention for most natural language processin",
+    "keywords": [],
+    "sections": [
+      {
+        "number": "",
+        "title": "Abstract",
+        "level": 1,
+        "page": 0
+      },
+      {
+        "number": "1",
+        "title": "Introduction",
+        "level": 1,
+        "page": 0
+      },
+      {
+        "number": "2",
+        "title": "Active Memory Models",
+        "level": 1,
+        "page": 2
+      },
+      {
+        "number": "3",
+        "title": "Experiments",
+        "level": 1,
+        "page": 5
+      },
+      {
+        "number": "4",
+        "title": "Discussion",
+        "level": 1,
+        "page": 6
+      },
+      {
+        "number": "",
+        "title": "References",
+        "level": 1,
+        "page": 7
+      }
+    ],
+    "tables": [
+      {
+        "number": "1",
+        "caption": "Results on the WMT English->French translation task. We provide the average per-word",
+        "page": 6,
+        "rows": [
+          [
+            "Model",
+            "Perplexity(log)",
+            "BLEU"
+          ],
+          [
+            "Neural GPU",
+            "30.1(3.5)",
+            "<5"
+          ],
+          [
+            "Markovian Neural GPU",
+            "11.8(2.5)",
+            "<5"
+          ],
+          [
+            "Extended Neural GPU",
+            "3.3(1.19)",
+            "29.6"
+          ],
+          [
+            "GRU+Attention",
+            "3.4(1.22)",
+            "26.4"
+          ]
+        ]
+      }
+    ],
+    "figures": [
+      {
+        "number": "1",
+        "caption": "Attention model. The state vector is used to compute a probability distribution over",
+        "page": 1
+      },
+      {
+        "number": "2",
+        "caption": "Active memory model. The whole memory takes part in the computation at every step.",
+        "page": 1
+      },
+      {
+        "number": "3",
+        "caption": "Neural GPU with 2 layers and width w = 3 unfolded in time.",
+        "page": 3
+      },
+      {
+        "number": "4",
+        "caption": "Markovian Neural GPU. Each output ok is conditionally dependent on the ﬁnal tensor",
+        "page": 4
+      },
+      {
+        "number": "5",
+        "caption": "Extended Neural GPU with active memory decoder. See the text below for deﬁnition.",
+        "page": 4
+      },
+      {
+        "number": "6",
+        "caption": "BLEU score (the higher the better) vs source sentence length.",
+        "page": 7
+      }
+    ],
+    "formulas": [
+      {
+        "page": 1,
+        "text": "new memory = memory"
+      },
+      {
+        "page": 2,
+        "text": "U ∗s[x, y, i] ="
+      },
+      {
+        "page": 2,
+        "text": "u=⌊−kw/2⌋"
+      },
+      {
+        "page": 2,
+        "text": "v=⌊−kh/2⌋"
+      },
+      {
+        "page": 2,
+        "text": "c=1"
+      },
+      {
+        "page": 2,
+        "text": "s′ = s + U ∗s,"
+      },
+      {
+        "page": 2,
+        "text": "CGRU(s) = u ⊙s + (1 −u) ⊙tanh(U ∗(r ⊙s) + B), where"
+      },
+      {
+        "page": 2,
+        "text": "u = σ(U ′ ∗s + B′)"
+      },
+      {
+        "page": 2,
+        "text": "r = σ(U ′′ ∗s + B′′)."
+      },
+      {
+        "page": 3,
+        "text": "st+1 = CGRUl(CGRUl−1 . . . CGRU1(st) . . . )"
+      },
+      {
+        "page": 3,
+        "text": "sﬁn = sn."
+      },
+      {
+        "page": 3,
+        "text": "lk = O concat(sﬁn[0, k, :], E′ok−1)."
+      },
+      {
+        "page": 4,
+        "text": "sﬁn = sn and the previous output symbol ok−1."
+      },
+      {
+        "page": 4,
+        "text": "sn = d0"
+      },
+      {
+        "page": 4,
+        "text": "dt+1 = CGRUd"
+      },
+      {
+        "page": 4,
+        "text": "CGRUd(s, p) = u ⊙s + (1 −u) ⊙tanh(U ∗(r ⊙s) + W ∗p + B), where"
+      },
+      {
+        "page": 4,
+        "text": "u = σ(U ′ ∗s + W ′ ∗p + B′)"
+      },
+      {
+        "page": 4,
+        "text": "r = σ(U ′′ ∗s + W ′′ ∗p + B′′)."
+      },
+      {
+        "page": 4,
+        "text": "pk+1 = pk"
+      }
+    ],
+    "references": {
+      "page": 7,
+      "count": 38,
+      "first": "Alex Krizhevsky, Ilya Sutskever, and Geoffrey Hinton. Imagenet classiﬁcation with deep convolutional",
+      "last": "Zhaopeng Tu, Zhengdong Lu, Yang Liu, Xiaohua Liu, and Hang Li."
+    },
+    "appendix": [],
+    "pages": 9
+  },
+  "1705.03122.pdf": {
+    "title": "Convolutional Sequence to Sequence Learning",
+    "authors": [
+      "Jonas Gehring",
+      "Michael Auli",
+      "David Grangier",
+      "Denis Yarats",
+      "Yann N. Dauphin"
+    ],
+    "affiliations": [
+      "Facebook AI Research",
+      "Abstract"
+    ],
+    "emails": [],
+    "abstract": "Abstract The prevalent approach to sequence to sequence learning maps an input sequence to a variable length output sequence via recurrent neural net- works. We introduce an architecture based en- tirely on convolutional neural networks.1 Com- pared to recurrent models, computations over all elements can be fully parallelized during training to better exploit the GPU hardware and optimiza- tion is easier since the number of non-linearities is ﬁxed and independent of the input length. Our use of gated linear units eases gradient propaga- tion and we equip each decoder layer with a sep- arate attention module. We outperform the accu- racy of the deep LSTM setup of Wu et al. (2016) on both WMT’14 English-German and WMT’14 English-French translation at an order of magni- tude faster speed, bot",
+    "keywords": [],
+    "sections": [
+      {
+        "number": "",
+        "title": "Abstract",
+        "level": 1,
+        "page": 0
+      },
+      {
+        "number": "1",
+        "title": "Introduction",
+        "level": 1,
+        "page": 0
+      },
+      {
+        "number": "2",
+        "title": "Recurrent Sequence to Sequence Learning",
+        "level": 1,
+        "page": 1
+      },
+      {
+        "number": "3",
+        "title": "A Convolutional Architecture",
+        "level": 1,
+        "page": 1
+      },
+      {
+        "number": "3.1",
+        "title": "Position Embeddings",
+        "level": 2,
+        "page": 1
+      },
+      {
+        "number": "3.2",
+        "title": "Convolutional Block Structure",
+        "level": 2,
+        "page": 1
+      },
+      {
+        "number": "3.3",
+        "title": "Multi-step Attention",
+        "level": 2,
+        "page": 2
+      },
+      {
+        "number": "3.4",
+        "title": "Normalization Strategy",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "3.5",
+        "title": "Initialization",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "4",
+        "title": "Experimental Setup",
+        "level": 1,
+        "page": 3
+      },
+      {
+        "number": "4.1",
+        "title": "Datasets",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "",
+        "title": "WMT’16 English-Romanian",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "",
+        "title": "WMT’14 English-German",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "",
+        "title": "WMT’14 English-French",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "4.2",
+        "title": "Model Parameters and Optimization",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "4.3",
+        "title": "Evaluation",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "5",
+        "title": "Results",
+        "level": 1,
+        "page": 5
+      },
+      {
+        "number": "5.2",
+        "title": "Ensemble Results",
+        "level": 2,
+        "page": 6
+      },
+      {
+        "number": "5.3",
+        "title": "Generation Speed",
+        "level": 2,
+        "page": 6
+      },
+      {
+        "number": "5.4",
+        "title": "Position Embeddings",
+        "level": 2,
+        "page": 6
+      },
+      {
+        "number": "5.5",
+        "title": "Multi-step Attention",
+        "level": 2,
+        "page": 7
+      },
+      {
+        "number": "5.6",
+        "title": "Kernel size and Depth",
+        "level": 2,
+        "page": 7
+      },
+      {
+        "number": "5.7",
+        "title": "Summarization",
+        "level": 2,
+        "page": 8
+      },
+      {
+        "number": "6",
+        "title": "Conclusion and Future Work",
+        "level": 1,
+        "page": 8
+      },
+      {
+        "number": "",
+        "title": "Acknowledgements",
+        "level": 1,
+        "page": 8
+      },
+      {
+        "number": "",
+        "title": "References",
+        "level": 1,
+        "page": 8
+      }
+    ],
+    "tables": [
+      {
+        "number": "1",
+        "caption": "Accuracy on WMT tasks comapred to previous work.",
+        "page": 5,
+        "rows": []
+      },
+      {
+        "number": "2",
+        "caption": "Accuracy of ensembles with eight models.",
+        "page": 6,
+        "rows": [
+          [
+            "",
+            "BLEU",
+            "Time(s)"
+          ],
+          [
+            "GNMTGPU(K80)",
+            "31.20",
+            "3,028"
+          ],
+          [
+            "GNMTCPU88cores",
+            "31.20",
+            "1,322"
+          ],
+          [
+            "GNMTTPU",
+            "31.21",
+            "384"
+          ],
+          [
+            "ConvS2SGPU(K40)b=1",
+            "33.45",
+            "327"
+          ],
+          [
+            "ConvS2SGPU(M40)b=1",
+            "33.45",
+            "221"
+          ],
+          [
+            "ConvS2SGPU(GTX-1080ti)b=1",
+            "33.45",
+            "142"
+          ],
+          [
+            "ConvS2SCPU48coresb=1",
+            "33.45",
+            "142"
+          ],
+          [
+            "ConvS2SGPU(K40)b=5",
+            "34.10",
+            "587"
+          ],
+          [
+            "ConvS2SCPU48coresb=5",
+            "34.10",
+            "482"
+          ],
+          [
+            "ConvS2SGPU(M40)b=5",
+            "34.10",
+            "406"
+          ],
+          [
+            "ConvS2SGPU(GTX-1080ti)b=5",
+            "34.10",
+            "256"
+          ]
+        ]
+      },
+      {
+        "number": "3",
+        "caption": "CPU and GPU generation speed in seconds on the de-",
+        "page": 6,
+        "rows": []
+      },
+      {
+        "number": "4",
+        "caption": "Effect of removing position embeddings from our model",
+        "page": 7,
+        "rows": [
+          [
+            "",
+            "PPL",
+            "BLEU"
+          ],
+          [
+            "ConvS2S",
+            "6.64",
+            "21.7"
+          ],
+          [
+            "-sourceposition",
+            "6.69",
+            "21.3"
+          ],
+          [
+            "-targetposition",
+            "6.63",
+            "21.5"
+          ],
+          [
+            "-source&targetposition",
+            "6.68",
+            "21.2"
+          ]
+        ]
+      },
+      {
+        "number": "5",
+        "caption": "Multi-step attention in all ﬁve decoder layers or fewer",
+        "page": 7,
+        "rows": [
+          [
+            "AttnLayers",
+            "PPL",
+            "BLEU"
+          ],
+          [
+            "1,2,3,4,5",
+            "6.65",
+            "21.63"
+          ],
+          [
+            "1,2,3,4",
+            "6.70",
+            "21.54"
+          ],
+          [
+            "1,2,3",
+            "6.95",
+            "21.36"
+          ],
+          [
+            "1,2",
+            "6.92",
+            "21.47"
+          ],
+          [
+            "1,3,5",
+            "6.97",
+            "21.10"
+          ],
+          [
+            "1",
+            "7.15",
+            "21.26"
+          ],
+          [
+            "2",
+            "7.09",
+            "21.30"
+          ],
+          [
+            "3",
+            "7.11",
+            "21.19"
+          ],
+          [
+            "4",
+            "7.19",
+            "21.31"
+          ],
+          [
+            "5",
+            "7.66",
+            "20.24"
+          ]
+        ]
+      },
+      {
+        "number": "6",
+        "caption": "Accuracy on two summarization tasks in terms of Rouge-1 (RG-1), Rouge-2 (RG-2), and Rouge-L (RG-L).",
+        "page": 8,
+        "rows": [
+          [
+            "",
+            "RG-1(R)",
+            "RG-2(R)",
+            "RG-L(R)",
+            "RG-1(F)",
+            "RG-2(F)",
+            "RG-L(F)"
+          ],
+          [
+            "RNNMLE(Shenetal.,2016)",
+            "24.92",
+            "8.60",
+            "22.25",
+            "32.67",
+            "15.23",
+            "30.56"
+          ],
+          [
+            "RNNMRT(Shenetal.,2016)",
+            "30.41",
+            "10.87",
+            "26.79",
+            "36.54",
+            "16.59",
+            "33.44"
+          ],
+          [
+            "WFE(Suzuki&Nagata,2017)",
+            "32.28",
+            "10.54",
+            "27.80",
+            "36.30",
+            "17.31",
+            "33.88"
+          ],
+          [
+            "ConvS2S",
+            "30.44",
+            "10.84",
+            "26.90",
+            "35.88",
+            "17.48",
+            "33.29"
+          ]
+        ]
+      },
+      {
+        "number": "7",
+        "caption": "Encoder with different kernel width in terms of BLEU.",
+        "page": 8,
+        "rows": [
+          [
+            "Kernelwidth",
+            "Enco",
+            "derlaye",
+            "rs"
+          ],
+          [
+            "",
+            "5",
+            "9",
+            "13"
+          ],
+          [
+            "3",
+            "20.61",
+            "21.17",
+            "21.63"
+          ],
+          [
+            "5",
+            "20.80",
+            "21.02",
+            "21.42"
+          ],
+          [
+            "7",
+            "20.81",
+            "21.30",
+            "21.09"
+          ]
+        ]
+      },
+      {
+        "number": "8",
+        "caption": "Decoder with different kernel width in terms of BLEU.",
+        "page": 8,
+        "rows": [
+          [
+            "Kernelwidth",
+            "Deco",
+            "derlaye",
+            "rs"
+          ],
+          [
+            "",
+            "3",
+            "5",
+            "7"
+          ],
+          [
+            "3",
+            "21.10",
+            "21.71",
+            "21.62"
+          ],
+          [
+            "5",
+            "21.09",
+            "21.63",
+            "21.24"
+          ],
+          [
+            "7",
+            "21.40",
+            "21.31",
+            "21.33"
+          ]
+        ]
+      }
+    ],
+    "figures": [
+      {
+        "number": "1",
+        "caption": "Illustration of batching during training.",
+        "page": 2
+      },
+      {
+        "number": "2",
+        "caption": "Encoder and decoder with different number of layers.",
+        "page": 7
+      },
+      {
+        "number": "3",
+        "caption": "Attention scores for different decoder layers for a sentence translated from English (y-axis) to German (x-axis). This model",
+        "page": 14
+      }
+    ],
+    "formulas": [
+      {
+        "page": 1,
+        "text": "tions z = (z1. . . . , zm). The decoder RNN takes z and"
+      },
+      {
+        "page": 1,
+        "text": "generates the output sequence y = (y1, . . . , yn) left to"
+      },
+      {
+        "page": 1,
+        "text": "tributional space as w = (w1, . . . , wm), where wj ∈Rf"
+      },
+      {
+        "page": 1,
+        "text": "solute position of input elements p = (p1, . . . , pm) where"
+      },
+      {
+        "page": 1,
+        "text": "resentations e = (w1 + p1, . . . , wm + pm). We proceed"
+      },
+      {
+        "page": 1,
+        "text": "g = (g1, . . . , gn). Position embeddings are useful in our"
+      },
+      {
+        "page": 1,
+        "text": "th block as hl = (hl"
+      },
+      {
+        "page": 1,
+        "text": "and zl = (zl"
+      },
+      {
+        "page": 2,
+        "text": "Each convolution kernel is parameterized as W ∈R2d×kd,"
+      },
+      {
+        "page": 2,
+        "text": "tion Y = [A B] ∈R2d:"
+      },
+      {
+        "page": 2,
+        "text": "v([A B]) = A ⊗σ(B)"
+      },
+      {
+        "page": 2,
+        "text": "i = v(W l[hl−1"
+      },
+      {
+        "page": 2,
+        "text": "p(yi+1|y1, . . . , yi, x) = softmax(WohL"
+      },
+      {
+        "page": 2,
+        "text": "i = W l"
+      },
+      {
+        "page": 2,
+        "text": "ij ="
+      },
+      {
+        "page": 2,
+        "text": "t=1 exp"
+      },
+      {
+        "page": 2,
+        "text": "i ="
+      },
+      {
+        "page": 2,
+        "text": "j=1"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S GPU (K40) b = 1"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S GPU (M40) b = 1"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S GPU (GTX-1080ti) b = 1"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S CPU 48 cores b = 1"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S GPU (K40) b = 5"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S CPU 48 cores b = 5"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S GPU (M40) b = 5"
+      },
+      {
+        "page": 6,
+        "text": "ConvS2S GPU (GTX-1080ti) b = 5"
+      },
+      {
+        "page": 11,
+        "text": "= nlV ar"
+      },
+      {
+        "page": 11,
+        "text": "= nlV ar"
+      },
+      {
+        "page": 11,
+        "text": "l−1) with yl−1 = (ya"
+      },
+      {
+        "page": 11,
+        "text": "= V ar"
+      },
+      {
+        "page": 11,
+        "text": "= E"
+      },
+      {
+        "page": 11,
+        "text": "= V ar[ya"
+      },
+      {
+        "page": 11,
+        "text": "l−1)] = 1/4:"
+      },
+      {
+        "page": 11,
+        "text": "= V ar"
+      },
+      {
+        "page": 11,
+        "text": "= V ar"
+      },
+      {
+        "page": 11,
+        "text": "= 1"
+      },
+      {
+        "page": 11,
+        "text": "σ(x)2 ≤(1/16)x2 −1/4 + σ(x) (Appendix B) to provide"
+      },
+      {
+        "page": 11,
+        "text": "E[σ(x)2] ≤E"
+      },
+      {
+        "page": 11,
+        "text": "= 1"
+      },
+      {
+        "page": 11,
+        "text": "≤1"
+      },
+      {
+        "page": 11,
+        "text": "= 1"
+      },
+      {
+        "page": 11,
+        "text": "l−1] = V ar[yb"
+      },
+      {
+        "page": 11,
+        "text": "l−1] = V ar[yl−1], this"
+      },
+      {
+        "page": 11,
+        "text": "≤1"
+      },
+      {
+        "page": 11,
+        "text": "V ar[xl] ≈1"
+      },
+      {
+        "page": 11,
+        "text": "V ar[yL] ≈V ar[y1]"
+      },
+      {
+        "page": 11,
+        "text": "l=2"
+      },
+      {
+        "page": 11,
+        "text": "= 1, ∀l"
+      },
+      {
+        "page": 11,
+        "text": "propagation as ∆xl = ˆWlyl. Considering separate gradi-"
+      },
+      {
+        "page": 11,
+        "text": "∆xl = ˆW a"
+      },
+      {
+        "page": 11,
+        "text": "contain the same values, i.e. ˆw = w. Similar to (3), the"
+      },
+      {
+        "page": 11,
+        "text": "V ar[∆xl] = ˆnl"
+      },
+      {
+        "page": 11,
+        "text": "l = ∆xl+1 σ(yb"
+      },
+      {
+        "page": 11,
+        "text": "l = ∆xl+1ya"
+      },
+      {
+        "page": 12,
+        "text": "4V ar[∆xl+1] ≤1"
+      },
+      {
+        "page": 12,
+        "text": "l ] ≤1"
+      },
+      {
+        "page": 12,
+        "text": "l ] ≈1"
+      },
+      {
+        "page": 12,
+        "text": "l ] ≈0"
+      },
+      {
+        "page": 12,
+        "text": "V ar[∆xl] ≈1"
+      },
+      {
+        "page": 12,
+        "text": "V ar[∆x2] ≈V ar[∆xL+1]"
+      },
+      {
+        "page": 12,
+        "text": "l=2"
+      },
+      {
+        "page": 12,
+        "text": "l ] = 1. In the"
+      },
+      {
+        "page": 12,
+        "text": "cases nl = ˆnl. Note that W b"
+      },
+      {
+        "page": 12,
+        "text": "x by a Bernoulli random variable r where Pr[r = 1/p] = p"
+      },
+      {
+        "page": 12,
+        "text": "and Pr[r = 0] = 1 −p (Srivastava et al., 2014). It holds"
+      },
+      {
+        "page": 12,
+        "text": "that E[r] = 1 and V ar[r] = (1 −p)/p. If x is independent"
+      },
+      {
+        "page": 12,
+        "text": "of r and E[x] = 0, the variance after dropout is"
+      },
+      {
+        "page": 12,
+        "text": "V ar[xr] = E[r]2V ar[x] + V ar[r]V ar[x]"
+      },
+      {
+        "page": 12,
+        "text": "= 1"
+      },
+      {
+        "page": 12,
+        "text": "V ar[xl+1] ≈1"
+      },
+      {
+        "page": 12,
+        "text": "V ar[∆xl] ≈1"
+      },
+      {
+        "page": 12,
+        "text": "bolic tangent by using the identity tanh(x) = 2 σ(2x) −1."
+      },
+      {
+        "page": 12,
+        "text": "with tanh(x) ∈[0, 1], x ≥0 it holds that"
+      },
+      {
+        "page": 12,
+        "text": "tanh′(x) ≤1, x ≥0"
+      },
+      {
+        "page": 12,
+        "text": "tanh′(x) dx ≤"
+      },
+      {
+        "page": 12,
+        "text": "tanh(x) ≤x, x ≥0"
+      },
+      {
+        "page": 12,
+        "text": "2 σ(x) −1 ≤1"
+      },
+      {
+        "page": 12,
+        "text": "2x, x ≥0"
+      },
+      {
+        "page": 12,
+        "text": "\u00012 ≤"
+      },
+      {
+        "page": 12,
+        "text": "⇔σ(x)2 ≤1"
+      }
+    ],
+    "references": {
+      "page": 8,
+      "count": 89,
+      "first": "Ba, Jimmy Lei, Kiros, Jamie Ryan, and Hinton, Ge-",
+      "last": "C. Attention Visualization"
+    },
+    "appendix": [],
+    "pages": 15
+  },
+  "1602.07776.pdf": {
+    "title": "Recurrent Neural Network Grammars",
+    "authors": [],
+    "affiliations": [
+      "♠School of Computer Science, Carnegie Mellon University, Pittsburgh, PA, USA",
+      "♦NLP Group, Pompeu Fabra University, Barcelona, Spain",
+      "♥Computer Science & Engineering, University of Washington, Seattle, WA, USA",
+      "Abstract"
+    ],
+    "emails": [
+      "miguel.ballesteros@upf.edu",
+      "nasmith@cs.washington.edu"
+    ],
+    "abstract": "Abstract We introduce recurrent neural network gram- mars, probabilistic models of sentences with explicit phrase structure. We explain efﬁcient inference procedures that allow application to both parsing and language modeling. Experi- ments show that they provide better parsing in English than any single previously published supervised generative model and better lan- guage modeling than state-of-the-art sequen- tial RNNs in English and Chinese1. 1",
+    "keywords": [],
+    "sections": [
+      {
+        "number": "",
+        "title": "Abstract",
+        "level": 1,
+        "page": 0
+      },
+      {
+        "number": "1",
+        "title": "Introduction",
+        "level": 1,
+        "page": 0
+      },
+      {
+        "number": "2",
+        "title": "RNN Grammars",
+        "level": 1,
+        "page": 1
+      },
+      {
+        "number": "3",
+        "title": "Top-down Parsing and Generation",
+        "level": 1,
+        "page": 1
+      },
+      {
+        "number": "",
+        "title": "Stackt",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "",
+        "title": "Stackt",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "",
+        "title": "Terminals",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "3.5",
+        "title": "Comparison to Other Models",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "4",
+        "title": "Generative Model",
+        "level": 1,
+        "page": 4
+      },
+      {
+        "number": "4.2",
+        "title": "Word Generation",
+        "level": 2,
+        "page": 5
+      },
+      {
+        "number": "6",
+        "title": "Experiments",
+        "level": 1,
+        "page": 6
+      },
+      {
+        "number": "",
+        "title": "Data",
+        "level": 2,
+        "page": 6
+      },
+      {
+        "number": "9",
+        "title": "Outlook",
+        "level": 1,
+        "page": 8
+      },
+      {
+        "number": "",
+        "title": "Acknowledgments",
+        "level": 1,
+        "page": 8
+      },
+      {
+        "number": "",
+        "title": "References",
+        "level": 1,
+        "page": 9
+      },
+      {
+        "number": "",
+        "title": "Abstract",
+        "level": 1,
+        "page": 11
+      }
+    ],
+    "tables": [
+      {
+        "number": "1",
+        "caption": "Corpus statistics.",
+        "page": 6,
+        "rows": [
+          [
+            "",
+            "PTB-train",
+            "PTB-test",
+            "CTB-train",
+            "CTB-test"
+          ],
+          [
+            "Sequences",
+            "39,831",
+            "2,416",
+            "50,734",
+            "348"
+          ],
+          [
+            "Tokens",
+            "950,012",
+            "56,684",
+            "1,184,532",
+            "8,008"
+          ],
+          [
+            "Types",
+            "23,815",
+            "6,823",
+            "31,358",
+            "1,637"
+          ],
+          [
+            "UNK-Types",
+            "49",
+            "42",
+            "1",
+            "1"
+          ]
+        ]
+      },
+      {
+        "number": "2",
+        "caption": "(last two rows)",
+        "page": 6,
+        "rows": []
+      },
+      {
+        "number": "3",
+        "caption": "Parsing results on CTB 5.1.",
+        "page": 7,
+        "rows": [
+          [
+            "Model",
+            "type",
+            "F1"
+          ],
+          [
+            "Vinyalsetal.(2015)(cid:63) –WSJonly",
+            "D",
+            "88.3"
+          ],
+          [
+            "Henderson(2004)",
+            "D",
+            "89.4"
+          ],
+          [
+            "Socheretal.(2013a)",
+            "D",
+            "90.4"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "D",
+            "90.4"
+          ],
+          [
+            "PetrovandKlein(2007)",
+            "G",
+            "90.1"
+          ],
+          [
+            "Bod(2003)",
+            "G",
+            "90.7"
+          ],
+          [
+            "Shindoetal.(2012)–single",
+            "G",
+            "91.1"
+          ],
+          [
+            "Shindoetal.(2012)–ensemble",
+            "G",
+            "92.4"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "S",
+            "91.3"
+          ],
+          [
+            "McCloskyetal.(2006)",
+            "S",
+            "92.1"
+          ],
+          [
+            "Vinyalsetal.(2015)–single",
+            "S",
+            "92.1"
+          ],
+          [
+            "Discriminative,q(y | x)",
+            "D",
+            "89.8"
+          ],
+          [
+            "Generative,pˆ(y | x)",
+            "G",
+            "92.4"
+          ]
+        ]
+      },
+      {
+        "number": "4",
+        "caption": "Language model perplexity results.",
+        "page": 7,
+        "rows": [
+          [
+            "Model",
+            "type",
+            "F1"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "D",
+            "82.6"
+          ],
+          [
+            "Wangetal.(2015)",
+            "D",
+            "83.2"
+          ],
+          [
+            "HuangandHarper(2009)",
+            "D",
+            "84.2"
+          ],
+          [
+            "Charniak(2000)",
+            "G",
+            "80.8"
+          ],
+          [
+            "Bikel(2004)",
+            "G",
+            "80.6"
+          ],
+          [
+            "PetrovandKlein(2007)",
+            "G",
+            "83.3"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "S",
+            "85.6"
+          ],
+          [
+            "WangandXue(2014)",
+            "S",
+            "86.3"
+          ],
+          [
+            "Wangetal.(2015)",
+            "S",
+            "86.6"
+          ],
+          [
+            "Discriminative,q(y | x)",
+            "D",
+            "80.7"
+          ],
+          [
+            "Generative,pˆ(y | x)",
+            "G",
+            "82.7"
+          ]
+        ]
+      },
+      {
+        "number": "6",
+        "caption": "(achieving the the best reported result on",
+        "page": 11,
+        "rows": [
+          [
+            "Model",
+            "type",
+            "F1"
+          ],
+          [
+            "Vinyalsetal.(2015)(cid:63) –WSJonly",
+            "D",
+            "88.3"
+          ],
+          [
+            "Henderson(2004)",
+            "D",
+            "89.4"
+          ],
+          [
+            "Socheretal.(2013a)",
+            "D",
+            "90.4"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "D",
+            "90.4"
+          ],
+          [
+            "PetrovandKlein(2007)",
+            "G",
+            "90.1"
+          ],
+          [
+            "Bod(2003)",
+            "G",
+            "90.7"
+          ],
+          [
+            "Shindoetal.(2012)–single",
+            "G",
+            "91.1"
+          ],
+          [
+            "Shindoetal.(2012)–ensemble",
+            "G",
+            "92.4"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "S",
+            "91.3"
+          ],
+          [
+            "McCloskyetal.(2006)",
+            "S",
+            "92.1"
+          ],
+          [
+            "Vinyalsetal.(2015)",
+            "S",
+            "92.1"
+          ],
+          [
+            "Discriminative,q(y | x)† –buggy",
+            "D",
+            "89.8"
+          ],
+          [
+            "Generative,pˆ(y | x)† –buggy",
+            "G",
+            "92.4"
+          ],
+          [
+            "Discriminative,q(y | x)–correct",
+            "D",
+            "91.7"
+          ],
+          [
+            "Generative,pˆ(y | x)–correct",
+            "G",
+            "93.3"
+          ]
+        ]
+      },
+      {
+        "number": "5",
+        "caption": "Parsing results with ﬁxed composition function on",
+        "page": 11,
+        "rows": []
+      },
+      {
+        "number": "6",
+        "caption": "Parsing results on CTB 5.1 including results with the",
+        "page": 12,
+        "rows": [
+          [
+            "Model",
+            "type",
+            "F1"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "D",
+            "82.6"
+          ],
+          [
+            "Wangetal.(2015)",
+            "D",
+            "83.2"
+          ],
+          [
+            "HuangandHarper(2009)",
+            "D",
+            "84.2"
+          ],
+          [
+            "Charniak(2000)",
+            "G",
+            "80.8"
+          ],
+          [
+            "Bikel(2004)",
+            "G",
+            "80.6"
+          ],
+          [
+            "PetrovandKlein(2007)",
+            "G",
+            "83.3"
+          ],
+          [
+            "Zhuetal.(2013)",
+            "S",
+            "85.6"
+          ],
+          [
+            "WangandXue(2014)",
+            "S",
+            "86.3"
+          ],
+          [
+            "Wangetal.(2015)",
+            "S",
+            "86.6"
+          ],
+          [
+            "Discriminative,q(y | x)† -buggy",
+            "D",
+            "80.7"
+          ],
+          [
+            "Generative,pˆ(y | x)† -buggy",
+            "G",
+            "82.7"
+          ],
+          [
+            "Discriminative,q(y | x)–correct",
+            "D",
+            "84.6"
+          ],
+          [
+            "Generative,pˆ(y | x)–correct",
+            "G",
+            "86.9"
+          ]
+        ]
+      },
+      {
+        "number": "7",
+        "caption": "PTB and CTB language modeling results including re-",
+        "page": 12,
+        "rows": [
+          [
+            "Model",
+            "testppl(PTB)",
+            "testppl(CTB)"
+          ],
+          [
+            "IKN5-gram",
+            "169.3",
+            "255.2"
+          ],
+          [
+            "LSTMLM",
+            "113.4",
+            "207.3"
+          ],
+          [
+            "RNNG–buggy†",
+            "102.4",
+            "171.9"
+          ],
+          [
+            "RNNG–correct",
+            "105.2",
+            "148.5"
+          ]
+        ]
+      }
+    ],
+    "figures": [
+      {
+        "number": "1",
+        "caption": "Parser transitions showing the stack, buffer, and open nonterminal count before and after each action type. S represents",
+        "page": 3
+      },
+      {
+        "number": "2",
+        "caption": "Top-down parsing example.",
+        "page": 3
+      },
+      {
+        "number": "3",
+        "caption": "Generator transitions. Symbols deﬁned as in Fig. 1 with the addition of T representing the history of generated terminals.",
+        "page": 3
+      },
+      {
+        "number": "4",
+        "caption": "Joint generation of a parse tree and sentence.",
+        "page": 3
+      },
+      {
+        "number": "6",
+        "caption": "Syntactic composition function based on bidirec-",
+        "page": 4
+      },
+      {
+        "number": "5",
+        "caption": "Neural architecture for deﬁning a distribution over at given representations of the stack (St), output buffer (Tt) and",
+        "page": 5
+      },
+      {
+        "number": "7",
+        "caption": "Correct RNNG composition function for the con-",
+        "page": 12
+      },
+      {
+        "number": "8",
+        "caption": "Buggy implementation of the RNNG composition",
+        "page": 12
+      }
+    ],
+    "formulas": [
+      {
+        "page": 1,
+        "text": "set of terminal symbols (Σ) such that N ∩Σ = ∅,"
+      },
+      {
+        "page": 2,
+        "text": "not empty and n ≥1."
+      },
+      {
+        "page": 2,
+        "text": "and n ≥1."
+      },
+      {
+        "page": 4,
+        "text": "p(x, y) ="
+      },
+      {
+        "page": 4,
+        "text": "t=1"
+      },
+      {
+        "page": 4,
+        "text": "t=1"
+      },
+      {
+        "page": 4,
+        "text": "ut = tanh (W[ot; st; ht] + c) ,"
+      },
+      {
+        "page": 5,
+        "text": "sary to compute the marginal probability p(x) ="
+      },
+      {
+        "page": 6,
+        "text": "=⇒"
+      },
+      {
+        "page": 6,
+        "text": "which we deﬁne as w(x, y) = p(x, y)/q(y | x), to"
+      },
+      {
+        "page": 6,
+        "text": "p(x) ="
+      },
+      {
+        "page": 6,
+        "text": "p(x, y) ="
+      },
+      {
+        "page": 6,
+        "text": "= Eq(y|x)w(x, y)."
+      },
+      {
+        "page": 6,
+        "text": "≈1"
+      },
+      {
+        "page": 6,
+        "text": "i=1"
+      },
+      {
+        "page": 6,
+        "text": "(by exponentiating each probability by α = 0.8 and"
+      },
+      {
+        "page": 7,
+        "text": "Parsing results on PTB §23 (D=discriminative,"
+      },
+      {
+        "page": 7,
+        "text": "G=generative, S=semisupervised)."
+      },
+      {
+        "page": 11,
+        "text": "PTB §23 (D=discriminative, G=generative, S=semisupervised)."
+      }
+    ],
+    "references": {
+      "page": 9,
+      "count": 47,
+      "first": "Steven Abney, David McAllester, and Fernando Pereira.",
+      "last": "Generative, ˆp(y | x) – correct"
+    },
+    "appendix": [],
+    "pages": 13
+  },
+  "2610.25991.pdf": {
+    "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+    "authors": [],
+    "affiliations": [
+      "1University of Tsukuba, Tsukuba, Japan",
+      "2National Institute of Advanced Industrial Science and Technology (AIST), Tokyo, Japan",
+      "ABSTRACT",
+      "individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based"
+    ],
+    "emails": [
+      "s2312431@u.tsukuba.ac.jp",
+      "okumura.k@aist.go.jp"
+    ],
+    "abstract": "Designing capable neural policies for multi-agent pathfinding (MAPF), which map local observations to action distributions, represents an important challenge in multi-agent learning, with practical relevance to scalable collective automation problems such as warehouse logistics. In contrast to prior studies focusing primarily on individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based MAPF. Specifically, given a collection of compact yet high-performing experts specialised for different map distributions, our architecture learns a router that selectively fuses their outputs according to each agent’s local situation. We instantiate and validate this MoE approach with a commonly used graph neural network-based policy as well as a newly de",
+    "keywords": [],
+    "sections": [
+      {
+        "number": "1",
+        "title": "Introduction",
+        "level": 1,
+        "page": 0
+      },
+      {
+        "number": "2",
+        "title": "Preliminaries",
+        "level": 1,
+        "page": 1
+      },
+      {
+        "number": "2.1",
+        "title": "Problem Formulation",
+        "level": 2,
+        "page": 1
+      },
+      {
+        "number": "2",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 2
+      },
+      {
+        "number": "2.2",
+        "title": "Neural MAPF Policies",
+        "level": 2,
+        "page": 2
+      },
+      {
+        "number": "2.2.1",
+        "title": "Observation",
+        "level": 3,
+        "page": 2
+      },
+      {
+        "number": "2.2.2",
+        "title": "GNN-based Policy and Communication",
+        "level": 3,
+        "page": 2
+      },
+      {
+        "number": "2.2.3",
+        "title": "Collision Shielding",
+        "level": 3,
+        "page": 2
+      },
+      {
+        "number": "3",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 3
+      },
+      {
+        "number": "3",
+        "title": "MoE over Map-Specific Experts",
+        "level": 1,
+        "page": 3
+      },
+      {
+        "number": "3.1",
+        "title": "Expert Training",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "3.1.2",
+        "title": "Reinforcement Learning Fine-Tuning",
+        "level": 3,
+        "page": 3
+      },
+      {
+        "number": "",
+        "title": "Rollout Procedure",
+        "level": 2,
+        "page": 3
+      },
+      {
+        "number": "4",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 4
+      },
+      {
+        "number": "",
+        "title": "Reward Design",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "",
+        "title": "Preference Likelihood",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "",
+        "title": "Loss Design",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "3.2",
+        "title": "Expert Fusion",
+        "level": 2,
+        "page": 4
+      },
+      {
+        "number": "5",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 5
+      },
+      {
+        "number": "",
+        "title": "Router Design",
+        "level": 2,
+        "page": 5
+      },
+      {
+        "number": "",
+        "title": "Training",
+        "level": 2,
+        "page": 5
+      },
+      {
+        "number": "4",
+        "title": "Lightweight yet Capable Architecture: ReCAT",
+        "level": 1,
+        "page": 5
+      },
+      {
+        "number": "4.1",
+        "title": "Spatial Encoding",
+        "level": 2,
+        "page": 5
+      },
+      {
+        "number": "6",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 6
+      },
+      {
+        "number": "4.2",
+        "title": "Action Tokenisation",
+        "level": 2,
+        "page": 6
+      },
+      {
+        "number": "4.3",
+        "title": "Recurrent Token Update",
+        "level": 2,
+        "page": 6
+      },
+      {
+        "number": "4.4",
+        "title": "Action Logits",
+        "level": 2,
+        "page": 6
+      },
+      {
+        "number": "5",
+        "title": "Evaluation",
+        "level": 1,
+        "page": 6
+      },
+      {
+        "number": "7",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 7
+      },
+      {
+        "number": "5.1",
+        "title": "Experimental Setup",
+        "level": 2,
+        "page": 7
+      },
+      {
+        "number": "5.1.1",
+        "title": "Dataset",
+        "level": 3,
+        "page": 7
+      },
+      {
+        "number": "8",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 8
+      },
+      {
+        "number": "5.1.2",
+        "title": "Training Procedure",
+        "level": 3,
+        "page": 8
+      },
+      {
+        "number": "",
+        "title": "Pretraining",
+        "level": 2,
+        "page": 8
+      },
+      {
+        "number": "",
+        "title": "RL Fine-Tuning",
+        "level": 2,
+        "page": 8
+      },
+      {
+        "number": "",
+        "title": "Router Training",
+        "level": 2,
+        "page": 8
+      },
+      {
+        "number": "5.1.3",
+        "title": "Model Configurations",
+        "level": 3,
+        "page": 8
+      },
+      {
+        "number": "5.1.4",
+        "title": "Baselines",
+        "level": 3,
+        "page": 8
+      },
+      {
+        "number": "9",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 9
+      },
+      {
+        "number": "5.1.5",
+        "title": "Metrics and Instances",
+        "level": 3,
+        "page": 9
+      },
+      {
+        "number": "5.2",
+        "title": "Main Results",
+        "level": 2,
+        "page": 9
+      },
+      {
+        "number": "",
+        "title": "Map-distribution Experts",
+        "level": 2,
+        "page": 9
+      },
+      {
+        "number": "",
+        "title": "Efficacy of MoE",
+        "level": 2,
+        "page": 9
+      },
+      {
+        "number": "",
+        "title": "Expert Usage Analysis",
+        "level": 2,
+        "page": 9
+      },
+      {
+        "number": "10",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 10
+      },
+      {
+        "number": "5.3",
+        "title": "Large-Scale Experiment",
+        "level": 2,
+        "page": 10
+      },
+      {
+        "number": "11",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 11
+      },
+      {
+        "number": "5.4",
+        "title": "Expert Training Ablation",
+        "level": 2,
+        "page": 11
+      },
+      {
+        "number": "5.5",
+        "title": "MoE Training Ablation",
+        "level": 2,
+        "page": 11
+      },
+      {
+        "number": "12",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 12
+      },
+      {
+        "number": "6",
+        "title": "Discussion",
+        "level": 1,
+        "page": 12
+      },
+      {
+        "number": "",
+        "title": "Multiple Algorithms and Policies in MAPF",
+        "level": 2,
+        "page": 12
+      },
+      {
+        "number": "13",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 13
+      },
+      {
+        "number": "",
+        "title": "ReCAT",
+        "level": 2,
+        "page": 13
+      },
+      {
+        "number": "",
+        "title": "Automatic Map Generation",
+        "level": 2,
+        "page": 13
+      },
+      {
+        "number": "",
+        "title": "Acknowledgments",
+        "level": 1,
+        "page": 13
+      },
+      {
+        "number": "",
+        "title": "References",
+        "level": 1,
+        "page": 13
+      },
+      {
+        "number": "14",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 14
+      },
+      {
+        "number": "15",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 15
+      },
+      {
+        "number": "16",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 16
+      },
+      {
+        "number": "17",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 17
+      },
+      {
+        "number": "",
+        "title": "Appendix",
+        "level": 1,
+        "page": 17
+      },
+      {
+        "number": "18",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 18
+      },
+      {
+        "number": "19",
+        "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+        "level": 1,
+        "page": 19
+      }
+    ],
+    "tables": [
+      {
+        "number": "1",
+        "caption": "Aggregated scores with and without CS-PIBT over the same 2,800 instances across six map",
+        "page": 10,
+        "rows": [
+          [
+            "Model",
+            "SR(%)",
+            "Rel.SoC",
+            "Time(s)",
+            "SR(%)",
+            "Rel.SoC",
+            "Time(s)"
+          ],
+          [
+            "MAGAT(485K)",
+            "78.4",
+            "1.752",
+            "0.879",
+            "62.4",
+            "2.161",
+            "0.501"
+          ],
+          [
+            "MAGATUniform",
+            "82.6",
+            "1.578",
+            "1.073",
+            "67.6",
+            "2.017",
+            "0.778"
+          ],
+          [
+            "MAGATMoE",
+            "83.4",
+            "1.555",
+            "1.173",
+            "67.8",
+            "1.984",
+            "0.821"
+          ],
+          [
+            "MAGAT(2.1M,SFT+RL)",
+            "87.3",
+            "1.470",
+            "0.733",
+            "73.6",
+            "1.829",
+            "0.412"
+          ],
+          [
+            "ReCAT(121K)",
+            "81.4",
+            "1.664",
+            "0.921",
+            "69.5",
+            "1.981",
+            "0.535"
+          ],
+          [
+            "ReCATUniform",
+            "90.3",
+            "1.414",
+            "1.252",
+            "76.9",
+            "1.729",
+            "1.042"
+          ],
+          [
+            "ReCATMoE",
+            "91.6",
+            "1.402",
+            "1.241",
+            "78.0",
+            "1.730",
+            "1.061"
+          ],
+          [
+            "ReCAT(782K,SFT+RL)",
+            "94.9",
+            "1.313",
+            "0.723",
+            "85.6",
+            "1.520",
+            "0.437"
+          ],
+          [
+            "HMAGAT",
+            "80.1",
+            "1.483",
+            "2.069",
+            "37.4",
+            "2.191",
+            "2.432"
+          ],
+          [
+            "MAPF-GPT-DDG",
+            "80.2",
+            "1.749",
+            "1.310",
+            "55.0",
+            "2.455",
+            "1.072"
+          ]
+        ]
+      },
+      {
+        "number": "2",
+        "caption": "Mean expert mixture weights (%). Columns correspond to evaluation distributions.",
+        "page": 10,
+        "rows": [
+          [
+            "",
+            "Expert",
+            "Maze",
+            "WH.",
+            "Room",
+            "Random",
+            "Sort.",
+            "Stripes",
+            "Empty",
+            "Avg."
+          ],
+          [
+            "Eo",
+            "Maze",
+            "97.4",
+            "11.0",
+            "12.4",
+            "10.1",
+            "63.3",
+            "94.5",
+            "65.5",
+            "50.6"
+          ],
+          [
+            "M",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "-T",
+            "WH.",
+            "0.3",
+            "78.9",
+            "0.5",
+            "1.1",
+            "0.7",
+            "0.0",
+            "12.1",
+            "13.4"
+          ],
+          [
+            "A",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "GA",
+            "Room",
+            "1.0",
+            "1.7",
+            "83.3",
+            "2.5",
+            "18.4",
+            "5.4",
+            "0.6",
+            "16.1"
+          ],
+          [
+            "M",
+            "Random",
+            "1.2",
+            "8.4",
+            "3.9",
+            "86.3",
+            "17.5",
+            "0.1",
+            "21.8",
+            "19.9"
+          ],
+          [
+            "EoM",
+            "Maze",
+            "70.4",
+            "22.0",
+            "28.2",
+            "25.0",
+            "49.7",
+            "69.5",
+            "42.4",
+            "43.9"
+          ],
+          [
+            "-T",
+            "WH.",
+            "8.7",
+            "72.6",
+            "8.1",
+            "6.5",
+            "9.0",
+            "9.1",
+            "18.9",
+            "19.0"
+          ],
+          [
+            "AC",
+            "Room",
+            "11.7",
+            "1.4",
+            "57.0",
+            "5.0",
+            "26.3",
+            "18.6",
+            "0.5",
+            "17.2"
+          ],
+          [
+            "e",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "R",
+            "Random",
+            "9.2",
+            "4.0",
+            "6.8",
+            "63.5",
+            "15.0",
+            "2.8",
+            "38.2",
+            "19.9"
+          ]
+        ]
+      },
+      {
+        "number": "3",
+        "caption": "Expert performance on Warehouse and Maze across different training strategies. PL denotes the",
+        "page": 11,
+        "rows": [
+          [
+            "",
+            "Training",
+            "SR(%)↑",
+            "Rel.SoC↓",
+            "SR(%)↑",
+            "Rel.SoC↓"
+          ],
+          [
+            "",
+            "Pretrain",
+            "78.8",
+            "1.900",
+            "70.8",
+            "1.826"
+          ],
+          [
+            ")K",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "58",
+            "SFT",
+            "85.6",
+            "1.646",
+            "74.4",
+            "1.711"
+          ],
+          [
+            "4(",
+            "RL(w/oPL)",
+            "83.8",
+            "1.928",
+            "75.0",
+            "1.854"
+          ],
+          [
+            "T",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "AG",
+            "RL(PL)",
+            "87.2",
+            "1.792",
+            "77.4",
+            "1.707"
+          ],
+          [
+            "AM",
+            "SFT+RL(w/oPL)",
+            "90.0",
+            "1.649",
+            "80.4",
+            "1.708"
+          ],
+          [
+            "",
+            "SFT+RL(PL)",
+            "90.0",
+            "1.602",
+            "75.8",
+            "1.630"
+          ],
+          [
+            "",
+            "Pretrain",
+            "75.0",
+            "1.838",
+            "76.4",
+            "1.738"
+          ],
+          [
+            ")",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "K1",
+            "SFT",
+            "90.4",
+            "1.522",
+            "82.4",
+            "1.568"
+          ],
+          [
+            "2",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "1(",
+            "RL(w/oPL)",
+            "94.2",
+            "1.649",
+            "81.8",
+            "1.642"
+          ],
+          [
+            "T",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "A",
+            "RL(PL)",
+            "89.2",
+            "1.645",
+            "85.2",
+            "1.549"
+          ],
+          [
+            "C",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "eR",
+            "SFT+RL(w/oPL)",
+            "95.4",
+            "1.438",
+            "85.4",
+            "1.607"
+          ],
+          [
+            "",
+            "SFT+RL(PL)",
+            "95.2",
+            "1.400",
+            "88.2",
+            "1.472"
+          ]
+        ]
+      },
+      {
+        "number": "4",
+        "caption": "Scalability assessment. Times report network inference. The versions with CS-PIBT is shown with",
+        "page": 11,
+        "rows": [
+          [
+            "#Agents ms/stepGoal",
+            "(%) SoC ms/stepGoal",
+            "(%) SoC ms/stepGoal",
+            "(%) SoC ms/stepGoal",
+            "(%) SoC ms/stepG",
+            "oal(%) SoC"
+          ],
+          [
+            "1,000 5.9(79.9)",
+            "1001.017 1.8(81.8)",
+            "1001.015 11.4(83.5)",
+            "1001.019 6.3(85.7)",
+            "1001.013 40.0(115.3)",
+            "1001.032"
+          ],
+          [
+            "10,000 13.1(727.7)",
+            "1001.095 5.0(707.1)",
+            "1001.090 97.7(809.9)",
+            "1001.080 60.3(771.1)",
+            "1001.079 424.2(1145.2)",
+            "1001.100"
+          ],
+          [
+            "100,000620.6(7402.2) 97.",
+            "1222.318285.6(7068.5) 98.",
+            "3352.2332189.8(9022.2) 99.",
+            "4662.1041227.5(8191.5) 99.",
+            "7112.0204476.2(11435.6)",
+            "96.5552.415"
+          ]
+        ]
+      },
+      {
+        "number": "5",
+        "caption": "Performance across different MoE training strategies w.r.t. success-rate gains over the pretrained",
+        "page": 12,
+        "rows": [
+          [
+            "RL",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "Maze",
+            "WH.",
+            "Room",
+            "Random",
+            "Sort.",
+            "Stripes",
+            "Avg."
+          ],
+          [
+            "s Router",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "N/A",
+            "+10.6",
+            "+20.6",
+            "+11.8",
+            "+6.0",
+            "+0.0",
+            "+13.3",
+            "+10.4"
+          ],
+          [
+            "N/A",
+            "+6.0",
+            "+15.8",
+            "+9.8",
+            "+3.8",
+            "-0.4",
+            "-18.3",
+            "+2.8"
+          ],
+          [
+            "",
+            "+9.0",
+            "+21.2",
+            "+12.6",
+            "+6.6",
+            "-0.2",
+            "+16.0",
+            "+10.9"
+          ],
+          [
+            "",
+            "+13.0",
+            "+21.6",
+            "+12.8",
+            "+8.4",
+            "+0.2",
+            "+24.3",
+            "+13.4"
+          ],
+          [
+            "",
+            "+3.6",
+            "+17.0",
+            "+9.2",
+            "+5.4",
+            "-0.4",
+            "-18.3",
+            "+2.7"
+          ],
+          [
+            "",
+            "+8.0",
+            "+19.0",
+            "+11.0",
+            "+6.4",
+            "+0.2",
+            "-5.3",
+            "+6.5"
+          ],
+          [
+            "",
+            "+12.8",
+            "+20.8",
+            "+14.2",
+            "+7.6",
+            "+0.0",
+            "+33.3",
+            "+14.8"
+          ]
+        ]
+      },
+      {
+        "number": "6",
+        "caption": "Parameter counts of the evaluated MAGAT and ReCAT configurations, including",
+        "page": 18,
+        "rows": []
+      },
+      {
+        "number": "7",
+        "caption": "Success rates (%) with CS-PIBT after excluding one expert while retaining router-training data from",
+        "page": 19,
+        "rows": [
+          [
+            "",
+            "Variant",
+            "Maze",
+            "WH.",
+            "Room",
+            "Random",
+            "Sort.",
+            "Stripes",
+            "Empty",
+            "Avg."
+          ],
+          [
+            "",
+            "\\",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "E",
+            "Maze",
+            "75.0(+0.2)",
+            "89.2(-2.0)",
+            "88.2(-1.4)",
+            "87.4(+3.0)",
+            "99.0(+0.0)",
+            "45.3(-1.0)",
+            "100.0(+0.0)",
+            "83.4(-0.2)"
+          ],
+          [
+            "oM-",
+            "\\WH.",
+            "77.0(+2.2)",
+            "87.6(-3.6)",
+            "87.6(-2.0)",
+            "87.2(+2.8)",
+            "99.0(+0.0)",
+            "43.7(-2.7)",
+            "100.0(+0.0)",
+            "83.2(-0.5)"
+          ],
+          [
+            "TAG",
+            "\\Room",
+            "74.8(+0.0)",
+            "89.4(-1.8)",
+            "83.8(-5.8)",
+            "87.0(+2.6)",
+            "98.8(-0.2)",
+            "43.7(-2.7)",
+            "100.0(+0.0)",
+            "82.5(-1.1)"
+          ],
+          [
+            "A",
+            "\\Random",
+            "77.2(+2.4)",
+            "89.8(-1.4)",
+            "88.8(-0.8)",
+            "84.4(+0.0)",
+            "98.6(-0.4)",
+            "46.7(+0.3)",
+            "100.0(+0.0)",
+            "83.6(+0.0)"
+          ],
+          [
+            "M",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "FullMoE",
+            "74.8",
+            "91.2",
+            "89.6",
+            "84.4",
+            "99.0",
+            "46.3",
+            "100.0",
+            "83.6"
+          ],
+          [
+            "",
+            "\\Maze",
+            "85.4(-1.6)",
+            "95.4(-0.2)",
+            "96.4(-1.0)",
+            "93.0(+0.4)",
+            "100.0(+0.2)",
+            "66.0(-1.3)",
+            "100.0(+0.0)",
+            "90.9(-0.5)"
+          ],
+          [
+            "E",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "oM",
+            "\\WH.",
+            "86.0(-1.0)",
+            "90.8(-4.8)",
+            "97.6(+0.2)",
+            "91.4(-1.2)",
+            "100.0(+0.2)",
+            "73.3(+6.0)",
+            "100.0(+0.0)",
+            "91.3(-0.1)"
+          ],
+          [
+            "-TA",
+            "\\Room",
+            "88.0(+1.0)",
+            "96.2(+0.6)",
+            "95.4(-2.0)",
+            "93.2(+0.6)",
+            "99.8(+0.0)",
+            "70.3(+3.0)",
+            "100.0(+0.0)",
+            "91.8(+0.5)"
+          ],
+          [
+            "CeR",
+            "\\Random",
+            "87.2(+0.2)",
+            "96.0(+0.4)",
+            "97.8(+0.4)",
+            "89.6(-3.0)",
+            "99.8(+0.0)",
+            "71.3(+4.0)",
+            "100.0(+0.0)",
+            "91.7(+0.3)"
+          ],
+          [
+            "",
+            "FullMoE",
+            "87.0",
+            "95.6",
+            "97.4",
+            "92.6",
+            "99.8",
+            "67.3",
+            "100.0",
+            "91.4"
+          ]
+        ]
+      }
+    ],
+    "figures": [
+      {
+        "number": "1",
+        "caption": "MoE framework. A learned router fuses map-distribution experts taking each agent’s local",
+        "page": 1
+      },
+      {
+        "number": "2",
+        "caption": "ReCAT architecture. Following the spatial encoding (left), an action token is refined through message",
+        "page": 4
+      },
+      {
+        "number": "3",
+        "caption": "Main results. Top: success rates (%) for MAGAT (left) and ReCAT (right); values in parentheses",
+        "page": 7
+      },
+      {
+        "number": "4",
+        "caption": "Examples from the four in-distribution map generators. Each column shows four different layouts;",
+        "page": 17
+      },
+      {
+        "number": "5",
+        "caption": "Success rate and mean relative SoC without CS-PIBT across seven map distributions. Each point",
+        "page": 19
+      }
+    ],
+    "formulas": [
+      {
+        "page": 1,
+        "text": "∑︁"
+      },
+      {
+        "page": 1,
+        "text": "𝑘=1"
+      },
+      {
+        "page": 1,
+        "text": "i = si, v1"
+      },
+      {
+        "page": 4,
+        "text": "𝑜𝑖(𝐻×𝑊×4)"
+      },
+      {
+        "page": 4,
+        "text": "×𝐵enc"
+      },
+      {
+        "page": 4,
+        "text": "3×3"
+      },
+      {
+        "page": 4,
+        "text": "DW 3×3"
+      },
+      {
+        "page": 4,
+        "text": "PW 1×1"
+      },
+      {
+        "page": 4,
+        "text": "𝐻×𝑊×𝐶"
+      },
+      {
+        "page": 4,
+        "text": ":5×𝑑"
+      },
+      {
+        "page": 4,
+        "text": "𝑖:5×𝑑"
+      },
+      {
+        "page": 4,
+        "text": "Rb ="
+      },
+      {
+        "page": 4,
+        "text": "rt,i ="
+      },
+      {
+        "page": 5,
+        "text": "πϕ(ot,i) = softmax"
+      },
+      {
+        "page": 5,
+        "text": "k=1"
+      },
+      {
+        "page": 5,
+        "text": "= SiLU(GN(Conv3×3(oi))) ."
+      },
+      {
+        "page": 6,
+        "text": "= SiLU"
+      },
+      {
+        "page": 6,
+        "text": "= SiLU"
+      },
+      {
+        "page": 6,
+        "text": "The final feature map Fi = F (Benc)"
+      },
+      {
+        "page": 6,
+        "text": "i,a = MLP([Fi(Q[i]), Fi(va), ∆ci,a, ea]) ,"
+      },
+      {
+        "page": 6,
+        "text": "mℓ= GATv2"
+      },
+      {
+        "page": 6,
+        "text": ", hℓ+1 = LN"
+      },
+      {
+        "page": 6,
+        "text": "zi,a = f0(h0"
+      }
+    ],
+    "references": {
+      "page": 13,
+      "count": 63,
+      "first": "Jean-Marc Alkazzi and Keisuke Okumura. A comprehensive review on leveraging machine learning for",
+      "last": "F. Suzuki and K. Okumura"
+    },
+    "appendix": [
+      {
+        "number": "",
+        "title": "Appendix",
+        "level": 1,
+        "page": 17
+      }
+    ],
+    "pages": 20
   }
 }

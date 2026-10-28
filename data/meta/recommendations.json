@@ -1,50 +1,95 @@
 {
- "updated_at": "2026-10-27T12:59:14+08:00",
- "library_size": 39,
+ "updated_at": "2026-10-28T13:16:43+08:00",
+ "library_size": 43,
  "items": [
   {
-   "key": "2610.25991",
-   "arxiv_id": "2610.25991",
-   "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+   "key": "2605.13373",
+   "arxiv_id": "2605.13373",
+   "title": "Exploiting Pre-trained Encoder-Decoder Transformers for Sequence-to-Sequence Constituent Parsing",
    "year": 2026,
-   "abstract": "Designing capable neural policies for multi-agent pathfinding (MAPF), which map local observations to action distributions, represents an important challenge in multi-agent learning, with practical relevance to scalable collective automation problems such as warehouse logistics. In contrast to prior studies focusing primarily on individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based MAPF. Specifically, given a collection of compact yet high-performing experts specialised for different map distributions, our architecture learns a router that selectively fuses their outputs according to each agent's local situation. We instantiate and validate this MoE approach with a commonly used graph neural network-based policy as well as a newly developed recursive action-token refinement model. Combined with supervised and reinforcement learning fine-tuning of the experts, our experiments show that MoE generally improves upon the pretrained policy and outperforms existing leading methods. At the same time, our findings reveal that appropriately trained, parameter-matched monolithic models still outperform MoE, highlighting a nuanced role f",
+   "abstract": "To achieve deep natural language understanding, syntactic constituent parsing plays a crucial role and is widely required by many artificial intelligence systems for processing both text and speech. A recent approach involves using standard sequence-to-sequence models to handle constituent parsing as a machine translation problem, moving away from traditional task-specific parsers. These models are typically initialized with pre-trained encoder-only language models like BERT or RoBERTa. However, the use of pre-trained encoder-decoder language models for constituency parsing has not been thoroughly explored. To bridge this gap, we extend the sequence-to-sequence framework by investigating parsers built on pre-trained encoder-decoder architectures, including BART, mBART, and T5. We fine-tune them to generate linearized parse trees and extensively evaluate them on different linearization strategies across both continuous treebanks and more complex discontinuous benchmarks. Our results demonstrate that our approach outperforms all prior sequence-to-sequence models and performs competitively with leading task-specific constituent parsers on continuous constituent parsing.",
    "authors": [
-    "Fumimaro Suzuki",
-    "Keisuke Okumura"
+    "D. Fernández-González",
+    "Cristina Outeirino Cid"
    ],
-   "url": "https://arxiv.org/abs/2610.25991",
+   "url": "https://arxiv.org/abs/2605.13373",
    "cited_by": [
-    "Layer Normalization"
+    "Recurrent Neural Network Grammars"
    ],
    "source": "cited",
    "github": "",
    "overlap": 0.333,
-   "topic": 0.332,
-   "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+   "topic": 0.298,
+   "topic_of": "Attention Is All You Need",
    "topic_top": [
     {
-     "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-     "sim": 0.386
+     "title": "Attention Is All You Need",
+     "sim": 0.298
     },
     {
-     "title": "DeepSeek-V3 Technical Report",
-     "sim": 0.211
+     "title": "Attention Is All You Need",
+     "sim": 0.298
     },
     {
-     "title": "Evaluating Large Language Models Trained on Code",
-     "sim": 0.198
+     "title": "Attention Is All You Need",
+     "sim": 0.296
     }
    ],
-   "base": 0.3827,
+   "base": 0.371,
    "collab": 0.0,
    "event": 0.0,
    "events": {
     "view": 0,
     "download": 0
    },
-   "score": 0.3827,
+   "score": 0.371,
    "vote": "",
-   "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的稀疏专家路由基础上，区别在于将MoE用于多智能体路径规划的神经策略学习，而非语言模型规模扩展。"
+   "reason": "在《Attention Is All You Need》的基础上，将标准序列到序列Transformer用于成分句法分析，区别在于把通用翻译架构迁移到句法解析任务，并利用预训练编码器-解码器。"
+  },
+  {
+   "key": "2603.27938",
+   "arxiv_id": "2603.27938",
+   "title": "Top-down string-to-dependency Neural Machine Translation",
+   "year": 2026,
+   "abstract": "Most of modern neural machine translation (NMT) models are based on an encoder-decoder framework with an attention mechanism. While they perform well on standard datasets, they can have trouble in translation of long inputs that are rare or unseen during training. Incorporating target syntax is one approach to dealing with such length-related problems. We propose a novel syntactic decoder that generates a target-language dependency tree in a top-down, left-to-right order. Experiments show that the proposed top-down string-to-tree decoding generalizes better than conventional sequence-to-sequence decoding in translating long inputs that are not observed in the training data.",
+   "authors": [
+    "Shuhei Kondo",
+    "Katsuhito Sudoh",
+    "Yuji Matsumoto"
+   ],
+   "url": "https://arxiv.org/abs/2603.27938",
+   "cited_by": [
+    "Recurrent Neural Network Grammars"
+   ],
+   "source": "cited",
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.282,
+   "topic_of": "Attention Is All You Need",
+   "topic_top": [
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.283
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.281
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.281
+    }
+   ],
+   "base": 0.3654,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.3654,
+   "vote": "",
+   "reason": "与《Attention Is All You Need》同属注意力编码器-解码器框架，但面向长输入罕见句的机器翻译难题，区别在于引入目标端句法信息构建自顶向下字符串到依存树的翻译。"
   },
   {
    "key": "2610.32142",
@@ -63,12 +108,12 @@
    "source": "cited",
    "github": "",
    "overlap": 0.333,
-   "topic": 0.263,
+   "topic": 0.264,
    "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
    "topic_top": [
     {
      "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
-     "sim": 0.279
+     "sim": 0.28
     },
     {
      "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
@@ -76,462 +121,292 @@
     },
     {
      "title": "Improving Language Understanding by Generative Pre-Training",
-     "sim": 0.219
+     "sim": 0.22
     }
    ],
-   "base": 0.3586,
+   "base": 0.3589,
    "collab": 0.0,
    "event": 0.0,
    "events": {
     "view": 0,
     "download": 0
    },
-   "score": 0.3586,
+   "score": 0.3589,
    "vote": "",
-   "reason": "在《LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS》的基础上，区别在于重新审视LoRA初始化与非对称学习率鲁棒性，而非提出新的LoRA变体。"
+   "reason": "这篇不属于《Attention Is All You Need》路线，而是研究LoRA低秩适配的初始化与学习率鲁棒性，与库内《Layer Normalization》的归一化训练稳定化思路形成对照。"
   },
   {
-   "key": "2610.28086",
-   "arxiv_id": "2610.28086",
-   "title": "MoDDiT: Simple Token Routing in Diffusion Transformers",
-   "year": 2026,
-   "abstract": "Real-time video generation, interactive world models, and on-device image synthesis are almost a reality. Diffusion Transformers (DiT) achieve excellent sample quality, shifting the bottleneck to the throughput of the models themselves. Natural images are inherently sparse, as large portions of an image are often background, contribute little to the scene content, and are easy to denoise. DiTs fail to exploit this sparsity, as they process image tokens statically and uniformly. We propose MoDDiT, a simple architecture modification that learns to route tokens through both MLP and self-attention operations. By routing tokens through both blocks independently, MoDDiT allows for dynamic compute allocation in MLPs that varies across tokens, images, and denoising timesteps. Using MoDDiT to train image generation models from scratch significantly reduces computational costs of training and inference, processing as few as 12.5% of the tokens. By increasing sparsity and model depth, MoDDiT reduces costs and improves generation performance over unrouted baselines. The learned allocation is interpretable, revealing how computation varies with visual content and noise level. We also use MoDDiT",
+   "key": "2502.11469",
+   "arxiv_id": "2502.11469",
+   "title": "If Attention Serves as a Cognitive Model of Human Memory Retrieval, What is the Plausible Memory Representation?",
+   "year": 2025,
+   "abstract": "Recent work in computational psycholinguistics has revealed intriguing parallels between attention mechanisms and human memory retrieval, focusing primarily on vanilla Transformers that operate on token-level representations. However, computational psycholinguistic research has also established that syntactic structures provide compelling explanations for human sentence processing that token-level factors cannot fully account for. In this paper, we investigate whether the attention mechanism of Transformer Grammar (TG), which uniquely operates on syntactic structures as representational units, can serve as a cognitive model of human memory retrieval, using Normalized Attention Entropy (NAE) as a linking hypothesis between models and humans. Our experiments demonstrate that TG's attention achieves superior predictive power for self-paced reading times compared to vanilla Transformer's, with further analyses revealing independent contributions from both models. These findings suggest that human sentence processing involves dual memory representations -- one based on syntactic structures and another on token sequences -- with attention serving as the general memory retrieval algorithm",
    "authors": [
-    "Jarek Liesen",
-    "M. Jackson",
-    "Benjamin Ellis",
-    "Shimon Whiteson",
-    "J. Foerster"
+    "Ryosuke Yoshida",
+    "Shinnosuke Isono",
+    "Kohei Kajikawa",
+    "Taiga Someya",
+    "Yushi Sugimoto",
+    "Yohei Oseki"
    ],
-   "url": "https://arxiv.org/abs/2610.28086",
+   "url": "https://arxiv.org/abs/2502.11469",
    "cited_by": [
-    "Layer Normalization"
+    "Recurrent Neural Network Grammars"
    ],
    "source": "cited",
    "github": "",
    "overlap": 0.333,
-   "topic": 0.251,
-   "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-   "topic_top": [
-    {
-     "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-     "sim": 0.257
-    },
-    {
-     "title": "Qwen2.5 Technical Report",
-     "sim": 0.246
-    },
-    {
-     "title": "Training language models to follow instructions with human feedback",
-     "sim": 0.231
-    }
-   ],
-   "base": 0.3546,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.3546,
-   "vote": "",
-   "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的token路由思想基础上，区别在于将简单token路由用于扩散Transformer以提升视频与图像生成吞吐。"
-  },
-  {
-   "key": "2610.28223",
-   "arxiv_id": "2610.28223",
-   "title": "Local Inference of LLMs on Long Contexts: A Data Systems Perspective",
-   "year": 2026,
-   "abstract": "Large language models can solve complex problems across a variety of subjects, such as mathematics and coding. For such complex analytical tasks, models with a long context perform better. Serving models with long context is currently mostly done on powerful systems with multiple GPUs, which are too expensive for most users. An alternative is local inference, or serving a model on a user's own machine, which removes per-token costs and rate limits, besides keeping sensitive data private and giving users full control over the models they run. The common understanding, however, is that local LLMs need compression (e.g., quantization) to run on a single GPU. In this paper, we set out to study the limitations that prevent serving long-context models for single users, besides the capacity issue. Rather than characterizing a single model on one GPU, we analyze how different models behave across several GPU generations. This lets us uncover not just individual bottlenecks but broader trends in where inefficiencies arise. Our analysis confirms that, as expected, self-attention dominates the runtime for long-context inference. More unexpectedly, our evaluation reveals that the current struc",
-   "authors": [
-    "Mattias Dürrmeier",
-    "Alberto Lerner"
-   ],
-   "url": "https://arxiv.org/abs/2610.28223",
-   "cited_by": [
-    "Layer Normalization"
-   ],
-   "source": "cited",
-   "github": "",
-   "overlap": 0.333,
-   "topic": 0.247,
-   "topic_of": "Training language models to follow instructions with human feedback",
-   "topic_top": [
-    {
-     "title": "Training language models to follow instructions with human feedback",
-     "sim": 0.257
-    },
-    {
-     "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
-     "sim": 0.227
-    },
-    {
-     "title": "Improving Language Understanding by Generative Pre-Training",
-     "sim": 0.224
-    }
-   ],
-   "base": 0.3533,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.3533,
-   "vote": "",
-   "reason": "在《Training language models to follow instructions with human feedback》所代表的LLM应用基础上，区别在于从数据系统视角研究长上下文LLM的本地推理部署，而非对齐训练。"
-  },
-  {
-   "key": "2610.29681",
-   "arxiv_id": "2610.29681",
-   "title": "Scaling Multilingual Pretraining of Pixel Language Models",
-   "year": 2026,
-   "abstract": "Pixel language models process text as rendered images instead of a finite vocabulary, which gives them strong cross-lingual transfer abilities. However, not much is known about how these abilities are influenced by larger-scale pretraining. In this paper, we train a family of MPIXEL models along three axes of variation: more languages, more scripts, and larger model capacity under fixed per-language compute. In evaluations on five tasks covering 83 languages, we find that scaling acts locally: each axis improves the added languages and scripts, while increased capacity mitigates the curse of multilinguality from pretraining on more languages. Transfer to unseen scripts improves with multilingual pretraining, but does not further improve with scaling. On typologically distant low-resource languages, our models outperform subword and character-level baselines across many writing systems. We also show that larger pixel models reserve more layers for visual processing, and that cross-lingual alignment weakens as more languages are added. Overall, our findings characterize how multilingual scaling improves pixel language models.",
-   "authors": [
-    "Ilker Kesen",
-    "Jenny Kunz",
-    "Kasra Malihi",
-    "Desmond Elliott"
-   ],
-   "url": "https://arxiv.org/abs/2610.29681",
-   "cited_by": [
-    "Layer Normalization"
-   ],
-   "source": "cited",
-   "github": "",
-   "overlap": 0.333,
-   "topic": 0.24,
-   "topic_of": "Emergent Abilities of Large Language Models",
-   "topic_top": [
-    {
-     "title": "Emergent Abilities of Large Language Models",
-     "sim": 0.253
-    },
-    {
-     "title": "Language Models are Few-Shot Learners",
-     "sim": 0.221
-    },
-    {
-     "title": "Qwen2.5 Technical Report",
-     "sim": 0.195
-    }
-   ],
-   "base": 0.3506,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.3506,
-   "vote": "",
-   "reason": "在《Emergent Abilities of Large Language Models》关注的规模效应基础上，区别在于研究像素语言模型多语言预训练的规模化，而非文本LLM的涌现能力。"
-  },
-  {
-   "key": "2610.33813",
-   "arxiv_id": "2610.33813",
-   "title": "Task Format as a Factor in Adaptation: A Controlled Comparison of LoRA and Full Fine-Tuning for Prompt-Safety Classification",
-   "year": 2026,
-   "abstract": "Fine-tuning a language model for classification involves many design decisions. Comparisons of low-rank adaptation (LoRA) with full fine-tuning are common but often confounded, and task format is rarely studied. We compare both regimes on prompt-safety classification with a matched 400M encoder-decoder pair (Ettin) across three task formats, with up to 15 seeds per cell and pre-specified analyses. At the pre-specified learning rates, full fine-tuning leads LoRA by 2-3 pp in every architecture and format trained on the label alone. On the encoder, the gap closes once both rates are chosen by the same search. Training LoRA to write a reason after its verdict adds 4.0 pp and closes the gap, but a content-free sentence of equal length does not. Trained models score above a prompted 8B in domain but fall behind it on two of three out-of-distribution corpora, trailing by 8-23 pp on adversarial jailbreaks and flagging 27-66% of benign but harmful-looking prompts as unsafe, against the 8B&#39;s 2-3%. Together, the results suggest that the adaptation regime matters less than how each model is trained, its learning rate, and training target, and that in-domain accuracy alone is an incomplete",
-   "authors": [],
-   "url": "https://arxiv.org/abs/2610.33813",
-   "cited_by": [],
-   "source": "recent",
-   "posted": "Tue, 27 Oct 2026",
-   "category": "cs.CL",
-   "github": "",
-   "overlap": 0.0,
-   "topic": 0.293,
-   "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
-   "topic_top": [
-    {
-     "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
-     "sim": 0.309
-    },
-    {
-     "title": "Improving Language Understanding by Generative Pre-Training",
-     "sim": 0.29
-    },
-    {
-     "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
-     "sim": 0.218
-    }
-   ],
-   "base": 0.2524,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.2524,
-   "vote": "",
-   "reason": "在《LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS》的基础上，区别在于控制任务格式变量，系统比较LoRA与全量微调在提示安全分类上的表现。"
-  },
-  {
-   "key": "2610.34180",
-   "arxiv_id": "2610.34180",
-   "title": "Write What Matters: Disentangling Token Selection from Slot Allocation in Recurrent Memory",
-   "year": 2026,
-   "abstract": "Long-sequence models must retain earlier information. Full attention keeps all past tokens but grows expensive, and recurrent-memory models compress history into fixed slots for linear-time processing. Limited capacity makes writes consequential: distractors can interfere with useful content, while skipped evidence cannot be recalled. Existing multi-slot memories write every token to the same number of slots, merging whether to store it with how many slots to update. We introduce Factorized Write Routing (FWR), which first keeps or skips each token and then chooses a fixed or token-adaptive number of slots. Queries still read all slots. Across ten seeds on two synthetic tasks that query facts after long contexts, we observe a density-dependent reversal. With four slots per write, long-context accuracy favors always writing on dense Feature Recall (0.472 vs 0.337), but learned selective writing on sparse-fact Passkey (0.222 vs 0.048). The tested adaptive rule underperforms fixed allocation under the learned gate on both tasks. A diagnostic oracle given fact labels unavailable at deployment reaches 0.372 on Passkey, showing headroom in filtering distractors. The results suggest avoid",
-   "authors": [],
-   "url": "https://arxiv.org/abs/2610.34180",
-   "cited_by": [],
-   "source": "recent",
-   "posted": "Tue, 27 Oct 2026",
-   "category": "cs.CL",
-   "github": "",
-   "overlap": 0.0,
-   "topic": 0.279,
-   "topic_of": "Layer Normalization",
-   "topic_top": [
-    {
-     "title": "Layer Normalization",
-     "sim": 0.318
-    },
-    {
-     "title": "RWKV: Reinventing RNNs for the Transformer Era",
-     "sim": 0.213
-    },
-    {
-     "title": "On Layer Normalization in the Transformer Architecture",
-     "sim": 0.161
-    }
-   ],
-   "base": 0.2475,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.2475,
-   "vote": "",
-   "reason": "在《Layer Normalization》所涉及的序列建模归一化基础上，区别在于解耦循环记忆中的token选择与槽位分配，而非层归一化本身。"
-  },
-  {
-   "key": "2610.34589",
-   "arxiv_id": "2610.34589",
-   "title": "HARP-LoRA: Hierarchy-Conditioned Rank Projection for Low-Rank Adaptation in Scientific Table Understanding",
-   "year": 2026,
-   "abstract": "Tabular data is widely used in scientific applications, where complex layouts, including multi-level headers, merged cells, captions, and footnotes, make information extraction difficult. This is particularly important in pharmacokinetics (PK), where values must be correctly associated with the drug, species, dose, administration route, unit, and experimental condition. Parameter-efficient fine-tuning methods such as Low-Rank Adaptation (LoRA) reduce adaptation cost but do not explicitly incorporate relationships between table values and surrounding headers. We introduce HARP-LoRA, a hierarchy-conditioned rank projection method for low-rank adaptation in scientific table understanding. HARP-LoRA extends projected LoRA by constructing token-specific intrinsic representations from the row- and column-header hierarchies of each data token. These representations condition the low-rank down-projection, incorporating hierarchical context while keeping the pretrained model and random projection tensors frozen. We evaluate HARP-LoRA on 950 manually annotated PK tables from 587 scientific articles and on WikiTableQuestions (WikiTQ) using Llama~3.2 3B, Llama~3.1 8B, and Gemma~3 27B. With Lla",
-   "authors": [],
-   "url": "https://arxiv.org/abs/2610.34589",
-   "cited_by": [],
-   "source": "recent",
-   "posted": "Tue, 27 Oct 2026",
-   "category": "cs.CL",
-   "github": "",
-   "overlap": 0.0,
-   "topic": 0.273,
-   "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
-   "topic_top": [
-    {
-     "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
-     "sim": 0.318
-    },
-    {
-     "title": "QLORA: Efficient Finetuning of Quantized LLMs",
-     "sim": 0.169
-    },
-    {
-     "title": "Improving Language Understanding by Generative Pre-Training",
-     "sim": 0.167
-    }
-   ],
-   "base": 0.2455,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.2455,
-   "vote": "",
-   "reason": "在《LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS》的基础上，区别在于提出层级条件秩投影，用于科学表格理解中的复杂布局信息抽取。"
-  },
-  {
-   "key": "2610.35190",
-   "arxiv_id": "2610.35190",
-   "title": "LEAP: a Latent Embedding Anomaly Patch-Transformer for time-series anomaly detection",
-   "year": 2026,
-   "abstract": "Time-series anomaly detection is dominated by reconstruction-based neural detectors, whose objective is structurally flawed. Since the target is also the input, an expressive model can learn to reconstruct anomalies too, leaving uninformative residuals. Recent large-scale benchmarks show that, on curated data, elaborate deep detectors rarely beat simple statistical baselines, while current leaders rely on representation learning. We propose LEAP (Latent Embedding Anomaly Patch-Transformer), which combines masked prediction with latent representation-based anomaly evidence, without relying on reconstruction or attention-based scoring. The model removes patches from a window and predicts them from the remaining temporal and cross-channel context, so prediction errors measure how well learned dynamics explain hidden segments. Deterministic complementary group masking ensures every time step is scored while hidden, with identical visible fractions during training and inference. LEAP adds three label-free evidence sources: latent-embedding novelty calibrated by local density, local temporal contrast, and per-channel novelty pooled over channels selected by six label-free criteria. Under",
-   "authors": [],
-   "url": "https://arxiv.org/abs/2610.35190",
-   "cited_by": [],
-   "source": "recent",
-   "posted": "Tue, 27 Oct 2026",
-   "category": "cs.LG",
-   "github": "",
-   "overlap": 0.0,
-   "topic": 0.229,
-   "topic_of": "Emergent Abilities of Large Language Models",
-   "topic_top": [
-    {
-     "title": "Emergent Abilities of Large Language Models",
-     "sim": 0.241
-    },
-    {
-     "title": "Attention Is All You Need",
-     "sim": 0.201
-    },
-    {
-     "title": "Attention Is All You Need",
-     "sim": 0.201
-    }
-   ],
-   "base": 0.23,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.23,
-   "vote": "",
-   "reason": "在《Emergent Abilities of Large Language Models》所体现的规模基准评测思路基础上，区别在于提出潜嵌入异常补丁Transformer用于时间序列异常检测，而非语言模型能力。"
-  },
-  {
-   "key": "2610.34336",
-   "arxiv_id": "2610.34336",
-   "title": "Improving the Chain-of-Thought Compressibility of Pruned Reasoning Models via Long--Short Contrastive Pruning",
-   "year": 2026,
-   "abstract": "Large reasoning models are costly to serve because they are large and because they generate long chains of thought (CoT). Weight pruning and CoT compression address these two costs separately, but they interfere in that pruning adds redundant reasoning on problems the model still solves and incomplete reasoning on those it no longer solves, and on harder problems makes the model less compressible by subsequent length-preference optimization. We trace this to a blind spot on each side: pruning criteria do not distinguish necessary from redundant reasoning, and preference-based CoT compression receives no training signal on problems a pruned model always or never solves. We propose Contrastive Set-Difference (CSD), which identifies neurons enriched in redundant reasoning by contrasting their activations on long and short correct solutions of the same problem and prunes them preferentially, and we extend preference pairs to the problems a pruned model always or never solves. Pruning 20\\% of DeepSeek-R1-Distill-Qwen-7B, the combination uses 8--22\\% fewer thinking tokens on four math benchmarks than pruning with reasoning-aware calibration (RAC) followed by the same compression, with ac",
-   "authors": [],
-   "url": "https://arxiv.org/abs/2610.34336",
-   "cited_by": [],
-   "source": "recent",
-   "posted": "Tue, 27 Oct 2026",
-   "category": "cs.CL",
-   "github": "",
-   "overlap": 0.0,
-   "topic": 0.224,
-   "topic_of": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
-   "topic_top": [
-    {
-     "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
-     "sim": 0.232
-    },
-    {
-     "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
-     "sim": 0.228
-    },
-    {
-     "title": "Evaluating Large Language Models Trained on Code",
-     "sim": 0.186
-    }
-   ],
-   "base": 0.2285,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.2285,
-   "vote": "",
-   "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的推理模型基础上，区别在于用长短期对比剪枝同时改善权重剪枝与思维链压缩的兼容性。"
-  },
-  {
-   "key": "2610.34507",
-   "arxiv_id": "2610.34507",
-   "title": "The Price of Scale in Proactive Memory Recall",
-   "year": 2026,
-   "abstract": "A long-lived assistant that brings up memories without being asked must decide at every turn whether anything in its store is worth an interruption. We show that this decision is a multiple-testing problem whose difficulty grows with the store size $N$. On streaming replays of LongMemEval and LoCoMo, a similarity threshold tuned to 5% false alarms at $N=8$ reaches 87-100% at $N=2048$, across embedding models and for explicit and implicit cues; LLM judges show the same growth from a lower base. We prove that a gate with false-alarm rate $\\alpha$ operates at a per-item false-positive rate of about $-\\ln(1-\\alpha)/N$, which pins its hit rate to the far left of the single-comparison ROC curve and, under regular variation, makes it decay as a power of $N$ with an explicit constant. The resulting prediction matches the hit rate of a per-$N$ oracle threshold to within one percentage point. The analysis explains why lexical and semantic channels need thresholds growing like $\\ln N$ and $\\sqrt{\\ln N}$, and why per-cue normalisation roughly doubles the hit rate at matched false alarms. A cue-swap conformal gate, which compares the current cue with the user&#39;s other cues on the same store,",
-   "authors": [],
-   "url": "https://arxiv.org/abs/2610.34507",
-   "cited_by": [],
-   "source": "recent",
-   "posted": "Tue, 27 Oct 2026",
-   "category": "cs.CL",
-   "github": "",
-   "overlap": 0.0,
-   "topic": 0.213,
-   "topic_of": "On Layer Normalization in the Transformer Architecture",
-   "topic_top": [
-    {
-     "title": "On Layer Normalization in the Transformer Architecture",
-     "sim": 0.24
-    },
-    {
-     "title": "Robust Speech Recognition via Large-Scale Weak Supervision",
-     "sim": 0.155
-    },
-    {
-     "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
-     "sim": 0.144
-    }
-   ],
-   "base": 0.2244,
-   "collab": 0.0,
-   "event": 0.0,
-   "events": {
-    "view": 0,
-    "download": 0
-   },
-   "score": 0.2244,
-   "vote": "",
-   "reason": "在《On Layer Normalization in the Transformer Architecture》的Transformer训练分析基础上，区别在于研究主动记忆召回中的多重检验问题与规模代价，而非归一化位置。"
-  },
-  {
-   "key": "orchardworkerdetectionusingspatialcontextattentionon2dlidardata",
-   "arxiv_id": "",
-   "title": "Orchard worker detection using spatial-context attention on 2D LiDAR data",
-   "year": 2027,
-   "abstract": "",
-   "authors": [
-    "Jintack Jeon",
-    "H. Chung",
-    "Gookhwan Kim",
-    "Seungyun Baek",
-    "Dae-Hyun Lee"
-   ],
-   "url": "",
-   "cited_by": [
-    "Attention Is All You Need",
-    "1706.03762v1_img",
-    "Attention Is All You Need"
-   ],
-   "source": "cited",
-   "github": "",
-   "overlap": 1.0,
-   "topic": 0.18,
+   "topic": 0.285,
    "topic_of": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
    "topic_top": [
     {
      "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
-     "sim": 0.21
+     "sim": 0.295
     },
     {
-     "title": "Attention Is All You Need",
-     "sim": 0.111
+     "title": "Can Active Memory Replace Attention?",
+     "sim": 0.284
     },
     {
-     "title": "Attention Is All You Need",
-     "sim": 0.111
+     "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
+     "sim": 0.239
     }
    ],
-   "base": 0.563,
+   "base": 0.3289,
    "collab": 0.0,
-   "event": 0.01,
-   "events": 0.2,
-   "score": 0.573,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.3289,
    "vote": "",
-   "reason": "在《Attention Is All You Need》的自注意力机制基础上，区别在于将空间上下文注意力用于2D LiDAR果园工人检测，而非序列 transduction 任务。"
+   "reason": "这篇不基于库内注意力架构论文，而是从心理语言学角度探讨注意力作为人类记忆提取认知模型时的记忆表示问题，与库内《Can Active Memory Replace Attention?》的机制替换议题相呼应。"
+  },
+  {
+   "key": "2610.37041",
+   "arxiv_id": "2610.37041",
+   "title": "Guided-RLVR: Guided Exploration in Reinforcement Learning with Verifiable Rewards",
+   "year": 2026,
+   "abstract": "Reinforcement learning with verifiable rewards (RLVR) has shown strong empirical gains in improving the reasoning ability of large language models (LLMs) on tasks such as mathematics and programming. However, recent studies have shown that RLVR rollouts often collapse onto a narrow set of reasoning trajectories, limiting the explored reasoning space. Motivated by findings that thinking tokens at critical steps serve as critical structural elements in LLM reasoning pathways, we propose Guided-RLVR, a novel approach that augments RLVR with a lightweight controller. The controller strategically injects semantically meaningful steering tokens into the sampling distribution, encouraging the model to approach problems from multiple reasoning perspectives and thereby expanding the exploration space. Experiments on mathematical reasoning and code generation benchmarks show that Guided-RLVR consistently outperforms existing RLVR methods while producing more diverse reasoning trajectories.",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.37041",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Wed, 28 Oct 2026",
+   "category": "cs.CL",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.343,
+   "topic_of": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+   "topic_top": [
+    {
+     "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+     "sim": 0.372
+    },
+    {
+     "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+     "sim": 0.325
+    },
+    {
+     "title": "Qwen2.5 Technical Report",
+     "sim": 0.23
+    }
+   ],
+   "base": 0.2702,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.2702,
+   "vote": "",
+   "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的可验证奖励强化学习基础上，区别在于针对RLVR rollout坍缩到狭窄推理路径的问题引入引导式探索。"
+  },
+  {
+   "key": "1912.11959",
+   "arxiv_id": "1912.11959",
+   "title": "Is Attention All What You Need? - An Empirical Investigation on Convolution-Based Active Memory and Self-Attention",
+   "year": 2019,
+   "abstract": "The key to a Transformer model is the self-attention mechanism, which allows the model to analyze an entire sequence in a computationally efficient manner. Recent work has suggested the possibility that general attention mechanisms used by RNNs could be replaced by active-memory mechanisms. In this work, we evaluate whether various active-memory mechanisms could replace self-attention in a Transformer. Our experiments suggest that active-memory alone achieves comparable results to the self-attention mechanism for language modelling, but optimal results are mostly achieved by using both active-memory and self-attention mechanisms together. We also note that, for some specific algorithmic tasks, active-memory mechanisms alone outperform both self-attention and a combination of the two.",
+   "authors": [
+    "Thomas Dowdell",
+    "Hong-Yu Zhang"
+   ],
+   "url": "https://arxiv.org/abs/1912.11959",
+   "cited_by": [
+    "Can Active Memory Replace Attention?"
+   ],
+   "source": "cited",
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.434,
+   "topic_of": "Can Active Memory Replace Attention?",
+   "topic_top": [
+    {
+     "title": "Can Active Memory Replace Attention?",
+     "sim": 0.499
+    },
+    {
+     "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
+     "sim": 0.325
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.242
+    }
+   ],
+   "base": 0.2686,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.2686,
+   "vote": "",
+   "reason": "在《Can Active Memory Replace Attention?》的基础上，实证检验卷积式主动记忆能否替代自注意力，区别在于系统比较两类机制在Transformer中的实际表现。"
+  },
+  {
+   "key": "2610.37481",
+   "arxiv_id": "2610.37481",
+   "title": "Follow the Gradient: Tracing Safety Degradation Back to Training Data",
+   "year": 2026,
+   "abstract": "Fine-tuning Large Language Models (LLMs) on instruction data can quietly erode their safety, even when no training example looks harmful. Because this safety-degrading data looks benign, standard content filters struggle to catch it. We tackle this problem by developing SimpleLoRIF, a scalable gradient embedding method that identifies fine-tuning examples whose gradients align with unsafe behavior. By simplifying a low-rank attribution method and restricting backpropagation to the final four transformer blocks, SimpleLoRIF can embed datasets on the order of a million examples, boosting gradient attribution from a small-scale analysis tool into a practical filter for full post-training datasets. We first validate it on emergent misalignment, where we find that gradients can connect insecure-code training data to the broadly harmful behaviors that appear after fine-tuning, with AUC as high as 0.865 in the gradient space of misaligned models. We then use SimpleLoRIF to build SafeTulu, a version of Tulu 3 with the 20% of examples most gradient-aligned with unsafe responses removed. Training on SafeTulu reduces GCG attack success rate by up to 22% across Qwen, Llama, and Olmo, outperfor",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.37481",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Wed, 28 Oct 2026",
+   "category": "cs.CL",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.262,
+   "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+   "topic_top": [
+    {
+     "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+     "sim": 0.267
+    },
+    {
+     "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+     "sim": 0.266
+    },
+    {
+     "title": "The Llama 3 Herd of Models",
+     "sim": 0.236
+    }
+   ],
+   "base": 0.2417,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.2417,
+   "vote": "",
+   "reason": "这篇不基于库内稀疏专家论文，而是追踪指令微调中安全退化到训练数据的梯度来源，与《Switch Transformers》的大规模稀疏训练关注点不同，属模型安全方向。"
+  },
+  {
+   "key": "2610.36572",
+   "arxiv_id": "2610.36572",
+   "title": "Learning from Points and Patches: A Pre-trained Hybrid Attention Transformer for Time Series Analysis",
+   "year": 2026,
+   "abstract": "Time-series data generated by Web services and connected systems support applications such as user activity analysis, service monitoring, and resource management. However, learning transferable representations from heterogeneous time series remains challenging due to diverse temporal patterns, variable sequence lengths, and limited high-quality annotations. Despite the success of pre-training in natural language processing and computer vision, effective time-series pre-training requires strategies tailored to temporal data. We propose TimeHAT (Hybrid Attention Transformer), a general-purpose pre-training framework for time-series analysis that addresses two complementary questions: what to learn and how to learn. For what to learn, we introduce a Unified Point-Patch Masking Strategy (UPPMS) that integrates point-level and patch-level supervision within a unified framework for contextual reconstruction and causal extrapolation, enabling the model to capture both fine-grained temporal variations and broader temporal patterns. For how to learn, we develop a Hybrid Attention Encoder (HAE) that combines prefix-constrained bidirectional attention in initial layers with directional hybrid",
+   "authors": [],
+   "url": "https://arxiv.org/abs/2610.36572",
+   "cited_by": [],
+   "source": "recent",
+   "posted": "Wed, 28 Oct 2026",
+   "category": "cs.LG",
+   "github": "",
+   "overlap": 0.0,
+   "topic": 0.261,
+   "topic_of": "Qwen2.5 Technical Report",
+   "topic_top": [
+    {
+     "title": "Qwen2.5 Technical Report",
+     "sim": 0.281
+    },
+    {
+     "title": "Instruction Pre-Training: Language Models are Supervised Multitask Learners",
+     "sim": 0.227
+    },
+    {
+     "title": "Learning Transferable Visual Models From Natural Language Supervision",
+     "sim": 0.201
+    }
+   ],
+   "base": 0.2414,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.2414,
+   "vote": "",
+   "reason": "这篇不基于库内大模型技术报告，而是面向异构时间序列预训练，提出点与片段混合注意力Transformer，与《Qwen2.5 Technical Report》的通用语言建模方向形成领域差异。"
+  },
+  {
+   "key": "2003.04974",
+   "arxiv_id": "2003.04974",
+   "title": "Transformer++",
+   "year": 2020,
+   "abstract": "Recent advancements in attention mechanisms have replaced recurrent neural networks and its variants for machine translation tasks. Transformer using attention mechanism solely achieved state-of-the-art results in sequence modeling. Neural machine translation based on the attention mechanism is parallelizable and addresses the problem of handling long-range dependencies among words in sentences more effectively than recurrent neural networks. One of the key concepts in attention is to learn three matrices, query, key, and value, where global dependencies among words are learned through linearly projecting word embeddings through these matrices. Multiple query, key, value matrices can be learned simultaneously focusing on a different subspace of the embedded dimension, which is called multi-head in Transformer. We argue that certain dependencies among words could be learned better through an intermediate context than directly modeling word-word dependencies. This could happen due to the nature of certain dependencies or lack of patterns that lend them difficult to be modeled globally using multi-head self-attention. In this work, we propose a new way of learning dependencies through",
+   "authors": [
+    "Prakhar Thapak",
+    "P. Hore"
+   ],
+   "url": "https://arxiv.org/abs/2003.04974",
+   "cited_by": [
+    "Can Active Memory Replace Attention?"
+   ],
+   "source": "cited",
+   "github": "",
+   "overlap": 0.333,
+   "topic": 0.298,
+   "topic_of": "Attention Is All You Need",
+   "topic_top": [
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.299
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.296
+    },
+    {
+     "title": "Attention Is All You Need",
+     "sim": 0.296
+    }
+   ],
+   "base": 0.221,
+   "collab": 0.0,
+   "event": 0.0,
+   "events": {
+    "view": 0,
+    "download": 0
+   },
+   "score": 0.221,
+   "vote": "",
+   "reason": "在《Attention Is All You Need》的基础上改进纯注意力序列建模，区别在于针对神经机器翻译的并行化与性能做增强，属Transformer变体研究。"
   }
  ],
  "errors": [],
  "offline": false,
- "candidates": 62,
- "without_arxiv": 18,
+ "candidates": 111,
+ "without_arxiv": 0,
  "sources": {
-  "cited": 23,
-  "recent": 6,
+  "cited": 6,
+  "recent": 4,
   "github": 0
  },
  "recent_scanned": 12,
- "user": "u-demo",
- "period": "daily",
+ "user": "default",
+ "period": "weekly",
  "collab_hits": 0,
- "event_hits": 1
+ "event_hits": 0
 }

@@ -572,3 +572,48 @@ GitHub 代码、有代码优先 ③ 用户反馈（点击/点赞/踩）④ 多�
 
 已知限制：GitHub 搜索受未认证限流（10 次/分钟），候选多时会只补前几条；
 `github: 0` 是精度门槛收紧的结果，不是接口失败。
+
+## 2026-10-28（周三）修「下载后显示重复」+ 推荐质量收紧
+
+### 背景
+用户从推荐卡片点「下载入库」，论文库里那条却被打上「重复」，而且那条重复指向一个
+`.download_1602.07776` 这种在库里根本找不到的 paper_id（删也删不掉）。
+
+### 根因
+`/library/download` 把 PDF 流式写进 `data/papers/.download_{id}.pdf`，这期间
+`sync_index()` 的 `glob("*.pdf")` 把这个临时文件登记成一条「幽灵论文」
+（`paper_id=".download_xxx"`）；临时文件随后被删，条目残留，于是 `save_paper` 查重时
+看到「同 arXiv 编号的幽灵」，把真正入库的那份标成了重复。
+
+### 改了什么
+- `app/papers.py`：`sync_index()` 跳过 `.` 开头的文件；顺手清掉指向「索引里已不存在
+  paper_id」的 `duplicate_of`（旧数据里那 3 条悬空标记由此自动修复）。
+- `app/main.py`：临时文件改到 `data/tmp/{arxiv_id}.part`（论文目录之外）；下载后先过
+  `_looks_like_paper()`（页数 ≥4 + 首页标题相似度 ≥0.5），不合格返回 422，不写库。
+- `app/recommend.py`：`RECENT_QUOTA = 3` —— 「新上架」保底 3 个名额（纯按分数排它们永远
+  挤不进前 12，赛题 1.4.3 的"每日/每周新论文推荐"等于空转）；`cited` 侧主题下限从 0.10
+  提到 0.20、单引用时提到 0.26；新上架主题门槛 0.20 → 0.24；理由提示词要求
+  「相似度 <0.30 时禁止写"在《X》的基础上"」，模板兜底同步改成"方向不同"。
+
+### 实测（原文）
+```
+GET /papers -> papers total 42, 悬空 duplicate_of 0
+重复标记 [('1706.03762v7.pdf','1706.03762v7'), ('1706.03762v1.pdf','1706.03762v7'),
+          ('1706.03762v1_img.pdf','1706.03762v7')]
+坏编号 2501.99999 -> 502 {"detail":"连不上 arXiv 详情页：...404 Not Found..."}
+POST /library/download {"query":"2610.25991"} -> 200 20.0s
+  {"downloaded":true,"arxiv_id":"2610.25991","duplicate_hit":"","indexed":283}
+refresh weekly -> sources {'cited':6,'recent':4}; items by source {'cited':6,'recent':3}
+```
+
+### 测试
+- 新增 7 例：`test_select_mixed_reserves_quota_for_recent`、
+  `test_select_mixed_quota_never_exceeds_limit`、`test_cited_noise_below_topic_floor_is_dropped`、
+  `test_looks_like_paper_rejects_non_pdf`、`test_looks_like_paper_accepts_real_pdf`、
+  `test_sync_index_ignores_dot_files`、`test_sync_index_clears_dangling_duplicate_of`。
+- `pytest -q -p no:cacheprovider --basetemp=.pytest_tmp` -> `239 passed, 11 warnings in 29.20s`
+- `ruff check app tests scripts` -> `All checks passed!`
+
+### 遗留
+- 收藏/点击事件 `data/meta/events.json` 与图表缓存 `data/meta/figures/` 是运行期产物，未入库。
+- `web/reader.html` 里另有一份"全篇搜索"改动未提交（不是本轮改动，没动它）。

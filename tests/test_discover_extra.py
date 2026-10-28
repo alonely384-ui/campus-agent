@@ -210,3 +210,83 @@ def test_scheduler_status_and_off_mode(monkeypatch):
     status = scheduler.status()
     assert status["mode"] == "off"
     assert status["hour"] == scheduler._hour()
+
+
+def test_select_mixed_reserves_quota_for_recent():
+    """纯按分数排时新上架永远挤不进榜，所以选榜时要给它们保底名额。"""
+    cited = [
+        {"key": f"c{i}", "source": "cited", "score": 0.9 - i * 0.01, "arxiv_id": f"2401.0000{i}"}
+        for i in range(8)
+    ]
+    recent = [
+        {"key": "r1", "source": "recent", "score": 0.30, "arxiv_id": "2402.00001"},
+        {"key": "r2", "source": "recent", "score": 0.28, "arxiv_id": "2402.00002"},
+    ]
+
+    picked = rec._select_mixed(cited + recent, limit=5, quota=2)
+
+    assert len(picked) == 5
+    assert sum(1 for item in picked if item["source"] == "recent") == 2
+    # 选完仍按分数排，引用扩展在前
+    assert picked[0]["key"] == "c0"
+
+
+def test_select_mixed_quota_never_exceeds_limit():
+    recent = [{"key": f"r{i}", "source": "recent", "score": 0.3, "arxiv_id": ""} for i in range(5)]
+
+    picked = rec._select_mixed(recent, limit=2, quota=3)
+
+    assert len(picked) == 2
+
+
+def test_cited_noise_below_topic_floor_is_dropped(monkeypatch):
+    """只靠"被同一篇引用过"、主题完全不搭的候选（实测里的机器人论文）要挡掉。"""
+    monkeypatch.setattr(
+        rec, "embed", lambda text: [1.0, 0.0] if "layer" in text.lower() else [0.0, 1.0]
+    )
+    lib = [("Layer Normalization", [1.0, 0.0])]
+    noise = {
+        "arxiv_id": "2401.99999",
+        "title": "Robot arm control",
+        "abstract": "",
+        "cited_by": ["a", "b", "c"],
+        "source": "cited",
+    }
+    good = {
+        "arxiv_id": "2401.88888",
+        "title": "Layer normalization variants",
+        "abstract": "",
+        "cited_by": ["a"],
+        "source": "cited",
+    }
+
+    ranked = rec.score_candidates([noise, good], lib, {})
+
+    assert [item["arxiv_id"] for item in ranked] == ["2401.88888"]
+
+
+def test_looks_like_paper_rejects_non_pdf(tmp_path):
+    from app.main import _looks_like_paper
+
+    bad = tmp_path / "downloaded.pdf"
+    bad.write_text("<html><body>arXiv error</body></html>", encoding="utf-8")
+
+    assert _looks_like_paper(bad, "Attention Is All You Need") is False
+
+
+def test_looks_like_paper_accepts_real_pdf(tmp_path):
+    import fitz
+
+    from app.main import _looks_like_paper
+
+    doc = fitz.open()
+    for _ in range(5):
+        doc.new_page()
+    doc[0].insert_text((60, 90), "Attention Is All You Need")
+    path = tmp_path / "ok.pdf"
+    doc.save(str(path))
+    doc.close()
+
+    assert _looks_like_paper(path, "Attention Is All You Need") is True
+    # 标题完全对不上的 PDF（比如别人的附件）也要拒
+    assert _looks_like_paper(path, "Layer Normalization") is False
