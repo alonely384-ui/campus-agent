@@ -54,7 +54,11 @@ RECENT_CATEGORIES = ("cs.CL", "cs.LG")
 RECENT_DAYS = 14
 RECENT_KEEP = 12
 # 没有引用信号时主题相似度要更严，否则会推荐一堆"只是词面像"的论文
-RECENT_MIN_TOPIC = 0.20  # 没有引用信号只能靠主题；实测同题材新论文 topic 多在 0.20~0.35
+# 0.20 实测仍会放进"训练安全退化"这类只共享个别词的论文，提到 0.24 更干净
+RECENT_MIN_TOPIC = 0.24
+# 榜单里给「新上架」保底位置：刚发布的论文还没人引用，纯按分数排永远挤不进来，
+# 等于 1.4.3 的"每日/每周新论文推荐"形同虚设。
+RECENT_QUOTA = 3
 
 WEIGHT_OVERLAP = 0.35
 WEIGHT_TOPIC = 0.35
@@ -452,10 +456,12 @@ def score_candidates(
             if topic_score < RECENT_MIN_TOPIC:
                 continue
         else:
-            # 相关性闸门：引用重叠够多，或者主题足够像，才留；两个都很弱就是噪声
-            if len(item["cited_by"]) < 2 and topic_score < 0.22:
+            # 相关性闸门：引用重叠够多，或者主题足够像，才留；两个都很弱就是噪声。
+            # 0.20 是实测出来的下限：低于它的条目基本只是"碰巧被同一篇引过"
+            # （比如 RL 的 PPO 引用链带出来的机器人论文），点进去用不上。
+            if topic_score < 0.20:
                 continue
-            if topic_score < 0.10:
+            if len(item["cited_by"]) < 2 and topic_score < 0.26:
                 continue
         github = find_github(item.get("abstract") or "", item["title"])
         code_score = 1.0 if github else 0.0
@@ -519,8 +525,8 @@ def rerank_with_feedback(
 _REASON_PROMPT = """你是一个学术助理。下面是若干篇候选论文，以及用户论文库里已有的论文（附摘要片段）。
 
 请为每篇候选写一句中文推荐理由（35~70 字），要求是**对照式**的：
-- 先点明它在库里的哪一篇**基础上**做（只能用下面给的"最相近的库内论文"或"引用库内"里出现过的篇名，不许编）；
-- 再说它的**区别/新意**是什么（换了任务、数据、方法或规模）；
+- 相似度 ≥0.30 时：先点明它在库里的哪一篇**基础上**做（只能用下面给的"最相近的库内论文"或"引用库内"里出现过的篇名，不许编），再说它的**区别/新意**（换了任务、数据、方法或规模）；
+- 相似度 <0.30 时：**禁止**写"在《X》的基础上"，直接讲这篇自己在做什么、属于哪个方向，以及它和库内那篇的差异在哪；
 - 如果候选摘要里明确写了在某个数据集上提升或超过某个基线，可以点出一句；没写就不要编数字。
 只输出 JSON 数组，不要任何解释，格式：
 [{"arxiv_id": "2401.00001", "reason": "在《Layer Normalization》的基础上……，区别在于……"}]
@@ -570,7 +576,15 @@ async def write_reasons(items: list[dict[str, Any]], library: list[dict[str, Any
         reason = reasons.get(item["arxiv_id"] or item["key"], "")
         if not reason:
             anchor = item.get("topic_of") or ""
-            if item.get("source") == "recent":
+            topic = float(item.get("topic") or 0.0)
+            if item.get("source") == "recent" and topic < 0.30:
+                # 相似度不高时不要硬凑"在《X》基础上"，那句话会误导用户
+                reason = (
+                    f"arXiv 近两周新上架（{item.get('category') or '未分类'}）；"
+                    f"与库内《{anchor or '—'}》方向不同（相似度 {topic:.2f}），"
+                    f"可作为该方向的旁证参考"
+                )
+            elif item.get("source") == "recent":
                 reason = (
                     f"arXiv 近两周新上架（{item.get('category') or '未分类'}），"
                     f"主题与库内《{anchor or '—'}》最接近（相似度 {item['topic']:.2f}）"
@@ -612,6 +626,25 @@ def _parse_reasons(answer: str) -> dict[str, str]:
 
 
 # --------------------------------------------------------------------------- 入口
+
+
+def _select_mixed(ranked: list[dict[str, Any]], limit: int, quota: int = RECENT_QUOTA) -> list[dict[str, Any]]:
+    """按分数取前 ``limit`` 条，但给「新上架」留至少 ``quota`` 个名额。
+
+    为什么不用 ``ranked[:limit]``：新上架没有引用信号，分数天然比引用扩展低
+    （实测 0.22~0.30 vs 0.35~0.38），纯按分数排会一条都进不去，
+    赛题 1.4.3 的"每日/每周新论文推荐"就名存实亡。
+    选完仍按 ``(有无 arXiv 号, 分数)`` 排，保证能下载的在前。
+    """
+    if limit <= 0:
+        return []
+    recent = [item for item in ranked if item.get("source") == "recent"]
+    others = [item for item in ranked if item.get("source") != "recent"]
+    keep_recent = recent[: min(quota, len(recent), limit)]
+    keep_others = others[: max(0, limit - len(keep_recent))]
+    picked = keep_others + keep_recent
+    picked.sort(key=lambda item: (bool(item.get("arxiv_id")), item["score"]), reverse=True)
+    return picked
 
 
 async def build_recommendations(
@@ -661,7 +694,7 @@ async def build_recommendations(
         "recent": sum(1 for item in ranked if item.get("source") == "recent"),
         "github": sum(1 for item in ranked if item.get("github")),
     }
-    ranked = await write_reasons(ranked[:limit], rows)
+    ranked = await write_reasons(_select_mixed(ranked, limit), rows)
     payload = {
         "updated_at": datetime.now(UTC).astimezone().isoformat(timespec="seconds"),
         "library_size": len(rows),
@@ -674,8 +707,8 @@ async def build_recommendations(
         "recent_scanned": recent_scanned,
         "user": user,
         "period": period,
-        "collab_hits": sum(1 for item in ranked[:limit] if item.get("collab")),
-        "event_hits": sum(1 for item in ranked[:limit] if item.get("event")),
+        "collab_hits": sum(1 for item in ranked if item.get("collab")),
+        "event_hits": sum(1 for item in ranked if item.get("event")),
     }
     write_cache(CACHE_KEY, payload)
     RECOMMEND_FILE.parent.mkdir(parents=True, exist_ok=True)

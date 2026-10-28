@@ -557,6 +557,35 @@ def _pick_search_result(query: str, results: list[dict]) -> dict | None:
     return best
 
 
+def _looks_like_paper(path: Path, title: str, min_pages: int = 4) -> bool:
+    """下载下来的东西到底是不是论文。
+
+    只挡两种真实发生过的情况：下回来的是 HTML 错误页（不是 PDF），
+    以及 PDF 页数过少 / 首页文字与标题完全对不上（可能是别人的附件）。
+    标题对不上时用相似度放宽到 0.5，因为 arXiv 标题常带换行与连字符。
+    """
+    try:
+        with fitz.open(path) as doc:
+            pages = doc.page_count
+            if pages < min_pages:
+                return False
+            head = (doc[0].get_text() or "")[:2000]
+    except Exception:
+        return False
+    if not title.strip():
+        return True
+    wanted = re.sub(r"\s+", " ", title.lower()).strip()
+    got = re.sub(r"\s+", " ", head.lower())
+    if wanted in got:
+        return True
+    # 标题常被换行/连字符切开："attention is all you\nneed" → 去掉空白再比
+    squeezed_wanted = re.sub(r"[^a-z0-9]", "", wanted)
+    squeezed_got = re.sub(r"[^a-z0-9]", "", got)
+    if squeezed_wanted and squeezed_wanted in squeezed_got:
+        return True
+    return difflib.SequenceMatcher(None, wanted[:120], got[:400]).ratio() >= 0.5
+
+
 @app.post("/library/download", summary="按论文名从 arXiv 下载并入库（1.4.1）")
 async def library_download(req: DownloadRequest) -> dict:
     """给一个论文名 → 在 arXiv 搜 → 下 PDF → 走上传同一条链路（去重/解析/入库）。
@@ -593,9 +622,19 @@ async def library_download(req: DownloadRequest) -> dict:
             "filename": existing["filename"],
         }
 
-    tmp = PAPERS_DIR / f".download_{arxiv_id}.pdf"
+    # 临时文件必须放论文目录外面：放里面会被 sync_index() 的 glob 当论文登记成
+    # 幽灵条目（`.download_xxx`），然后真正入库那份反而被判成"重复"。
+    tmp_dir = PAPERS_DIR.parent / "tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp = tmp_dir / f"{arxiv_id}.part"
     try:
         await run_in_threadpool(download_pdf, arxiv_id, tmp)
+        if not _looks_like_paper(tmp, str(best.get("title") or "")):
+            # arXiv 偶尔回 HTML 错误页或摘要页；宁可拒收，也不能让垃圾进论文库
+            raise HTTPException(
+                status_code=422,
+                detail="下载到的不是有效论文（页数太少或标题对不上），已丢弃",
+            )
         data = tmp.read_bytes()
     except OnlineError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from None

@@ -235,6 +235,11 @@ def sync_index() -> list[Paper]:
     changed = False
 
     for path in sorted(PAPERS_DIR.glob("*.pdf")):
+        if path.name.startswith("."):
+            # `.download_xxx.pdf` 这类临时文件也会被 glob 匹配到（Python 的 glob 不过滤
+            # 隐藏文件）。它在下载中途存在，一旦被当论文登记就成了"幽灵论文"，
+            # 还会让真正入库的那份被判成重复。
+            continue
         if path.stem in known_ids:
             continue
         meta = structures.get(path.name) or {}
@@ -268,6 +273,16 @@ def sync_index() -> list[Paper]:
     ]
     if len(kept) != len(papers):
         changed = True
+
+    # 指向"已经不存在的 paper_id"的重复标记要清掉：历史上下载临时文件曾被登记成论文，
+    # 真正入库的那份于是记着 `duplicate_of=".download_xxx"`，界面上就显示成"重复"，
+    # 但那个 paper_id 根本不在库里（也删不掉），用户只会觉得是 bug。
+    kept_ids = {p.paper_id for p in kept}
+    for paper in kept:
+        if paper.duplicate_of and paper.duplicate_of not in kept_ids:
+            paper.duplicate_of = ""
+            paper.duplicate_reason = ""
+            changed = True
 
     # 历史条目可能是在还没有查重逻辑时登记的（样例库那对 v1/v7 就是），
     # 这里按 arXiv 编号补一次标记：同编号里挑一个"正版"（文件名就是 paper_id 的、
