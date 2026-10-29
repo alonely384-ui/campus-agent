@@ -16,6 +16,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Windows 控制台默认 GBK，装不下 ✓ / ✗ 这类符号，直接 print 会 UnicodeEncodeError 退出 1，
+# 让 CI 误判成「依赖不一致」。这里把 stdout 的错误策略改成 replace，符号降级成 ? 而不是崩掉。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
+
 # import 名 → PyPI 发行包名（只在两者不同时才需要映射）
 IMPORT_TO_DIST = {
     "fitz": "pymupdf",

@@ -80,10 +80,6 @@
     .fi { border: 1px solid #eef1f5; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
     .fi .t { font-size: 13.5px; font-weight: 600; color: #111827; line-height: 1.5; }
     .fi .basis { font-size: 12px; color: #6b7280; margin-top: 6px; line-height: 1.7; }
-    .fi .quote {
-      font-size: 12.5px; color: #374151; line-height: 1.75; margin-top: 8px;
-      padding: 8px 12px; background: #f8fafc; border-left: 3px solid #1a7f37; border-radius: 0 6px 6px 0;
-    }
     .fi .foot { margin-top: 8px; display: flex; gap: 14px; font-size: 12px; color: #9ca3af; }
 
     .empty { text-align: center; color: #9ca3af; font-size: 13px; padding: 40px 0; }
@@ -180,7 +176,7 @@
       cornerstone: '基石', hub: '枢纽', bridge: '桥接',
       foundation: '基础件', fringe: '边缘', isolated: '孤立'
     };
-    const KIND_COLOR = { recent_cited: '#1a73e8', bridge: '#9333ea', island: '#dc2626', future_work: '#1a7f37' };
+    const KIND_COLOR = { recent_cited: '#1a73e8', bridge: '#9333ea', island: '#dc2626' };
 
     let surveyData = null;
     let frontierData = null;
@@ -281,7 +277,7 @@
       const d = frontierData;
       const st = d.stats || {};
       $('frontierStats').innerHTML = [
-        ['Future Work 原文', st.future_work], ['新近且被引', st.recent_cited], ['跨社区桥接', st.bridges],
+        ['新近且被引', st.recent_cited], ['跨社区桥接', st.bridges],
         ['未被接入', st.islands], ['分析论文', st.papers]
       ].map(([k, v]) => `<div class="stat">${esc(k)}<b>${esc(v)}</b></div>`).join('');
 
@@ -291,7 +287,7 @@
       const byKind = {};
       (d.items || []).forEach(it => { (byKind[it.kind] = byKind[it.kind] || []).push(it); });
 
-      const order = ['future_work', 'recent_cited', 'bridge', 'island'];
+      const order = ['recent_cited', 'bridge', 'island'];
       let html = '';
       order.forEach(kind => {
         const arr = byKind[kind] || [];
@@ -303,16 +299,11 @@
             <span class="desc">${esc(lg.desc || '')}</span>
           </div>`;
         arr.forEach(it => {
-          // Future Work 直接把作者原话列出来，这是「凭什么说这是待探索方向」的唯一依据
-          const quotes = (it.sentences || []).map(s =>
-            `<div class="quote">${esc(s)}</div>`).join('');
           html += `<div class="fi">
               <div class="t">${esc(it.title)}</div>
               <div class="basis">${esc(it.basis)}</div>
-              ${quotes}
               <div class="foot">
                 <span>${it.year ? esc(it.year) + ' 年' : '年份未知'}</span>
-                ${it.sentences && it.sentences.length ? `<span>${it.sentences.length} 句原文</span>` : ''}
                 ${it.reader_url ? `<a class="open" href="${esc(it.reader_url)}">打开原文</a>` : ''}
               </div>
             </div>`;

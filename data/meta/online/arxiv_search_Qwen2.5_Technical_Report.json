@@ -1,0 +1,47 @@
+{
+ "saved_at": "2026-10-29T16:11:27+00:00",
+ "data": [
+  {
+   "arxiv_id": "2506.00019",
+   "title": "Amadeus-Verbo Technical Report : The powerful Qwen2.5 family models trained in Portuguese",
+   "url": "https://arxiv.org/abs/2506.00019",
+   "submitted": "20 May, 2025"
+  },
+  {
+   "arxiv_id": "2503.20215",
+   "title": "Qwen2.5 -Omni Technical Report",
+   "url": "https://arxiv.org/abs/2503.20215",
+   "submitted": "26 March, 2025"
+  },
+  {
+   "arxiv_id": "2502.13923",
+   "title": "Qwen2.5 -VL Technical Report",
+   "url": "https://arxiv.org/abs/2502.13923",
+   "submitted": "19 February, 2025"
+  },
+  {
+   "arxiv_id": "2501.15383",
+   "title": "Qwen2.5 -1M Technical Report",
+   "url": "https://arxiv.org/abs/2501.15383",
+   "submitted": "25 January, 2025"
+  },
+  {
+   "arxiv_id": "2412.15115",
+   "title": "Qwen2.5 Technical Report",
+   "url": "https://arxiv.org/abs/2412.15115",
+   "submitted": "2 January, 2025"
+  },
+  {
+   "arxiv_id": "2409.12186",
+   "title": "Qwen2.5 -Coder Technical Report",
+   "url": "https://arxiv.org/abs/2409.12186",
+   "submitted": "12 November, 2024"
+  },
+  {
+   "arxiv_id": "2409.12122",
+   "title": "Qwen2.5 -Math Technical Report : Toward Mathematical Expert Model via Self-Improvement",
+   "url": "https://arxiv.org/abs/2409.12122",
+   "submitted": "18 September, 2024"
+  }
+ ]
+}
