@@ -1,4 +1,4 @@
-﻿# ---- Python ----
+# ---- Python ----
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -19,6 +19,24 @@ data/papers/
 data/eval/pages/
 data/models/
 *.sqlite3
+
+# 引用图谱的生成物：可随时用 scripts/build_graph.py 重建，不进仓库
+# （ref-titles-cache.json 是权威库查询缓存，体积随论文数增长，同样不入库）
+data/meta/citation-graph*.json
+data/meta/ref-titles-cache.json
+
+# 重建解析结果前的临时备份，只在本地改动时用，不进仓库
+data/meta/*.before.json
+data/meta/*.pre-rebuild.json
+
+# 1.6 写作助手的生成物，全部按内容哈希命名，随时可重新生成。
+# 注意：.gitignore 不支持行尾注释，# 必须独占一行，否则整行会被当成字面路径。
+data/meta/charts/
+data/meta/diagrams/
+data/meta/zh2en/
+data/meta/_preview/
+data/meta/figures/
+data/meta/translations/
 
 # ---- 工具缓存 ----
 .pytest_cache/

@@ -2,37 +2,68 @@
 # 依赖清单
 # 用法： uv add <包名>   （不要手动改这个文件的版本号）
 # 手动装： uv pip install -r requirements.txt
+#
+# 本文件与 app/ 下的实际 import 保持一一对应。
+# 改了 import 就同步改这里，否则别人装完起不来服务。
+# 核对方法见文末「依赖自检」。
 # ============================================
 
 # --- Web 服务 ---
-fastapi>=0.115
-uvicorn[standard]>=0.32          # 启动服务的服务器
-python-multipart>=0.0.12         # 处理文件上传
-sse-starlette>=2.1               # SSE 流式输出
+fastapi>=0.115                   # HTTP 框架（app/main.py）
+uvicorn[standard]>=0.32          # 启动服务的服务器（app/__main__.py 入口）
+python-multipart>=0.0.12         # FastAPI 的 UploadFile 必需，否则 /upload 起不来
+# 注：SSE 流式输出用 FastAPI 原生 StreamingResponse 实现，
+#     见 app/main.py 的 /chat/stream 与 /paper/{filename}/translate，不依赖 sse-starlette。
 
 # --- 数据校验与配置 ---
-pydantic>=2.9
-pydantic-settings>=2.5           # 从 .env 读配置
+pydantic>=2.9                    # app/main.py 的请求/响应模型
+pydantic-settings>=2.5           # 从 .env 读配置（app/config.py）
 
 # --- LLM ---
-openai>=1.50                     # 通用 LLM 客户端（DeepSeek/通义等兼容此协议）
+openai>=1.50                     # 通用 LLM 客户端（DeepSeek/通义等兼容此协议，app/llm.py）
+
+# --- PDF 解析 ---
+pymupdf>=1.24                    # 主力解析器（app/graph.py, layout.py, translate.py, ocr.py, figures.py, diagram.py）
+                                 # 提供 import 名 pymupdf 与 fitz，两个都在用
+pdfplumber>=0.11                 # 表格抽取（文本策略，app/structure.py）
+pypdf>=5.0                       # 页数探测与轻量文本提取（app/papers.py, rag/pipeline.py）
+
+# --- OCR（扫描件） ---
+rapidocr-onnxruntime>=1.3        # 扫描件降级识别（app/ocr.py）
+onnxruntime>=1.17                # rapidocr 与重排模型的推理后端（app/rag/rerank.py）
 
 # --- RAG ---
-chromadb>=0.5                    # 轻量向量库
-pypdf>=5.0                       # 解析 PDF
-pdfplumber>=0.11                 # 表格抽取（文本策略，见 app/structure.py）
-tiktoken>=0.8                    # 算 token 数（估算成本）
+chromadb>=0.5                    # 向量库（app/rag/pipeline.py）
+tokenizers>=0.20                 # 重排模型的分词器（app/rag/rerank.py，读 data/models/*/tokenizer.json）
 
-# --- 数据库 / 缓存 ---
-redis>=5.0
-sqlalchemy>=2.0
-pymysql>=1.1
+# --- 引用图谱与写作助手 ---
+# 注：图谱的 PageRank / 中介中心性 / Louvain 全部是 app/graph.py 里自己实现的，
+#     只用标准库，刻意不依赖 networkx / scipy（见 graph.py:1365 的注释）。
+numpy>=1.26                      # 重排打分与归一化（app/rag/rerank.py）
+pandas>=2.2                      # CSV 统计（app/chart.py）
+matplotlib>=3.8                  # 论文级 PNG 导出，中文需 fonts-noto-cjk（app/chart.py）
 
 # --- HTTP ---
-httpx>=0.27
-aiohttp>=3.10
+httpx>=0.27                      # arXiv / Crossref / Semantic Scholar 查询（app/online.py, app/literature.py）
 
 # --- 开发工具 ---
 pytest>=8.3
 pytest-asyncio>=0.24
 ruff>=0.7
+
+# ---- 已移除（代码从未 import，删掉后 pytest 与 ruff 仍全绿） ----
+#   redis            只有 app/config.py 里一个未使用的 redis_url 配置字段
+#   sqlalchemy       无任何 ORM 用法，数据全存 JSON
+#   pymysql          无数据库连接
+#   aiohttp          网络请求统一走 httpx
+#   sse-starlette    SSE 用 FastAPI 原生 StreamingResponse
+#   tiktoken         无 token 计费逻辑
+#
+# ---- 可选（非 Python 或非必需） ----
+#   mermaid-cli      1.6.2 Mermaid 渲染需要，Node.js 环境：npm i -g @mermaid-js/mermaid-cli
+#   graphviz        1.6.2 Graphviz 渲染需要，系统包：apt install graphviz / choco install graphviz
+#   pdflatex        1.6.2 TikZ 渲染需要，装 TeX Live 或 MiKTeX
+
+# ---- 依赖自检 ----
+# 扫描 app/ 下真实 import 并与本文件比对：
+#   python scripts/check_deps.py

@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-28T16:54:52+08:00",
+ "updated_at": "2026-10-28T17:19:20+08:00",
  "library_size": 39,
  "items": [
   {
@@ -38,7 +38,7 @@
    "base": 0.3444,
    "score": 0.3444,
    "vote": "",
-   "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的稀疏专家路由基础上，把MoE用于多智能体路径规划，区别在于按地图分布设计专家而非语言模型扩容。"
+   "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的稀疏专家路由基础上，将MoE引入多智能体路径规划，区别在于按地图分布设计专家以生成动作分布。"
   },
   {
    "key": "2610.32142",
@@ -76,7 +76,7 @@
    "base": 0.3256,
    "score": 0.3256,
    "vote": "",
-   "reason": "这篇聚焦LoRA初始化与学习率鲁棒性，属于参数高效微调方向；与库内《Layer Normalization》的归一化训练稳定化思路不同，它针对的是低秩适配的LR敏感问题。"
+   "reason": "与库内LoRA类低秩适配工作方向相近但相似度不足0.30，本文不设计新变体，而是重新审视LoRA初始化以提升对非对称学习率的鲁棒性，属参数高效微调方向。"
   },
   {
    "key": "2610.37041",
@@ -111,7 +111,7 @@
    "base": 0.2202,
    "score": 0.2202,
    "vote": "",
-   "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的RLVR基础上，针对rollout坍缩到狭窄推理路径的问题引入引导式探索，区别在于探索策略设计。"
+   "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的RLVR路线上，针对rollout坍缩到狭窄推理模式的问题引入引导式探索，区别在于探索策略设计。"
   },
   {
    "key": "2610.37481",
@@ -146,7 +146,7 @@
    "base": 0.1917,
    "score": 0.1917,
    "vote": "",
-   "reason": "这篇从梯度信号追踪微调数据导致的安全退化，属于LLM安全与数据归因方向；与库内《Switch Transformers》的稀疏扩容主题不同，它关注的是良性数据中的隐性风险。"
+   "reason": "与库内稀疏专家与规模训练工作相似度不足0.30，本文属LLM安全对齐方向，用梯度信号SimpleLoRIF追踪看似无害却侵蚀安全的指令微调数据，差异在安全诊断任务。"
   },
   {
    "key": "2610.36572",
@@ -181,7 +181,7 @@
    "base": 0.1914,
    "score": 0.1914,
    "vote": "",
-   "reason": "这篇提出预训练混合注意力Transformer用于时间序列分析，属于时序表征学习方向；与库内《Qwen2.5 Technical Report》的语言模型路线不同，它面向异构时序的迁移表示。"
+   "reason": "与库内Qwen2.5技术报告相似度不足0.30，本文属时间序列预训练方向，提出点与片段混合注意力Transformer学习可迁移表示，差异在模态与预训练目标。"
   },
   {
    "key": "trainingareasoninglargelanguagemodelforimprovingpowerflowconvergence",
@@ -220,7 +220,7 @@
    "base": 0.3335,
    "score": 0.3335,
    "vote": "",
-   "reason": "在《Proximal Policy Optimization Algorithms》的强化学习训练思路上，把推理大模型用于电力潮流收敛，区别在于以可解释推理替代黑盒数据驱动方法。"
+   "reason": "在《Proximal Policy Optimization Algorithms》的强化学习训练思路启发下，将推理大模型用于电力潮流收敛，区别在于把RL推理能力迁移到电力系统数值求解任务。"
   }
  ],
  "errors": [],
@@ -233,6 +233,6 @@
   "github": 0
  },
  "recent_scanned": 12,
- "user": "default",
+ "user": "uqa8j6r",
  "period": "daily"
 }
