@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>写作助手 · 科研小助手</title>
+<script src="/ui/vendor/echarts/echarts.min.js"></script>
+<!-- 划词翻译浮钮：选中正文里的一段英文，鼠标旁浮出「译」 -->
+<link rel="stylesheet" href="/ui/quick-translate.css">
+<script src="/ui/quick-translate.js"></script>
+<style>
+  /* 白底主题：配色对齐 web/analysis.html 与 web/index.html，
+     不自创视觉风格——全站看起来是一套东西。 */
+  :root {
+    --bg: #f5f6f8;        /* 页面底色 */
+    --panel: #ffffff;     /* 卡片/面板 */
+    --panel2: #f8fafc;    /* 次级填充（列表项、输入框） */
+    --line: #e3e7ee;      /* 分隔线/边框 */
+    --line2: #f1f4f8;     /* 更浅的分隔线 */
+    --text: #1f2937;      /* 主文字 */
+    --text2: #374151;     /* 次级文字 */
+    --dim: #6b7280;       /* 说明文字 */
+    --accent: #1a73e8;    /* 主题蓝 */
+    --accent-weak: #eef1f5;
+    --ok: #1a7f37; --okbg: #e8f5ec;
+    --warn: #9a6700; --warnbg: #fff8e6;
+    --bad: #c62828; --badbg: #fdecec;
+    --purple: #6b4fa8; --purplebg: #f2eefb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  header {
+    padding: 12px 22px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px; background: var(--panel);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; color: #111827; }
+  header .sub { color: var(--dim); font-size: 12px; }
+  header a { color: var(--accent); text-decoration: none; font-size: 13px; margin-left: auto; }
+  header a:hover { text-decoration: underline; }
+  .tabs { display: flex; gap: 6px; padding: 14px 22px 0; flex-wrap: wrap; }
+  .tab {
+    padding: 7px 15px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); color: var(--text2); cursor: pointer; font-size: 13px;
+  }
+  .tab:hover { border-color: #b9c6d8; }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  main { padding: 14px 22px 48px; }
+  .pane {
+    display: none; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px 22px;
+  }
+  .pane.active { display: block; }
+  .row { display: flex; gap: 18px; }
+  .col { flex: 1; min-width: 0; }
+  label { display: block; font-size: 12.5px; color: var(--text2); font-weight: 500; margin: 14px 0 6px; }
+  input[type=text], input[type=file], select, textarea {
+    width: 100%; background: #fff; border: 1px solid #d5dbe5; color: var(--text);
+    border-radius: 8px; padding: 8px 11px; font: inherit; font-size: 13px;
+  }
+  input[type=text]:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,115,232,.12);
+  }
+  textarea { resize: vertical; min-height: 90px; }
+  button {
+    background: var(--accent); color: #fff; border: 1px solid var(--accent); border-radius: 8px;
+    padding: 8px 18px; font-size: 13.5px; font-weight: 500; cursor: pointer; margin-top: 14px;
+  }
+  button:hover:not(:disabled) { background: #1667d0; border-color: #1667d0; }
+  button:disabled { background: #9ca3af; border-color: #9ca3af; cursor: default; }
+  button.ghost { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  button.ghost:hover:not(:disabled) { background: #f3f8fe; }
+  pre {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; overflow: auto; font-size: 12px; max-height: 420px; white-space: pre-wrap;
+    color: var(--text2);
+  }
+  .out { margin-top: 16px; }
+  .out h3 {
+    font-size: 13px; font-weight: 600; margin: 20px 0 8px; color: #111827;
+    padding-bottom: 6px; border-bottom: 1px solid var(--line2);
+  }
+  .cand {
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; margin-bottom: 6px;
+    background: var(--panel2); font-size: 12.5px; color: var(--text2);
+  }
+  .cand b { color: var(--accent); }
+  .cand .meta { color: var(--dim); font-size: 11.5px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; margin-left: 6px; }
+  .badge.local { background: var(--okbg); color: var(--ok); }
+  .badge.arxiv { background: var(--warnbg); color: var(--warn); }
+  .badge.crossref { background: var(--purplebg); color: var(--purple); }
+  .badge.unknown { background: var(--badbg); color: var(--bad); }
+  .status { font-size: 12.5px; margin-top: 10px; color: var(--dim); }
+  .status.err { color: var(--bad); }
+  .status.ok { color: var(--ok); }
+  .status.work { color: var(--warn); }
+  #chartBox { width: 100%; height: 420px; background: #fff; border-radius: 8px; margin-top: 10px; border: 1px solid var(--line); }
+  .ref { font-size: 12px; color: var(--dim); margin-bottom: 6px; word-break: break-word; line-height: 1.7; }
+  .ref b { color: var(--text2); }
+  .markdown {
+    background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px 18px; color: var(--text2);
+  }
+  .markdown h2 {
+    font-size: 15px; color: #111827; margin: 20px 0 8px;
+    border-bottom: 1px solid var(--line2); padding-bottom: 5px;
+  }
+  .markdown h2:first-child { margin-top: 0; }
+  .markdown p { margin: 8px 0; }
+  .hint { font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .imgwrap { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 10px; text-align: center; }
+  .imgwrap img { max-width: 100%; }
+
+  /* 使用说明 */
+  button.guide { background: #fff; border: 1px solid #d5dbe5; color: var(--text2); margin: 0; }
+  button.guide:hover:not(:disabled) { background: #f8fafc; border-color: #b9c6d8; }
+  #guideMask {
+    position: fixed; inset: 0; background: rgba(17, 24, 39, .38);
+    z-index: 80; display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  #guideMask[hidden] { display: none; }
+  .guide-box {
+    background: #fff; border-radius: 14px; width: min(760px, 100%);
+    max-height: calc(100vh - 60px); display: flex; flex-direction: column;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, .22); overflow: hidden;
+  }
+  .guide-head {
+    display: flex; align-items: center; gap: 10px; padding: 15px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .guide-head h2 { font-size: 15px; margin: 0; font-weight: 600; color: #111827; }
+  .guide-head .sub { font-size: 12px; color: var(--dim); }
+  .guide-head .x {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    font-size: 19px; line-height: 1; color: #9ca3af; padding: 0 4px;
+  }
+  .guide-head .x:hover { color: var(--text2); }
+  .guide-body { padding: 16px 20px 20px; overflow: auto; }
+  .guide-item { margin-bottom: 16px; }
+  .guide-item:last-child { margin-bottom: 0; }
+  .guide-item h3 {
+    font-size: 13.5px; font-weight: 600; color: #111827; margin: 0 0 7px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .guide-item h3 .tag {
+    font-size: 11px; font-weight: 400; color: var(--accent);
+    background: #eef4fd; border-radius: 999px; padding: 1px 9px;
+  }
+  .guide-item ol, .guide-item ul { margin: 0; padding-left: 20px; }
+  .guide-item li { font-size: 12.8px; line-height: 1.85; color: var(--text2); }
+  .guide-item .tip {
+    font-size: 12px; color: var(--warn); background: var(--warnbg);
+    border-radius: 6px; padding: 7px 10px; margin-top: 7px; line-height: 1.7;
+  }
+  .guide-item code {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 4px;
+    padding: 0 5px; font-size: 12px; color: #b02a37;
+  }
+  .guide-foot {
+    display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+    border-top: 1px solid var(--line); background: #fafbfc;
+  }
+  .guide-foot label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dim); margin: 0; font-weight: 400; }
+  .guide-foot button { margin: 0; margin-left: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>写作助手</h1>
+  <span class="sub">赛题 1.6 · 框架生成 / 架构图 / 数据可视化 / 中译英</span>
+  <button class="guide" id="btnGuide" type="button">使用说明</button>
+  <a href="/ui/">← 回到对话</a>
+</header>
+
+<!-- 使用说明：首次进入自动弹一次，之后点右上角按钮随时可看 -->
+<div id="guideMask" hidden>
+  <div class="guide-box" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <div class="guide-head">
+      <h2 id="guideTitle">写作助手 · 使用说明</h2>
+      <span class="sub">四块功能互相独立，各管一件事</span>
+      <button class="x" id="guideX" type="button" title="关闭">×</button>
+    </div>
+    <div class="guide-body">
+      <div class="guide-item">
+        <h3>1.6.1 框架生成<span class="tag">最常用</span></h3>
+        <ol>
+          <li>「研究 idea」写一句话，说清<strong>要解决什么问题</strong>，别写成论文标题。</li>
+          <li>候选文献池默认 16 篇，池子越大可引用的真文献越多，但等待也越久。</li>
+          <li>点「生成论文框架」，等 20–60 秒，出 Abstract / Introduction / Related Work。</li>
+        </ol>
+        <div class="tip">为什么不会编造参考文献：模型只能引用候选池里的编号（C1、C2…），完整条目由代码照着真实元数据生成，模型碰不到。正文里的 <code>[C3]</code> 若标红，说明模型引用了池外编号，会在顶部提示。</div>
+      </div>
+      <div class="guide-item">
+        <h3>1.6.2 架构图</h3>
+        <ol>
+          <li>用一句话描述系统结构，比如「用户提问→混合检索→重排序→生成」。</li>
+          <li>渲染器二选一：<strong>Mermaid</strong> 语法稳、出错少；<strong>Graphviz</strong> 是黑白方框图，更像论文里的系统图。</li>
+          <li>也可以直接查库里已有论文的原始架构图，拿来做参考。</li>
+        </ol>
+        <div class="tip">渲染失败会自动把报错回喂给模型改一次语法，但不会改你描述的结构。</div>
+      </div>
+      <div class="guide-item">
+        <h3>1.6.3 数据可视化</h3>
+        <ol>
+          <li>上传 CSV，编码自动识别 UTF-8 / GBK（Excel 导出的常是 GBK）。</li>
+          <li>图表类型留空就会按数据形状自动选：单调递增列作横轴出折线，多指标出雷达，两数值出散点。</li>
+          <li>同时得到可交互预览和投稿用的 PNG，图注也会一并生成。</li>
+        </ol>
+        <div class="tip">最多 5000 行；跨两个数量级以上的数值维度会自动用对数轴。</div>
+      </div>
+      <div class="guide-item">
+        <h3>1.6.4 中译英</h3>
+        <ol>
+          <li>贴入中文段落，可选填术语表，一行一条 <code>中文=English</code>。</li>
+          <li>译文按学术语域输出，可直接塞进 IEEE / ACM 模板。</li>
+        </ol>
+        <div class="tip">术语表能让全文译法统一（比如「重排序」固定译成 reranking），建议先用上。</div>
+      </div>
+      <div class="guide-item">
+        <h3>看英文论文时：划词翻译</h3>
+        <ol>
+          <li>用鼠标选中生成的正文或参考文献里的一段英文。</li>
+          <li>鼠标旁浮出「译」，点一下就地弹出中文译文。</li>
+          <li>点空白处或按 Esc 关闭。</li>
+        </ol>
+        <div class="tip">一次最多 6000 字符。这个浮钮在论文分析页也有。</div>
+      </div>
+    </div>
+    <div class="guide-foot">
+      <label><input type="checkbox" id="guideNoMore"> 以后不再自动弹出</label>
+      <button id="guideOk" type="button">知道了</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-pane="p1">1.6.1 框架生成</div>
+  <div class="tab" data-pane="p2">1.6.2 架构图</div>
+  <div class="tab" data-pane="p3">1.6.3 数据可视化</div>
+  <div class="tab" data-pane="p4">1.6.4 中译英</div>
+</div>
+
+<main>
+  <!-- 1.6.1 -->
+  <section class="pane active" id="p1">
+    <label>研究 idea（一句话说清你要解决什么问题）</label>
+    <textarea id="idea">利用稀疏注意力降低长文档问答中 Transformer 的计算开销，同时保持检索质量</textarea>
+    <div class="row">
+      <div class="col">
+        <label>候选文献池大小</label>
+        <input type="text" id="candN" value="16">
+        <div class="hint">池越大可选的真文献越多，但 prompt 也越长。</div>
+      </div>
+      <div class="col">
+        <button id="btnFramework">生成论文框架</button>
+        <div class="status" id="st1"></div>
+      </div>
+    </div>
+    <div class="out" id="out1" style="display:none">
+      <div id="check1"></div>
+      <h3>候选文献池（全部来自真实检索）</h3>
+      <div id="pool1"></div>
+      <h3>生成的正文</h3>
+      <div class="markdown" id="md1"></div>
+      <h3>参考文献（由代码按候选原文生成，模型未参与）</h3>
+      <div id="refs1"></div>
+    </div>
+  </section>
+
+  <!-- 1.6.2 -->
+  <section class="pane" id="p2">
+    <label>要画的系统，用一句话描述</label>
+    <textarea id="desc">一个 RAG 问答系统：用户提问后先做意图识别，需要检索时走 BM25 加向量混合检索，然后重排序，最后交给大模型生成带引用的回答</textarea>
+    <div class="row">
+      <div class="col">
+        <label>渲染器</label>
+        <select id="renderer">
+          <option value="mermaid">Mermaid（流程图，语法稳）</option>
+          <option value="graphviz">Graphviz（论文风格方框图）</option>
+          <option value="tikz">TikZ（LaTeX 原生，投稿模板直接用）</option>
+        </select>
+      </div>
+      <div class="col">
+        <button id="btnDiagram">生成架构图</button>
+        <div class="status" id="st2"></div>
+      </div>
+    </div>
+    <div class="out" id="out2" style="display:none">
+      <div id="img2"></div>
+      <h3>生成的代码</h3>
+      <pre id="code2"></pre>
+    </div>
+    <div class="out">
+      <h3>或者：直接用库里论文的原始架构图</h3>
+      <div class="row">
+        <div class="col">
+          <input type="text" id="paperName" value="1706.03762v7.pdf" placeholder="论文文件名或标题关键词">
+        </div>
+        <div class="col" style="max-width:220px">
+          <button class="ghost" id="btnPaperFig">查找</button>
+        </div>
+      </div>
+      <div id="pf2"></div>
+    </div>
+  </section>
+
+  <!-- 1.6.3 -->
+  <section class="pane" id="p3">
+    <label>上传 CSV（自动识别 UTF-8 / GBK）</label>
+    <input type="file" id="csvFile" accept=".csv,text/csv">
+    <div class="row">
+      <div class="col">
+        <label>图表类型（留空则按数据形状自动选）</label>
+        <select id="chartKind">
+          <option value="">自动选择</option>
+          <option value="line">折线图</option>
+          <option value="bar">柱状图</option>
+          <option value="scatter">散点图</option>
+          <option value="radar">雷达图</option>
+          <option value="radar3d">三维雷达图</option>
+          <option value="pie">饼图</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>补充说明（写进 caption 用，可留空）</label>
+        <input type="text" id="chartNote" placeholder="例如：五个代表性大模型在 MMLU 上的表现">
+      </div>
+    </div>
+    <button id="btnChart">生成图表</button>
+    <div class="status" id="st3"></div>
+    <div class="out" id="out3" style="display:none">
+      <h3>交互预览（ECharts）</h3>
+      <div id="chartBox"></div>
+      <h3>自动生成的 Figure Caption</h3>
+      <div class="ref" id="cap3" style="font-size:13px"></div>
+      <h3>投稿用 PNG（matplotlib 导出）</h3>
+      <div id="png3"></div>
+    </div>
+  </section>
+
+  <!-- 1.6.4 -->
+  <section class="pane" id="p4">
+    <label>中文原文</label>
+    <textarea id="zh" style="min-height:170px">本文提出一种基于注意力机制的检索增强生成方法。我们发现，当检索到的文档数量超过五个时，模型的回答准确率反而下降，这可能是由于上下文中的噪声累积所致。为了缓解这一问题，我们在重排序阶段引入了对比学习目标，使得不同文档的相关性得分具有更强的区分度。</textarea>
+    <label>术语表（可选，一行一条「中文=English」，用于保证全文译法一致）</label>
+    <textarea id="glossary" style="min-height:90px">注意力机制=attention mechanism
+检索增强生成=retrieval-augmented generation
+重排序=reranking
+对比学习=contrastive learning</textarea>
+    <button id="btnZh2en">翻译成学术英文</button>
+    <div class="status" id="st4"></div>
+    <div class="out" id="out4" style="display:none">
+      <h3>译文</h3>
+      <div class="markdown" id="en4"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// 标签切换。用 data-pane 对应 section 的 id，不引入路由库。
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('active', p.id === t.dataset.pane));
+  };
+});
+
+function setStatus(el, text, cls) {
+  el.textContent = text;
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+// 极简 Markdown 渲染：只处理标题、加粗、引用标记。够本页用，不引第三方库。
+function renderMarkdown(md) {
+  const esc = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    // 池外的编号染红，让人一眼看到模型有没有编引用
+    .replace(/\[(C\d{1,3})\]/g, '<span class="badge" data-k="$1">[$1]</span>')
+    .split(/\n{2,}/).map(p => p.startsWith('<h2>') ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+}
+
+const SRC_LABEL = { local: '本库', arxiv: 'arXiv', crossref: 'Crossref' };
+
+// ---------------- 1.6.1
+$('btnFramework').onclick = async () => {
+  const idea = $('idea').value.trim();
+  if (!idea) return;
+  const n = parseInt($('candN').value, 10) || 16;
+  const btn = $('btnFramework');
+  btn.disabled = true;
+  setStatus($('st1'), '检索真实文献并生成中，约 20-60 秒…', 'work');
+  try {
+    const r = await fetch('/writing/framework', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idea, candidates: n })
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const d = await r.json();
+    if (d.warning) {
+      setStatus($('st1'), d.warning, 'err');
+      $('out1').style.display = 'none';
+      return;
+    }
+    const ck = d.check;
+    const okCount = ck.cited_keys.length;
+    $('check1').innerHTML =
+      `<div class="status ok">检索词：${d.queries.join(' / ')} ｜ 候选池 ${d.candidates.length} 篇 ｜ ` +
+      `正文引用 ${okCount} 篇` +
+      (ck.unknown_keys.length
+        ? ` ｜ <span style="color:var(--bad)">⚠ ${ck.unknown_keys.length} 条引用不在候选池中：${ck.unknown_keys.join(', ')}</span>`
+        : ' ｜ 全部引用均可回溯到候选池') +
+      `</div>`;
+
+    const byKey = Object.fromEntries(d.candidates.map(c => [c.key, c]));
+    $('pool1').innerHTML = d.candidates.map(c =>
+      `<div class="cand"><b>${c.key}</b> ${escapeHtml(c.title)}
+       <span class="badge ${c.source}">${SRC_LABEL[c.source] || c.source}</span>
+       <div class="meta">${escapeHtml((c.authors || []).slice(0, 3).join(', '))}`
+       + `${(c.authors || []).length > 3 ? ' et al.' : ''} · ${c.year || '年份不详'}`
+       + `${c.local_file ? ' · <a href="/ui/reader.html?paper=' + encodeURIComponent(c.local_file) + '" style="color:var(--accent)">读原文</a>' : ''}</div></div>`
+    ).join('');
+
+    $('md1').innerHTML = renderMarkdown(d.markdown);
+    // 池外编号染色
+    document.querySelectorAll('#md1 .badge').forEach(b => {
+      const k = b.dataset.k;
+      b.classList.add(byKey[k] ? 'local' : 'unknown');
+      if (!byKey[k]) b.title = '这条引用不在候选文献池中';
+    });
+
+    $('refs1').innerHTML = d.references.length
+      ? d.references.map(ref =>
+          `<div class="ref"><b>[${ref.key}]</b> ${escapeHtml(ref.text)}
+           <span class="badge ${ref.source}">${SRC_LABEL[ref.source] || ref.source}</span></div>`
+        ).join('')
+      : '<div class="ref">正文没有引用任何候选文献。</div>';
+
+    $('out1').style.display = 'block';
+    setStatus($('st1'), '完成', 'ok');
+  } catch (e) {
+    setStatus($('st1'), '失败：' + e.message, 'err');
+  } finally { btn.disabled = false; }
+};
+
+// ---------------- 1.6.2
+$('btnDiagram').onclick = async () => {
+  const description = $('desc').value.trim();
+  if (!description) return;
+  const kind = $('renderer').value;
+  const btn = $('btnDiagram');
+  btn.disabled = true;
+  setStatus($('st2'), '生成并渲染中，约 15-40 秒…', 'work');
+  try {
+    const r = await fetch('/writing/diagram', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description, kind })
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const d = await r.json();
+    $('code2').textContent = d.code || '';
+    if (d.ok) {
+      $('img2').innerHTML = `<div class="imgwrap"><img src="${d.image_url}" alt="架构图"></div>`;
+      setStatus($('st2'), `渲染成功 · ${(d.bytes / 1024).toFixed(1)} KB` + (d.retried ? ' · 语法修正后重试过一次' : ''), 'ok');
+    } else {
+      $('img2').innerHTML = '';
+      setStatus($('st2'), '渲染失败：' + (d.error || '未知原因') + '（代码已给出，可手动修改）', 'err');
+    }
+    $('out2').style.display = 'block';
+  } catch (e) {
+    setStatus($('st2'), '失败：' + e.message, 'err');
+  } finally { btn.disabled = false; }
+};
+
+$('btnPaperFig').onclick = async () => {
+  const paper = $('paperName').value.trim();
+  if (!paper) return;
+  $('pf2').innerHTML = '<div class="status work">查找中…</div>';
+  try {
+    const r = await fetch('/writing/paper-figures?paper=' + encodeURIComponent(paper));
+    const d = await r.json();
+    $('pf2').innerHTML = d.figures.length
+      ? d.figures.map(f =>
+          `<div class="cand">第 ${f.page} 页 · ${escapeHtml(f.caption)}<div class="imgwrap"><img src="/ui/..${f.image_url}" alt=""></div></div>`
+        ).join('')
+      : '<div class="status">没找到匹配的图，换个关键词试试。</div>';
+  } catch (e) {
+    $('pf2').innerHTML = '<div class="status err">失败：' + e.message + '</div>';
+  }
+};
+
+// ---------------- 1.6.3
+let chartInst = null;
+$('btnChart').onclick = async () => {
+  const f = $('csvFile').files[0];
+  if (!f) { setStatus($('st3'), '请先选择 CSV 文件', 'err'); return; }
+  const fd = new FormData();
+  fd.append('file', f);
+  const kind = $('chartKind').value;
+  const note = $('chartNote').value;
+  const btn = $('btnChart');
+  btn.disabled = true;
+  setStatus($('st3'), '解析并生成中…', 'work');
+  try {
+    const qs = new URLSearchParams();
+    if (kind) qs.set('kind', kind);
+    if (note) qs.set('note', note);
+    const r = await fetch('/writing/chart?' + qs.toString(), { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const d = await r.json();
+
+    if (chartInst) chartInst.dispose();
+    chartInst = echarts.init($('chartBox'), null, { renderer: 'canvas' });
+    chartInst.setOption(d.option);
+
+    $('cap3').textContent = d.caption || '（caption 生成失败，可重试）';
+    const susp = d.caption_suspect_numbers || [];
+    if (susp.length) {
+      const tip = document.createElement('div');
+      tip.className = 'status';
+      tip.style.color = 'var(--warn)';
+      tip.style.marginTop = '6px';
+      tip.textContent = '⚠ 这几个数字在统计数据里找不到，引用前请核对：' + susp.join(', ');
+      $('cap3').appendChild(tip);
+    }
+    $('png3').innerHTML = d.png_url
+      ? `<div class="imgwrap"><img src="${d.png_url}" alt="导出图"></div>`
+      : '';
+    $('out3').style.display = 'block';
+    setStatus($('st3'), `完成 · ${d.rows} 行 × ${d.columns.length} 列 · 自动选型 ${d.spec.kind}`, 'ok');
+  } catch (e) {
+    setStatus($('st3'), '失败：' + e.message, 'err');
+  } finally { btn.disabled = false; }
+};
+
+// ---------------- 1.6.4
+$('btnZh2en').onclick = async () => {
+  const text = $('zh').value.trim();
+  if (!text) return;
+  const btn = $('btnZh2en');
+  btn.disabled = true;
+  setStatus($('st4'), '翻译中…', 'work');
+  try {
+    const r = await fetch('/writing/zh2en', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, glossary: $('glossary').value })
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const d = await r.json();
+    $('en4').innerHTML = '<p>' + escapeHtml(d.translation).replace(/\n{2,}/g, '</p><p>') + '</p>';
+    $('out4').style.display = 'block';
+    setStatus($('st4'), `完成 · ${d.chunks} 块 · ${d.chars_in} 字 → ${d.chars_out} 字符` + (d.cached ? ' · 命中缓存' : ''), 'ok');
+  } catch (e) {
+    setStatus($('st4'), '失败：' + e.message, 'err');
+  } finally { btn.disabled = false; }
+};
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// 启动时问一下本机有哪些渲染器，没有的把选项灰掉，别让用户点了才报错
+fetch('/writing/renderers').then(r => r.json()).then(av => {
+  [...$('renderer').options].forEach(o => {
+    if (!av[o.value]) { o.disabled = true; o.text = o.text + '（本机未安装）'; }
+  });
+}).catch(() => {});
+
+window.addEventListener('resize', () => { if (chartInst) chartInst.resize(); });
+
+// ---------------- 划词翻译
+// 挂到会出英文的两个区域：生成的正文、参考文献列表（预览图/代码块不挂，
+// 在那里面拖选多半是想复制，弹个「译」反而碍事）。
+QuickTranslate.attach($('md1'), $('refs1'));
+
+// ---------------- 使用说明
+// 首次进入自动弹一次，「以后不再自动弹出」记在 localStorage，
+// 之后随时可以点右上角按钮再打开。
+const GUIDE_KEY = 'writing.guide.skip';
+
+function openGuide() {
+  $('guideMask').hidden = false;
+  $('guideNoMore').checked = localStorage.getItem(GUIDE_KEY) === '1';
+}
+function closeGuide() {
+  if ($('guideNoMore').checked) {
+    localStorage.setItem(GUIDE_KEY, '1');
+  } else {
+    localStorage.removeItem(GUIDE_KEY);
+  }
+  $('guideMask').hidden = true;
+}
+
+$('btnGuide').onclick = openGuide;
+$('guideX').onclick = closeGuide;
+$('guideOk').onclick = closeGuide;
+$('guideMask').onclick = (e) => { if (e.target === $('guideMask')) closeGuide(); };
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('guideMask').hidden) closeGuide();
+});
+
+if (localStorage.getItem(GUIDE_KEY) !== '1') openGuide();
+</script>
+</body>
+</html>
