@@ -30,6 +30,7 @@ from __future__ import annotations
 import difflib
 import json
 import re
+import time
 from collections import Counter
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -642,30 +643,55 @@ async def _rag_context_with_evidence(
     source: str | None = None,
     sources: list[str] | None = None,
     history: list[dict] | None = None,
+    roles: list[RoleRun] | None = None,
 ) -> tuple[str, list[Evidence]]:
     """检索论文库，返回 (给模型看的参考资料, 给前端看的证据列表)。
 
     两样东西同源：模型看到的是"4 段原文 + 页码"，用户看到的是"哪 4 段、排第几、融合分多少"。
     source 传单篇时只搜那一篇；sources 传多篇时每篇各取 3 块，合并去重后最多 8 条。
+
+    roles 传一个 list 进来时，会往里追加 Planner / Retriever / Extractor 三个角色的执行记录。
     """
+    t_start = time.perf_counter()
     picked = [s for s in (sources or []) if s]
+    auto_locked = False
     if not picked and not source and _wants_compare(question):
         auto = _plan_multi_sources(question)
         if len(auto) >= 2:
             picked = auto
+            auto_locked = True
             logger.info("对比类问题自动锁定 %d 篇：%s", len(picked), picked)
     multi = bool(picked) and not source
     ref_note = ""
     try:
         # 中文问题先换成英文检索词（库是英文论文），否则字面/向量都对不上
         query = await _search_query(question)
+        t_plan = time.perf_counter()
+        if roles is not None:
+            if multi:
+                plan = f"多篇对比：锁定 {len(picked)} 篇（{'自动识别' if auto_locked else '用户指定'}）"
+            elif source:
+                plan = f"单篇聚焦：{source}"
+            else:
+                plan = "全库检索"
+            roles.append(
+                RoleRun(
+                    role=ROLE_PLANNER,
+                    summary=f"{plan} · 检索词「{query}」",
+                    duration_ms=int((t_plan - t_start) * 1000),
+                    detail={"query": query, "mode": "multi" if multi else "single",
+                            "locked": picked if multi else ([source] if source else [])},
+                )
+            )
         if multi:
             groups = []
+            failed = []
             for one in picked:
                 try:
                     groups.append(retrieve_scored(query, top_k=PER_PAPER_TOP_K, source=one))
                 except Exception:  # noqa: BLE001
                     logger.exception("多篇检索失败，跳过：%s", one)
+                    failed.append(one)
             scored = _merge_scored(groups)
         else:
             # 问句里点名了论文标题时，先锁定单篇，避免跑到别的论文里
@@ -676,7 +702,32 @@ async def _rag_context_with_evidence(
             scored = retrieve_scored(query, top_k=RETRIEVE_TOP_K, source=source)
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
+        if roles is not None:
+            roles.append(
+                RoleRun(
+                    role=ROLE_RETRIEVER,
+                    summary="检索异常，本轮不带参考资料",
+                    duration_ms=int((time.perf_counter() - t_start) * 1000),
+                    ok=False,
+                )
+            )
         return "", []
+
+    t_retrieved = time.perf_counter()
+    if roles is not None:
+        papers = {c.source for c, _s, _c in scored}
+        roles.append(
+            RoleRun(
+                role=ROLE_RETRIEVER,
+                summary=f"召回 {len(scored)} 段原文，覆盖 {len(papers)} 篇论文",
+                duration_ms=int((t_retrieved - t_plan) * 1000),
+                detail={
+                    "chunks": len(scored),
+                    "papers": sorted(papers)[:8],
+                    "per_paper_top_k": PER_PAPER_TOP_K if multi else RETRIEVE_TOP_K,
+                },
+            )
+        )
 
     # 全库问题（"一共多少篇/都有哪些"）不吃检索结果：直接注入清单，
     # 否则模型只能数检索片段里出现过几篇（见 docs/RESEARCH-MEMORY-COUNT.md 问题 A）。
@@ -696,6 +747,25 @@ async def _rag_context_with_evidence(
     )
 
     if not scored:
+        final_evidence = [catalog_evidence] if catalog_evidence else []
+        # 即使没检索到，也要把 Extractor/Verifier 写进时间线：
+        # 否则界面停在 Retriever，"为什么没答案"就无从解释。
+        if roles is not None:
+            roles.append(
+                RoleRun(
+                    role=ROLE_EXTRACTOR,
+                    summary="没有召回任何片段，无结构化材料可加工",
+                    duration_ms=0,
+                )
+            )
+            roles.append(
+                RoleRun(
+                    role=ROLE_VERIFIER,
+                    summary="没有检索到任何证据，回答会明确说明资料不足",
+                    duration_ms=0,
+                    ok=False,
+                )
+            )
         if catalog_block:
             context = "\n".join(
                 [
@@ -703,8 +773,8 @@ async def _rag_context_with_evidence(
                     "\n（这是全库清单。如果清单不足以回答，直接说资料不足，不要编造。）",
                 ]
             )
-            return context, [catalog_evidence] if catalog_evidence else []
-        return "", []
+            return context, final_evidence
+        return "", final_evidence
 
     evidence = [
         Evidence(
@@ -932,6 +1002,46 @@ async def _rag_context_with_evidence(
                 )
 
     lines.append("\n如果以上片段没有能回答问题的内容，直接回答：论文库中没有找到相关信息。")
+
+    if roles is not None:
+        # Extractor：把检索到的原文再加工成"模型能直接用的材料"——
+        # 精华卡、补的整页数字行、结构化表格行、章节页正文。
+        extra = [ev for ev in evidence if ev.channels[0] in ("card", "table-rows", "table", "section")]
+        kinds = sorted({ev.channels[0] for ev in extra})
+        roles.append(
+            RoleRun(
+                role=ROLE_EXTRACTOR,
+                summary=(
+                    f"加工出 {len(extra)} 条结构化材料（{'/'.join(kinds)}）"
+                    if extra
+                    else "本次问题不需要结构化加工，直接用检索片段"
+                ),
+                duration_ms=int((time.perf_counter() - t_retrieved) * 1000),
+                detail={"extra_items": len(extra), "kinds": kinds},
+            )
+        )
+        # Verifier：自检"证据够不够回答问题"。这里只做能自动判定的部分，
+        # 不做主观打分——判不准就不判，宁可说"有证据"也不瞎给置信度。
+        pages_known = sum(1 for ev in evidence if ev.page is not None)
+        if not evidence:
+            verdict, ok = "没有检索到任何证据，回答会明确说明资料不足", False
+        elif pages_known == 0:
+            verdict, ok = f"证据 {len(evidence)} 条但都缺页码，引用无法溯源", False
+        else:
+            verdict, ok = (
+                f"证据 {len(evidence)} 条，其中 {pages_known} 条可定位到具体页码",
+                True,
+            )
+        roles.append(
+            RoleRun(
+                role=ROLE_VERIFIER,
+                summary=verdict,
+                duration_ms=0,
+                detail={"evidence": len(evidence), "with_page": pages_known},
+                ok=ok,
+            )
+        )
+
     return "\n".join(lines), evidence
 
 
@@ -954,6 +1064,51 @@ class AgentStep:
     tool_name: str
     arguments: str
     result: str
+    role: str = "writer"      # 归属哪个角色，见 RoleRun
+
+
+# 四个角色：官方赛题「AI 技术深度」点名要「多智能体协同」。
+# 这里的做法不是让四个模型互相聊天（那样一个问答要多调 3~4 次 LLM，
+# 演示时会从 20 秒涨到 2 分钟），而是把本来就在跑的四个阶段显式命名、
+# 各自留下可核验的产物，让用户能看见"谁做了什么"。
+# 好处：调用次数不变，但每一步都可追溯、可截图、可单独测试。
+ROLE_PLANNER = "planner"
+ROLE_RETRIEVER = "retriever"
+ROLE_EXTRACTOR = "extractor"
+ROLE_VERIFIER = "verifier"
+ROLE_WRITER = "writer"
+
+ROLE_LABELS: dict[str, str] = {
+    ROLE_PLANNER: "Planner 规划",
+    ROLE_RETRIEVER: "Retriever 检索",
+    ROLE_EXTRACTOR: "Extractor 抽取",
+    ROLE_VERIFIER: "Verifier 校验",
+    ROLE_WRITER: "Writer 写作",
+}
+
+
+@dataclass
+class RoleRun:
+    """一个角色的一次执行记录。
+
+    summary 是给人看的一句话（前端时间线直接显示），detail 是可选的结构化补充。
+    """
+
+    role: str
+    summary: str
+    duration_ms: int = 0
+    detail: dict[str, Any] = field(default_factory=dict)
+    ok: bool = True
+
+    def to_dict(self) -> dict:
+        return {
+            "role": self.role,
+            "label": ROLE_LABELS.get(self.role, self.role),
+            "summary": self.summary,
+            "duration_ms": self.duration_ms,
+            "detail": self.detail,
+            "ok": self.ok,
+        }
 
 
 @dataclass
@@ -991,6 +1146,29 @@ class AgentResult:
     steps: list[AgentStep] = field(default_factory=list)
     rounds: int = 0
     evidence: list[Evidence] = field(default_factory=list)
+    roles: list[RoleRun] = field(default_factory=list)
+    status: str = ""
+
+
+def _make_status(evidence: list[Evidence], roles: list[RoleRun] | None = None) -> str:
+    """状态回显条：一句话说清这一问到底用了多少材料。
+
+    形如「证据=8 · 覆盖论文=3 · 页码=2,7,8」。
+    """
+    if not evidence:
+        return "证据=0 · 本轮按资料不足作答"
+    papers = {e.source for e in evidence if e.source and e.source != "论文库清单"}
+    pages = sorted({e.page for e in evidence if isinstance(e.page, int)})
+    head = f"证据={len(evidence)} · 覆盖论文={len(papers)}"
+    if pages:
+        shown = ",".join(str(p) for p in pages[:8])
+        more = "…" if len(pages) > 8 else ""
+        head += f" · 页码={shown}{more}"
+    if roles:
+        rounds = sum(1 for r in roles if r.role == ROLE_WRITER)
+        if rounds > 1:
+            head += f" · 写作轮次={rounds}"
+    return head
 
 
 def _parse_arguments(raw: str) -> dict[str, Any]:
@@ -1072,7 +1250,10 @@ async def run_agent(
 ) -> AgentResult:
     """Agent 主循环（非流式版）。返回最终答案 + 调用轨迹。"""
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context, evidence = await _rag_context_with_evidence(user_message, source, sources, history)
+    roles: list[RoleRun] = []
+    context, evidence = await _rag_context_with_evidence(
+        user_message, source, sources, history, roles
+    )
     if context:
         messages.append({"role": "system", "content": context})
     if history:
@@ -1084,6 +1265,7 @@ async def run_agent(
     for round_no in range(1, MAX_ROUNDS + 1):
         logger.info("--- 第 %d 轮 ---", round_no)
 
+        t_writer = time.perf_counter()
         resp = await get_client().chat.completions.create(
             model=settings.llm_model,
             messages=messages,
@@ -1097,11 +1279,32 @@ async def run_agent(
         if not msg.tool_calls:
             answer = msg.content or "（模型没有返回内容）"
             logger.info("Agent 结束，共 %d 轮", round_no)
+            roles.append(
+                RoleRun(
+                    role=ROLE_WRITER,
+                    summary=f"生成答案（{len(answer)} 字，第 {round_no} 轮定稿）",
+                    duration_ms=int((time.perf_counter() - t_writer) * 1000),
+                    detail={"chars": len(answer), "round": round_no},
+                )
+            )
             return AgentResult(
-                answer=answer, steps=steps, rounds=round_no, evidence=evidence
+                answer=answer,
+                steps=steps,
+                rounds=round_no,
+                evidence=evidence,
+                roles=roles,
+                status=_make_status(evidence, roles),
             )
 
         # ---- 情况 B：模型要求调用工具 ----
+        roles.append(
+            RoleRun(
+                role=ROLE_WRITER,
+                summary=f"第 {round_no} 轮决定调用 {len(msg.tool_calls)} 个工具",
+                duration_ms=int((time.perf_counter() - t_writer) * 1000),
+                detail={"round": round_no, "tools": [tc.function.name for tc in msg.tool_calls]},
+            )
+        )
         # 先把模型这条"我要调工具"的消息放进对话历史（协议要求，别漏）
         messages.append(
             {
@@ -1146,11 +1349,20 @@ async def run_agent(
 
     # ---- 情况 C：超过最大轮数，说明陷入死循环 ----
     logger.warning("达到最大轮数 %d，强制结束", MAX_ROUNDS)
+    roles.append(
+        RoleRun(
+            role=ROLE_WRITER,
+            summary=f"达到最大轮数 {MAX_ROUNDS}，强制收尾",
+            ok=False,
+        )
+    )
     return AgentResult(
         answer=f"抱歉，我尝试了 {MAX_ROUNDS} 轮仍没能完成任务，请把问题拆小一点再问我。",
         steps=steps,
         rounds=MAX_ROUNDS,
         evidence=evidence,
+        roles=roles,
+        status=_make_status(evidence, roles),
     )
 
 
@@ -1169,7 +1381,10 @@ async def run_agent_stream(
         {"type": "done", "rounds": 2}
     """
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context, evidence = await _rag_context_with_evidence(user_message, source, sources, history)
+    roles: list[RoleRun] = []
+    context, evidence = await _rag_context_with_evidence(
+        user_message, source, sources, history, roles
+    )
     if context:
         messages.append({"role": "system", "content": context})
     if history:
@@ -1178,6 +1393,10 @@ async def run_agent_stream(
     # 先把手里的证据发给前端，卡片在回答出来之前就能看到
     if evidence:
         yield {"type": "evidence", "items": [e.to_dict() for e in evidence]}
+    # 规划/检索/抽取/校验四个角色已跑完，先把时间线发出去，用户能看到过程
+    if roles:
+        yield {"type": "roles", "items": [r.to_dict() for r in roles]}
+        yield {"type": "status", "text": _make_status(evidence, roles)}
 
     for round_no in range(1, MAX_ROUNDS + 1):
         stream = await get_client().chat.completions.create(
@@ -1217,8 +1436,25 @@ async def run_agent_stream(
 
         # 没有工具调用 → 本轮就是最终答案，结束
         if not tool_bufs:
+            roles.append(
+                RoleRun(
+                    role=ROLE_WRITER,
+                    summary=f"生成答案（{len(content_buf)} 字，第 {round_no} 轮定稿）",
+                    detail={"chars": len(content_buf), "round": round_no},
+                )
+            )
+            yield {"type": "roles", "items": [r.to_dict() for r in roles]}
+            yield {"type": "status", "text": _make_status(evidence, roles)}
             yield {"type": "done", "rounds": round_no}
             return
+
+        roles.append(
+            RoleRun(
+                role=ROLE_WRITER,
+                summary=f"第 {round_no} 轮决定调用 {len(tool_bufs)} 个工具",
+                detail={"round": round_no, "tools": [b["name"] for b in tool_bufs.values()]},
+            )
+        )
 
         # 有工具调用：记录 assistant 消息，然后执行
         messages.append(

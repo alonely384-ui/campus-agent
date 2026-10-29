@@ -189,3 +189,129 @@ def test_numeric_excerpt_keeps_numbers_beyond_first_1600_chars():
     assert "61.4% accuracy" in excerpt
     assert "无数字" not in excerpt
     assert len(excerpt) <= 1604
+
+
+# ---------------- 多智能体角色时间线 ----------------
+# 官方赛题「AI 技术深度」点名要「多智能体协同」。这里不新增 LLM 调用，
+# 只是把本来就在跑的四个阶段显式命名并留下可核验的产物。
+
+
+async def test_rag_context_records_four_roles_in_order(monkeypatch):
+    """Planner → Retriever → Extractor → Verifier，顺序固定且每条都有摘要。"""
+
+    def fake_retrieve(question, top_k=4, source=None):
+        return [
+            (Chunk(text="8 NVIDIA P100 GPUs", source="p.pdf", page=7), 0.057, ["dense"]),
+            (Chunk(text="28.4 BLEU", source="p.pdf", page=8), 0.055, ["bm25"]),
+        ]
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    roles: list = []
+    _context, evidence = await _rag_context_with_evidence(
+        "训练用了多少 GPU？", roles=roles
+    )
+
+    assert [r.role for r in roles] == [
+        agent_module.ROLE_PLANNER,
+        agent_module.ROLE_RETRIEVER,
+        agent_module.ROLE_EXTRACTOR,
+        agent_module.ROLE_VERIFIER,
+    ]
+    assert all(r.summary for r in roles)
+    assert all(r.ok for r in roles)
+    # Retriever 的摘要要能看出召回了几段、覆盖几篇
+    retriever = roles[1]
+    assert "召回 2 段" in retriever.summary
+    assert retriever.detail["chunks"] == 2
+    # Verifier 只做能自动判定的部分：证据都有页码就算通过
+    assert "2 条可定位到具体页码" in roles[3].summary
+    assert evidence  # 证据照样产出
+
+
+async def test_verifier_flags_evidence_without_page(monkeypatch):
+    """证据全缺页码时 Verifier 必须标 ok=False——引用无法溯源是硬伤。"""
+
+    def fake_retrieve(question, top_k=4, source=None):
+        return [(Chunk(text="没有页码的片段", source="p.pdf", page=None), 0.05, ["hash"])]
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    roles: list = []
+    await _rag_context_with_evidence("随便问问", roles=roles)
+
+    verifier = [r for r in roles if r.role == agent_module.ROLE_VERIFIER][0]
+    assert verifier.ok is False
+    assert "缺页码" in verifier.summary
+
+
+async def test_verifier_flags_empty_evidence(monkeypatch):
+    """一条证据都没有时，Verifier 要明说会按资料不足作答。"""
+    monkeypatch.setattr(agent_module, "retrieve_scored", lambda q, top_k=4, source=None: [])
+    roles: list = []
+    await _rag_context_with_evidence("库里没有的问题", roles=roles)
+
+    verifier = [r for r in roles if r.role == agent_module.ROLE_VERIFIER][0]
+    assert verifier.ok is False
+    assert "资料不足" in verifier.summary
+
+
+async def test_retriever_role_marked_failed_when_index_breaks(monkeypatch):
+    """检索炸了要留下失败记录，不能悄悄降级成"没找到"。"""
+
+    def boom(question, top_k=4, source=None):
+        raise RuntimeError("chroma 没建好")
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", boom)
+    roles: list = []
+    await _rag_context_with_evidence("任何问题", roles=roles)
+
+    failed = [r for r in roles if not r.ok]
+    assert failed, "检索失败必须有 ok=False 的角色记录"
+    assert failed[0].role == agent_module.ROLE_RETRIEVER
+
+
+def test_role_labels_cover_every_role():
+    """前端直接显示 label，漏一个就会出现英文裸 id。"""
+    for role in [
+        agent_module.ROLE_PLANNER,
+        agent_module.ROLE_RETRIEVER,
+        agent_module.ROLE_EXTRACTOR,
+        agent_module.ROLE_VERIFIER,
+        agent_module.ROLE_WRITER,
+    ]:
+        assert role in agent_module.ROLE_LABELS
+        assert agent_module.ROLE_LABELS[role].strip()
+
+
+def test_role_run_to_dict_shape():
+    """前端 renderRoles 读的是 role/label/summary/duration_ms/detail/ok 这几个键。"""
+    run = agent_module.RoleRun(
+        role=agent_module.ROLE_PLANNER, summary="全库检索", duration_ms=12
+    )
+    d = run.to_dict()
+
+    assert set(d) == {"role", "label", "summary", "duration_ms", "detail", "ok"}
+    assert d["label"] == agent_module.ROLE_LABELS[agent_module.ROLE_PLANNER]
+    assert d["duration_ms"] == 12
+    assert d["ok"] is True
+
+
+def test_make_status_reports_counts():
+    """状态回显：证据数 / 覆盖论文 / 页码。"""
+    ev1 = agent_module.Evidence(
+        rank=1, source="a.pdf", page=2, score=1.0, channels=["dense"], text="x"
+    )
+    ev2 = agent_module.Evidence(
+        rank=2, source="b.pdf", page=11, score=0.9, channels=["bm25"], text="y"
+    )
+
+    status = agent_module._make_status([ev1, ev2], [])
+
+    assert "证据=2" in status
+    assert "覆盖论文=2" in status
+    assert "页码=2,11" in status
+
+
+def test_make_status_says_no_evidence():
+    status = agent_module._make_status([], [])
+    assert "证据=0" in status
+    assert "资料不足" in status
