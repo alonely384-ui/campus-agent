@@ -21,8 +21,11 @@ from starlette.concurrency import run_in_threadpool
 
 from app import scheduler
 from app.agent import run_agent, run_agent_stream
+from app.chart import make_chart
 from app.config import settings
+from app.diagram import find_paper_figures, generate_diagram, renderer_available
 from app.figures import figure_bytes, page_png
+from app.graph import frontier, graph_view, load_graph, survey
 from app.layout import detect_layout
 from app.logging_config import get_logger, setup_logging
 from app.online import (
@@ -67,6 +70,8 @@ from app.translate import (
     translate_pages,
     translate_text,
 )
+from app.writing import generate_framework
+from app.zh2en import parse_glossary, translate_zh2en
 
 setup_logging()
 logger = get_logger(__name__)
@@ -98,6 +103,30 @@ class ChatResponse(BaseModel):
     rounds: int
     steps: list[dict] = Field(default_factory=list)
     evidence: list[dict] = Field(default_factory=list, description="检索证据（证据卡片）")
+    roles: list[dict] = Field(default_factory=list, description="四个角色的执行记录（时间线）")
+    status: str = Field(default="", description="状态回显：证据数 / 覆盖论文 / 页码")
+
+
+# ---------------- 写作助手（1.6）请求模型 ----------------
+class FrameworkRequest(BaseModel):
+    """POST /writing/framework 的请求体。"""
+
+    idea: str = Field(..., min_length=5, max_length=2000, description="研究想法")
+    candidates: int = Field(default=16, ge=4, le=40, description="候选文献池大小")
+
+
+class DiagramRequest(BaseModel):
+    """POST /writing/diagram 的请求体。"""
+
+    description: str = Field(..., min_length=5, max_length=2000, description="要画的系统描述")
+    kind: str = Field(default="mermaid", description="渲染器：mermaid / graphviz")
+
+
+class Zh2EnRequest(BaseModel):
+    """POST /writing/zh2en 的请求体。"""
+
+    text: str = Field(..., min_length=1, max_length=20000, description="待翻译的中文")
+    glossary: str = Field(default="", description="术语表，一行一条「中文=English」")
 
 
 # ---------------- 接口 ----------------
@@ -127,6 +156,8 @@ async def chat(req: ChatRequest) -> ChatResponse:
             for s in result.steps
         ],
         evidence=[e.to_dict() for e in result.evidence],
+        roles=[r.to_dict() for r in result.roles],
+        status=result.status,
     )
 
 
@@ -829,6 +860,137 @@ async def recommendations_schedule(enable: bool = False, mode: str = "") -> dict
     if enable:
         return await run_in_threadpool(scheduler.start, mode or None)
     return scheduler.status()
+
+
+@app.get("/graph", summary="论文引用关系图谱（读缓存，1.5.1 / 1.5.2）")
+async def citation_graph(limit_reviews: int = 60) -> dict:
+    """返回库内论文的引用图谱，供 `web/graph.html` 画力导向图。
+
+    数据来自 `data/meta/citation-graph.json`（由 `scripts/build_graph.py` 生成）。
+    本接口只做读 + 派生（社区、中介中心性、阅读页跳转链接），不重跑 PDF 解析。
+
+    缓存不存在时返回 `ready=false` 并带上生成命令，前端据此提示用户先跑一次构建。
+    """
+    raw = await run_in_threadpool(load_graph)
+    if not raw:
+        return {
+            "ready": False,
+            "detail": "图谱缓存还没生成，请先运行 python scripts/build_graph.py",
+            "summary": {},
+            "nodes": [],
+            "edges": [],
+            "reviews": [],
+            "reviews_total": 0,
+            "merge_decisions": [],
+        }
+    view = await run_in_threadpool(graph_view, raw, max(0, min(limit_reviews, 500)))
+    view["ready"] = True
+    return view
+
+
+@app.get("/graph/survey", summary="自动综述（1.5.3）")
+async def graph_survey(focus: str = "") -> dict:
+    """基于引用图谱自动生成领域综述。
+
+    `focus` 传某个主题名（如「模型架构」）时只综述该主题，不传则综述全库。
+    每一句都带具体数字和论文标题，可回溯到图上，不调外部大模型也不会有幻觉引用。
+    """
+    raw = await run_in_threadpool(load_graph)
+    if not raw:
+        return {"ready": False, "detail": "图谱缓存还没生成，请先运行 python scripts/build_graph.py"}
+    view = await run_in_threadpool(graph_view, raw)
+    return await run_in_threadpool(survey, view, focus)
+
+
+@app.get("/graph/frontier", summary="前沿探索（1.5.4）")
+async def graph_frontier(limit: int = 8) -> dict:
+    """给出值得关注的研究方向，每条都附可核验的量化依据。
+
+    三条线索：新近且被引 / 跨社区桥接 / 未被接入引用网。
+    """
+    raw = await run_in_threadpool(load_graph)
+    if not raw:
+        return {"ready": False, "detail": "图谱缓存还没生成，请先运行 python scripts/build_graph.py"}
+    view = await run_in_threadpool(graph_view, raw)
+    return await run_in_threadpool(frontier, view, max(1, min(limit, 50)))
+
+
+# ---------------- 写作助手（1.6） ----------------
+
+
+@app.get("/writing/renderers", summary="本机可用的架构图渲染器（1.6.2）")
+async def writing_renderers() -> dict:
+    """前端据此灰掉不可用的渲染选项，而不是让用户点了才报错。"""
+    return renderer_available()
+
+
+@app.post("/writing/framework", summary="论文框架生成（1.6.1）")
+async def writing_framework(req: FrameworkRequest) -> dict:
+    """给定 idea 生成 Abstract / Introduction / Related Work / References。
+
+    参考文献由代码从候选池里取，模型碰不到——这是"无幻觉引用"的保证方式。
+    """
+    try:
+        return await generate_framework(req.idea, total_candidates=req.candidates)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/writing/diagram", summary="架构图生成（1.6.2）")
+async def writing_diagram(req: DiagramRequest) -> dict:
+    """一句话描述 → Mermaid / Graphviz 代码 → 本地渲染成 PNG。"""
+    try:
+        return await generate_diagram(req.description, req.kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/writing/paper-figures", summary="从库内 PDF 找已有架构图（1.6.2 参考）")
+async def writing_paper_figures(paper: str, keyword: str = "architecture", limit: int = 6) -> dict:
+    """按论文名从 PDF 里找架构图。
+
+    这是"引用真实架构图"而不是"让模型画"——评委问图哪来的，能指回原文第几页。
+    """
+    items = await run_in_threadpool(find_paper_figures, paper, keyword, max(1, min(limit, 20)))
+    return {"paper": paper, "keyword": keyword, "figures": items}
+
+
+@app.post("/writing/chart", summary="CSV 数据可视化（1.6.3）")
+async def writing_chart(file: UploadFile, kind: str = "", note: str = "") -> dict:
+    """上传 CSV，返回 ECharts 配置 + 导出的 PNG + 自动写的英文 caption。"""
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="上传的 CSV 是空的")
+    try:
+        return await make_chart(raw, kind=kind, extra=note)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/writing/chart/{name}", summary="导出的图表 PNG（1.6.3）")
+async def writing_chart_png(name: str) -> FileResponse:
+    path = Path("data") / "meta" / "charts" / Path(name).name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="图表不存在")
+    return FileResponse(path, media_type="image/png")
+
+
+@app.get("/writing/diagram/{name}", summary="渲染出的架构图 PNG（1.6.2）")
+async def writing_diagram_png(name: str) -> FileResponse:
+    path = Path("data") / "meta" / "diagrams" / Path(name).name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="图不存在")
+    return FileResponse(path, media_type="image/png")
+
+
+@app.post("/writing/zh2en", summary="学术中译英（1.6.4）")
+async def writing_zh2en(req: Zh2EnRequest) -> dict:
+    """中文论文片段 → 可投稿的英文表达。术语表可选，用于保证全文一致。"""
+    glossary = parse_glossary(req.glossary)
+    try:
+        return await translate_zh2en(req.text, glossary)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ---------------- 前端页面 ----------------

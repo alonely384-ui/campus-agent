@@ -332,6 +332,37 @@
   }
   #selBtn[hidden] { display: none; }
 
+  /* 悬停翻译（1.3.3.1）：鼠标停在英文句子上浮出的译文卡片。
+     白底对齐全站主题；z-index 比 #selBtn 高一档，但低于 toast。 */
+  #hoverCard {
+    position: fixed; z-index: 62; width: min(420px, calc(100vw - 24px));
+    max-height: min(360px, calc(100vh - 90px)); overflow: auto;
+    background: #fff; border: 1px solid #e3e7ee; border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(15,23,42,.16); padding: 10px 12px;
+    font-size: 13px; color: #1f2937; line-height: 1.6;
+  }
+  #hoverCard[hidden] { display: none; }
+  #hoverCard .hc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  #hoverCard .hc-tag { font-size: 11px; color: #1a7f37; background: #e8f5ec;
+                       border-radius: 6px; padding: 1px 7px; }
+  #hoverCard .hc-pin, #hoverCard .hc-x {
+    border: none; background: #eef1f5; color: #374151; border-radius: 6px;
+    font-size: 11px; padding: 2px 8px; cursor: pointer; line-height: 1.6;
+  }
+  #hoverCard .hc-pin { margin-left: auto; }
+  #hoverCard .hc-pin.on { background: #1a73e8; color: #fff; }
+  #hoverCard .hc-pin:hover, #hoverCard .hc-x:hover { background: #e2e8f0; }
+  #hoverCard .hc-pin.on:hover { background: #1558b0; }
+  #hoverCard .hc-src { font-size: 11.5px; color: #6b7280; margin-bottom: 6px;
+                       padding-left: 7px; border-left: 2px solid #e3e7ee; }
+  #hoverCard .hc-out { color: #1f2937; }
+  #hoverCard .hc-out .tempty { color: #9aa3af; }
+  #hoverCard .hc-out strong { color: #1a73e8; }
+  /* 悬停中的句子给个淡淡的底色，让用户知道"译的是这一句" */
+  .textLayer span.hover-hit { background: rgba(26,115,232,.14); }
+  /* 悬停模式打开时，光标提示这块能悬停 */
+  #pages.hover-on .textLayer span { cursor: help; }
+
   /* 窄屏：章节树变抽屉，顶栏减负 */
   @media (max-width: 900px) {
     aside#sidebar {
@@ -370,6 +401,7 @@
     <div class="tools">
       <select id="paperSelect" title="换一篇论文"></select>
       <button class="icon-btn" id="transToggle" title="中文翻译 / 中英对比（1.3.3）">译</button>
+      <button class="icon-btn" id="hoverToggle" title="悬停翻译：鼠标停在英文句子上自动出中文（1.3.3.1）">悬</button>
       <input id="pageInput" type="number" min="1" value="1" title="跳到指定页，回车确认" />
       <span class="pager" id="pageTotal">/ 0</span>
       <button class="icon-btn" id="layoutBadge" title="原文版式：单栏 / 双栏（赛题 1.3.1）">版式</button>
@@ -423,6 +455,16 @@
   <div id="scrim"></div>
   <button id="backJump" hidden>↩ 返回第 <b id="backJumpPage">1</b> 页</button>
   <button id="selBtn" hidden>译</button>
+  <!-- 悬停翻译（1.3.3.1）：鼠标停在英文句子上自动浮出中文，不需要选中 -->
+  <div id="hoverCard" hidden>
+    <div class="hc-head">
+      <span class="hc-tag">悬停翻译</span>
+      <button class="hc-pin" id="hoverPin" type="button" title="钉住这条译文，方便边看边对照">钉住</button>
+      <button class="hc-x" id="hoverClose" type="button" title="关闭（Esc）">×</button>
+    </div>
+    <div class="hc-src" id="hoverSrc"></div>
+    <div class="hc-out" id="hoverOut"></div>
+  </div>
   <div id="toast" hidden></div>
   <div id="findBar" hidden>
     <input id="findInput" type="search" placeholder="全篇搜索（回车下一个）" autocomplete="off" spellcheck="false" />
@@ -467,6 +509,30 @@ const transSyncBtnEl = document.getElementById('transSyncBtn');
 const transStopBtnEl = document.getElementById('transStopBtn');
 const transCloseBtnEl = document.getElementById('transCloseBtn');
 const selBtnEl = document.getElementById('selBtn');
+const hoverToggleEl = document.getElementById('hoverToggle');
+const hoverCardEl = document.getElementById('hoverCard');
+const hoverSrcEl = document.getElementById('hoverSrc');
+const hoverOutEl = document.getElementById('hoverOut');
+const hoverPinEl = document.getElementById('hoverPin');
+const hoverCloseEl = document.getElementById('hoverClose');
+
+// 悬停翻译（1.3.3.1）的运行状态。定义必须早于下面所有用到它的监听器，
+// 否则 `const` 的暂时性死区会让第一次按 Esc 直接抛 ReferenceError。
+const HOVER_DELAY_MS = 450;
+const HOVER_MIN_CHARS = 20;    // 太短的（页眉、作者名、章节号）不译
+const HOVER_MAX_CHARS = 600;
+// 句子边界的搜索半径。没有这两个上限，落在标题/作者行上时会一路吞到整页。
+const HOVER_MAX_BACK = 300;
+const HOVER_MAX_FWD = 400;
+const hover = {
+  on: false,
+  timer: null,        // 悬停防抖：450ms 后才真的去译
+  hideTimer: null,    // 收起宽限：给鼠标挪进卡片留时间
+  cache: new Map(),   // 句子原文 -> 译文 markdown
+  seq: 0,             // 在途请求序号：回来时若已换了句子就丢弃
+  current: '',        // 当前卡片展示的句子
+  pinned: false,
+};
 const layoutBadgeEl = document.getElementById('layoutBadge');
 const layoutPanelEl = document.getElementById('layoutPanel');
 const tblListEl = document.getElementById('tblList');
@@ -1072,13 +1138,16 @@ function buildTextLayer(items, viewport, layer, pageNo) {
     if (!item.str || !item.str.trim()) continue;
     const tx = util.transform(viewport.transform, item.transform);
     const fontHeight = Math.hypot(tx[2], tx[3]);
-    if (!fontHeight || fontHeight < 1) continue;
     const left = tx[4];
     const top = tx[5] - fontHeight;
 
+    // 偏移必须按「所有非空白 item」累计，口径和 pageTextIndex() 一致。
+    // 下面有些 item 不渲染（fontHeight<1），但它们仍算进拼串，否则 dataset.s
+    // 会比 pageTextIndex().text 的坐标偏大，悬停取句/搜索反查都会错位。
     const s0 = textOffset;
     const s1 = s0 + item.str.length;
     textOffset = s1;
+    if (!fontHeight || fontHeight < 1) continue;
 
     const span = document.createElement('span');
     span.dataset.s = String(s0);          // 这段话在本页拼串里的起点
@@ -1788,6 +1857,16 @@ document.addEventListener('keydown', e => {
     selBtnEl.hidden = true;   // 先关划词浮钮，别把"返回原位置"一起吞掉
     return;
   }
+  // 悬停翻译卡片：Esc 关掉（钉住的也算关，Esc 就是明确的"我要它消失"）
+  if (e.key === 'Escape' && !hoverCardEl.hidden) {
+    hover.pinned = false;
+    hoverPinEl.classList.remove('on');
+    hoverPinEl.textContent = '钉住';
+    hover.current = '';
+    hoverCardEl.hidden = true;
+    clearHoverHit();
+    return;
+  }
   if (e.key === 'Escape' && !backJumpEl.hidden) {
     backJumpEl.click();
   }
@@ -2111,6 +2190,9 @@ selBtnEl.addEventListener('click', async () => {
   selBtnEl.hidden = true;
   if (!text) return;
   openTrans();
+  // 划词是一条独立于"整页/全文翻译"的路径，状态栏不会自己更新，
+  // 所以这里手动推三个状态，否则译文出来了顶部还挂着上一次的"未翻译"。
+  transStatus('划词翻译中…');
   state.trans.selHtml = '<div class="sel"><div class="src">选中的原文 · 翻译中…</div>' +
     `<div class="tempty">${escapeHtml(text.slice(0, 160))}${text.length > 160 ? '…' : ''}</div></div>`;
   renderTrans();
@@ -2128,11 +2210,300 @@ selBtnEl.addEventListener('click', async () => {
     state.trans.selHtml = '<div class="sel"><div class="src">选中的原文</div>' +
       `<p style="font-size:12px;color:#6b7280;margin:0 0 8px">${escapeHtml(text.slice(0, 240))}${text.length > 240 ? '…' : ''}</p>` +
       `${mdToHtml(data.markdown || '')}</div>`;
+    transStatus(`划词翻译完成 · ${text.length} 字`);
   } catch (e) {
     state.trans.selHtml = '<div class="sel"><div class="src">翻译失败</div>' +
       `${escapeHtml(String((e && e.message) || e))}</div>`;
+    transStatus('划词翻译失败');
   }
   renderTrans();
+});
+
+// ---------------- 悬停翻译（赛题 1.3.3.1「划词或者悬停」） ----------------
+// 划词是"选中→点译"，悬停是"鼠标停一下就出译文"，两条路都走 /translate/selection。
+// 设计要点：
+//   1. 句子边界用 pageTextIndex 的整页拼串算，而不是拿单个 span 当句子
+//      （pdf.js 的 text item 常常只有一两个词，整句要往左右扩）；
+//   2. 450ms 才触发请求，横扫页面时不会每滑过一个词就打一次接口；
+//   3. 同一句译过就缓存，来回移动不重复花钱；
+//   4. 默认关闭（顶栏「悬」），否则会干扰引用点击和正常阅读。
+// 说明：HOVER_* 常量与 hover 状态对象定义在文件上方的元素引用区（避免暂时性死区）。
+
+/**
+ * 把整页文本按 run 重建成「带空格的分行文本」，并记录每个字符回到原始偏移的映射。
+ *
+ * 为什么必须重建：pdf.js 的 text item 之间在 pageTextIndex().text 里是**直接拼接、没有分隔符**的，
+ * 整页会变成 "scholarly works.Attention Is All You NeedAshish Vaswani∗Google Brain"... 这样一条长串。
+ * 在原始串上找 ". " 句号几乎找不到，句子会被吞成整页。重建后每个 item 之间补空格，
+ * 句子边界才能正确定位。
+ *
+ * @returns {{text: string, map: number[][]}} map[i] = [原始起, 原始止)
+ */
+function hoverText(idx) {
+  if (idx.__hoverText) return idx.__hoverText;
+  const runs = (idx.runs || []).slice().sort((a, b) => a.s - b.s);
+  let text = '';
+  const map = [];
+  const push = (str, s0, s1) => {
+    for (let k = 0; k < str.length; k += 1) {
+      text += str[k];
+      map.push([s0, s1]);
+    }
+  };
+  let prevEnd = 0;
+  for (const run of runs) {
+    if (run.s > prevEnd) {
+      // runs 之间的空隙（pdf.js 未记录的字符），原样带上
+      push(idx.text.slice(prevEnd, run.s), prevEnd, run.s);
+    }
+    const piece = idx.text.slice(run.s, run.e);
+    // 相邻两个 item 之间补空格，避免 "toreproduce"
+    if (text && piece && !/\s$/.test(text) && !/^\s/.test(piece)) {
+      text += ' ';
+      map.push([run.s, run.s]);
+    }
+    push(piece, run.s, run.e);
+    prevEnd = run.e;
+  }
+  if (prevEnd < idx.text.length) {
+    push(idx.text.slice(prevEnd), prevEnd, idx.text.length);
+  }
+  const built = { text, map };
+  Object.defineProperty(idx, '__hoverText', { value: built, enumerable: false });
+  return built;
+}
+
+/** 在重建文本里，找出原始偏移 pos 落在哪个字符下标上。 */
+function rebuiltIndexOf(hx, pos) {
+  const map = hx.map;
+  let lo = 0;
+  let hi = map.length - 1;
+  let ans = map.length;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const [s0] = map[mid];
+    if (s0 <= pos) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  return Math.min(ans, Math.max(0, map.length - 1));
+}
+
+/** 把整页文本里 [s, e) 所在的句子扩到左右边界。返回 {text, s, e} 或 null。 */
+function sentenceAt(idx, s, e) {
+  const hx = hoverText(idx);
+  const text = hx.text;
+  if (!text) return null;
+
+  const at = rebuiltIndexOf(hx, s);
+  const atEnd = Math.max(at, rebuiltIndexOf(hx, e));
+  if (at < 0 || at >= text.length) return null;
+
+  // 左边界：往前找句末标记（重建后句号后面有空格，能正确命中）
+  const leftLimit = Math.max(0, at - HOVER_MAX_BACK);
+  let left = leftLimit;
+  let foundLeft = false;
+  for (let i = at - 1; i >= leftLimit; i -= 1) {
+    const ch = text[i];
+    if (ch === '.' || ch === '?' || ch === '!') {
+      const nx = text[i + 1];
+      if (nx === undefined || /\s/.test(nx)) { left = i + 1; foundLeft = true; break; }
+    }
+  }
+  // 没找到句末（标题、作者行这类短行），就从搜索上限处起——但不能把整页并进来
+  if (!foundLeft) left = leftLimit;
+
+  // 右边界
+  const rightLimit = Math.min(text.length, atEnd + HOVER_MAX_FWD);
+  let right = rightLimit;
+  for (let i = atEnd; i < rightLimit; i += 1) {
+    const ch = text[i];
+    if (ch === '.' || ch === '?' || ch === '!') {
+      const nx = text[i + 1];
+      if (nx === undefined || /\s/.test(nx)) { right = i + 1; break; }
+    }
+  }
+
+  const out = text.slice(left, right).replace(/\s+/g, ' ').trim();
+  if (!out) return null;
+  // 返回的 s/e 是重建文本下标，供高亮用
+  return { text: out, s: left, e: right };
+}
+
+/** 这个字符串值不值得译：要像一句英文，不能是页眉/编号/纯符号。 */
+function worthHovering(text) {
+  if (text.length < HOVER_MIN_CHARS) return false;
+  const letters = (text.match(/[A-Za-z]/g) || []).length;
+  if (letters < text.length * 0.4) return false;   // 中文/公式/数字堆不算
+  // 已经基本是中文的不用再译（悬停翻的是英文）
+  const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  if (cjk > letters * 0.3) return false;
+  return true;
+}
+
+function hideHoverCard() {
+  if (hover.pinned) return;      // 钉住的卡片不跟着鼠标消失
+  hoverCardEl.hidden = true;
+  clearHoverHit();
+}
+
+/**
+ * 延后收起：鼠标要从正文挪到卡片上时，中途会先离开 pages。
+ * 立即收会让卡片永远点不到（「钉住」按钮也点不了），所以给一小段宽限。
+ */
+function scheduleHideHoverCard() {
+  if (hover.pinned) return;
+  clearTimeout(hover.hideTimer);
+  hover.hideTimer = setTimeout(() => {
+    // 鼠标此刻若已经在卡片里，就不收
+    if (hoverCardEl.matches(':hover')) return;
+    hoverCardEl.hidden = true;
+    clearHoverHit();
+  }, 220);
+}
+
+function clearHoverHit() {
+  pagesEl.querySelectorAll('span.hover-hit').forEach(el => el.classList.remove('hover-hit'));
+}
+
+/** 卡片摆位：优先放鼠标右下方，放不下就翻到上方/左边。 */
+function placeHoverCard(x, y) {
+  const pad = 12;
+  const r = hoverCardEl.getBoundingClientRect();
+  const w = r.width || 420;
+  const h = r.height || 200;
+  let left = x + 14;
+  if (left + w + pad > window.innerWidth) left = Math.max(pad, x - w - 14);
+  let top = y + 18;
+  if (top + h + pad > window.innerHeight) top = Math.max(pad, y - h - 14);
+  hoverCardEl.style.left = `${left}px`;
+  hoverCardEl.style.top = `${top}px`;
+}
+
+/** 真正去要译文：带缓存 + 在途序号防串。 */
+async function translateHoverSentence(text) {
+  if (hover.cache.has(text)) return hover.cache.get(text);
+  const mySeq = ++hover.seq;
+  const r = await fetch('/translate/selection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  if (!r.ok) {
+    const detail = await r.json().catch(() => ({}));
+    // 失败不写缓存，鼠标再停一次可以重试
+    throw new Error(detail.detail || `HTTP ${r.status}`);
+  }
+  const data = await r.json();
+  const md = data.markdown || '';
+  // 只有最新一次请求的结果才写缓存，避免慢的旧请求盖掉新的
+  if (mySeq === hover.seq) hover.cache.set(text, md);
+  return md;
+}
+
+/** 悬停主流程：拿到句子 → 开卡片 → 要译文。 */
+async function hoverAt(span, ev) {
+  const pageEl = span.closest('.page');
+  if (!pageEl) return;
+  const pageNo = Number(pageEl.dataset.page);
+  const s = Number(span.dataset.s);
+  const e = Number(span.dataset.se);
+  if (!Number.isFinite(s) || !Number.isFinite(e)) return;
+
+  let idx;
+  try {
+    idx = await pageTextIndex(pageNo);
+  } catch { return; }
+
+  const sent = sentenceAt(idx, s, e);
+  if (!sent) return;
+  const text = sent.text.slice(0, HOVER_MAX_CHARS);
+  if (!worthHovering(text)) return;
+
+  // 换句子才重开卡片；同一句反复移动不闪
+  if (hover.current !== text) {
+    hover.current = text;
+    hover.pinned = false;
+    hoverPinEl.classList.remove('on');
+    hoverPinEl.textContent = '钉住';
+    hoverSrcEl.textContent = `第 ${pageNo} 页 · ${text}`;
+    hoverOutEl.innerHTML = '<span class="tempty">翻译中…</span>';
+  }
+  hoverCardEl.hidden = false;
+  placeHoverCard(ev.clientX, ev.clientY);
+
+  clearHoverHit();
+  span.classList.add('hover-hit');
+
+  try {
+    const md = await translateHoverSentence(text);
+    if (hover.current !== text) return;      // 已经换成别的句子了
+    hoverOutEl.innerHTML = mdToHtml(md);
+    placeHoverCard(ev.clientX, ev.clientY);
+  } catch (err) {
+    if (hover.current !== text) return;
+    hoverOutEl.innerHTML = `<span class="tempty">翻译失败：${escapeHtml(String((err && err.message) || err))}</span>`;
+  }
+}
+
+function setHoverMode(on) {
+  hover.on = !!on;
+  hoverToggleEl.classList.toggle('on', hover.on);
+  pagesEl.classList.toggle('hover-on', hover.on);
+  if (!hover.on) {
+    clearTimeout(hover.timer);
+    clearTimeout(hover.hideTimer);
+    hover.timer = null;
+    hover.hideTimer = null;
+    hover.current = '';
+    hover.pinned = false;
+    hoverCardEl.hidden = true;
+    clearHoverHit();
+  }
+}
+
+hoverToggleEl.addEventListener('click', () => {
+  setHoverMode(!hover.on);
+  toast(hover.on
+    ? '悬停翻译已开启：鼠标停在英文句子上自动出中文'
+    : '悬停翻译已关闭');
+});
+
+// 用 mouseover 而不是 mousemove：同一行内移动不重复触发，跨 span 才换
+pagesEl.addEventListener('mouseover', (ev) => {
+  if (!hover.on) return;
+  const span = ev.target.closest('.textLayer span');
+  if (!span) return;
+  // 引用链接自己有点击行为，悬停它时不抢
+  if (ev.target.closest('.cite, .cite-n, .cite-a, .ref-link')) return;
+  clearTimeout(hover.timer);
+  const { clientX: x, clientY: y } = ev;
+  hover.timer = setTimeout(() => { hoverAt(span, { clientX: x, clientY: y }); }, HOVER_DELAY_MS);
+});
+
+// 鼠标离开正文区就收起（钉住的除外）。用宽限版，否则来不及把鼠标移到卡片上。
+pagesEl.addEventListener('mouseleave', () => {
+  clearTimeout(hover.timer);
+  scheduleHideHoverCard();
+});
+
+hoverCardEl.addEventListener('mouseenter', () => {
+  // 鼠标进了卡片：停掉待触发的计时和待收起的计时，允许用户点「钉住」
+  clearTimeout(hover.timer);
+  clearTimeout(hover.hideTimer);
+});
+hoverCardEl.addEventListener('mouseleave', () => hideHoverCard());
+
+hoverPinEl.addEventListener('click', () => {
+  hover.pinned = !hover.pinned;
+  hoverPinEl.classList.toggle('on', hover.pinned);
+  hoverPinEl.textContent = hover.pinned ? '已钉住' : '钉住';
+});
+
+hoverCloseEl.addEventListener('click', () => {
+  hover.pinned = false;
+  hoverPinEl.classList.remove('on');
+  hoverPinEl.textContent = '钉住';
+  hoverCardEl.hidden = true;
+  clearHoverHit();
 });
 
 // 中英对比：双向滚动同步。程序滚动时给一段"别理我"的时间窗，避免两边互相拽。

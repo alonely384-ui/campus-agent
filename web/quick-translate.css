@@ -1,0 +1,55 @@
+/* 划词翻译浮钮 —— 阅读器里已跑通的那套交互，抽出来给其它页面复用。
+ *
+ * 用法：
+ *   <link rel="stylesheet" href="/ui/quick-translate.css">
+ *   <script src="/ui/quick-translate.js"></script>
+ *   <script>QuickTranslate.attach(document.getElementById('某容器'));</script>
+ *
+ * 行为：在容器内选中 ≥4 个字符 → 鼠标旁浮出「译」→ 点一下调
+ * POST /translate/selection → 在浮钮下方弹出译文卡片。
+ * 点空白处、按 Esc、或再点一次浮钮都会关掉。
+ *
+ * 为什么复用 /translate/selection 而不是新写接口：它内部就是「分块 → 逐块调模型
+ * → 拼回来」，不校验文字来源，方向就是英译中，正好是这里要的。
+ */
+
+#qtBtn {
+  position: fixed; z-index: 60; background: #111827; color: #fff; border: none;
+  border-radius: 6px; font-size: 12px; padding: 6px 10px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .25); line-height: 1.2;
+}
+#qtBtn:hover { background: #1f2937; }
+#qtBtn[hidden] { display: none; }
+
+#qtCard {
+  position: fixed; z-index: 61; width: min(460px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 80px)); overflow: auto;
+  background: #fff; border: 1px solid #e3e7ee; border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16); padding: 12px 14px;
+  font: 13px/1.8 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #1f2937;
+}
+#qtCard[hidden] { display: none; }
+#qtCard .qt-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; color: #6b7280; margin-bottom: 8px;
+  padding-bottom: 7px; border-bottom: 1px solid #f1f4f8;
+}
+#qtCard .qt-src {
+  font-size: 11.5px; color: #6b7280; background: #f8fafc;
+  border-radius: 6px; padding: 7px 9px; margin-bottom: 9px;
+  max-height: 76px; overflow: auto; line-height: 1.65;
+}
+#qtCard .qt-out { color: #374151; white-space: pre-wrap; }
+#qtCard .qt-out p { margin: 6px 0; }
+#qtCard .qt-out.err { color: #c62828; }
+#qtCard .qt-out.busy { color: #9a6700; }
+#qtCard .qt-close {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: #9ca3af; font-size: 15px; line-height: 1; padding: 0 2px;
+}
+#qtCard .qt-close:hover { color: #4b5563; }
+#qtCard .qt-pin {
+  font-size: 11px; color: #9ca3af; border: 1px solid #e3e7ee;
+  border-radius: 999px; padding: 1px 8px;
+}

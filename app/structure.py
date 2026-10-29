@@ -30,8 +30,62 @@ _AFFIL_WORDS = (
     "inc.", "labs", "laboratory", "college", "school", "center", "centre",
     "abstract", "academy", "corporation", "microsoft", "meta", "openai",
 )
-# 人名：2~4 个首字母大写的单词，允许中间带 . 或 -
-_NAME_RE = re.compile(r"^[A-Z][a-zA-Z.\-']+(?: [A-Z][a-zA-Z.\-']+){1,3}$")
+# 人名：首字母大写的单词串联。
+# 上限放到 5 是为了 "Henrique Ponde de Oliveira Pinto"（Codex）这种西语全名；
+# 原来的上限 3 会把这一条切成 "Henrique Ponde" + "Oliveira Pinto" 两个人。
+# 中间的小写虚词（de / van / von / del / der / la / le）是姓名的一部分，要允许。
+# 名字里允许带重音字母（María / François / Gérard / ˇSaˇsko），
+# 只认 ASCII 会把 BLOOM 这类多国作者表里的名字漏掉。
+# 首词必须是大写字母开头，后续词也以大写开头——小写虚词见 _NAME_LINK。
+# **不能吃掉数字**：所以不用 \w（含数字），只列字母和姓名里真会出现的符号。
+_NAME_PART = r"[^\W\d_a-z](?:[^\W\d_.\-'’]|\.|\-|'|’)*"
+_NAME_LINK = r"(?:de|van|von|del|der|la|le|da|di|dos|das|bin|al)"
+_NAME_RE = re.compile(rf"^{_NAME_PART}(?: {_NAME_LINK} {_NAME_PART}| {_NAME_PART}){{1,5}}$")
+# 合著论文的作者块常写成 "Alec Radford * 1 Jong Wook Kim * 1 Chris Hallacy 1 ..."：
+# 姓名之间靠数字上标和 * / † / ∗ 分隔，没有逗号。所以人名后面允许跟标记。
+_NAME_TOKEN = rf"{_NAME_PART}(?: {_NAME_LINK} {_NAME_PART}| {_NAME_PART}){{1,5}}"
+_NAME_LOOSE_RE = re.compile(rf"^{_NAME_TOKEN}$")
+# 连字：Raffel 里常是 "Raﬀel"（ﬀ = U+FB00），不同字体抽出来不一样，先归一
+_LIGATURES = {
+    "\ufb00": "ff", "\ufb01": "fi", "\ufb02": "fl", "\ufb03": "ffi",
+    "\ufb04": "ffl", "\ufb05": "st", "\ufb06": "st", "\u00ad": "",
+}
+# 脚注符号 + 上标编号：出现在名字首尾，不是名字的一部分
+_MARK_CHARS = r"\s*†‡∗⋄§¶,;:.0123456789"
+_TRAIL_MARKS = re.compile(rf"[{_MARK_CHARS}]+$")
+_LEAD_MARKS = re.compile(rf"^[{_MARK_CHARS}]+")
+# 作者可能直接写成机构名（GPT-4 的 "OpenAI∗"、DeepSeek 的 "DeepSeek-AI"）
+# 这些词单独出现时是作者，跟着别的词（"Google Brain"）时才是机构。
+# 这些机构在论文首页把自己当作"作者"署名，而不是"所属单位"。
+# 注意：Google Brain / Microsoft Research / Google Research 之类是**单位**，
+# 不能进这张表——它们的行紧跟在真人名后面，进了就会混进作者列表。
+_ORG_AUTHOR_RE = re.compile(
+    r"^(?:OpenAI|DeepSeek-AI|DeepSeek|Anthropic|Meta AI|Meta|Llama Team|Llama Team, AI"
+    r"|Qwen Team|Qwen|Alibaba Group|Google DeepMind|DeepMind)$"
+)
+# 大团队论文（BLOOM 这种 60+ 作者）把作者按贡献分组，每个组前面是一个小标题：
+#   "BigScience Workshop∗" / "Major Contributors" / "Dataset" / "Tokenization"
+# 这些行的字形和真人名一模一样（两个首字母大写的词），姓名正则拦不住，
+# 只能靠词表。下面这些词出现在名字里，说明它是分组标题而不是人名。
+_AUTHOR_GROUP_WORDS = frozenset(
+    """
+    workshop contributors contributor team group members member authors author
+    participants participant reviewers reviewer advisors advisor leads lead
+    dataset tokenization tokenisation modeling modelling evaluation prompt
+    engineering contributors-list core maintainers editors
+    """.split()
+)
+
+
+def _is_author_group_heading(text: str) -> bool:
+    """这是贡献分组小标题（"Major Contributors" / "BigScience Workshop∗"），不是人名。
+
+    判定是"含任一分组词"，不是"整行都是分组词"——BLOOM 写的是
+    "BigScience Workshop∗"（机构名 + 分组词），后半截就够定性了。
+    真人名不会包含 contributor / workshop / dataset 这类词。
+    """
+    words = re.findall(r"[A-Za-z]+", _norm(text).lower())
+    return any(w in _AUTHOR_GROUP_WORDS for w in words)
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 # 题注：Table 2.1 / Figure 3 / Fig. 3
 _TABLE_CAPTION_RE = re.compile(r"^\s*Table\s+(\d+(?:\.\d+)?)\s*[.:]?\s+(.{4,300})", re.IGNORECASE)
@@ -102,23 +156,224 @@ def _title(first_page: list[dict], body: float) -> str:
     return " ".join(ln["text"] for ln in band)[:200]
 
 
+def _strip_marks(text: str) -> str:
+    """把连字归一（Raﬀel → Raffel），其它字符原样保留。"""
+    out = []
+    for ch in text:
+        out.append(_LIGATURES.get(ch, ch))
+    return "".join(out)
+
+
+def _split_author_block(text: str) -> list[str]:
+    """把一段作者块切成一个个名字。
+
+    作者块有四种写法，都要吃得下：
+    1. 逗号分隔：``Ashish Vaswani, Noam Shazeer``
+    2. 空格 + 上标数字分隔（LaTeX 模板最常见）::
+
+           Alec Radford * 1 Jong Wook Kim * 1 Chris Hallacy 1 ...
+
+    3. 名字和编号粘连：``Haotian Liu1∗, Chunyuan Li2∗``
+    4. 连逗号都没有：``Bo Peng1,2∗Eric Alcaide2,3,4∗``
+
+    做法：先按逗号/分号切段，再用"姓 + 名"正则从每段里逐个抽出名字。
+    因为正则允许名字中间有空格，``Radford * 1 Jong Wook Kim`` 会先匹配到
+    ``Radford``（后面 ``*`` 断了），再匹配到 ``Jong Wook Kim``，正好切开。
+    """
+    s = _strip_marks(text)
+    out: list[str] = []
+    for chunk in re.split(r"[,;，、]", s):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        pos = 0
+        token_re = re.compile(_NAME_TOKEN)
+        while pos < len(chunk):
+            m = token_re.search(chunk, pos)
+            if not m:
+                break
+            name = m.group(0).strip()
+            if _NAME_LOOSE_RE.match(name):
+                out.append(name)
+            pos = m.end()
+    return out
+
+
+def _title_bottom(first_page: list[dict], title: str, body: float) -> float:
+    """标题块的底部纵坐标（跨行标题取最后一行的 y + 行高）。
+
+    为什么需要：``_title`` 把跨行标题用空格拼成一句，作者区如果从"包含标题
+    文字的任意一行"开始算，第二行标题（如 "TRANSFORMERS FOR IMAGE
+    RECOGNITION AT SCALE"）会落进作者区，被姓名规则切成假名。
+
+    做法和 ``_title`` 保持一致：先按"字号 ≥ 正文 1.3 倍"筛出候选行，
+    再取最上面那行往下 ``size * 2.2`` 的带状区域，区域里最靠下的一行的底部
+    就是标题块底部。
+    """
+    if not title:
+        return 0.0
+    cand = [ln for ln in first_page if ln["size"] >= body * 1.3 and len(ln["text"]) >= 8]
+    if not cand:
+        return 0.0
+    top = min(ln["y"] for ln in cand)
+    band = [ln for ln in cand if ln["y"] - top <= ln["size"] * 2.2]
+    last = max(band, key=lambda ln: ln["y"])
+    return last["y"] + last["size"]
+
+
+def _looks_like_body_line(text: str, size: float, body: float) -> bool:
+    """像正文行：正文字号 + 有连续的英文小写单词（人名里不会出现）。"""
+    if size > body * 1.05:
+        return False
+    t = _norm(text)
+    if len(t) < 45:
+        return False
+    # 连续两个以上小写单词（≥3 字母）——人名是首字母大写，机构名也不会有句子
+    return bool(re.search(r"\b[a-z]{3,}\s+[a-z]{3,}\b", t))
+
+
+def _is_author_zone_stop(text: str, size: float, body: float) -> bool:
+    """作者区到哪儿为止。
+
+    作者区在标题和 Abstract/正文之间，短行密集。终止条件：
+    1. 遇到 "Abstract" / "1 Introduction" 标题
+    2. 遇到像正文的行（见 _looks_like_body_line）
+
+    LLaMA 3 那种没有 "Abstract" 标题的模板（正文段落直接从标题下方开始），
+    靠条件 2 拦截；否则整段摘要都会被当成作者区，切出 "Llama Guard" 这种假名。
+    """
+    t = _norm(text)
+    low = t.lower()
+    if low.startswith("abstract") or low == "introduction":
+        return True
+    if re.match(r"^1\.?\s+introduction\b", low):
+        return True
+    return _looks_like_body_line(t, size, body)
+
+
+def _is_name_continuation(prev_line: str, next_word: str) -> bool:
+    """上一行末尾被断开的名字，下一行开头是不是它的续接。
+
+    只认两种**有版面证据**的断行，不猜：
+    1. 硬连字符断词：``Joydeep Bhattachar-`` + ``jee`` → ``Joydeep Bhattacharjee``
+       要求上一行以 ``-`` 结尾、下一行开头是小写字母。
+    2. 未写完的姓名片段：``..., Alexander M.`` 换行 ``Rush, Stella ...``
+       上一行最后一段是"首字母大写串 + 可选的单个大写字母缩写"（如 ``Alexander M.``），
+       且它整体不过姓名正则（说明只有 1~2 个词，还没写完），下一行以一个大写词开头。
+    """
+    prev_line = prev_line.rstrip()
+    if not prev_line:
+        return False
+    if prev_line.endswith("-") and next_word[:1].islower():
+        return True
+    tail = re.split(r",\s*", prev_line)[-1].strip(" ∗*†‡,")
+    if not tail or not next_word[:1].isupper():
+        return False
+    # "Alexander M."：行尾是单字母缩写，说明姓被换行断到下一行了
+    if not _looks_unfinished(tail):
+        return False
+    return bool(_NAME_RE.match(f"{tail} {next_word}"))
+
+
+def _join_broken_names(text: str) -> str:
+    """把被硬连字符断开的词接回去：``Bhattachar-`` 换行 ``jee`` → ``Bhattacharjee``。
+
+    只处理行尾 ``-`` 且下一个词全小写的情况；行内正常的连字符名字
+    （``Herbert-Voss``、``Gonzalez-Dios``）不受影响，因为它们不在行尾。
+    """
+    return re.sub(r"([A-Za-z])-\s+([a-z]{2,})", r"\1\2", text)
+
+
+def _looks_unfinished(name: str) -> bool:
+    """这个名字是不是还没写完（只是行尾的半截）。
+
+    判据只有一条，且是版面事实而不是猜：**最后一个词是单字母缩写**
+    （``Alexander M.``）——缩写后面一定还有姓，只是被换行断开了。
+    完整的写法是 ``Christopher D. Manning`` 这种"缩写 + 词"，最后一个是词。
+
+    以连字符结尾的（``Joydeep Bhattachar-``）也属于没写完。
+    """
+    name = name.strip()
+    if name.endswith("-"):
+        return True
+    last = name.split()[-1] if name.split() else ""
+    return bool(re.fullmatch(r"[A-Za-z]\.?", last))
+
+
 def _authors(first_page: list[dict], title_y: float, body: float) -> list[str]:
     """作者 = 标题下方、Abstract 之前，长得像人名的行（按 y 分行、按 x 排序）。"""
     names: list[str] = []
-    for ln in first_page:
-        t = ln["text"].strip()
+    # 上一行末尾被断开的那一小段（如 "Alexander M."），等下一行来了再决定接不接
+    carry = ""
+    for ln in sorted(first_page, key=lambda x: x["y"]):
+        # 连字要先归一："Colin Raﬀel" 里的 ﬀ（U+FB00）过不了 _NAME_RE，
+        # 不先替换就会只抽到 "Colin Ra"
+        t = _strip_marks(ln["text"].strip())
         if ln["y"] <= title_y or ln["y"] - title_y > 260:
             continue
-        if len(t) > 80 or "@" in t:
+        if not t:
+            continue
+        if carry:
+            # 上一行留下的半截名字，看这一行的开头能不能接上
+            words = _LEAD_MARKS.sub("", t).split()
+            head = words[0].strip(" ∗*†‡,.-") if words else ""
+            if head and _is_name_continuation(carry, head):
+                if carry.endswith("-"):
+                    # 硬连字符断词：把连字符去掉直接拼
+                    carry = carry[:-1] + head
+                else:
+                    carry = f"{carry} {head}"
+                # 去掉已经吃进 carry 的那个词，剩下的接在后面
+                rest = t[len(words[0]):].lstrip(" ,;") if words else ""
+                t = f"{carry}, {rest}" if rest else carry
+            carry = ""
+        if _is_author_zone_stop(t, ln["size"], body):
+            break
+        if "@" in t:
+            # "Llama Team, AI @ Meta1" 这种署名里带 @，但前半段是人名/团队名
+            head = re.split(r"@", t)[0].strip(" ,;")
+            if head and _ORG_AUTHOR_RE.match(_TRAIL_MARKS.sub("", head)):
+                names.append(_ORG_AUTHOR_RE.match(_TRAIL_MARKS.sub("", head)).group(0))
+            continue
+        # 整行就是一个机构署名（"OpenAI∗" / "DeepSeek-AI"）时保留。
+        # 必须放在人名分支之前：这类行既没有逗号、也过不了 _NAME_RE，
+        # 掉进 _split_author_block 会返回空列表，作者就丢了。
+        org = _ORG_AUTHOR_RE.match(_TRAIL_MARKS.sub("", t).strip())
+        if org:
+            names.append(org.group(0))
+            continue
+        # 贡献分组小标题（"BigScience Workshop∗" / "Major Contributors"）不是人名。
+        # 必须放在机构署名分支**之后**：Qwen Team / Llama Team 既有 "team"
+        # 这种分组词，又确实是论文作者署名，得让机构分支先认领。
+        if _is_author_group_heading(t):
             continue
         low = t.lower()
         if any(w in low for w in _AFFIL_WORDS):
+            # 机构行（"Tsinghua University"、"Google Brain"）跳过
             continue
         # 一行多个作者（"Ashish Vaswani, Noam Shazeer"）按逗号拆
         parts = [p.strip(" ∗*†‡,") for p in re.split(r",\s*", t)]
-        for p in parts:
-            if _NAME_RE.match(p):
-                names.append(p)
+        hits = [p for p in parts if _NAME_RE.match(p)]
+        if hits:
+            tail = parts[-1] if parts else ""
+            # 最后一段没写完（"Alexander M." / "Joydeep Bhattachar-"），
+            # 留给下一行接，不单独成条
+            if len(hits) == len(parts) and not (tail == hits[-1] and _looks_unfinished(tail)):
+                names.extend(hits)
+            else:
+                complete = hits[:-1] if hits[-1] == tail else hits
+                names.extend(complete)
+                if hits[-1] == tail:
+                    carry = tail
+            continue
+        # 逗号拆不开时（LaTeX 作者块），改用姓名边界逐个抽。
+        # 只对短行做——长行多半是正文段落，硬切会切出 "Large Language" 这种假名
+        if len(t) <= 200:
+            names.extend(_split_author_block(t))
+    if carry:
+        names.append(carry)
+    # 行内硬连字符断词接回去（"Bhattachar- jee" → "Bhattacharjee"）
+    names = [_join_broken_names(n) for n in names]
     # 去重但保持原顺序
     seen: set[str] = set()
     return [n for n in names if not (n in seen or seen.add(n))]
@@ -719,7 +974,10 @@ def parse_structure(path: str, max_pages: int = 25, with_tables: bool = True) ->
             head += _lines(doc[pno], pno)
         body = _body_size(head)
         title = _title(first, body)
-        title_y = next((ln["y"] for ln in first if ln["text"] in title), 0.0)
+        # 标题可能跨多行（"AN IMAGE IS WORTH 16X16 WORDS:" + "TRANSFORMERS FOR ..."）。
+        # 作者区必须从标题**最后一行**之下开始，否则第二行标题会被当成作者行，
+        # 切出 "TRANSFORMERS FOR IMAGE RECOGNITION" 这种假名。
+        title_y = _title_bottom(first, title, body)
         sections = _sections(head, body)
         tables, figures = _captions(head)
         if with_tables and tables:

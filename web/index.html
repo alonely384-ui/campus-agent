@@ -52,9 +52,43 @@
                color: #fff; text-decoration: none; white-space: nowrap; }
     .ev-open:hover { background: #1558b0; }
 
+    /* ---------- 角色时间线：四智能体协作过程可核验 ----------
+       官方赛题「AI 技术深度」点名要「多智能体协同」。这里把 Planner/Retriever/
+       Extractor/Verifier/Writer 每一步摊开，谁做了什么、花了多久，一眼能看到。 */
+    .roles { align-self: flex-start; width: 82%; background: #fff; border: 1px solid #e3e7ee;
+             border-radius: 10px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .roles-head { font-size: 12px; color: #6b7280; display: flex; gap: 10px;
+                  align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .roles-head b { color: #1f2937; font-size: 13px; font-weight: 600; }
+    .role-status { font-size: 11px; padding: 2px 8px; border-radius: 6px;
+                   background: #e8f5ec; color: #1a7f37; font-family: ui-monospace, Consolas, monospace; }
+    .role-list { display: flex; flex-direction: column; gap: 0; }
+    .role { display: flex; gap: 10px; padding: 7px 0; position: relative; }
+    .role + .role { border-top: 1px solid #f1f4f8; }
+    /* 左侧圆点 + 竖线，画出"流水线"的视觉 */
+    .role-dot { flex: 0 0 18px; display: flex; flex-direction: column; align-items: center; }
+    .role-dot i { width: 8px; height: 8px; border-radius: 50%; background: #1a73e8;
+                  margin-top: 5px; display: block; }
+    .role.fail .role-dot i { background: #c62828; }
+    .role-dot span { flex: 1; width: 2px; background: #e3e7ee; margin-top: 3px; }
+    .role:last-child .role-dot span { display: none; }
+    .role-body { flex: 1; min-width: 0; }
+    .role-title { font-size: 12px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .role-title b { color: #1f2937; font-weight: 600; }
+    .role-ms { color: #9aa3af; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .role-text { font-size: 12.5px; color: #374151; line-height: 1.55; margin-top: 2px;
+                 word-break: break-word; }
+    .role.fail .role-text { color: #c62828; }
+
     /* ---------- 论文库：批量上传 / 去重提示 / 删除 ---------- */
     button.ghost { background: #eef1f5; color: #374151; }
     button.ghost:hover { background: #e2e8f0; }
+    /* 「引用图谱」是页面跳转不是弹窗，用 <a> 保证能中键新开标签；
+       样式对齐 .ghost，避免混在按钮里显得突兀 */
+    .ghost-link { display: inline-block; background: #eef1f5; color: #374151;
+                  border: 1px solid #d5d9e0; font-size: 13px; padding: 8px 12px;
+                  border-radius: 8px; text-decoration: none; line-height: 1.15; }
+    .ghost-link:hover { background: #e2e8f0; }
     #libModal { position: fixed; inset: 0; background: rgba(15,23,42,.42); z-index: 50;
                 display: flex; align-items: center; justify-content: center; padding: 16px; }
     #libModal[hidden] { display: none; }
@@ -177,6 +211,12 @@
       <h1>📚 科研小助手</h1>
       <button id="openLib" class="ghost" title="上传、查看、删除论文（支持批量，自动查重）">论文库</button>
       <button id="openDisc" class="ghost" title="按论文名下载、批量下参考文献、看新论文推荐（1.4）">发现</button>
+      <a id="openGraph" class="ghost-link" href="graph.html"
+         title="论文引用关系图谱：谁引用了谁、哪些是基石节点（1.5）">引用图谱</a>
+      <a id="openAnalysis" class="ghost-link" href="analysis.html"
+         title="论文分析：自动综述与前沿探索（1.5）">论文分析</a>
+      <a id="openWriting" class="ghost-link" href="writing.html"
+         title="写作助手：框架生成、架构图、数据可视化、中译英（1.6）">写作助手</a>
       <button id="newChat" class="ghost" title="清空对话历史，重新开始">新对话</button>
     </div>
     <div class="status" id="status">检查服务状态…</div>
@@ -380,12 +420,20 @@ function renderEvidence(botEl, items) {
       const card = document.createElement('div');
       card.className = 'ev';
       const channels = (it.channels || []).join(' + ') || '未知';
-      // 注意：score 是 RRF 融合分（由多路名次换算），不是"相似度概率"
+      // score 有两种口径，后端用 score_type 区分（app/agent.py:980）：
+      //   rrf    —— RRF 融合分，由多路名次换算，恒为正，不是"相似度概率"
+      //   rerank —— 交叉编码器的原始 logit，可为负，越大越相关
+      // 二者不可比，标签必须分开写；否则用户看到"融合分 -0.0777"会以为融合分能是负的。
+      const isRerank = it.score_type === 'rerank';
+      const scoreLabel = isRerank ? '重排分' : '融合分';
+      const scoreTip = isRerank
+        ? '交叉编码器对"问题—原文"打的原始分，可为负，越大越相关'
+        : '多路召回按名次融合得到的分，恒为正，不是相似度概率';
       card.innerHTML =
         '<div class="ev-head">' +
         `<b>证据 #${it.rank}</b>` +
         `<span>第 ${it.page == null ? '?' : it.page} 页</span>` +
-        `<span>融合分 ${Number(it.score).toFixed(4)}</span>` +
+        `<span title="${scoreTip}">${scoreLabel} ${Number(it.score).toFixed(4)}</span>` +
         `<span>命中通道 ${channels}</span>` +
         `<span class="ev-badge">${it.source}</span>` +
         // 点一下直接翻到原文那一页：paper=文件名，page=1 基页码（阅读页会把该页滚到顶部）
@@ -406,6 +454,45 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
+}
+
+// ---------- 角色时间线：Planner → Retriever → Extractor → Verifier → Writer ----------
+// 后端 app/agent.py 的 RoleRun 已经按执行顺序追加，这里按顺序画即可。
+function renderRoles(botEl, items, status) {
+  if (!items || items.length === 0) return null;
+  const box = document.createElement('div');
+  box.className = 'roles';
+
+  const head = document.createElement('div');
+  head.className = 'roles-head';
+  head.innerHTML = '<b>多智能体协作</b>';
+  if (status) {
+    const st = document.createElement('span');
+    st.className = 'role-status';
+    st.textContent = status;
+    head.appendChild(st);
+  }
+  box.appendChild(head);
+
+  const list = document.createElement('div');
+  list.className = 'role-list';
+  items.forEach(it => {
+    const row = document.createElement('div');
+    row.className = 'role' + (it.ok === false ? ' fail' : '');
+    const ms = Number(it.duration_ms || 0);
+    row.innerHTML =
+      '<div class="role-dot"><i></i><span></span></div>' +
+      '<div class="role-body">' +
+      '<div class="role-title"><b>' + escapeHtml(it.label || it.role) + '</b>' +
+      (ms ? `<span class="role-ms">${ms} ms</span>` : '') +
+      '</div>' +
+      '<div class="role-text">' + escapeHtml(it.summary || '') + '</div>' +
+      '</div>';
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+  botEl.insertAdjacentElement('afterend', box);
+  return box;
 }
 
 function addMsg(text, cls) {
@@ -484,6 +571,8 @@ async function send() {
   let traceEl = null;
   let answer = '';
   let evidenceItems = [];
+  let roleItems = [];
+  let statusText = '';
 
   try {
     // 勾了 1 篇 → 单篇；勾了 2 篇以上 → 多篇对比；一篇没勾 → 全库
@@ -523,6 +612,10 @@ async function send() {
 
         if (ev.type === 'evidence') {
           evidenceItems = ev.items || [];
+        } else if (ev.type === 'roles') {
+          roleItems = ev.items || [];
+        } else if (ev.type === 'status') {
+          statusText = ev.text || '';
         } else if (ev.type === 'answer_delta') {
           answer += ev.text;
           botEl.textContent = answer;
@@ -540,7 +633,9 @@ async function send() {
     }
 
     if (!answer) botEl.textContent = '（没有返回内容）';
-    renderEvidence(botEl, evidenceItems);
+    // 先画协作时间线，再画证据卡片：时间线讲"怎么找到这些证据"，放在证据上方更顺
+    const rolesBox = roleItems.length ? renderRoles(botEl, roleItems, statusText) : null;
+    renderEvidence(rolesBox || botEl, evidenceItems);
 
     // 成功拿到回答才记入历史：失败/空回答不污染下一轮
     if (answer) {
