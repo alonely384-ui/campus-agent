@@ -1,4 +1,4 @@
-"""构建引用图谱并落盘（运行期命令，不参与检索索引）。
+r"""构建引用图谱并落盘（运行期命令，不参与检索索引）。
 
 用法：
     .\.venv\Scripts\python.exe scripts\build_graph.py
@@ -14,6 +14,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import graph  # noqa: E402
+
+
+def _safe(text: str) -> str:
+    """控制台的编码可能装不下某些字符（如连字 ﬁ U+FB01），换成 ? 而不是让整个脚本崩掉。
+
+    Windows 下默认代码页是 GBK，而参考文献标题里常出现 PDF 抽取带出来的连字与特殊符号，
+    这些字在 GBK 里没有对应码位。落盘用的是 UTF-8，只有打印会出问题，所以只在这里兜底。
+    """
+    enc = sys.stdout.encoding or "utf-8"
+    return text.encode(enc, errors="replace").decode(enc, errors="replace")
 
 
 def main() -> int:
@@ -39,11 +49,11 @@ def main() -> int:
     print("多副本节点：")
     for n in data["nodes"]:
         if n["copy_count"] > 1:
-            print(f"  {n['canonical_id']:22s} x{n['copy_count']}  {n['title'][:50]}  {n['copies']}")
+            print(_safe(f"  {n['canonical_id']:22s} x{n['copy_count']}  {n['title'][:50]}  {n['copies']}"))
     print("匹配方式统计：", json.dumps(s["refs"], ensure_ascii=False))
     print(f"待人工核验：{len(data['reviews'])} 条")
     for r in data["reviews"][:10]:
-        print(f"  {r['source']} ~ {r['candidate']}  {r['match_score']}  「{r['reference_title'][:60]}」")
+        print(_safe(f"  {r['source']} ~ {r['candidate']}  {r['match_score']}  「{r['reference_title'][:60]}」"))
     return 0
 
 
