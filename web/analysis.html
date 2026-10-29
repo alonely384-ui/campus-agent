@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>论文分析 · 科研小助手</title>
+  <!-- 不走 CDN：演示环境可能断网，赛题也要求能离线跑 -->
+  <script src="vendor/echarts/echarts.min.js"></script>
+  <!-- 划词翻译浮钮：选中正文里的一段英文，鼠标旁浮出「译」 -->
+  <link rel="stylesheet" href="quick-translate.css" />
+  <script src="quick-translate.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #f5f6f8; min-height: 100vh; color: #1f2937;
+    }
+    header {
+      padding: 12px 18px; background: #fff; border-bottom: 1px solid #e3e7ee;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      position: sticky; top: 0; z-index: 10;
+    }
+    h1 { font-size: 16px; font-weight: 600; }
+    a.back { font-size: 13px; color: #1a73e8; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    .pill { font-size: 12px; color: #6b7280; background: #eef1f5; padding: 3px 9px; border-radius: 999px; }
+    .pill b { color: #374151; font-weight: 600; }
+    .spacer { flex: 1; }
+    .tab {
+      font-size: 13px; padding: 6px 14px; border: 1px solid #d5dbe5; background: #fff;
+      border-radius: 8px; cursor: pointer; color: #4b5563;
+    }
+    .tab.on { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+    select, button.act {
+      font-size: 13px; padding: 6px 10px; border: 1px solid #d5dbe5; border-radius: 8px;
+      background: #fff; color: #374151; cursor: pointer;
+    }
+    button.act { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+    button.act:disabled { background: #9ca3af; border-color: #9ca3af; cursor: default; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 20px 18px 60px; }
+
+    .card { background: #fff; border: 1px solid #e3e7ee; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 10px; color: #111827; }
+    .card h2 .sub { font-size: 12px; font-weight: 400; color: #9ca3af; margin-left: 8px; }
+    .stat-row { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 14px; }
+    .stat { font-size: 12px; color: #6b7280; }
+    .stat b { display: block; font-size: 22px; color: #1a73e8; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+    .overview { font-size: 14px; line-height: 1.85; color: #374151; background: #f8fbff;
+                border-left: 3px solid #1a73e8; padding: 12px 16px; border-radius: 0 8px 8px 0; }
+    .sec { margin-top: 18px; }
+    .sec h3 { font-size: 13px; font-weight: 600; color: #111827; margin-bottom: 8px;
+              padding-bottom: 6px; border-bottom: 1px solid #eef1f5; }
+    .sec .body { font-size: 13px; line-height: 1.9; color: #4b5563; white-space: pre-wrap; }
+
+    table.lst { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.lst th { text-align: left; font-weight: 600; color: #6b7280; font-size: 12px;
+                   padding: 8px 10px; background: #f8fafc; border-bottom: 1px solid #e3e7ee; }
+    table.lst td { padding: 9px 10px; border-bottom: 1px solid #f1f4f8; color: #374151; vertical-align: top; }
+    table.lst tr:last-child td { border-bottom: none; }
+    table.lst tr:hover td { background: #f8fbff; }
+    table.lst td.num { font-variant-numeric: tabular-nums; text-align: right; color: #1a73e8; font-weight: 600; }
+    .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+    .tag.cornerstone { background: #fef3c7; color: #92400e; }
+    .tag.hub         { background: #dbeafe; color: #1e40af; }
+    .tag.bridge      { background: #e9d5ff; color: #6b21a8; }
+    .tag.foundation  { background: #d1fae5; color: #065f46; }
+    .tag.fringe      { background: #f3f4f6; color: #6b7280; }
+    .tag.isolated    { background: #fee2e2; color: #991b1b; }
+    a.open { color: #1a73e8; text-decoration: none; font-size: 12px; }
+    a.open:hover { text-decoration: underline; }
+
+    #chart { width: 100%; height: 240px; }
+
+    .kind-head { display: flex; align-items: center; gap: 10px; margin: 20px 0 10px; }
+    .kind-head .dot { width: 9px; height: 9px; border-radius: 50%; }
+    .kind-head b { font-size: 14px; }
+    .kind-head .desc { font-size: 12px; color: #9ca3af; }
+    .fi { border: 1px solid #eef1f5; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+    .fi .t { font-size: 13.5px; font-weight: 600; color: #111827; line-height: 1.5; }
+    .fi .basis { font-size: 12px; color: #6b7280; margin-top: 6px; line-height: 1.7; }
+    .fi .quote {
+      font-size: 12.5px; color: #374151; line-height: 1.75; margin-top: 8px;
+      padding: 8px 12px; background: #f8fafc; border-left: 3px solid #1a7f37; border-radius: 0 6px 6px 0;
+    }
+    .fi .foot { margin-top: 8px; display: flex; gap: 14px; font-size: 12px; color: #9ca3af; }
+
+    .empty { text-align: center; color: #9ca3af; font-size: 13px; padding: 40px 0; }
+    #loading { text-align: center; color: #9ca3af; font-size: 13px; padding: 60px 0; }
+    [hidden] { display: none !important; }
+
+    /* 英译中 */
+    #enInput {
+      width: 100%; border: 1px solid #d5dbe5; border-radius: 8px; padding: 11px 13px;
+      font: inherit; font-size: 13.5px; line-height: 1.75; resize: vertical;
+      color: #1f2937; background: #fff;
+    }
+    #enInput:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,.12); }
+    .tr-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+    button.ghost-btn { background: #fff; border-color: #d5dbe5; color: #4b5563; }
+    button.ghost-btn:hover:not(:disabled) { background: #f8fafc; }
+    .tr-hint { font-size: 12px; color: #9ca3af; }
+    .tr-hint.err { color: #c62828; }
+    .tr-hint.ok { color: #1a7f37; }
+    .tr-out {
+      font-size: 13.5px; line-height: 1.95; color: #374151; white-space: pre-wrap;
+      background: #f8fafc; border-left: 3px solid #1a73e8; padding: 13px 16px;
+      border-radius: 0 8px 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔎 论文分析</h1>
+    <span class="pill" id="stats">加载中…</span>
+    <div class="spacer"></div>
+    <button class="tab on" id="tabSurvey" data-tab="survey">自动综述</button>
+    <button class="tab" id="tabFrontier" data-tab="frontier">前沿探索</button>
+    <button class="tab" id="tabTranslate" data-tab="translate">英译中</button>
+    <select id="focus" title="按主题过滤综述范围">
+      <option value="">全部主题</option>
+    </select>
+    <a class="back" href="graph.html">引用图谱 →</a>
+    <a class="back" href="index.html">← 返回对话</a>
+  </header>
+
+  <main>
+    <div id="loading">正在读取图谱数据…</div>
+
+    <!-- 自动综述 -->
+    <div id="paneSurvey" hidden>
+      <div class="card">
+        <h2>领域概览<span class="sub">每句话都可回溯到图上的具体数字</span></h2>
+        <div class="stat-row" id="surveyStats"></div>
+        <div class="overview" id="surveyOverview"></div>
+      </div>
+      <div class="card">
+        <h2>发展脉络</h2>
+        <div id="chart"></div>
+        <div id="timelineNote" style="font-size:12px;color:#9ca3af;margin-top:8px;"></div>
+      </div>
+      <div class="card">
+        <h2>主题聚类与代表性工作</h2>
+        <div class="sec" id="secClusters"></div>
+        <div class="sec" id="secReps"></div>
+        <div class="sec" id="secFringe"></div>
+      </div>
+    </div>
+
+    <!-- 前沿探索 -->
+    <div id="paneFrontier" hidden>
+      <div class="card">
+        <h2>值得关注的方向<span class="sub">每条都附可核验的量化依据</span></h2>
+        <div class="stat-row" id="frontierStats"></div>
+      </div>
+      <div class="card" id="frontierBody"></div>
+    </div>
+
+    <!-- 英译中：读论文时遇到看不懂的段落，选中贴进来就译 -->
+    <div id="paneTranslate" hidden>
+      <div class="card">
+        <h2>英文段落翻译<span class="sub">从论文里复制一段，贴进来译成中文</span></h2>
+        <textarea id="enInput" rows="9" placeholder="把英文原文贴在这里……"></textarea>
+        <div class="tr-row">
+          <button class="act" id="btnEn2zh">译成中文</button>
+          <button class="act ghost-btn" id="btnClear">清空</button>
+          <span class="tr-hint" id="trHint"></span>
+        </div>
+      </div>
+      <div class="card" id="trOutCard" hidden>
+        <h2>中文译文</h2>
+        <div class="tr-out" id="zhOutput"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const ROLE_CN = {
+      cornerstone: '基石', hub: '枢纽', bridge: '桥接',
+      foundation: '基础件', fringe: '边缘', isolated: '孤立'
+    };
+    const KIND_COLOR = { recent_cited: '#1a73e8', bridge: '#9333ea', island: '#dc2626', future_work: '#1a7f37' };
+
+    let surveyData = null;
+    let frontierData = null;
+    let chart = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    async function getJSON(url) {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(url + ' → HTTP ' + r.status);
+      return r.json();
+    }
+
+    // ---------- 自动综述 ----------
+    function renderSurvey() {
+      const d = surveyData;
+      const st = d.stats || {};
+      $('surveyStats').innerHTML = [
+        ['论文数', st.papers], ['引用边', st.edges],
+        ['引用社区', st.clusters], ['时间跨度', st.years]
+      ].map(([k, v]) => `<div class="stat">${esc(k)}<b>${esc(v)}</b></div>`).join('');
+
+      $('surveyOverview').textContent = d.overview || '';
+
+      // 时间轴柱状图：每年论文数
+      const years = (d.timeline || []);
+      if (chart) { chart.dispose(); chart = null; }
+      if (years.length) {
+        chart = echarts.init($('chart'));
+        chart.setOption({
+          grid: { left: 44, right: 20, top: 26, bottom: 30 },
+          tooltip: {
+            trigger: 'axis',
+            formatter: ps => {
+              const i = ps[0].dataIndex, y = years[i];
+              return `<b>${y.year} 年</b>（${y.count} 篇）<br/>`
+                + y.papers.slice(0, 6).map(p => `${esc(p.title)} —— 被引 ${p.cited_by}`).join('<br/>');
+            }
+          },
+          xAxis: {
+            type: 'category', data: years.map(y => y.year),
+            axisLine: { lineStyle: { color: '#d5dbe5' } },
+            axisLabel: { color: '#6b7280', fontSize: 11 }
+          },
+          yAxis: {
+            type: 'value', name: '篇', nameTextStyle: { color: '#9ca3af', fontSize: 11 },
+            splitLine: { lineStyle: { color: '#f1f4f8' } },
+            axisLabel: { color: '#9ca3af', fontSize: 11 }
+          },
+          series: [{
+            type: 'bar', data: years.map(y => y.count), barWidth: '52%',
+            itemStyle: { color: '#1a73e8', borderRadius: [4, 4, 0, 0] },
+            label: { show: true, position: 'top', color: '#6b7280', fontSize: 11 }
+          }]
+        });
+      }
+      const noYear = st.papers - years.reduce((a, y) => a + y.count, 0);
+      $('timelineNote').textContent = noYear > 0
+        ? `另有 ${noYear} 篇因库内元数据缺少年份，未计入时间轴（概览中已逐篇说明）。`
+        : '全部论文都已计入时间轴。';
+
+      // 主题聚类
+      const cl = d.clusters || [];
+      $('secClusters').innerHTML = '<h3>主题聚类</h3><div class="body">'
+        + cl.map(c => `社区 ${c.community}：${c.size} 篇`
+          + (c.category ? `，主题集中在「${esc(c.category)}」` : '')
+          + `，代表工作《${esc(c.lead)}》`).join('\n') + '</div>';
+
+      // 代表性工作
+      const reps = d.representatives || [];
+      $('secReps').innerHTML = '<h3>代表性工作</h3>'
+        + (reps.length ? '<table class="lst"><thead><tr><th>论文</th><th>年份</th><th>角色</th>'
+          + '<th style="text-align:right">基石分</th><th style="text-align:right">被引</th><th></th></tr></thead><tbody>'
+          + reps.map(n => `<tr>
+              <td>${esc(n.title)}</td>
+              <td>${esc(n.year || '—')}</td>
+              <td><span class="tag ${esc(n.role)}">${esc(ROLE_CN[n.role] || n.role)}</span></td>
+              <td class="num">${n.score.toFixed(3)}</td>
+              <td class="num">${n.cited_by}</td>
+              <td>${n.reader_url ? `<a class="open" href="${esc(n.reader_url)}">阅读</a>` : ''}</td>
+            </tr>`).join('') + '</tbody></table>'
+          : '<div class="body">暂无。</div>');
+
+      // 综合地位靠后的工作
+      const fringe = (d.sections || []).find(s => s.heading === '综合地位靠后的工作');
+      $('secFringe').innerHTML = fringe
+        ? `<h3>${esc(fringe.heading)}</h3><div class="body">${esc(fringe.body)}</div>` : '';
+    }
+
+    // ---------- 前沿探索 ----------
+    function renderFrontier() {
+      const d = frontierData;
+      const st = d.stats || {};
+      $('frontierStats').innerHTML = [
+        ['Future Work 原文', st.future_work], ['新近且被引', st.recent_cited], ['跨社区桥接', st.bridges],
+        ['未被接入', st.islands], ['分析论文', st.papers]
+      ].map(([k, v]) => `<div class="stat">${esc(k)}<b>${esc(v)}</b></div>`).join('');
+
+      const legend = {};
+      (d.legend || []).forEach(l => { legend[l.kind] = l; });
+
+      const byKind = {};
+      (d.items || []).forEach(it => { (byKind[it.kind] = byKind[it.kind] || []).push(it); });
+
+      const order = ['future_work', 'recent_cited', 'bridge', 'island'];
+      let html = '';
+      order.forEach(kind => {
+        const arr = byKind[kind] || [];
+        if (!arr.length) return;
+        const lg = legend[kind] || {};
+        html += `<div class="kind-head">
+            <span class="dot" style="background:${KIND_COLOR[kind] || '#999'}"></span>
+            <b>${esc(lg.label || kind)}</b>
+            <span class="desc">${esc(lg.desc || '')}</span>
+          </div>`;
+        arr.forEach(it => {
+          // Future Work 直接把作者原话列出来，这是「凭什么说这是待探索方向」的唯一依据
+          const quotes = (it.sentences || []).map(s =>
+            `<div class="quote">${esc(s)}</div>`).join('');
+          html += `<div class="fi">
+              <div class="t">${esc(it.title)}</div>
+              <div class="basis">${esc(it.basis)}</div>
+              ${quotes}
+              <div class="foot">
+                <span>${it.year ? esc(it.year) + ' 年' : '年份未知'}</span>
+                ${it.sentences && it.sentences.length ? `<span>${it.sentences.length} 句原文</span>` : ''}
+                ${it.reader_url ? `<a class="open" href="${esc(it.reader_url)}">打开原文</a>` : ''}
+              </div>
+            </div>`;
+        });
+      });
+      $('frontierBody').innerHTML = html || '<div class="empty">暂无前沿线索。</div>';
+    }
+
+    // ---------- 装载 ----------
+    async function load(which) {
+      $('loading').hidden = false;
+      $('loading').textContent = '正在读取图谱数据…';
+      try {
+        if (which === 'survey') {
+          const focus = $('focus').value;
+          surveyData = await getJSON('/graph/survey' + (focus ? '?focus=' + encodeURIComponent(focus) : ''));
+          if (!surveyData.ready) throw new Error(surveyData.detail || '综述生成失败');
+          renderSurvey();
+          // 主题下拉只装一次
+          const sel = $('focus');
+          if (sel.options.length <= 1 && surveyData.topics) {
+            surveyData.topics.forEach(t => {
+              const o = document.createElement('option');
+              o.value = t; o.textContent = t; sel.appendChild(o);
+            });
+          }
+        } else {
+          frontierData = await getJSON('/graph/frontier');
+          if (!frontierData.ready) throw new Error(frontierData.detail || '前沿探索失败');
+          renderFrontier();
+        }
+        $('loading').hidden = true;
+      } catch (e) {
+        $('loading').textContent = '加载失败：' + e.message;
+      }
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+      $('paneSurvey').hidden = name !== 'survey';
+      $('paneFrontier').hidden = name !== 'frontier';
+      $('paneTranslate').hidden = name !== 'translate';
+      // 主题过滤只对综述有意义
+      $('focus').hidden = name !== 'survey';
+      // 翻译不需要读图谱数据，加载中提示别挡路
+      if (name === 'translate') { $('loading').hidden = true; return; }
+      if (name === 'survey' && !surveyData) load('survey');
+      if (name === 'frontier' && !frontierData) load('frontier');
+      if (name === 'survey' && chart) chart.resize();
+    }
+
+    document.querySelectorAll('.tab').forEach(b => {
+      b.addEventListener('click', () => switchTab(b.dataset.tab));
+    });
+    $('focus').addEventListener('change', () => { surveyData = null; load('survey'); });
+    window.addEventListener('resize', () => { if (chart) chart.resize(); });
+
+    // ---------- 英译中 ----------
+    // 复用 /translate/selection：它内部就是「分块 → 逐块调模型 → 拼回来」，
+    // 不校验文字来源，正好拿来翻译整段。没必要为方向相反再写一个接口。
+    $('btnClear').addEventListener('click', () => {
+      $('enInput').value = '';
+      $('trOutCard').hidden = true;
+      trHint('', '');
+    });
+
+    $('btnEn2zh').addEventListener('click', async () => {
+      const text = $('enInput').value.trim();
+      if (!text) { trHint('先贴一段英文', 'err'); return; }
+      // 后端 /translate/selection 卡 max_length=6000，超了会回 422，
+      // 不如在这里就拦住，提示得清楚。
+      if (text.length > 6000) {
+        trHint(`太长：${text.length} 字符，一次最多 6000，请分段译`, 'err');
+        return;
+      }
+      const btn = $('btnEn2zh');
+      btn.disabled = true;
+      trHint('翻译中…（约 3-15 秒）', '');
+      try {
+        const r = await fetch('/translate/selection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, context: '' })
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          throw new Error(j.detail || ('HTTP ' + r.status));
+        }
+        const d = await r.json();
+        const zh = (d.markdown || '').trim();
+        if (!zh) throw new Error('模型没有返回译文');
+        $('zhOutput').textContent = zh;
+        $('trOutCard').hidden = false;
+        trHint(`完成 · ${text.length} 字符 → ${zh.length} 字`, 'ok');
+      } catch (e) {
+        trHint('失败：' + e.message, 'err');
+      } finally { btn.disabled = false; }
+    });
+
+    function trHint(msg, cls) {
+      const el = $('trHint');
+      el.textContent = msg;
+      el.className = 'tr-hint' + (cls ? ' ' + cls : '');
+    }
+
+    // 顶栏统计：用 /graph 的 summary，顺便验证图上数据一致性
+    getJSON('/graph').then(g => {
+      const s = g.summary || {};
+      $('stats').innerHTML = `论文 <b>${s.node_count ?? '—'}</b> · 引用边 <b>${s.edge_count ?? '—'}</b>`;
+    }).catch(() => { $('stats').textContent = '图谱未就绪'; });
+
+    switchTab('survey');
+
+    // 划词翻译：挂到综述和前沿探索的正文区。选中一段英文，鼠标旁就浮出「译」。
+    // 和阅读器里的划词是同一套交互，代码共用 quick-translate.js。
+    QuickTranslate.attach(
+      document.getElementById('paneSurvey'),
+      document.getElementById('paneFrontier')
+    );
+  </script>
+</body>
+</html>
