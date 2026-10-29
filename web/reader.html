@@ -216,6 +216,32 @@
     box-shadow: 0 0 0 2px rgba(26,115,232,.35);
     border-radius: 2px;
   }
+  /* 全篇搜索高亮：独立图层 + pointer-events:none，不拦 textLayer 的选字和引用点击 */
+  .searchLayer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  .searchLayer mark {
+    position: absolute; border-radius: 2px; pointer-events: none;
+    background: rgba(255,214,0,.42); mix-blend-mode: multiply;
+  }
+  .searchLayer mark.cur {
+    background: rgba(255,140,0,.62);
+    box-shadow: inset 0 0 0 1.5px rgba(216,92,0,.85);
+  }
+  /* 搜索条：浮在正文顶上，Ctrl+F 或点顶栏「找」呼出 */
+  #findBar {
+    position: fixed; top: 62px; left: 50%; transform: translateX(-50%); z-index: 70;
+    display: flex; align-items: center; gap: 6px; padding: 7px 8px;
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.16);
+  }
+  #findBar[hidden] { display: none; }
+  #findBar input {
+    width: 224px; font-size: 13px; padding: 6px 9px; border: 1px solid var(--line);
+    border-radius: 8px; outline: none; color: #1a1a1a; background: #fff;
+  }
+  #findBar input:focus { border-color: var(--blue); }
+  #findCount { font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 78px; }
+  #findCount.none { color: #c0392b; }
+  #findBar .icon-btn:disabled { opacity: .45; cursor: default; border-color: var(--line); color: #9aa3af; }
 
   /* 返回原位置：从引用跳转跳到 References 后浮出来 */
   #backJump {
@@ -347,6 +373,7 @@
       <input id="pageInput" type="number" min="1" value="1" title="跳到指定页，回车确认" />
       <span class="pager" id="pageTotal">/ 0</span>
       <button class="icon-btn" id="layoutBadge" title="原文版式：单栏 / 双栏（赛题 1.3.1）">版式</button>
+      <button class="icon-btn" id="findToggle" title="全篇搜索（Ctrl+F）">找</button>
       <div class="viewmodes" role="group" aria-label="视图模式">
         <button class="icon-btn on" id="viewFit" data-mode="fit" title="适合宽度（整栏铺满）">宽</button>
         <button class="icon-btn" id="viewActual" data-mode="actual" title="实际大小 100%（公式/表格看原尺寸）">1:1</button>
@@ -397,6 +424,13 @@
   <button id="backJump" hidden>↩ 返回第 <b id="backJumpPage">1</b> 页</button>
   <button id="selBtn" hidden>译</button>
   <div id="toast" hidden></div>
+  <div id="findBar" hidden>
+    <input id="findInput" type="search" placeholder="全篇搜索（回车下一个）" autocomplete="off" spellcheck="false" />
+    <span id="findCount"></span>
+    <button class="icon-btn" id="findPrev" title="上一个（Shift+Enter）" disabled>‹</button>
+    <button class="icon-btn" id="findNext" title="下一个（Enter）" disabled>›</button>
+    <button class="icon-btn" id="findClose" title="关闭（Esc）">×</button>
+  </div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
 <script>
@@ -461,6 +495,15 @@ const state = {
   citeIndex: new Map(),  // 引用编号 n -> 正文里第一次出现它的页码（惰性扫描后缓存）
   citeOrigin: null,      // 最近一次从正文点进来的引用：{key, page, top}，供 References 条目跳回
   authorIndex: new Map(), // "姓氏|年份" -> {page, needle}，作者-年份引用的惰性索引
+  tcCache: new Map(),   // 页码 -> Promise<text items>：全篇搜索和渲染共用一次文本解析
+  search: {
+    q: '',              // 当前查询词（已 trim）
+    matches: [],        // [{page, a, b}]：a/b 是该页拼串里的字符偏移
+    idx: -1,            // 当前命中下标（-1 = 没有）
+    texts: new Map(),   // 页码 -> {text, runs}：该页拼串 + 每个 text item 的偏移区间
+    scanId: 0,          // 扫描序号：新查询一来，旧扫描结果直接丢弃
+    navId: 0,           // 跳转序号：连按回车只认最后一次
+  },
   trans: {
     open: false,        // 译文栏是否展开
     sync: false,        // 中英对比：双向滚动同步
@@ -503,6 +546,7 @@ function parseAuthorCite(raw) {
 
 // ---------- 打开一篇论文 ----------
 async function openPaper(filename, page) {
+  cancelRenders();   // 上一篇还在跑的渲染任务作废
   state.pdf = null;
   state.rendered.clear();
   pagesEl.innerHTML = '';
@@ -513,6 +557,7 @@ async function openPaper(filename, page) {
   state.citeIndex = new Map();
   state.citeOrigin = null;
   backJumpEl.hidden = true;
+  resetSearch();   // 换论文：上一轮的查询、命中、文本缓存全部作废
 
   if (!window.pdfjsLib) {
     overlayEl.hidden = false;
@@ -908,6 +953,18 @@ function buildPagePlaceholders() {
   applyPagesLayout();
 }
 
+// 正在跑的渲染任务。缩放 / 换版式 / 换论文时要先 cancel()：
+// pdf.js 里一个没结束的 render 会一直占着这一页的渲染状态，
+// 新的 render 的 promise 永远不 settle，整页就停在空白 + dataset.rendering='1'（实测能卡住十几秒）。
+const liveTasks = new Map();
+
+function cancelRenders() {
+  for (const t of liveTasks.values()) {
+    try { t.cancel(); } catch (e) { /* 已经收尾的任务 cancel 会抛，忽略 */ }
+  }
+  liveTasks.clear();
+}
+
 let observer = null;
 function observePages() {
   if (!('IntersectionObserver' in window)) {
@@ -929,7 +986,14 @@ async function renderPage(pageNo) {
   if (!pdf || pageNo < 1 || pageNo > state.numPages) return;
   const holder = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
   if (!holder || holder.dataset.ready === '1' || holder.dataset.rendering === '1') return;
+  // 这一页可能还挂着一个上轮的渲染任务（缩放/换版式打断的），先取消再重来
+  const stale = liveTasks.get(pageNo);
+  if (stale) {
+    try { stale.cancel(); } catch (e) { /* ignore */ }
+    liveTasks.delete(pageNo);
+  }
   holder.dataset.rendering = '1';
+  let task = null;
 
   try {
     const page = await pdf.getPage(pageNo);
@@ -949,19 +1013,27 @@ async function renderPage(pageNo) {
     holder.appendChild(canvas);
 
     const ctx = canvas.getContext('2d');
-    const task = page.render({
+    task = page.render({
       canvasContext: ctx,
       viewport,
       transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
     });
-    await task.promise;
+    liveTasks.set(pageNo, task);
+    try {
+      await task.promise;
+    } catch (e) {
+      // 被 relayout()/换论文取消：不是错误，这一页交给下一轮重渲
+      if (e && e.name === 'RenderingCancelledException') return;
+      throw e;
+    }
+    liveTasks.delete(pageNo);
 
     // 文本层：透明文字叠在 canvas 上，用来选中文字 + 定位正文 [n]
     const textLayer = document.createElement('div');
     textLayer.className = 'textLayer';
     holder.appendChild(textLayer);
-    const tc = await page.getTextContent({ normalizeWhitespace: false });
-    buildTextLayer(tc.items, viewport, textLayer, pageNo);
+    const items = await pageTextItems(pageNo);
+    buildTextLayer(items, viewport, textLayer, pageNo);
 
     const tag = document.createElement('div');
     tag.className = 'pno';
@@ -970,9 +1042,12 @@ async function renderPage(pageNo) {
 
     holder.dataset.ready = '1';
     state.rendered.set(pageNo, { canvas, textLayer });
+    // 这一页可能落在已有搜索结果里：渲染完立刻补上高亮（缩放/换版式重渲也走这里）
+    paintSearchPage(pageNo);
   } catch (e) {
     console.warn('page render failed', pageNo, e);
   } finally {
+    if (task && liveTasks.get(pageNo) === task) liveTasks.delete(pageNo);
     delete holder.dataset.rendering;
   }
 }
@@ -988,6 +1063,10 @@ function buildTextLayer(items, viewport, layer, pageNo) {
   // 参考文献页（含其后连续几页）自己不该再生成引用链接：已经在看源头了。
   // 反过来，这些页上的 "[12]" 条目编号是"反向跳转"的入口。
   const isRefRegion = state.refPage != null && pageNo >= state.refPage;
+  // 这一页"拼串"的累计偏移：口径和 pageTextIndex() 完全一致，搜索命中才能反查回 span
+  let textOffset = 0;
+  // 攒 {span, item}：等整层挂到 DOM 后再按 PDF 的真实 advance 宽度做水平缩放
+  const spanItems = [];
 
   for (const item of items) {
     if (!item.str || !item.str.trim()) continue;
@@ -997,7 +1076,15 @@ function buildTextLayer(items, viewport, layer, pageNo) {
     const left = tx[4];
     const top = tx[5] - fontHeight;
 
+    const s0 = textOffset;
+    const s1 = s0 + item.str.length;
+    textOffset = s1;
+
     const span = document.createElement('span');
+    span.dataset.s = String(s0);          // 这段话在本页拼串里的起点
+    span.dataset.se = String(s1);         // 终点
+    span.dataset.pad = '0';               // textContent 比 item.str 少掉的前导字符数（见 ref-link 分支）
+    spanItems.push({ span, item });
     span.style.left = `${left.toFixed(2)}px`;
     span.style.top = `${top.toFixed(2)}px`;
     span.style.fontSize = `${fontHeight.toFixed(2)}px`;
@@ -1018,6 +1105,8 @@ function buildTextLayer(items, viewport, layer, pageNo) {
       });
       span.appendChild(link);
       span.appendChild(document.createTextNode(item.str.slice(mRef[0].length)));
+      // 编号前的空格被 trim 掉了，textContent 会比 item.str 短一段：记下来做偏移修正
+      span.dataset.pad = String(item.str.length - span.textContent.length);
       frag.appendChild(span);
       continue;
     }
@@ -1098,7 +1187,294 @@ function buildTextLayer(items, viewport, layer, pageNo) {
     frag.appendChild(span);
   }
   layer.appendChild(frag);
+
+  // 把每段透明文字水平缩放到 PDF 里的真实 advance 宽度（pdf.js viewer 的标准做法 scaleX）。
+  // 不做这一步的后果：替代字体比原字体宽 ~10%，一行越到行尾偏得越多（实测最大 151px），
+  // 选字框、引用底色、搜索高亮都会压不到 canvas 上的字。
+  const fits = [];
+  for (const pair of spanItems) {
+    const target = pair.item.width * viewport.scale;
+    const natural = pair.span.getBoundingClientRect().width;
+    if (!(target > 0) || !(natural > 1)) continue;
+    fits.push([pair.span, clamp(target / natural, 0.4, 2.5)]);
+  }
+  for (const [span, k] of fits) {
+    if (Math.abs(k - 1) >= 0.004) span.style.transform = `scaleX(${k.toFixed(4)})`;
+  }
 }
+
+// ---------- 全篇搜索（Ctrl+F）----------
+// 三个约束决定实现方式：
+//   1) 页面懒渲染（只渲染视口附近）→ 搜索只读 page.getTextContent()，不依赖 DOM，
+//      这样没渲染过的页也能搜到，"共 y 个"才是全篇的数；
+//   2) 不给命中文字套 <mark>：那会切断 textLayer 的选字和引用点击 → 改用
+//      Range.getClientRects() 量出真实字形矩形，在独立的 .searchLayer 上画色块；
+//   3) pdf.js 常把一行字切成好几个 text item → 命中跨 item 时拆成多块矩形，
+//      视觉上仍然是一条连续的高亮。
+
+const findBarEl = document.getElementById('findBar');
+const findInputEl = document.getElementById('findInput');
+const findCountEl = document.getElementById('findCount');
+const findPrevEl = document.getElementById('findPrev');
+const findNextEl = document.getElementById('findNext');
+const findCloseEl = document.getElementById('findClose');
+const findToggleEl = document.getElementById('findToggle');
+
+/** 一页的 text items（缓存 Promise：渲染和搜索共用同一次解析）。 */
+function pageTextItems(pageNo) {
+  if (!state.tcCache.has(pageNo)) {
+    state.tcCache.set(pageNo, (async () => {
+      const page = await state.pdf.getPage(pageNo);
+      const tc = await page.getTextContent({ normalizeWhitespace: false });
+      return tc.items;
+    })());
+  }
+  return state.tcCache.get(pageNo);
+}
+
+/** 这一页拼起来的纯文本 + 每个 text item 的偏移区间（口径与 buildTextLayer 一致）。 */
+async function pageTextIndex(pageNo) {
+  if (state.search.texts.has(pageNo)) return state.search.texts.get(pageNo);
+  const items = await pageTextItems(pageNo);
+  let text = '';
+  const runs = [];
+  for (const it of items) {
+    if (!it.str || !it.str.trim()) continue;   // buildTextLayer 也跳过纯空白 item
+    runs.push({ s: text.length, e: text.length + it.str.length });
+    text += it.str;
+  }
+  const idx = { text, runs };
+  state.search.texts.set(pageNo, idx);
+  return idx;
+}
+
+/** 扫全篇：逐页取文本、大小写不敏感，一页都不渲染。 */
+async function scanSearch(q) {
+  const needle = q.toLowerCase();
+  const myId = ++state.search.scanId;
+  const matches = [];
+  for (let p = 1; p <= (state.numPages || 0); p++) {
+    const idx = await pageTextIndex(p);
+    if (myId !== state.search.scanId) return;   // 期间又搜了新词，本次结果作废
+    const hay = idx.text.toLowerCase();
+    let at = hay.indexOf(needle);
+    while (at !== -1) {
+      matches.push({ page: p, a: at, b: at + needle.length });
+      at = hay.indexOf(needle, at + needle.length);
+    }
+  }
+  state.search.matches = matches;
+  state.search.idx = matches.length ? 0 : -1;
+  paintAllSearch();
+  updateFindCount();
+  if (matches.length) gotoMatch(0);
+}
+
+/** 画某一页的高亮；页还没渲染就先跳过，等 renderPage 里的回调补画。 */
+function paintSearchPage(pageNo) {
+  const holder = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
+  if (!holder) return;
+  const old = holder.querySelector('.searchLayer');
+  if (old) old.remove();
+  if (!state.search.q || holder.dataset.ready !== '1') return;
+
+  const spans = [...holder.querySelectorAll('.textLayer > span')];
+  if (!spans.length) return;
+  const layer = document.createElement('div');
+  layer.className = 'searchLayer';
+  const hr = holder.getBoundingClientRect();
+
+  state.search.matches.forEach((m, mi) => {
+    if (m.page !== pageNo) return;
+    for (const span of spans) {
+      const s = +(span.dataset.s || 0);
+      const e = +(span.dataset.se || 0);
+      if (e <= s) continue;
+      const from = Math.max(m.a, s);
+      const to = Math.min(m.b, e);
+      if (to <= from) continue;
+      // ref-link 那类被 trim 过的 span：item.str 偏移要减掉前导空格数才落回 textContent
+      const pad = +(span.dataset.pad || 0);
+      const len = span.textContent.length;
+      const lf = clamp(from - s - pad, 0, len);
+      const lt = clamp(to - s - pad, 0, len);
+      if (lt <= lf) continue;
+      for (const r of rangeRects(span, lf, lt)) {
+        if (r.width < 0.5) continue;
+        const mk = document.createElement('mark');
+        mk.dataset.mi = String(mi);
+        mk.style.left = `${(r.left - hr.left).toFixed(1)}px`;
+        mk.style.top = `${(r.top - hr.top).toFixed(1)}px`;
+        mk.style.width = `${r.width.toFixed(1)}px`;
+        mk.style.height = `${r.height.toFixed(1)}px`;
+        layer.appendChild(mk);
+      }
+    }
+  });
+  if (!layer.firstChild) return;
+  holder.appendChild(layer);
+  syncCurrentMark();
+}
+
+function paintAllSearch() {
+  for (let p = 1; p <= (state.numPages || 0); p++) paintSearchPage(p);
+}
+
+/** 当前命中染成橙色：所有页一起刷，切页后旧页不会残留橙色。 */
+function syncCurrentMark() {
+  const cur = String(state.search.idx);
+  pagesEl.querySelectorAll('.searchLayer mark').forEach(mk => {
+    mk.classList.toggle('cur', mk.dataset.mi === cur);
+  });
+}
+
+/** span 内 [from,to) 这段文字的真实矩形（穿透内层 span，一行一个矩形）。 */
+function rangeRects(root, from, to) {
+  const nodes = [];
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walk.nextNode())) nodes.push(n);
+  let acc = 0, sn = null, so = 0, en = null, eo = 0;
+  for (const node of nodes) {
+    const len = node.nodeValue.length;
+    if (sn === null && from < acc + len) { sn = node; so = from - acc; }
+    if (sn !== null && to <= acc + len) { en = node; eo = to - acc; break; }
+    acc += len;
+  }
+  if (!sn || !en) return [];
+  const r = document.createRange();
+  r.setStart(sn, so);
+  r.setEnd(en, eo);
+  return [...r.getClientRects()];
+}
+
+function updateFindCount() {
+  const n = state.search.matches.length;
+  if (!state.search.q) {
+    findCountEl.textContent = '';
+    findCountEl.classList.remove('none');
+    findPrevEl.disabled = true;
+    findNextEl.disabled = true;
+    return;
+  }
+  findCountEl.classList.toggle('none', n === 0);
+  findCountEl.textContent = n ? `第 ${state.search.idx + 1} / 共 ${n} 个` : '没有找到';
+  findPrevEl.disabled = n === 0;
+  findNextEl.disabled = n === 0;
+}
+
+/** 跳到第 i 个命中（环形）：先确保那一页渲染出来，再把高亮块滚进视口。 */
+async function gotoMatch(i) {
+  const n = state.search.matches.length;
+  if (!n) return;
+  const idx = ((i % n) + n) % n;
+  state.search.idx = idx;
+  updateFindCount();
+  const m = state.search.matches[idx];
+  const myId = ++state.search.navId;
+  const ok = await ensureRendered(m.page);
+  if (myId !== state.search.navId) return;   // 连按回车：只认最后一次
+  paintSearchPage(m.page);
+  syncCurrentMark();
+  if (!ok) return;
+  const mk = pagesEl.querySelector(
+    `.page[data-page="${m.page}"] .searchLayer mark[data-mi="${idx}"]`);
+  if (!mk) return;
+  scrollElIntoView(mk);
+  state.currentPage = m.page;
+  pageInputEl.value = String(m.page);
+  markActiveSection(m.page);
+}
+
+let findTick = null;
+
+function runFindNow() {
+  if (!state.pdf) return;
+  const q = findInputEl.value.trim();
+  state.search.q = q;
+  state.search.matches = [];
+  state.search.idx = -1;
+  if (!q) {
+    paintAllSearch();   // 清空查询：把旧高亮全部抹掉
+    updateFindCount();
+    return;
+  }
+  scanSearch(q);
+}
+
+function openFind() {
+  findBarEl.hidden = false;
+  findInputEl.focus();
+  findInputEl.select();
+}
+
+function closeFind() {
+  findBarEl.hidden = true;
+  findInputEl.blur();
+}
+
+/** 换论文 / 重置：查询、命中、文本缓存、DOM 高亮一起清。 */
+function resetSearch() {
+  state.tcCache = new Map();
+  state.search.texts = new Map();
+  state.search.q = '';
+  state.search.matches = [];
+  state.search.idx = -1;
+  state.search.scanId++;
+  state.search.navId++;
+  pagesEl.querySelectorAll('.searchLayer').forEach(el => el.remove());
+  if (findInputEl) findInputEl.value = '';
+  updateFindCount();
+}
+
+findInputEl.addEventListener('input', () => {
+  clearTimeout(findTick);
+  findTick = setTimeout(runFindNow, 200);
+});
+findInputEl.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    clearTimeout(findTick);
+    if (findInputEl.value.trim() !== state.search.q) runFindNow();   // 还没扫完就直接用新词扫
+    else if (state.search.matches.length) gotoMatch(state.search.idx + (ev.shiftKey ? -1 : 1));
+  } else if (ev.key === 'Escape') {
+    closeFind();
+  }
+});
+findPrevEl.addEventListener('click', () => gotoMatch(state.search.idx - 1));
+findNextEl.addEventListener('click', () => gotoMatch(state.search.idx + 1));
+findCloseEl.addEventListener('click', closeFind);
+findToggleEl.addEventListener('click', () => {
+  if (findBarEl.hidden) openFind(); else closeFind();
+});
+
+document.addEventListener('keydown', ev => {
+  // 接管浏览器自带的"页内查找"：正文是 canvas，原生查找只能搜到透明文字层的一半
+  if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'f' || ev.key === 'F')) {
+    ev.preventDefault();
+    openFind();
+    return;
+  }
+  if (ev.key === 'Escape' && !findBarEl.hidden) closeFind();
+});
+
+// 点高亮跳过去：高亮块 pointer-events:none，靠坐标命中，不拦选字与引用点击
+pagesEl.addEventListener('click', ev => {
+  if (!state.search.matches.length) return;
+  if (ev.target.closest('.cite, .cite-a, .cite-n, .ref-link')) return;
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && String(sel)) return;   // 正在选字，别抢
+  const pageEl = ev.target.closest('.page');
+  if (!pageEl) return;
+  for (const mk of pageEl.querySelectorAll('.searchLayer mark')) {
+    const r = mk.getBoundingClientRect();
+    if (ev.clientX >= r.left - 1 && ev.clientX <= r.right + 1 &&
+        ev.clientY >= r.top - 1 && ev.clientY <= r.bottom + 1) {
+      gotoMatch(+mk.dataset.mi);
+      return;
+    }
+  }
+});
 
 // ---------- 跳转 ----------
 // 用 getBoundingClientRect 算"这一页在滚动容器里的绝对位置"：
@@ -1481,6 +1857,7 @@ function relayout() {
   if (!state.pdf || !state.dims.length) return;
   computeBaseScale();
   const scale = scaleNow();
+  cancelRenders();          // 旧尺寸的渲染任务作废，否则新任务会被卡住
   state.rendered.clear();
   pagesEl.querySelectorAll('.page').forEach((el, i) => {
     const d = state.dims[i];
