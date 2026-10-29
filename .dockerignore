@@ -1,0 +1,53 @@
+# 构建上下文剔除：这些目录加起来超过 1.4 GB，进镜像会拖慢构建、撑大镜像，
+# 而且都是本机运行产生的数据，不能进镜像（论文 PDF 有版权问题，索引换个库就该重建）。
+
+# ---- 虚拟环境与缓存 ----
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# ---- 运行数据（容器里用 volume 挂载）----
+data/papers/
+data/meta/
+data/chroma/
+data/uploads/
+data/online/
+data/*.json
+
+# ---- 版本控制与编辑器 ----
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# ---- 密钥 ----
+.env
+.env.*
+!.env.example
+
+# ---- 文档与临时文件 ----
+docs/
+eval/
+科研小助手/
+科研小助手.*
+*.docx
+*.rar
+*.zip
+*.md
+!README.md
+*.log
+*.png
+*.jpg
+*.webp
+*.pdf
+ck.ps1
+*.egg-info/
+scripts/_tmp_*.py
+scripts/_verify_*.py
+scripts/probe_*.py
