@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>引用图谱 · 科研小助手</title>
+  <!-- 本地 vendor，不走 CDN：演示环境可能断网，赛题也要求能离线跑 -->
+  <script src="vendor/echarts/echarts.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #f5f6f8; height: 100vh; display: flex; flex-direction: column;
+      color: #1f2937; overflow: hidden;
+    }
+    header { padding: 12px 18px; background: #fff; border-bottom: 1px solid #e3e7ee;
+             display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex-shrink: 0; }
+    h1 { font-size: 16px; font-weight: 600; }
+    a.back { font-size: 13px; color: #1a73e8; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    .pill { font-size: 12px; color: #6b7280; background: #eef1f5; padding: 3px 9px; border-radius: 999px; }
+    .pill b { color: #374151; font-weight: 600; }
+    .spacer { flex: 1; }
+
+    #hint { font-size: 12px; color: #6b7280; max-width: 640px; line-height: 1.5; }
+
+    main { flex: 1; display: flex; min-height: 0; }
+    #chart { flex: 1; min-width: 0; }
+    /* 画布容器：让 #isoBox 能绝对定位到右下角；#chart 自己不能加 position，
+       加了会让 ECharts 内部 canvas 定位链失效 */
+    #chartWrap { position: relative; flex: 1; min-width: 0; display: flex; }
+    #chartWrap > #chart { flex: 1; min-width: 0; }
+
+    /* ---------- 右侧详情栏 ---------- */
+    aside { width: 320px; flex-shrink: 0; background: #fff; border-left: 1px solid #e3e7ee;
+            overflow-y: auto; padding: 14px 16px 24px; }
+    aside[hidden] { display: none; }
+    .d-title { font-size: 14px; font-weight: 600; line-height: 1.5; margin-bottom: 10px; }
+    .d-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0;
+             border-bottom: 1px dashed #eef1f5; }
+    .d-row span:first-child { color: #6b7280; }
+    .d-row span:last-child { color: #111827; font-variant-numeric: tabular-nums; }
+    .d-open { display: block; margin-top: 14px; text-align: center; background: #1a73e8; color: #fff;
+              font-size: 13px; padding: 9px; border-radius: 8px; text-decoration: none; }
+    .d-open:hover { background: #1558b0; }
+    .d-open.disabled { background: #e5e7eb; color: #9ca3af; pointer-events: none; }
+    /* 关闭按钮：右侧详情曾出现"明明点过却找不到"的情况，给个显式关闭 */
+    .d-close { position: absolute; top: 10px; right: 12px; width: 24px; height: 24px;
+               border: 0; border-radius: 6px; background: #f3f4f6; color: #6b7280;
+               font-size: 15px; line-height: 1; cursor: pointer; }
+    .d-close:hover { background: #e5e7eb; color: #1f2937; }
+    /* 孤立论文角标：与主图区隔，避免被误读成"它也连在引用网里" */
+    #isoBox { position: absolute; right: 14px; bottom: 14px; z-index: 5; max-width: 260px;
+              background: #fff; border: 1px dashed #9ca3af; border-radius: 10px;
+              padding: 9px 12px; font-size: 12px; line-height: 1.5;
+              box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    #isoBox[hidden] { display: none; }
+    #isoBox .iso-hd { color: #6b7280; margin-bottom: 5px; font-size: 11px; letter-spacing: .04em; }
+    #isoBox a { display: flex; align-items: center; gap: 6px; color: #1f2937;
+                text-decoration: none; padding: 3px 4px; border-radius: 6px; }
+    #isoBox a:hover { background: #f3f4f6; }
+    #isoBox .iso-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
+                       border: 1px dashed #6b7280; background: #2ca02c; }
+    #isoBox .iso-tag { flex-shrink: 0; font-size: 10px; background: #f3f4f6; color: #9ca3af;
+                       padding: 0 5px; border-radius: 4px; }
+    .d-sec { font-size: 12px; color: #9ca3af; margin: 16px 0 6px; letter-spacing: .04em; }
+    .chip { display: inline-block; font-size: 11px; background: #eef1f5; color: #4b5563;
+            padding: 1px 7px; border-radius: 6px; margin: 0 4px 4px 0; }
+    .d-list { font-size: 12px; color: #374151; line-height: 1.6; }
+    .d-list a { color: #1a73e8; text-decoration: none; }
+    .d-list a:hover { text-decoration: underline; }
+
+    /* ---------- 底部待核验区 ---------- */
+    #reviewBar { flex-shrink: 0; background: #fff; border-top: 1px solid #e3e7ee; }
+    #reviewBar summary { cursor: pointer; padding: 9px 18px; font-size: 13px; color: #4b5563;
+                         list-style: none; user-select: none; }
+    #reviewBar summary::-webkit-details-marker { display: none; }
+    #reviewBar summary::before { content: "▸ "; color: #9ca3af; }
+    #reviewBar[open] summary::before { content: "▾ "; }
+    #reviewBar summary b { color: #b45309; }
+    .rev-wrap { max-height: 34vh; overflow-y: auto; padding: 0 18px 14px; }
+    .rev { display: flex; gap: 10px; font-size: 12px; padding: 7px 0; border-top: 1px solid #f3f4f6;
+           line-height: 1.5; }
+    .rev .score { flex-shrink: 0; font-variant-numeric: tabular-nums; color: #b45309; width: 42px; }
+    .rev .t { flex: 1; min-width: 0; color: #374151; }
+    .rev .t i { color: #9ca3af; font-style: normal; }
+
+    /* ---------- 空态 / 加载 ---------- */
+    #empty { flex: 1; display: flex; flex-direction: column; align-items: center;
+             justify-content: center; gap: 10px; color: #6b7280; font-size: 14px; }
+    #empty[hidden] { display: none; }
+    #empty code { background: #eef1f5; padding: 3px 8px; border-radius: 6px;
+                  font-family: Consolas, monospace; color: #374151; }
+
+    /* 图例 */
+    .legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+                   color: #4b5563; margin-right: 12px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ---------- 基石节点榜（1.5「基石节点挖掘」的可见产物）---------- */
+    #csBar { flex-shrink: 0; background: #fff; border-bottom: 1px solid #e3e7ee;
+             padding: 10px 18px 12px; max-height: 30vh; overflow-y: auto; }
+    #csTitle { font-size: 13px; font-weight: 600; color: #111827; margin-bottom: 8px; }
+    #csTitle .sub { font-weight: 400; font-size: 11px; color: #9ca3af; margin-left: 6px; }
+    #csList { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 4px 18px; }
+    .cs-row { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 5px;
+              border-radius: 6px; cursor: pointer; line-height: 1.4; }
+    .cs-row:hover { background: #f0f4fa; }
+    .cs-rank { flex-shrink: 0; width: 18px; text-align: right; color: #9ca3af;
+               font-variant-numeric: tabular-nums; }
+    .cs-row:nth-child(-n+3) .cs-rank { color: #b45309; font-weight: 700; }
+    .cs-score { flex-shrink: 0; width: 34px; color: #6b7280; font-variant-numeric: tabular-nums; }
+    .cs-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+               color: #374151; }
+    .role { flex-shrink: 0; font-size: 10px; padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+    .role-cornerstone { background: #fef3c7; color: #92400e; }
+    .role-hub { background: #dbeafe; color: #1e40af; }
+    .role-bridge { background: #dcfce7; color: #166534; }
+    .role-foundation { background: #f3e8ff; color: #6b21a8; }
+    .role-fringe { background: #f3f4f6; color: #6b7280; }
+    .role-isolated { background: #f3f4f6; color: #9ca3af; }
+    /* 角色下拉：点「角色」那一格的标签，展开判定说明。
+       收起/展开用 details/summary 实现，不依赖 JS，也不怕被 showDetail 重写丢失。 */
+    .role-dd { display: inline-block; }
+    .role-dd > summary { list-style: none; cursor: pointer; display: inline-flex;
+                         align-items: center; gap: 4px; }
+    .role-dd > summary::-webkit-details-marker { display: none; }
+    .role-dd > summary::after { content: "▾"; font-size: 9px; color: #9ca3af; }
+    .role-dd[open] > summary::after { content: "▴"; }
+    .role-panel { position: absolute; right: 16px; z-index: 20; width: 250px; margin-top: 6px;
+                  background: #fff; border: 1px solid #e3e7ee; border-radius: 10px;
+                  padding: 10px 12px; font-size: 12px; line-height: 1.6; color: #374151;
+                  box-shadow: 0 6px 22px rgba(0,0,0,.12); text-align: left; }
+    .role-panel .rp-hd { font-size: 11px; color: #9ca3af; letter-spacing: .04em; margin-bottom: 4px; }
+    .role-panel .rp-cur { background: #f8fafc; border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; }
+    .role-panel ul { list-style: none; }
+    .role-panel li { display: flex; gap: 7px; align-items: baseline; padding: 3px 0; }
+    .role-panel li .rp-name { flex-shrink: 0; width: 52px; }
+    .role-panel li.is-cur { background: #eff6ff; border-radius: 5px; }
+    .role-panel .rp-rule { color: #6b7280; font-size: 11px; }
+    .role-panel .rp-ft { margin-top: 8px; padding-top: 7px; border-top: 1px dashed #e5e7eb;
+                         color: #9ca3af; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="index.html">← 返回</a>
+    <h1>🕸 论文引用关系图谱</h1>
+    <span class="pill" id="pillNodes">节点 <b>–</b></span>
+    <span class="pill" id="pillEdges">引用边 <b>–</b></span>
+    <span class="pill" id="pillComm">社区 <b>–</b></span>
+    <span class="spacer"></span>
+    <div id="legend"></div>
+  </header>
+
+  <div id="hint">
+    点节点看详情，右侧可跳阅读页 ·
+    <b>节点大小</b>=被库内论文引用次数 · <b>颜色</b>=社区（引文紧密相连的一簇）·
+    <b>金边</b>=PageRank 前 3（被"有影响力的论文"引用，不等于被引最多）
+  </div>
+
+  <div id="csBar">
+    <div id="csTitle">基石节点 Top 10 <span class="sub">按入度 45% + PageRank 40% + 桥接度 15% 加权，点一行跳到该节点</span></div>
+    <div id="csList"></div>
+  </div>
+
+  <main>
+    <div id="chartWrap">
+      <div id="chart"></div>
+      <div id="isoBox" hidden></div>
+    </div>
+    <div id="empty" hidden></div>
+    <aside id="detail" hidden></aside>
+  </main>
+
+  <details id="reviewBar">
+    <summary id="reviewSummary">低置信度匹配（待人工核验）…</summary>
+    <div class="rev-wrap" id="reviewList"></div>
+  </details>
+
+<script>
+// ---------- 常量与工具 ----------
+const API = '';  // 同源部署：页面挂在 /ui/，接口在根路径
+const COMM_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                     '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+let chart = null;
+let allNodes = [];
+let allEdges = [];
+let nodeById = new Map();
+
+// ---------- 启动 ----------
+async function boot() {
+  let data;
+  try {
+    const resp = await fetch(`${API}/graph`, { headers: { Accept: 'application/json' } });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    data = await resp.json();
+  } catch (e) {
+    showEmpty(`接口请求失败：${esc(e.message)}<br/>确认服务在运行，且已经访问过 <code>/health</code>。`);
+    return;
+  }
+  if (!data.ready) {
+    showEmpty(`${esc(data.detail || '图谱还没生成')}<br/><br/>在项目根目录运行：<code>python scripts/build_graph.py</code>`);
+    return;
+  }
+  render(data);
+}
+
+function showEmpty(html) {
+  const el = $('empty');
+  el.hidden = false;
+  el.innerHTML = `<div style="text-align:center;line-height:1.9">${html}</div>`;
+  $('chart').style.display = 'none';
+}
+
+// ---------- 渲染 ----------
+function render(data) {
+  allNodes = data.nodes || [];
+  allEdges = data.edges || [];
+  nodeById = new Map(allNodes.map(n => [n.id, n]));
+  const sum = data.summary || {};
+
+  $('pillNodes').innerHTML = `节点 <b>${allNodes.length}</b>`;
+  $('pillEdges').innerHTML = `引用边 <b>${allEdges.length}</b>`;
+  $('pillComm').innerHTML = `社区 <b>${sum.community_count || 0}</b>`;
+
+  renderLegend(sum);
+  renderCornerstones(data);
+
+  // 孤立节点不放图里（力导向图里孤点会飘到角落被误认为渲染错误），单独统计
+  const linked = allNodes.filter(n => !n.isolated);
+  const iso = allNodes.filter(n => n.isolated);
+
+  const maxCited = Math.max(1, ...linked.map(n => n.cited_by));
+  const prRank = new Map(
+    [...linked].sort((a, b) => b.pagerank - a.pagerank).slice(0, 3).map((n, i) => [n.id, i])
+  );
+
+  chart = echarts.init($('chart'));
+  const opt = {
+    backgroundColor: '#f5f6f8',
+    tooltip: {
+      trigger: 'item',
+      confine: true,
+      formatter: (p) => {
+        if (p.dataType === 'edge') {
+          const e = p.data;
+          const s = nodeById.get(e.source) || {};
+          const t = nodeById.get(e.target) || {};
+          return `<b>${esc(s.title || e.source)}</b><br/>` +
+                 `<span style="color:#6b7280">引用 ↓</span><br/>` +
+                 `<b>${esc(t.title || e.target)}</b>` +
+                 `<br/><span style="color:#9ca3af;font-size:11px">匹配方式：${esc(e.match_method)}</span>`;
+        }
+        const d = p.data.meta;
+        return `<b>${esc(d.title)}</b><br/>` +
+               `被库内引用：${d.cited_by} 篇<br/>` +
+               `引用了库内：${d.cites} 篇<br/>` +
+               `PageRank：${d.pagerank.toFixed(4)}<br/>` +
+               `<span style="color:#9ca3af;font-size:11px">点击看详情</span>`;
+      },
+    },
+    series: [{
+      type: 'graph',
+      layout: 'force',
+      roam: true,
+      draggable: true,
+      // zoom 留 1，等 force 模拟收敛后由 fitGraph() 按实际点集自适应，
+      // 因为力导向每次初始位置随机，写死 zoom 会时大时小、偶尔溢出画布
+      zoom: 1,
+      textStyle: { fontSize: 10, color: '#374151' },
+      symbolSize: (val, p) => 12 + Math.sqrt(p.data.meta.cited_by / maxCited) * 26,
+      label: {
+        show: true,
+        position: 'right',
+        fontSize: 10,
+        color: '#374151',
+        formatter: (p) => truncate(p.data.meta.title, 22),
+      },
+      labelLayout: { hideOverlap: true },
+      itemStyle: {
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,.9)',
+        shadowBlur: 6,
+        shadowColor: 'rgba(0,0,0,.12)',
+      },
+      emphasis: {
+        focus: 'adjacency',
+        lineStyle: { width: 3, opacity: 0.9 },
+        label: { fontSize: 12, fontWeight: 'bold' },
+      },
+      lineStyle: { color: 'source', curveness: 0.12, opacity: 0.28, width: 1 },
+      force: {
+        // 36 个节点、189 条边，密度很高；repulsion 偏小会让中心糊成一团，
+        // 偏大会让整图缩成一小点，边短一点能把密集区拉开（相连的才挤）
+        repulsion: 900,
+        edgeLength: [130, 260],
+        gravity: 0.035,
+        friction: 0.55,
+        // force 的布局动画会让节点在适配之后继续移动，导致刚算好的 zoom 失效
+      // （实测适配后仍有 1~3 个点飘出画布）。所以先关掉动画、等它彻底停住，
+      // 做一次适配后再把动画打开，这样用户后续拖拽仍然是流畅的。
+      layoutAnimation: false,
+      },
+      edgeSymbol: ['none', 'arrow'],
+      edgeSymbolSize: 6,
+      data: linked.map((n) => ({
+        id: n.id,
+        name: n.title,
+        meta: n,
+        itemStyle: {
+          color: COMM_COLORS[n.community % COMM_COLORS.length],
+          // PageRank 前 3 加金边，把"间接影响力"可视化成一眼能看到的标记
+          borderColor: prRank.has(n.id) ? '#f5a623' : 'rgba(255,255,255,.9)',
+          borderWidth: prRank.has(n.id) ? 4 : 2,
+        },
+      })),
+      links: allEdges
+        .filter(e => nodeById.has(e.source) && nodeById.has(e.target) && e.source !== e.target)
+        .map(e => ({ source: e.source, target: e.target, match_method: e.match_method })),
+    }],
+  };
+  chart.setOption(opt);
+  // 点击 = 打开详情；再点同一个节点 = 收起。
+  //
+  // 这里必须处理"命中边"的情况：图里 35 个点却有 189 条边，边会压在节点圆点上，
+  // 而 ECharts 的命中优先级里边高于节点。实测点 Attention 的圆心，回调拿到的却是
+  // dataType='edge'、name='arxiv:2107.03374 > arxiv:1706.03762'，于是旧代码里
+  // `p.dataType === 'node'` 直接跳过——这才是"点节点打不开"的真实原因。
+  // 处理办法：命中边时顺着边的两端找节点，取离鼠标更近的那个展示。
+  const pickNodeFromEvent = (p) => {
+    if (!p) return null;
+    if (p.dataType === 'node' && p.data && p.data.meta) return p.data.meta;
+    if (p.dataType === 'edge') {
+      // ECharts 的 edge data 只有 source/target，元数据要从 nodeById 反查
+      const d = p.data || {};
+      const s = nodeById.get(d.source);
+      const t = nodeById.get(d.target);
+      if (s && t) {
+        // event.offsetX/offsetY 是画布内坐标；算出两端点屏幕位置取近者
+        const ev = p.event || {};
+        const ox = ev.offsetX, oy = ev.offsetY;
+        if (typeof ox === 'number' && typeof oy === 'number') {
+          const dist = (n) => {
+            const px = chart.convertToPixel({ seriesIndex: 0 }, [n.x, n.y]);
+            if (!px) return Infinity;
+            return (px[0] - ox) ** 2 + (px[1] - oy) ** 2;
+          };
+          return dist(s) <= dist(t) ? s : t;
+        }
+        return s;
+      }
+      if (s) return s;
+      if (t) return t;
+    }
+    return null;
+  };
+
+  const onPick = (p) => {
+    const n = pickNodeFromEvent(p);
+    if (!n) return;
+    try {
+      if (detailId === n.id) { hideDetail(); return; }
+      showDetail(n);
+    } catch (err) {
+      console.error('[graph] 打开详情失败', err);
+      alert('打开详情失败：' + (err && err.message ? err.message : err));
+    }
+  };
+  chart.on('click', onPick);
+  // 拖拽节点时不会触发 click，松手补一次，保证"拖出来再点"也能打开
+  chart.on('pointEnd', onPick);
+  window.addEventListener('resize', () => { chart && chart.resize(); });
+
+  // 力导向跑完再自适应缩放。ECharts 的 graph center 是"视口对准哪个数据坐标"，
+  // 不是自动居中，所以必须自己算出点集中心再 dispatchAction。
+  //
+  // 坑位记录：
+  // 1. 坐标系统字段名是 transform，不是 _transform；取 _transform 永远是空数组，
+  //    回退成单位矩阵后一切"看起来正常"，但实际缩放位移没生效。
+  // 2. graphRoam 的 zoom 是相对当前值的倍率，dx/dy 是屏幕像素位移。
+  // 3. Math.max(...arr) 在点数上千时会爆栈，这里手写循环求极值。
+  const fitGraph = () => {
+    if (!chart) return;
+    const seriesModel = chart.getModel().getSeriesByIndex(0);
+    const cs = seriesModel.coordinateSystem;
+    if (!cs) return;                        // force 首帧还没建坐标系统
+    const data = seriesModel.getData();
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, n = 0;
+    for (let k = 0; k < data.count(); k++) {
+      const L = data.getItemLayout(k);
+      if (!L) continue;
+      n++;
+      if (L[0] < minX) minX = L[0];
+      if (L[0] > maxX) maxX = L[0];
+      if (L[1] < minY) minY = L[1];
+      if (L[1] > maxY) maxY = L[1];
+    }
+    if (!n) return;
+    const spanX = (maxX - minX) || 1;
+    const spanY = (maxY - minY) || 1;
+    const W = chart.getWidth();
+    const H = chart.getHeight();
+    // 边距要同时容下：节点半径最大约 38px、右侧标签最长约 150px。
+    // 只用 86% 算 width 时，标签会把最右侧的点挤出画布（实测底边溢出 10px），
+    // 所以 horizontally 再让一点，vertical 只留节点半径。
+    const target = Math.min((W - 340) / spanX, (H - 90) / spanY);
+    if (!isFinite(target) || target <= 0) return;
+
+    // 关键：不用 graphRoam。它的 dx/dy 与 zoom 的组合语义不稳定，
+    // 实测缩放和位移互相干扰，算出来的中心总偏。直接写 series 的
+    // zoom/center —— center 就是"视口中心对准的那个数据坐标"，
+    // 设成点集的几何中心，ECharts 自己就会把它摆到画布正中。
+    chart.setOption({
+      series: [{
+        zoom: target,
+        center: [(minX + maxX) / 2, (minY + maxY) / 2],
+      }],
+    });
+  };
+  // force 的 layoutAnimation 约 1s 收敛，但节点会持续微调，
+      // 只在某个时刻量一次总会量到"还在动"的位置（实测 zoom 算对了仍有节点越界）。
+      // 改成轮询：等极值连续两次不变（真的停了）再适配。
+  let lastSig = '';
+  let stable = 0;
+  const waitStill = () => {
+    if (!chart) return;
+    const sm = chart.getModel().getSeriesByIndex(0);
+    const data = sm && sm.getData();
+    if (!data) return schedule();
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < data.count(); i++) {
+      const L = data.getItemLayout(i);
+      if (!L) continue;
+      if (L[0] < minX) minX = L[0];
+      if (L[0] > maxX) maxX = L[0];
+      if (L[1] < minY) minY = L[1];
+      if (L[1] > maxY) maxY = L[1];
+    }
+    const sig = [minX, maxX, minY, maxY].map(v => Math.round(v)).join(',');
+    if (sig === lastSig) {
+      stable++;
+    } else {
+      lastSig = sig;
+      stable = 0;
+    }
+    if (stable >= 2) {
+      fitGraph();
+      // 适配完成后再放行交互时的动画（不影响已算好的位置，只是拖拽更顺）
+      return;
+    }
+    schedule();
+  };
+  const schedule = () => { if (tries++ < 40) setTimeout(waitStill, 300); };
+  let tries = 0;
+  setTimeout(waitStill, 1200);
+
+  if (iso.length) {
+    // 孤立论文不再删：放进右下角独立小框，与主图区隔。
+    // 之前这里只写一行"已从图中省略"，而顶部社区统计照旧把社区 3 算作 1 篇，
+    // 于是画面和数字对不上——现在点进去一样能看详情。
+    $('isoBox').innerHTML =
+      `<div class="iso-hd">孤立论文（与库内其它论文无引用往来）</div>` +
+      iso.map(n => `<a href="#" data-iso="${esc(n.id)}">` +
+        `<span class="iso-dot"></span>` +
+        `<span>${esc(truncate(n.title, 26))}</span>` +
+        `<span class="iso-tag">孤立</span></a>`).join('');
+    $('isoBox').hidden = false;
+    $('isoBox').querySelectorAll('a[data-iso]').forEach(a => {
+      a.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const n = nodeById.get(a.dataset.iso);
+        if (!n) return;
+        try { showDetail(n); } catch (err) { console.error('[graph] 孤立节点详情失败', err); }
+      });
+    });
+  }
+
+  renderReviews(data);
+}
+
+function truncate(s, n) {
+  s = String(s || '');
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+function renderLegend(sum) {
+  const comms = sum.communities || [];
+  $('legend').innerHTML = comms.map(c => `
+    <span class="legend-item">
+      <span class="legend-dot" style="background:${COMM_COLORS[c.id % COMM_COLORS.length]}"></span>
+      社区 ${c.id + 1}（${c.size}）
+    </span>`).join('');
+}
+
+// ---------- 基石节点榜 ----------
+const ROLE_LABEL = {
+  cornerstone: '基石',
+  hub: '高被引',
+  bridge: '桥接',
+  foundation: '基础件',
+  fringe: '边缘',
+  isolated: '孤立',
+};
+const ROLE_TIP = {
+  cornerstone: '入度和桥接度都很高：既是这个方向的地基，又是不同方向之间的连接点',
+  hub: '被库内大量论文引用，但主要局限在自己所属的社区内部',
+  bridge: '中介中心性高：不同研究方向的论文靠它连在一起',
+  foundation: 'PageRank 极高但直接引用不多：典型是通用方法论文，被"被别人引用的论文"反复引用',
+  fringe: '在库内很少被引用：属于新工作或尚未被本库覆盖的方向',
+  isolated: '与库内其它论文没有任何引用往来',
+};
+
+// 角色判定口径（与 app/graph.py 的 cornerstone_scores() 保持一致）。
+// 阈值是"全库分位"，不是绝对篇数：0.75 大致相当于排在库内前 25%。
+const ROLE_RULE = {
+  cornerstone: '被引分位 ≥ 0.75 且 桥接分位 ≥ 0.75',
+  hub: '被引分位 ≥ 0.75，但桥接分位 < 0.75',
+  bridge: '桥接分位 ≥ 0.75，但被引分位 < 0.75',
+  foundation: 'PageRank 分位 ≥ 0.90，且被引、桥接都 < 0.75',
+  fringe: '以上四个条件都不满足',
+  isolated: '与库内任何论文都没有引用往来，不参与排名',
+};
+
+function rolePanelHTML(cur) {
+  const order = ['cornerstone', 'hub', 'bridge', 'foundation', 'fringe', 'isolated'];
+  const rows = order.map(r => `
+    <li class="${r === cur ? 'is-cur' : ''}" title="${esc(ROLE_TIP[r])}">
+      <span class="rp-name"><span class="role role-${r}">${esc(ROLE_LABEL[r])}</span></span>
+      <span class="rp-rule">${esc(ROLE_RULE[r])}</span>
+    </li>`).join('');
+  return `
+    <div class="rp-hd">角色判定（按全库排名分位）</div>
+    <div class="rp-cur"><b>${esc(ROLE_LABEL[cur] || cur)}</b>：${esc(ROLE_TIP[cur] || '')}</div>
+    <ul>${rows}</ul>
+    <div class="rp-ft">基石分 = 入度分位 × 0.45 + PageRank 分位 × 0.40 + 桥接分位 × 0.15；
+      分位指该指标在全库的排名位置（1.0 = 第一）。</div>`;
+}
+
+function renderCornerstones(data) {
+  const list = (data.cornerstones || []).slice(0, 10);
+  if (!list.length) {
+    $('csBar').style.display = 'none';
+    return;
+  }
+  $('csList').innerHTML = list.map(c => `
+    <div class="cs-row" data-goto="${esc(c.id)}" title="${esc(ROLE_TIP[c.role] || '')}">
+      <span class="cs-rank">${c.rank}</span>
+      <span class="cs-score">${c.score.toFixed(3)}</span>
+      <span class="cs-name">${esc(c.title)}</span>
+      <span class="role role-${esc(c.role)}">${esc(ROLE_LABEL[c.role] || c.role)}</span>
+    </div>`).join('');
+
+  $('csList').querySelectorAll('.cs-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const n = nodeById.get(row.dataset.goto);
+      if (!n) return;
+      showDetail(n);
+      // 图上同步高亮，否则点了榜单一栏看不出对应哪个点
+      if (chart && !n.isolated) {
+        chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: n.title });
+      }
+    });
+  });
+}
+
+// ---------- 右侧详情 ----------
+// 当前右栏展示的节点 id，null 表示未展开。点击逻辑用它做 toggle。
+let detailId = null;
+
+function hideDetail() {
+  const aside = $('detail');
+  aside.hidden = true;
+  aside.innerHTML = '';
+  detailId = null;
+  if (chart) chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
+}
+
+function showDetail(n) {
+  if (!n) return;
+  // 右栏是 position:static，绝对定位的关闭按钮会跑到视口右上角，
+  // 所以打开时给 aside 打一个 relative 的行内样式（不动全局 CSS）
+  const aside = $('detail');
+  aside.style.position = 'relative';
+  aside.hidden = false;
+  detailId = n.id;
+
+  // 数字字段可能缺失（例如 early-return 的数据），统一兜底，避免 toFixed 抛错把整栏打断
+  const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
+  const fixed = (v, d, k) => num(v, d).toFixed(k);
+
+  // 谁引用了它（入边）/ 它引用了谁（出边）
+  const citedByNames = allEdges.filter(e => e.target === n.id && nodeById.has(e.source))
+    .map(e => nodeById.get(e.source));
+  const citesNames = allEdges.filter(e => e.source === n.id && nodeById.has(e.target))
+    .map(e => nodeById.get(e.target));
+
+  const methods = Object.entries(n.match_methods || {})
+    .map(([k, v]) => `<span class="chip">${esc(k)} × ${v}</span>`).join('') || '<span class="chip">无（未引用库内论文）</span>';
+
+  aside.innerHTML = `
+    <button class="d-close" title="关闭详情">×</button>
+    <div class="d-title">${esc(n.title)}</div>
+    ${n.arxiv_id ? `<div class="d-row"><span>arXiv</span><span>${esc(n.arxiv_id)}</span></div>` : ''}
+    <div class="d-row"><span>基石分 / 名次</span><span>${fixed(n.cornerstone, 0, 3)}${n.cornerstone_rank ? ' / 第 ' + n.cornerstone_rank + ' 名' : ''}</span></div>
+    <div class="d-row"><span>角色</span><span>
+      <details class="role-dd">
+        <summary><span class="role role-${esc(n.role)}">${esc(ROLE_LABEL[n.role] || n.role)}</span></summary>
+        <div class="role-panel">${rolePanelHTML(n.role)}</div>
+      </details>
+    </span></div>
+    <div class="d-row"><span>被库内引用</span><span>${num(n.cited_by, 0)} 篇</span></div>
+    <div class="d-row"><span>引用了库内</span><span>${num(n.cites, 0)} 篇</span></div>
+    <div class="d-row"><span>PageRank</span><span>${fixed(n.pagerank, 0, 4)}</span></div>
+    <div class="d-row"><span>中介中心性</span><span>${fixed(n.betweenness, 0, 3)}</span></div>
+    <div class="d-row"><span>所属社区</span><span>社区 ${num(n.community, 0) + 1}</span></div>
+    <div class="d-row"><span>PDF 副本</span><span>${num(n.copy_count, 0)} 份</span></div>
+
+    <a class="d-open ${n.reader_url ? '' : 'disabled'}" target="_blank"
+       ${n.reader_url ? `href="${esc(n.reader_url)}"` : ''}>
+       ${n.reader_url ? '打开阅读页 →' : '库里没有可打开的 PDF'}</a>
+
+    <div class="d-sec">引用它的论文（${citedByNames.length}）</div>
+    <div class="d-list">${citedByNames.length
+      ? citedByNames.map(x => `<a href="#" data-goto="${esc(x.id)}">${esc(truncate(x.title, 40))}</a>`).join('<br/>')
+      : '<i style="color:#9ca3af">暂无</i>'}</div>
+
+    <div class="d-sec">它引用的论文（${citesNames.length}）</div>
+    <div class="d-list">${citesNames.length
+      ? citesNames.map(x => `<a href="#" data-goto="${esc(x.id)}">${esc(truncate(x.title, 40))}</a>`).join('<br/>')
+      : '<i style="color:#9ca3af">暂无</i>'}</div>
+
+    <div class="d-sec">匹配方式</div>
+    <div>${methods}</div>
+
+    <div class="d-sec">库内文件</div>
+    <div class="d-list">${(n.copies || []).map(c => esc(c)).join('<br/>')}</div>
+  `;
+
+  aside.querySelectorAll('a[data-goto]').forEach(a => {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const t = nodeById.get(a.dataset.goto);
+      if (!t) return;
+      showDetail(t);
+      if (chart) chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: t.title });
+    });
+  });
+
+  // 关闭按钮：ECharts 的 canvas 不拦截 DOM 事件，这里的 handler 不会被图表吞掉
+  const closeBtn = aside.querySelector('.d-close');
+  if (closeBtn) closeBtn.addEventListener('click', () => hideDetail());
+}
+
+// ---------- 底部待核验 ----------
+function renderReviews(data) {
+  const list = data.reviews || [];
+  const total = data.reviews_total || list.length;
+  $('reviewSummary').innerHTML =
+    `低置信度匹配（待人工核验）<b>${total}</b> 条 —— 相似度落在阈值之间，<b>没有计入图谱</b>，避免误连`;
+
+  if (!list.length) {
+    $('reviewList').innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:8px 0">没有待核验条目。</div>';
+    return;
+  }
+  $('reviewList').innerHTML = list.map(r => `
+    <div class="rev">
+      <div class="score">${(r.match_score || 0).toFixed(3)}</div>
+      <div class="t">
+        <b>${esc(r.reference_title || '（无标题）')}</b><br/>
+        <i>↳ 疑似匹配到：</i>${esc(r.candidate_title || r.candidate || '')}
+      </div>
+    </div>`).join('');
+}
+
+boot();
+</script>
+</body>
+</html>
