@@ -229,18 +229,117 @@ async def test_rag_context_records_four_roles_in_order(monkeypatch):
 
 
 async def test_verifier_flags_evidence_without_page(monkeypatch):
-    """证据全缺页码时 Verifier 必须标 ok=False——引用无法溯源是硬伤。"""
+    """证据全缺页码且补救无效时，Verifier 必须标 ok=False——引用无法溯源是硬伤。"""
 
     def fake_retrieve(question, top_k=4, source=None):
         return [(Chunk(text="没有页码的片段", source="p.pdf", page=None), 0.05, ["hash"])]
 
     monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    # 三条补救信号全部无效：重排后仍缺页码、放宽条数也拿不到带页码的
+    monkeypatch.setattr(agent_module, "_apply_page_fill", lambda ev: 0)
+    monkeypatch.setattr(agent_module, "_apply_rerank", lambda q, s: s)
+    monkeypatch.setattr(agent_module, "_apply_widen", lambda *a, **k: [])
     roles: list = []
     await _rag_context_with_evidence("随便问问", roles=roles)
 
     verifier = [r for r in roles if r.role == agent_module.ROLE_VERIFIER][0]
     assert verifier.ok is False
     assert "缺页码" in verifier.summary
+
+
+# ---------------- 校验回环：Verifier 驱动 Retriever 重检 ----------------
+# 这是四个角色之间唯一真正的交互。之前的 Verifier 只报告不行动，
+# 测出「全缺页码」也只是打个红点，答案照样在没有页码依据的情况下生成。
+
+
+async def test_verifier_triggers_retriever_repair_when_pages_missing(monkeypatch):
+    """Verifier 判定证据无页码 → 驱动 Retriever 回检，且时间线里要能看见这次回检。"""
+    calls = {"page_text": 0, "widen": 0}
+
+    def fake_retrieve(question, top_k=4, source=None):
+        return [(Chunk(text="没有页码的片段", source="p.pdf", page=None), 0.05, ["hash"])]
+
+    def fake_page_text(source, page):
+        calls["page_text"] += 1
+        # 第一页确实含这段原文 → 补页策略应当成功，并把 page 填成 1
+        return "前言……没有页码的片段……后面还有正文"
+
+    def fake_widen(*args, **kwargs):
+        calls["widen"] += 1
+        return []
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    monkeypatch.setattr(agent_module, "page_text", fake_page_text)
+    monkeypatch.setattr(agent_module, "_apply_widen", fake_widen)
+
+    roles: list = []
+    _ctx, evidence = await _rag_context_with_evidence("随便问问", roles=roles)
+
+    # 证据确实被补上页码，并且打了 page-fill 标记
+    assert evidence and evidence[0].page == 1
+    assert "page-fill" in evidence[0].channels
+
+    # 时间线里出现一条 Retriever 的回检记录，摘要说明是 Verifier 驱动的
+    repairs = [r for r in roles if "回检补页" in r.summary]
+    assert repairs, f"没有找到回检记录：{[r.summary for r in roles]}"
+    assert repairs[0].role == agent_module.ROLE_RETRIEVER
+    # 补页是第一策略，成功后不应再走放宽条数
+    assert calls["widen"] == 0
+
+    # Verifier 复查后应当转成合格，并注明已回填
+    verifier = [r for r in roles if r.role == agent_module.ROLE_VERIFIER][0]
+    assert verifier.ok is True
+    assert "回填页码" in verifier.summary
+
+
+async def test_repair_falls_through_all_strategies_before_giving_up(monkeypatch):
+    """三条信号都救不回来时，要留下一条 ok=False 记录说清「试过哪些」，不能静默失败。"""
+
+    def fake_retrieve(question, top_k=4, source=None):
+        return [(Chunk(text="没有页码的片段", source="p.pdf", page=None), 0.05, ["hash"])]
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    monkeypatch.setattr(agent_module, "_apply_page_fill", lambda ev: 0)
+    monkeypatch.setattr(agent_module, "_apply_rerank", lambda q, s: s)
+    monkeypatch.setattr(agent_module, "_apply_widen", lambda *a, **k: [])
+
+    roles: list = []
+    await _rag_context_with_evidence("随便问问", roles=roles)
+
+    exhausted = [r for r in roles if "仍未补回" in r.summary]
+    assert exhausted, f"没有找到认输记录：{[r.summary for r in roles]}"
+    assert exhausted[0].ok is False
+    # 三条策略都要被尝试过
+    tried = exhausted[0].detail.get("tried") or []
+    assert set(tried) == set(agent_module._REPAIR_STRATEGIES)
+
+
+async def test_repair_is_skipped_when_evidence_already_has_pages(monkeypatch):
+    """证据本来就有页码时不能多此一举——回环必须有触发条件，否则每问都多花时间。"""
+    touched = []
+
+    def fake_retrieve(question, top_k=4, source=None):
+        return [(Chunk(text="8 NVIDIA P100 GPUs", source="p.pdf", page=7), 0.057, ["dense"])]
+
+    monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
+    monkeypatch.setattr(agent_module, "_apply_page_fill", lambda ev: touched.append(1) or 0)
+
+    roles: list = []
+    await _rag_context_with_evidence("训练用了多少 GPU？", roles=roles)
+
+    assert touched == [], "证据本就有页码，不应触发回检"
+    assert not any("回检" in r.summary for r in roles)
+
+
+def test_evidence_pages_counts_only_known_pages():
+    """_evidence_pages 只数有页码的条数，None 不算。"""
+    ev = agent_module.Evidence
+    items = [
+        ev(rank=1, source="a.pdf", page=3, score=1.0, channels=["dense"], text="x"),
+        ev(rank=2, source="a.pdf", page=None, score=0.5, channels=["hash"], text="y"),
+        ev(rank=3, source="b.pdf", page=1, score=0.4, channels=["bm25"], text="z"),
+    ]
+    assert agent_module._evidence_pages(items) == 2
 
 
 async def test_verifier_flags_empty_evidence(monkeypatch):
