@@ -39,6 +39,34 @@ def get_client() -> AsyncOpenAI:
     return _client
 
 
+def reset_client() -> None:
+    """丢掉已缓存的客户端，下一次调用按新的 key / base_url 重建。
+
+    为什么需要：`get_client()` 只在 `_client is None` 那一刻读配置，
+    建好之后就固定了。设置页改完 API Key 或 Base URL 不重建，
+    请求还会打向旧地址，界面上就会出现"显示已保存、实际没生效"的假象。
+
+    为什么要 close：AsyncOpenAI 内部持有 httpx 连接池，
+    不关掉就丢掉引用，连接会一直挂到进程退出。close 是异步的，
+    这里用 `client.close()` 的同步包装拿不到，所以只在事件循环里 await 调用
+    （见 reset_client_async）；同步版本只做解引用，用于重启/测试场景。
+    """
+    global _client
+    _client = None
+
+
+async def reset_client_async() -> None:
+    """异步版：关掉旧连接池再解引用，设置页保存后应当用这个。"""
+    global _client
+    old, _client = _client, None
+    if old is None:
+        return
+    try:
+        await old.close()
+    except Exception:  # noqa: BLE001 —— 关连接失败不该阻断配置生效，但必须留痕
+        logger.warning("关闭旧 LLM 客户端时出错（已忽略，不影响新配置生效）", exc_info=True)
+
+
 async def chat(messages: list[dict], temperature: float = 0.3) -> str:
     """一次性拿完整回答。
 
