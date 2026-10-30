@@ -49,13 +49,26 @@ CJK_FONT = "Microsoft YaHei"
 
 # mmdc / dot 是 npm 包和 Graphviz 安装出来的可执行文件，不在虚拟环境里，
 # 而且 Windows 下常常有 .cmd 后缀。这里按固定顺序找，找不到就报清晰的错。
-_EXTRA_BIN_DIRS = [
-    Path(os.environ.get("APPDATA", "")) / "npm",
-    Path("C:/Program Files/Graphviz/bin"),
-    Path("C:/Program Files (x86)/Graphviz/bin"),
-    Path("C:/Program Files/nodejs"),
-    Path("C:/Program Files (x86)/nodejs"),
-]
+#
+# 必须按平台分开：这些是 Windows 的安装位置。Linux 下硬塞进来只会得到
+# 一串必然不存在的 PosixPath('C:/Program Files/...')。实测在部署到
+# Ubuntu 的机器上，_search_dirs() 前 5 项全是 C:/ 路径，纯噪声。
+if os.name == "nt":
+    _EXTRA_BIN_DIRS = [
+        Path(os.environ.get("APPDATA", "")) / "npm",
+        Path("C:/Program Files/Graphviz/bin"),
+        Path("C:/Program Files (x86)/Graphviz/bin"),
+        Path("C:/Program Files/nodejs"),
+        Path("C:/Program Files (x86)/nodejs"),
+    ]
+else:
+    # Linux：npm 全局包在 /usr/lib/node_modules，其中 /usr/bin 通常已在 PATH 里，
+    # 这里补几个发行版常见的 Graphviz / TeX Live 安装前缀即可。
+    _EXTRA_BIN_DIRS = [
+        Path("/usr/local/bin"),
+        Path("/usr/bin"),
+        Path("/opt/graphviz/bin"),
+    ]
 
 
 def _which(name: str) -> str | None:
@@ -294,14 +307,88 @@ def _run(cmd: list[str], cwd: Path, timeout: int = 60) -> tuple[int, str]:
         return 126, f"无法执行 {cmd[0]}: {exc}"
 
 
+def _npm_global_roots() -> list[Path]:
+    """列出可能的 npm 全局 node_modules 目录，按可信度排序。
+
+    为什么不能只写死 ``%APPDATA%/npm/node_modules``：那个路径只在 Windows
+    的 npm 默认前缀下成立。Linux 上 npm 全局包在 ``/usr/lib/node_modules``，
+    用 nvm 时又在 ``~/.nvm/versions/node/vX/lib/node_modules``。
+    实测 Ubuntu + ``npm install -g @mermaid-js/mermaid-cli`` 时，
+    写死 Windows 路径会让 cli.js 判断永远落空，被迫走 mmdc 分支，
+    而 mmdc 在 root 下没有 --no-sandbox 会直接起不来。
+    """
+    roots: list[Path] = []
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        roots.append(Path(appdata) / "npm" / "node_modules")
+    # npm_config_prefix / NPM_CONFIG_PREFIX 是 npm 支持的显式配置，优先采信
+    for env in ("npm_config_prefix", "NPM_CONFIG_PREFIX"):
+        prefix = os.environ.get(env)
+        if prefix:
+            roots.append(Path(prefix) / "lib" / "node_modules")
+            roots.append(Path(prefix) / "node_modules")
+    if os.name == "nt":
+        roots.append(Path("C:/Program Files/nodejs/node_modules"))
+    else:
+        roots.append(Path("/usr/local/lib/node_modules"))
+        roots.append(Path("/usr/lib/node_modules"))
+    return roots
+
+
+def _find_mermaid_cli(mmdc_path: str | None = None) -> Path | None:
+    """找到 @mermaid-js/mermaid-cli 的 cli.js。
+
+    除了查全局 node_modules，还会从 mmdc 可执行文件本身往上翻：
+    npm 全局安装的 mmdc 一般是指向 ``.../mermaid-cli/src/cli.js`` 的软链，
+    顺着它就能定位，不依赖前缀猜测。
+    """
+    candidates: list[Path] = []
+    if mmdc_path:
+        real = Path(mmdc_path).resolve()
+        # 情况一：mmdc 就是软链到 cli.js
+        if real.name == "cli.js" and real.is_file():
+            candidates.append(real)
+        # 情况二：mmdc 在 <prefix>/bin 下，包体在 <prefix>/lib/node_modules 下
+        for parent in real.parents[:4]:
+            candidates.append(parent / "lib" / "node_modules" / "@mermaid-js" / "mermaid-cli" / "src" / "cli.js")
+            candidates.append(parent / "node_modules" / "@mermaid-js" / "mermaid-cli" / "src" / "cli.js")
+    for root in _npm_global_roots():
+        candidates.append(root / "@mermaid-js" / "mermaid-cli" / "src" / "cli.js")
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
+def _puppeteer_config() -> Path | None:
+    """写一份临时的 puppeteer 配置，让 Chromium 以 --no-sandbox 启动。
+
+    部署在 Linux 服务器上时，服务通常以 root 跑，Chromium 的 zygote 沙箱
+    会拒绝启动并报 ``Running as root without --no-sandbox is not supported``
+    （实测 Ubuntu 24.04 + Chromium 头无头模式下报
+    ``zygote_host_impl_linux.cc:101] Running ...`` 然后 Code: 1 退出）。
+    mermaid-cli 支持 ``-p`` 传 puppeteer 配置文件，这里临时生成一份。
+    """
+    if os.name == "nt":
+        return None
+    cfg = Path(tempfile.gettempdir()) / "mermaid_pptr.json"
+    try:
+        cfg.write_text(
+            json.dumps({"args": ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]}),
+            encoding="utf-8",
+        )
+        return cfg
+    except OSError:
+        return None
+
+
 def render_mermaid(code: str, out_dir: Path) -> tuple[bytes | None, str]:
     """把 Mermaid 代码渲染成 PNG。返回 (图片字节, 错误信息)。
 
-    这里**绕开 mmdc.cmd**，直接用 node 跑 cli.js。原因是那个 .cmd 里写死了
-    用 ``node`` 这个名字去调起 node.exe，而服务若是被测试框架/IDE 拉起来的，
-    PATH 里不一定有 node 目录，就会报
-    ``'"node"' is not recognized as an internal or external command``。
-    直接找 node.exe 并走 cli.js 更稳。
+    优先走 ``node cli.js``：mmdc 那个启动脚本里写死了用 ``node`` 这个名字去调
+    起 node.exe，服务若是被测试框架/IDE 拉起来的，PATH 里不一定有 node 目录，
+    就会报 ``'"node"' is not recognized as an internal or external command``。
+    找不到 cli.js 才退回直接调 mmdc。
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as td:
@@ -310,23 +397,18 @@ def render_mermaid(code: str, out_dir: Path) -> tuple[bytes | None, str]:
         src.write_text(code, encoding="utf-8")
 
         node = _which("node")
-        cli = (
-            Path(os.environ.get("APPDATA", ""))
-            / "npm"
-            / "node_modules"
-            / "@mermaid-js"
-            / "mermaid-cli"
-            / "src"
-            / "cli.js"
-        )
-        if node and cli.exists():
+        mmdc = _which("mmdc")
+        cli = _find_mermaid_cli(mmdc)
+        pptr = _puppeteer_config()
+        extra = ["-p", str(pptr)] if pptr else []
+
+        if node and cli:
             # -b white 是必须的：默认透明背景在深色网页里几乎看不见
-            argv = [node, str(cli), "-i", str(src), "-o", str(dst), "-b", "white", "-s", "2"]
+            argv = [node, str(cli), "-i", str(src), "-o", str(dst), "-b", "white", "-s", "2", *extra]
+        elif mmdc:
+            argv = [mmdc, "-i", str(src), "-o", str(dst), "-b", "white", "-s", "2", *extra]
         else:
-            exe = _which("mmdc")
-            if not exe:
-                return None, "本机未安装 mermaid-cli（既没有 node + mermaid-cli，也没有 mmdc）"
-            argv = [exe, "-i", str(src), "-o", str(dst), "-b", "white", "-s", "2"]
+            return None, "本机未安装 mermaid-cli（既没有 node + mermaid-cli，也没有 mmdc）"
 
         rc, log = _run(argv, cwd=Path(td), timeout=90)
         if rc != 0 or not dst.exists():
