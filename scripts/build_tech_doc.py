@@ -249,7 +249,7 @@ def build() -> Path:
 
     for _ in range(6):
         doc.add_paragraph()
-    for line in ("第八届传智杯大赛 · 人工智能赛道", "参赛作品技术文档", "2026 年 10 月"):
+    for line in ("第九届传智杯大赛 · AI 大模型创新应用挑战赛", "参赛作品技术文档", "2026 年 10 月"):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(line)
