@@ -94,6 +94,23 @@ RETRIEVE_TOP_K = 4
 PER_PAPER_TOP_K = 3
 MULTI_MAX_EVIDENCE = 8
 
+# 校验回环：Verifier 判定「证据不可溯源」时，让 Retriever 按策略逐个重试。
+#
+# 为什么要有这一步：Verifier 早期只是一个"报告器"——它测出「N 条证据全都缺页码」，
+# 打个红色 ok=False 就结束了，什么也不做，答案照样在没有页码依据的情况下生成。
+# 这是虚假的协同：角色有名字，但没有人能改变别人的行为。
+#
+# 现在的做法是让它成为"驱动者"：判定不合格 → 换一路信号重检 → 复查 → 还不行换下一路。
+# 最多试 len(_REPAIR_STRATEGIES) 条信号（默认 3 条），全部失败才如实认输。
+# 之所以敢试 3 条：前两条几乎零成本（补页是本地读缓存、换排序是复用已加载的重排器），
+# 只有第三条「放宽条数」要重新检索，约 2~3 秒，且只在真的需要时才走到。
+MAX_REPAIR_ROUNDS = 1
+
+# 重检时用的三个信号，按顺序尝试，命中即止。
+# 顺序有讲究：先补整页正文（零成本、最可能带来页码），再换重排（复用已加载模型），
+# 最后才放宽条数（要重新跑三路召回，代价最大）。
+_REPAIR_STRATEGIES: tuple[str, ...] = ("page_fill", "rerank", "widen")
+
 # 全库清单：由 scripts/build_catalog.py 生成，回答"一共多少篇/都有哪些"用。
 # 为什么要单独一份：向量检索每次只回 top-k 片段，模型看不见"全库"，
 # 问"多少篇"时它只能数片段里出现过几篇（这就是之前答成 3–4 篇的原因）。
@@ -638,6 +655,185 @@ async def _search_query(question: str) -> str:
         return question
 
 
+def _evidence_pages(evidence: list[Evidence]) -> int:
+    """能定位到具体页码的证据条数。缺页码 = 引用无法溯源，是 Verifier 判不合格的唯一硬指标。"""
+    return sum(1 for ev in evidence if ev.page is not None)
+
+
+def _apply_page_fill(evidence: list[Evidence]) -> int:
+    """补救一：给缺页码的证据补上整页正文，顺带把页码找回来。
+
+    为什么要这样补：`retrieve_scored` 返回的 Chunk 页码来自向量库元数据，
+    有些旧索引里 page 存的是 -1（建索引时还没写页码），pipeline 里把它转成 None。
+    这些片段其实来自真实 PDF——按 source 去磁盘取对应页正文就能确认页码在不在。
+
+    只对「有 source 但没 page」的证据动手；本来就有页码的不碰。
+    返回补上页码的条数，0 表示这条路走不通。
+    """
+    filled = 0
+    for ev in evidence:
+        if ev.page is not None or not ev.source:
+            continue
+        # 没有页码时无法定位是第几页，只能按"该论文第一页"做保守探测——
+        # 只有第一页确实含这段原文时才认，否则宁可保持缺页码，也不瞎标一个页码。
+        try:
+            first = page_text(ev.source, 1)
+        except Exception:  # noqa: BLE001 —— 取页失败不影响主流程
+            continue
+        probe = ev.text.strip()[:60]
+        if probe and probe in first:
+            ev.page = 1
+            ev.channels = [*ev.channels, "page-fill"]
+            filled += 1
+    return filled
+
+
+def _apply_rerank(query: str, scored: list[tuple]) -> list[tuple]:
+    """补救二：换一路排序再试一次。
+
+    RRF 只看名次、不看分数，重排器看的是"这句话能不能回答这个问题"。
+    两种排序本身就是两路信号，换一路很可能就把带页码的整页片段提到前面来。
+    这里复用 pipeline 已经建好的重排器，不额外加载模型。
+    """
+    try:
+        from app.rag.rerank import rerank as rerank_fn
+
+        return rerank_fn(query, list(scored), len(scored))
+    except Exception:  # noqa: BLE001 —— 重排不可用就保持原序
+        return scored
+
+
+def _apply_widen(
+    query: str, top_k: int, source: str | None, picked: list[str], multi: bool
+) -> list[tuple]:
+    """补救三：放宽条数重新检索（代价最大，放最后试）。
+
+    top_k 翻倍，让更多原始片段进证据池。页码缺失往往是因为 top-k 太小，
+    排在前面的恰好都是没有元数据页码的短片段。
+    """
+    try:
+        if multi:
+            groups = []
+            for one in picked:
+                groups.append(retrieve_scored(query, top_k=PER_PAPER_TOP_K + 1, source=one))
+            merged = _merge_scored(groups)
+            return merged[: MULTI_MAX_EVIDENCE + 4]
+        return retrieve_scored(query, top_k=top_k * 2, source=source)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+async def _repair_unverifiable(
+    *,
+    question: str,
+    evidence: list[Evidence],
+    scored: list[tuple],
+    source: str | None,
+    multi: bool,
+    picked: list[str],
+    roles: list[RoleRun] | None,
+) -> tuple[list[Evidence], list[tuple]] | None:
+    """Verifier 驱动 Retriever 重检：证据不可溯源时换一路信号补救。
+
+    返回 None 表示不需要补救（证据本来就能溯源），调用方保持原样。
+    返回 (新证据, 新 scored) 表示补救过，调用方要用新的继续走下去。
+
+    这是「多智能体协同」在本项目里唯一货真价实的地方：
+    前三个角色各自产出材料，Verifier 读这些材料做判定，判定结果**改变了 Retriever 的行为**。
+    """
+    if not evidence or _evidence_pages(evidence) > 0:
+        return None  # 证据本来就能定位，没必要折腾
+
+    query = await _search_query(question)
+    tried: list[str] = []
+
+    for strategy in _REPAIR_STRATEGIES:
+        t0 = time.perf_counter()
+        tried.append(strategy)
+
+        if strategy == "page_fill":
+            filled = _apply_page_fill(evidence)
+            note = f"按原文回填页码，补上 {filled} 条"
+            if filled:
+                if roles is not None:
+                    roles.append(
+                        RoleRun(
+                            role=ROLE_RETRIEVER,
+                            summary=f"Verifier 判定证据无页码，回检补页：{note}",
+                            duration_ms=int((time.perf_counter() - t0) * 1000),
+                            detail={"strategy": strategy, "filled": filled},
+                        )
+                    )
+                return evidence, scored
+
+        elif strategy == "rerank":
+            rescored = _apply_rerank(query, scored)
+            if rescored:
+                scored = rescored
+                evidence = [
+                    Evidence(
+                        rank=rank,
+                        source=chunk.source,
+                        page=chunk.page,
+                        score=score,
+                        channels=channels,
+                        text=chunk.text,
+                    )
+                    for rank, (chunk, score, channels) in enumerate(scored, 1)
+                ]
+                if _evidence_pages(evidence) > 0:
+                    if roles is not None:
+                        roles.append(
+                            RoleRun(
+                                role=ROLE_RETRIEVER,
+                                summary="Verifier 判定证据无页码，换重排信号后补回页码",
+                                duration_ms=int((time.perf_counter() - t0) * 1000),
+                                detail={"strategy": strategy},
+                            )
+                        )
+                    return evidence, scored
+
+        else:  # widen
+            widened = _apply_widen(query, RETRIEVE_TOP_K, source, picked, multi)
+            if widened:
+                scored = widened
+                evidence = [
+                    Evidence(
+                        rank=rank,
+                        source=chunk.source,
+                        page=chunk.page,
+                        score=score,
+                        channels=channels,
+                        text=chunk.text,
+                    )
+                    for rank, (chunk, score, channels) in enumerate(scored, 1)
+                ]
+                if _evidence_pages(evidence) > 0:
+                    if roles is not None:
+                        roles.append(
+                            RoleRun(
+                                role=ROLE_RETRIEVER,
+                                summary=f"Verifier 判定证据无页码，放宽条数到 {RETRIEVE_TOP_K * 2} 后补回页码",
+                                duration_ms=int((time.perf_counter() - t0) * 1000),
+                                detail={"strategy": strategy},
+                            )
+                        )
+                    return evidence, scored
+
+    # 三条信号都没救回来：如实记一笔，让前端看见「试过了但不行」
+    if roles is not None:
+        roles.append(
+            RoleRun(
+                role=ROLE_RETRIEVER,
+                summary=f"Verifier 判定证据无页码，试过 {'/'.join(tried)} 仍未补回，保持缺页码",
+                duration_ms=0,
+                detail={"strategy": "exhausted", "tried": tried},
+                ok=False,
+            )
+        )
+    return evidence, scored
+
+
 async def _rag_context_with_evidence(
     question: str,
     source: str | None = None,
@@ -787,6 +983,22 @@ async def _rag_context_with_evidence(
         )
         for rank, (chunk, score, channels) in enumerate(scored, 1)
     ]
+
+    # ---- 校验回环：Verifier 判定「证据不可溯源」→ 驱动 Retriever 换信号重检 ----
+    #
+    # 这是四个角色之间唯一真正的交互：Verifier 的结论会改变 Retriever 的行为。
+    # 之前的版本里 Verifier 只是个报告器，测出问题打个红点就结束了。
+    repaired = await _repair_unverifiable(
+        question=question,
+        evidence=evidence,
+        scored=scored,
+        source=source,
+        multi=multi,
+        picked=picked,
+        roles=roles,
+    )
+    if repaired is not None:
+        evidence, scored = repaired
     # 精华卡：摘要级问题（主旨/研究问题/方法/贡献）走预计算卡片，不靠检索碰运气。
     # 只在问题明确涉及摘要语义、且能确定"是哪几篇"时注入，避免污染普通内容问答。
     # 多篇对比时不注入：对比表每格必须能落到正文片段，卡片只有第 1 页会让表失真。
@@ -1022,14 +1234,20 @@ async def _rag_context_with_evidence(
         )
         # Verifier：自检"证据够不够回答问题"。这里只做能自动判定的部分，
         # 不做主观打分——判不准就不判，宁可说"有证据"也不瞎给置信度。
-        pages_known = sum(1 for ev in evidence if ev.page is not None)
+        #
+        # 注意这段跑在「校验回环」之后：如果 Retriever 被 Verifier 打回重检过，
+        # 这里的 pages_known 反映的是补救之后的结果（可能已经从 0 变成 N）。
+        pages_known = _evidence_pages(evidence)
+        repaired_note = ""
+        if any("page-fill" in ev.channels for ev in evidence):
+            repaired_note = "（已按原文回填页码）"
         if not evidence:
             verdict, ok = "没有检索到任何证据，回答会明确说明资料不足", False
         elif pages_known == 0:
             verdict, ok = f"证据 {len(evidence)} 条但都缺页码，引用无法溯源", False
         else:
             verdict, ok = (
-                f"证据 {len(evidence)} 条，其中 {pages_known} 条可定位到具体页码",
+                f"证据 {len(evidence)} 条，其中 {pages_known} 条可定位到具体页码{repaired_note}",
                 True,
             )
         roles.append(
