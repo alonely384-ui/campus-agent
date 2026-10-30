@@ -10,7 +10,7 @@ from app.rag.pipeline import Chunk
 
 
 async def test_rag_context_has_source_and_page(monkeypatch):
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         assert "GPUs" in question
         return [
             (
@@ -32,7 +32,7 @@ async def test_rag_context_has_source_and_page(monkeypatch):
 async def test_metadata_block_carries_page_1(monkeypatch):
     """元数据（标题/作者）也要能标页码，否则模型会写出"本篇元数据"这种非法引用。"""
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [(Chunk(text="title page", source="v7.pdf", page=1), 0.05, ["hash"])]
 
     monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
@@ -50,7 +50,7 @@ async def test_metadata_block_carries_page_1(monkeypatch):
 async def test_evidence_card_fields(monkeypatch):
     """证据卡片要有：排名、页码、融合分、命中通道、原文。"""
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [
             (Chunk(text="8 NVIDIA P100 GPUs", source="p.pdf", page=7), 0.057, ["dense"]),
             (Chunk(text="28.4 BLEU", source="p.pdf", page=8), 0.055, ["bm25"]),
@@ -69,7 +69,7 @@ async def test_evidence_card_fields(monkeypatch):
 
 
 async def test_rag_context_survives_retrieve_error(monkeypatch):
-    def boom(question, top_k=4, source=None):
+    def boom(question, top_k=4, source=None, use_dense=True):
         raise RuntimeError("chroma 没建好")
 
     monkeypatch.setattr(agent_module, "retrieve_scored", boom)
@@ -77,7 +77,7 @@ async def test_rag_context_survives_retrieve_error(monkeypatch):
 
 
 async def test_rag_context_empty_when_no_hits(monkeypatch):
-    monkeypatch.setattr(agent_module, "retrieve_scored", lambda q, top_k=4, source=None: [])
+    monkeypatch.setattr(agent_module, "retrieve_scored", lambda q, top_k=4, source=None, use_dense=True: [])
     assert await _rag_context("库里没有的问题") == ""
 
 
@@ -85,7 +85,7 @@ async def test_rag_context_empty_when_no_hits(monkeypatch):
 async def test_run_agent_passes_context_to_model(monkeypatch):
     captured: list[list[dict]] = []
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [
             (Chunk(text="We trained on 8 NVIDIA P100 GPUs", source="p.pdf", page=7), 0.06, ["dense"])
         ]
@@ -128,7 +128,7 @@ async def test_multi_source_retrieval_merges_per_paper(monkeypatch):
     """多篇对比：每篇各查一次（各取 3 块），证据里两篇都在，且提示模型出对比表。"""
     calls: list[tuple[int, str | None]] = []
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         calls.append((top_k, source))
         if source == "a.pdf":
             return [(Chunk(text="A 的方法", source="a.pdf", page=1), 0.05, ["dense"])]
@@ -148,7 +148,7 @@ async def test_multi_source_retrieval_merges_per_paper(monkeypatch):
 async def test_multi_source_survives_one_failure_and_caps_evidence(monkeypatch):
     """一篇检索炸了不影响另一篇；合并后证据不超过上限。"""
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         if source == "bad.pdf":
             raise RuntimeError("索引坏了")
         return [
@@ -199,7 +199,7 @@ def test_numeric_excerpt_keeps_numbers_beyond_first_1600_chars():
 async def test_rag_context_records_four_roles_in_order(monkeypatch):
     """Planner → Retriever → Extractor → Verifier，顺序固定且每条都有摘要。"""
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [
             (Chunk(text="8 NVIDIA P100 GPUs", source="p.pdf", page=7), 0.057, ["dense"]),
             (Chunk(text="28.4 BLEU", source="p.pdf", page=8), 0.055, ["bm25"]),
@@ -231,7 +231,7 @@ async def test_rag_context_records_four_roles_in_order(monkeypatch):
 async def test_verifier_flags_evidence_without_page(monkeypatch):
     """证据全缺页码且补救无效时，Verifier 必须标 ok=False——引用无法溯源是硬伤。"""
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [(Chunk(text="没有页码的片段", source="p.pdf", page=None), 0.05, ["hash"])]
 
     monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
@@ -256,7 +256,7 @@ async def test_verifier_triggers_retriever_repair_when_pages_missing(monkeypatch
     """Verifier 判定证据无页码 → 驱动 Retriever 回检，且时间线里要能看见这次回检。"""
     calls = {"page_text": 0, "widen": 0}
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [(Chunk(text="没有页码的片段", source="p.pdf", page=None), 0.05, ["hash"])]
 
     def fake_page_text(source, page):
@@ -295,7 +295,7 @@ async def test_verifier_triggers_retriever_repair_when_pages_missing(monkeypatch
 async def test_repair_falls_through_all_strategies_before_giving_up(monkeypatch):
     """三条信号都救不回来时，要留下一条 ok=False 记录说清「试过哪些」，不能静默失败。"""
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [(Chunk(text="没有页码的片段", source="p.pdf", page=None), 0.05, ["hash"])]
 
     monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
@@ -318,7 +318,7 @@ async def test_repair_is_skipped_when_evidence_already_has_pages(monkeypatch):
     """证据本来就有页码时不能多此一举——回环必须有触发条件，否则每问都多花时间。"""
     touched = []
 
-    def fake_retrieve(question, top_k=4, source=None):
+    def fake_retrieve(question, top_k=4, source=None, use_dense=True):
         return [(Chunk(text="8 NVIDIA P100 GPUs", source="p.pdf", page=7), 0.057, ["dense"])]
 
     monkeypatch.setattr(agent_module, "retrieve_scored", fake_retrieve)
@@ -344,7 +344,7 @@ def test_evidence_pages_counts_only_known_pages():
 
 async def test_verifier_flags_empty_evidence(monkeypatch):
     """一条证据都没有时，Verifier 要明说会按资料不足作答。"""
-    monkeypatch.setattr(agent_module, "retrieve_scored", lambda q, top_k=4, source=None: [])
+    monkeypatch.setattr(agent_module, "retrieve_scored", lambda q, top_k=4, source=None, use_dense=True: [])
     roles: list = []
     await _rag_context_with_evidence("库里没有的问题", roles=roles)
 
@@ -356,7 +356,7 @@ async def test_verifier_flags_empty_evidence(monkeypatch):
 async def test_retriever_role_marked_failed_when_index_breaks(monkeypatch):
     """检索炸了要留下失败记录，不能悄悄降级成"没找到"。"""
 
-    def boom(question, top_k=4, source=None):
+    def boom(question, top_k=4, source=None, use_dense=True):
         raise RuntimeError("chroma 没建好")
 
     monkeypatch.setattr(agent_module, "retrieve_scored", boom)

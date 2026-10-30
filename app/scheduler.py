@@ -39,15 +39,40 @@ _state: dict[str, object] = {
 }
 
 
+def _env_setting(name: str, default: str) -> str:
+    """按 环境变量 → settings 字段 → 默认值 的顺序取一个字符串配置。
+
+    顺序必须和 pydantic-settings 一致（环境变量 > .env > 默认值），
+    否则会出现"进程环境里明明是 off，定时器却按 .env 的 weekly 跑"。
+
+    为什么不能只读 os.environ：pydantic-settings 读 .env 时只填 Settings 对象，
+    不会把键塞进 os.environ，所以 .env 里写的 DISCOVER_SCHEDULE=weekly
+    在重启后 os.getenv 是拿不到的，定时器会静默退回 daily。
+    两个来源都要看，且顺序要对。
+    """
+    env = os.getenv(name)
+    if env is not None and env != "":
+        return env
+
+    from app.config import settings
+
+    field = name.lower()
+    if field in type(settings).model_fields:
+        value = getattr(settings, field, None)
+        if value is not None and str(value) != "":
+            return str(value)
+    return default
+
+
 def schedule_mode() -> str:
-    """读环境变量里的周期；非法值按 daily 处理。"""
-    mode = (os.environ.get(SCHEDULE_ENV) or "daily").strip().lower()
+    """读周期配置；非法值按 daily 处理。"""
+    mode = _env_setting(SCHEDULE_ENV, "daily").strip().lower()
     return mode if mode in VALID else "daily"
 
 
 def _hour() -> int:
     try:
-        return max(0, min(23, int(os.environ.get(HOUR_ENV) or DEFAULT_HOUR)))
+        return max(0, min(23, int(_env_setting(HOUR_ENV, str(DEFAULT_HOUR)))))
     except ValueError:
         return DEFAULT_HOUR
 
@@ -94,7 +119,12 @@ def _loop(mode: str) -> None:
 
 
 def start(mode: str | None = None) -> dict[str, object]:
-    """启动定时器（重复调用无副作用）；返回状态，含下次运行时间。"""
+    """启动定时器（重复调用无副作用）；返回状态，含下次运行时间。
+
+    mode 与当前运行的模式**不同**时会先停掉旧线程再按新模式起，
+    否则设置页把 daily 改成 weekly 却因为"线程还活着"直接返回，
+    界面显示成功、实际仍按 daily 跑。
+    """
     mode = mode or schedule_mode()
     if mode == "off":
         # 关掉时要把已经在跑的线程也停掉，否则 status() 里 running 还是 True，
@@ -107,7 +137,10 @@ def start(mode: str | None = None) -> dict[str, object]:
     with _lock:
         thread = _state.get("thread")
         if isinstance(thread, threading.Thread) and thread.is_alive():
-            return status()
+            if _state.get("mode") == mode:
+                return status()
+            # 模式变了：先让旧线程退出，再重建
+            _state["stop"] = True
         _state["stop"] = False
         _state["mode"] = mode
         _state["next_run"] = next_run_time(mode).isoformat(timespec="seconds")
@@ -128,9 +161,14 @@ def stop() -> dict[str, object]:
 
 def status() -> dict[str, object]:
     thread = _state.get("thread")
+    mode = _state.get("mode") or "off"
+    # 关掉之后旧线程要等当前这轮 sleep 结束才真正退出（最长 30 秒），
+    # 这段时间 is_alive() 还是 True，界面上会短暂显示「已关但仍运行」。
+    # 只要模式是 off，对用户来说就是没在跑，直接报 False。
+    alive = mode != "off" and isinstance(thread, threading.Thread) and thread.is_alive()
     return {
-        "mode": _state.get("mode") or "off",
-        "running": isinstance(thread, threading.Thread) and thread.is_alive(),
+        "mode": mode,
+        "running": alive,
         "next_run": _state.get("next_run") or "",
         "last_run": _state.get("last_run") or "",
         "last_error": _state.get("last_error") or "",
@@ -143,7 +181,7 @@ def autostart() -> dict[str, object] | None:
     if (
         "pytest" in sys.modules  # 测试进程里导入 app.main 也别起线程
         or os.environ.get("PYTEST_CURRENT_TEST")
-        or os.environ.get("DISCOVER_SCHEDULE", "").lower() == "off"
+        or schedule_mode() == "off"
     ):
         return None
     return start()

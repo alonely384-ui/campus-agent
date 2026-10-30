@@ -59,7 +59,7 @@ def test_page_text_fallback_injected(monkeypatch):
     monkeypatch.setattr(
         agent_module,
         "retrieve_scored",
-        lambda q, top_k=4, source=None: [
+        lambda q, top_k=4, source=None, use_dense=True: [
             (Chunk(text="Transformer (big) 28.4 41.8", source="x.pdf", page=8, chunk_id=1), 0.05, ["bm25"])
         ],
     )
@@ -82,7 +82,7 @@ def test_page_text_not_injected_for_general_question(monkeypatch):
     monkeypatch.setattr(
         agent_module,
         "retrieve_scored",
-        lambda q, top_k=4, source=None: [
+        lambda q, top_k=4, source=None, use_dense=True: [
             (Chunk(text="Transformer 用自注意力替代循环结构", source="x.pdf", page=1, chunk_id=1), 0.05, ["bm25"])
         ],
     )

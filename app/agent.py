@@ -704,7 +704,12 @@ def _apply_rerank(query: str, scored: list[tuple]) -> list[tuple]:
 
 
 def _apply_widen(
-    query: str, top_k: int, source: str | None, picked: list[str], multi: bool
+    query: str,
+    top_k: int,
+    source: str | None,
+    picked: list[str],
+    multi: bool,
+    use_dense: bool = True,
 ) -> list[tuple]:
     """补救三：放宽条数重新检索（代价最大，放最后试）。
 
@@ -715,10 +720,10 @@ def _apply_widen(
         if multi:
             groups = []
             for one in picked:
-                groups.append(retrieve_scored(query, top_k=PER_PAPER_TOP_K + 1, source=one))
+                groups.append(retrieve_scored(query, top_k=PER_PAPER_TOP_K + 1, source=one, use_dense=use_dense))
             merged = _merge_scored(groups)
             return merged[: MULTI_MAX_EVIDENCE + 4]
-        return retrieve_scored(query, top_k=top_k * 2, source=source)
+        return retrieve_scored(query, top_k=top_k * 2, source=source, use_dense=use_dense)
     except Exception:  # noqa: BLE001
         return []
 
@@ -732,6 +737,7 @@ async def _repair_unverifiable(
     multi: bool,
     picked: list[str],
     roles: list[RoleRun] | None,
+    use_dense: bool = True,
 ) -> tuple[list[Evidence], list[tuple]] | None:
     """Verifier 驱动 Retriever 重检：证据不可溯源时换一路信号补救。
 
@@ -794,7 +800,7 @@ async def _repair_unverifiable(
                     return evidence, scored
 
         else:  # widen
-            widened = _apply_widen(query, RETRIEVE_TOP_K, source, picked, multi)
+            widened = _apply_widen(query, RETRIEVE_TOP_K, source, picked, multi, use_dense=use_dense)
             if widened:
                 scored = widened
                 evidence = [
@@ -840,6 +846,7 @@ async def _rag_context_with_evidence(
     sources: list[str] | None = None,
     history: list[dict] | None = None,
     roles: list[RoleRun] | None = None,
+    use_dense: bool = True,
 ) -> tuple[str, list[Evidence]]:
     """检索论文库，返回 (给模型看的参考资料, 给前端看的证据列表)。
 
@@ -847,6 +854,7 @@ async def _rag_context_with_evidence(
     source 传单篇时只搜那一篇；sources 传多篇时每篇各取 3 块，合并去重后最多 8 条。
 
     roles 传一个 list 进来时，会往里追加 Planner / Retriever / Extractor 三个角色的执行记录。
+    use_dense=False 对应前端「智能搜索」关掉：稠密语义那一路不参与，只剩哈希 + BM25。
     """
     t_start = time.perf_counter()
     picked = [s for s in (sources or []) if s]
@@ -884,7 +892,7 @@ async def _rag_context_with_evidence(
             failed = []
             for one in picked:
                 try:
-                    groups.append(retrieve_scored(query, top_k=PER_PAPER_TOP_K, source=one))
+                    groups.append(retrieve_scored(query, top_k=PER_PAPER_TOP_K, source=one, use_dense=use_dense))
                 except Exception:  # noqa: BLE001
                     logger.exception("多篇检索失败，跳过：%s", one)
                     failed.append(one)
@@ -895,7 +903,7 @@ async def _rag_context_with_evidence(
             if not source:
                 named = _named_sources(question)
                 source = named[0] if named else None
-            scored = retrieve_scored(query, top_k=RETRIEVE_TOP_K, source=source)
+            scored = retrieve_scored(query, top_k=RETRIEVE_TOP_K, source=source, use_dense=use_dense)
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
         if roles is not None:
@@ -996,6 +1004,7 @@ async def _rag_context_with_evidence(
         multi=multi,
         picked=picked,
         roles=roles,
+        use_dense=use_dense,
     )
     if repaired is not None:
         evidence, scored = repaired
@@ -1465,12 +1474,13 @@ async def run_agent(
     history: list[dict] | None = None,
     source: str | None = None,
     sources: list[str] | None = None,
+    use_dense: bool = True,
 ) -> AgentResult:
     """Agent 主循环（非流式版）。返回最终答案 + 调用轨迹。"""
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
     roles: list[RoleRun] = []
     context, evidence = await _rag_context_with_evidence(
-        user_message, source, sources, history, roles
+        user_message, source, sources, history, roles, use_dense=use_dense
     )
     if context:
         messages.append({"role": "system", "content": context})
@@ -1589,6 +1599,7 @@ async def run_agent_stream(
     history: list[dict] | None = None,
     source: str | None = None,
     sources: list[str] | None = None,
+    use_dense: bool = True,
 ) -> AsyncIterator[dict]:
     """Agent 流式版：边执行边把过程吐出去，供 SSE 接口使用。
 
@@ -1601,7 +1612,7 @@ async def run_agent_stream(
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
     roles: list[RoleRun] = []
     context, evidence = await _rag_context_with_evidence(
-        user_message, source, sources, history, roles
+        user_message, source, sources, history, roles, use_dense=use_dense
     )
     if context:
         messages.append({"role": "system", "content": context})

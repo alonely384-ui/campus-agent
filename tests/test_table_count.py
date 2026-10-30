@@ -74,7 +74,7 @@ async def test_count_question_injects_table_and_evidence(monkeypatch: pytest.Mon
     monkeypatch.setattr("app.agent.page_text", _page_text)
     chunk = Chunk(text="我们训练了不同规模的模型", source="x.pdf", page=1, chunk_id=1)
 
-    def _fake_retrieve(question: str, top_k: int = 4, source: str | None = None):
+    def _fake_retrieve(question: str, top_k: int = 4, source: str | None = None, use_dense: bool = True):
         return [(chunk, 0.05, ["dense"])]
 
     monkeypatch.setattr("app.agent.retrieve_scored", _fake_retrieve)
