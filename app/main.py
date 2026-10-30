@@ -14,12 +14,12 @@ from pathlib import Path
 
 import fitz
 from fastapi import FastAPI, File, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from app import scheduler
+from app import kb_health, llm, scheduler, settings_api
 from app.agent import run_agent, run_agent_stream
 from app.chart import make_chart
 from app.config import settings
@@ -76,10 +76,13 @@ from app.zh2en import parse_glossary, translate_zh2en
 setup_logging()
 logger = get_logger(__name__)
 
+# 单一版本号来源：FastAPI 元数据、/health、设置页「关于」都读它
+VERSION = "0.1.0"
+
 app = FastAPI(
     title="Campus Agent",
     description="校园智能助手：RAG 问答 + 工具调用 + 流式输出",
-    version="0.1.0",
+    version=VERSION,
 )
 
 UPLOAD_DIR = Path("data/uploads")
@@ -95,6 +98,10 @@ class ChatRequest(BaseModel):
     source: str | None = Field(default=None, description="只在这篇论文里检索（单篇问答）")
     sources: list[str] | None = Field(
         default=None, description="多篇对比：只在这些论文里检索（每篇各取 3 块）"
+    )
+    use_dense: bool = Field(
+        default=True,
+        description="是否启用稠密向量召回。前端「智能搜索」关掉时传 false，只跑哈希 + BM25",
     )
 
 
@@ -130,10 +137,21 @@ class Zh2EnRequest(BaseModel):
 
 
 # ---------------- 接口 ----------------
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> RedirectResponse:
+    """浏览器默认会来要 /favicon.ico，页面里只声明了 SVG 版，这里转过去。
+
+    不加这条的话，每个页面开控制台都会有一条 404——虽然不影响功能，
+    但看演示时会让人以为哪坏了。用 302 而不是把 ico 静态文件塞进仓库：
+    SVG 一份就够，改图标只改一个地方。
+    """
+    return RedirectResponse(url="/ui/favicon.svg", status_code=302)
+
+
 @app.get("/health", summary="健康检查")
 async def health() -> dict:
     """部署后用这个接口判断服务是不是活着。Nginx / Docker 都靠它做探活。"""
-    return {"status": "ok", "model": settings.llm_model, "version": "0.1.0"}
+    return {"status": "ok", "model": settings.llm_model, "version": VERSION}
 
 
 @app.post("/chat", response_model=ChatResponse, summary="对话（一次性返回）")
@@ -141,7 +159,11 @@ async def chat(req: ChatRequest) -> ChatResponse:
     """最简单的一问一答。前端想要"打字机效果"请用 /chat/stream。"""
     try:
         result = await run_agent(
-            req.message, req.history, source=req.source, sources=req.sources
+            req.message,
+            req.history,
+            source=req.source,
+            sources=req.sources,
+            use_dense=req.use_dense,
         )
     except Exception as e:
         logger.exception("处理 /chat 失败")
@@ -176,7 +198,11 @@ async def chat_stream(req: ChatRequest) -> StreamingResponse:
     async def event_generator():
         try:
             async for event in run_agent_stream(
-                req.message, req.history, source=req.source, sources=req.sources
+                req.message,
+                req.history,
+                source=req.source,
+                sources=req.sources,
+                use_dense=req.use_dense,
             ):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception:
@@ -238,6 +264,13 @@ class PaperOut(BaseModel):
     uploaded_at: str
     duplicate_of: str = ""
     duplicate_reason: str = ""
+    # 以下三项来自 app/paper_topics.py 的只读聚合：解析出的真实标题、截断后的短标题、
+    # 以及它属于哪个引用图谱社区。取不到时给空串 / -1，前端自己决定怎么退回。
+    title: str = ""
+    display_title: str = ""
+    title_truncated: bool = False
+    topic_id: int = -1
+    topic_name: str = ""
 
 
 @app.get("/papers/files", summary="论文库里的文件名（供单篇选择）")
@@ -253,8 +286,81 @@ async def papers_files() -> dict:
 
 @app.get("/papers", summary="论文列表")
 async def papers_list() -> dict:
+    """列出论文，顺带附上解析出的真实标题和主题归属（只读聚合，不调大模型）。"""
     items = list_papers()
-    return {"total": len(items), "papers": [PaperOut(**vars(p)) for p in items]}
+    topics = {p.filename: p for p in _topic_index([p.filename for p in items])}
+    papers: list[PaperOut] = []
+    for item in items:
+        row = PaperOut(**vars(item))
+        topic = topics.get(item.filename)
+        if topic is not None:
+            row.title = topic.title
+            row.display_title = topic.display_title
+            row.title_truncated = topic.truncated
+            row.topic_id = topic.topic_id
+            row.topic_name = topic.topic_name
+        papers.append(row)
+    return {"total": len(papers), "papers": papers}
+
+
+def _topic_index(filenames: list[str]):
+    """把分组结果摊平，方便按文件名回查。分组失败时返回空列表，不影响论文列表本身。"""
+    from app.paper_topics import build_topics
+
+    try:
+        groups = build_topics(filenames)
+    except Exception as exc:  # noqa: BLE001 - 主题是锦上添花，不能让它拖垮论文库
+        logger.warning("论文主题分组失败，本次不展示主题信息：%s", exc, exc_info=True)
+        return []
+    return [paper for group in groups for paper in group.papers]
+
+
+@app.get("/papers/topics", summary="论文按主题分组（引用图谱社区）")
+async def papers_topics() -> dict:
+    """按引用图谱的 Louvain 社区把论文分组，附带每组的真实标题。
+
+    只读聚合：社区号复用 `app/graph.py: communities()`，与引用图谱页同一套算法；
+    标题取自 `data/meta/structures.json`。不重新聚类、不调大模型。
+
+    返回 `page_size`，前端据此做分页，避免前后端各写一个魔法数字。
+    """
+    from app.paper_topics import PAGE_SIZE
+
+    filenames = [p.filename for p in list_papers()]
+    groups = _topic_groups(filenames)
+    return {
+        "total": sum(len(g.papers) for g in groups),
+        "page_size": PAGE_SIZE,
+        "topics": [
+            {
+                "topic_id": g.topic_id,
+                "name": g.name,
+                "count": len(g.papers),
+                "papers": [
+                    {
+                        "filename": p.filename,
+                        "title": p.title,
+                        "display_title": p.display_title,
+                        "truncated": p.truncated,
+                        "cited_by": p.cited_by,
+                        "node_id": p.node_id,
+                    }
+                    for p in g.papers
+                ],
+            }
+            for g in groups
+        ],
+    }
+
+
+def _topic_groups(filenames: list[str]):
+    from app.paper_topics import build_topics
+
+    try:
+        return build_topics(filenames)
+    except Exception as exc:  # noqa: BLE001 - 分组失败退化成单组，别让页面打不开
+        logger.warning("论文主题分组失败，退化成「全部」单组：%s", exc, exc_info=True)
+        return []
 
 
 @app.post("/papers/upload", summary="上传论文（支持批量，自动查重）")
@@ -991,6 +1097,121 @@ async def writing_zh2en(req: Zh2EnRequest) -> dict:
         return await translate_zh2en(req.text, glossary)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ---------------- 设置中心 ----------------
+# 只暴露审计确认「改了立即生效」的项；API Key 在响应里永远是掩码。
+
+
+class SettingsUpdateRequest(BaseModel):
+    key: str = Field(..., min_length=1, max_length=64)
+    value: str = Field(default="", max_length=400)
+
+
+class IndexCleanupRequest(BaseModel):
+    """清理幽灵索引的入参。sources 为空表示由后端自己判定全部幽灵。"""
+
+    sources: list[str] = Field(default_factory=list, max_length=500)
+
+
+@app.get("/settings", summary="读取全部设置（API Key 已脱敏）")
+async def settings_read() -> dict:
+    return await run_in_threadpool(settings_api.snapshot)
+
+
+@app.get("/settings/about", summary="项目信息（技术栈与版本）")
+async def settings_about() -> dict:
+    return settings_api.about()
+
+
+@app.post("/settings", summary="保存一项设置")
+async def settings_save(req: SettingsUpdateRequest) -> dict:
+    try:
+        result = await run_in_threadpool(settings_api.save, req.key, req.value)
+    except settings_api.SettingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # 改了客户端相关配置，旧客户端必须丢掉，否则新 key/base_url 不生效
+    item = settings_api.SETTINGS.get(req.key)
+    if item is not None and item.needs_client_reset:
+        await llm.reset_client_async()
+    return {**result, "settings": settings_api.snapshot()}
+
+
+@app.post("/settings/restore", summary="单项恢复默认值")
+async def settings_restore(req: SettingsUpdateRequest) -> dict:
+    try:
+        result = await run_in_threadpool(settings_api.restore_default, req.key)
+    except settings_api.SettingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {**result, "settings": settings_api.snapshot()}
+
+
+@app.post("/settings/test-connection", summary="测试模型连接")
+async def settings_test_connection() -> dict:
+    probe = await settings_api.test_connection()
+    return {
+        "ok": probe.ok,
+        "model": probe.model,
+        "base_url": probe.base_url,
+        "latency_ms": probe.latency_ms,
+        "detail": probe.detail,
+        "error": probe.error,
+    }
+
+
+@app.get("/settings/schedule", summary="定时刷新状态")
+async def settings_schedule() -> dict:
+    return await run_in_threadpool(scheduler.status)
+
+
+@app.post("/settings/schedule", summary="应用定时刷新设置")
+async def settings_schedule_apply(req: SettingsUpdateRequest) -> dict:
+    """先写配置、再动运行时；运行时起不来就把配置回滚。
+
+    这条路径专门对付「界面显示成功、后台其实没启动」：
+    只要 scheduler.start() 返回的 running 为 False，一律判失败并回滚。
+    """
+    key = req.key or "DISCOVER_SCHEDULE"
+    if key not in ("DISCOVER_SCHEDULE", "DISCOVER_HOUR"):
+        raise HTTPException(status_code=400, detail=f"不支持的配置项: {key}")
+
+    before = settings_api.snapshot()
+    old_mode = str(before["groups"]["schedule"][0]["value"])
+    try:
+        settings_api.save("DISCOVER_SCHEDULE", req.value)
+    except settings_api.SettingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    mode = req.value.strip().lower()
+    info = await run_in_threadpool(scheduler.start, mode)
+
+    running = bool(info.get("running"))
+    if mode != "off" and not running:
+        # 运行时没起来：把磁盘和内存都退回改动前
+        logger.error("定时器启动失败，回滚为 %s", old_mode)
+        settings_api.save("DISCOVER_SCHEDULE", old_mode)
+        await run_in_threadpool(scheduler.start, old_mode)
+        raise HTTPException(status_code=500, detail="定时器未能启动，已回滚为原来的设置")
+
+    return {"ok": True, "mode": info.get("mode"), "running": running,
+            "next_run": info.get("next_run") or "", "settings": settings_api.snapshot()}
+
+
+@app.get("/settings/index/health", summary="索引健康检查（只读）")
+async def settings_index_health() -> dict:
+    report = await run_in_threadpool(kb_health.health_check)
+    return report.to_dict()
+
+
+@app.post("/settings/index/cleanup", summary="清理幽灵索引（三路同步）")
+async def settings_index_cleanup(req: IndexCleanupRequest | None = None) -> dict:
+    """只清理磁盘上已不存在的 source；有效论文一律跳过（在 cleanup_ghosts 里保证）。"""
+    sources: list[str] | None = None
+    if req is not None and req.sources:
+        sources = [s.strip() for s in req.sources if s and s.strip()]
+    result = await run_in_threadpool(kb_health.cleanup_ghosts, sources)
+    verify = await run_in_threadpool(kb_health.verify_consistency)
+    return {"result": result.to_dict(), "verify": verify}
 
 
 # ---------------- 前端页面 ----------------
