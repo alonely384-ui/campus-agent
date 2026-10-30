@@ -96,9 +96,48 @@ chown -R appuser:appuser /opt/campus-agent
 python3.11 --version
 # 期望：Python 3.11.x
 
-fc-list | grep -i "noto sans cjk" | head -2
-# 期望：能看到 Noto Sans CJK 字体（图表导出中文用）
+fc-list :lang=zh | head -5
+# 期望：能看到 Noto Sans CJK SC / Noto Serif CJK SC 等字体
+# 注意：Ubuntu 24.04 的 fonts-noto-cjk 包装的是 Serif 版本，
+#       用 grep "noto sans cjk" 去验证会查不到，看起来像装失败了。
+#       用 fc-list :lang=zh（按语言查）才准。
+
+fc-match sans-serif:lang=zh
+# 期望：返回一个 .ttc/.otf 路径，不是 "DejaVuSans.ttf"
+# 这条最关键 —— 它告诉我们「网页请求中文字体时实际返回哪个文件」，
+# Chromium 渲染 Mermaid 走的就是这条路径。
 ```
+
+### 🚨 中文字体：为什么必须单独确认
+
+**现象**：服务器上一切正常，但「写作助手 → 架构图」生成的 PNG 里中文全是方块。
+- Mermaid 渲染出来是 `□□□□`
+- Graphviz 渲染出来是 `Web[52][74]`（把 Unicode 码位画成了方框）
+
+**根因**：Ubuntu 最小安装默认**不带任何 CJK 字体**。两条渲染路径都会挂：
+
+| 渲染器 | 字体由谁决定 | 缺字体时的表现 |
+|---|---|---|
+| **Mermaid** | Chromium 的 CSS 字体栈 | 节点文字变 `□□` |
+| **Graphviz** | `dot` 的 `fontname` 属性 | 文字变 `[52][74]` 这种码位方框 |
+| **TikZ** | `\usepackage{ctex}` 调 LaTeX 字体 | 编译直接失败 |
+
+代码里已经做了两层兜底（`app/diagram.py`）：
+- `_ensure_font()` 给 DOT 代码注入 `fontname="Microsoft YaHei"`
+- `_ensure_mermaid_font()` 给 Mermaid 代码注入 `%%{init}%` 指令指定字体族
+
+但**这两层都只能「指定字体名」，不能「凭空造出字体文件」**。系统里没有字形，指定什么都是方块。
+
+**所以 `apt install fonts-noto-cjk` 是硬要求，不是可选项。**
+
+装完之后重启服务（字体缓存被清理时 Chromium 可能还握着旧句柄）：
+
+```bash
+pkill -f "uvicorn app.main:app"; sleep 2
+nohup .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+```
+
+验证方式：调一次 `/writing/diagram`，**把返回的 PNG 下载下来用眼睛看**——只看 `ok: true` 是不够的，中文成方块时接口照样返回成功。
 
 ---
 
@@ -312,11 +351,39 @@ http://<你的公网IP>:8000/ui/
 
 - [ ] `http://<IP>:8000/health` 返回 ok
 - [ ] `http://<IP>:8000/ui/` 首页能打开
-- [ ] 在网页里问一个问题，能出带证据卡片的答案
-- [ ] `http://<IP>:8000/ui/graph.html` 引用图谱能画出来
+- [ ] 点开「论文库」，能看到 39 行论文
+- [ ] 在网页里问一个问题，能出**带证据卡片的答案**（四段结构：结论/依据/局限/下一步）
+- [ ] 回答下方有「多智能体协作」时间线，五个角色都在
+- [ ] `http://<IP>:8000/ui/graph.html` 引用图谱能画出来（节点 36 / 边 189）
+- [ ] `http://<IP>:8000/ui/analysis.html` 点「前沿探索」能看到三组结果
 - [ ] `http://<IP>:8000/ui/writing.html` 写作助手能打开
+- [ ] **写作助手 → 架构图，选 Mermaid 生成一张，下载下来看中文是不是方块**
 - [ ] 服务器上 `free -h` 显示 available 还剩 1G 以上
 - [ ] `systemctl status campus-agent` 是 running
+
+### 关键接口自检（复制粘贴即跑）
+
+```bash
+# 一张表看全部：哪个通、哪个不通，一眼就知道
+for p in /health /papers/files /reader/papers /graph /graph/survey /graph/frontier \
+         /recommendations /writing/renderers; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000$p)
+  printf "%-20s %s\n" "$p" "$code"
+done
+```
+
+期望全部是 `200`。`/writing/renderers` 返回 `{"mermaid":true,"graphviz":true,"tikz":false}` 是**正常**的
+——`tikz` 为 `false` 表示没装 TeX Live，前端会自动把这一项灰掉，不影响演示。
+
+```bash
+# 完整出图 + 中文校验（能出图 ≠ 中文对，一定要下载看）
+curl -s -X POST http://127.0.0.1:8000/writing/diagram \
+  -H "Content-Type: application/json" \
+  -d '{"description":"用户提问经意图识别，走BM25检索和大模型生成，输出带引用回答","kind":"mermaid"}' \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('ok=', d.get('ok')); print('http://<IP>:8000' + str(d.get('image_url')))"
+```
+
+把打印出的地址在浏览器打开，**看到中文清晰可读才算通**。
 
 ---
 
