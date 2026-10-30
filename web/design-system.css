@@ -1,0 +1,1232 @@
+/* ==========================================================================
+   科研小助手 · 全站设计系统
+   --------------------------------------------------------------------------
+   引入方式（在每个页面的 <style> 之前）：
+       <link rel="stylesheet" href="design-system.css">
+
+   设计原则
+   1. 所有色值只在这里定义一次，页面 CSS 一律引用变量，不再写字面量。
+   2. 变量按「语义」命名（--text-muted 表示"次要文字"），不按颜色命名
+      （不要写 --gray-500），这样将来换色 / 加深色模式只改一处。
+   3. 当前只提供浅色主题。深色主题的变量值已经预留位置，第二阶段填入，
+      阶段一不开放（避免出现"能切但读不清"的半成品）。
+
+   对比度（WCAG AA：正文 ≥ 4.5:1，大字号 ≥ 3:1）
+   --text-primary    #1f2937 on #ffffff = 14.68:1  ✓
+   --text-secondary  #374151 on #ffffff = 10.31:1  ✓
+   --text-muted      #5c6672 on #ffffff =  5.57:1  ✓
+   --text-muted      #5c6672 on #f5f6f8 =  5.11:1  ✓ （原 #6b7280 只有 4.43:1，不达标）
+   --text-subtle     #9ca3af on #ffffff =  2.54:1  ✗ 仅限占位符 / 禁用态等非关键信息
+   ========================================================================== */
+
+:root {
+  /* ---------- 中性色阶（内部调色板，页面层不要直接引用 ---------- */
+  --gray-0:  #ffffff;   /* 最亮：卡片、输入框、弹窗底 */
+  --gray-25: #fbfcfd;
+  --gray-50: #f8fafc;
+  --gray-100:#f3f5f8;
+  --gray-150:#eef1f5;
+  --gray-200:#e3e7ee;
+  --gray-300:#d5dbe3;
+  --gray-400:#c3ccd8;
+  --gray-500:#9ca3af;
+  --gray-600:#5c6672;
+  --gray-700:#374151;
+  --gray-800:#1f2937;
+  --gray-900:#111827;
+
+  /* ---------- 品牌主色（蓝）---------- */
+  --blue-50: #eef4fd;
+  --blue-100:#dbe8fb;
+  --blue-200:#c6d9f9;
+  --blue-500:#1a73e8;
+  --blue-600:#1667d0;
+  --blue-700:#1558b0;
+
+  /* ---------- 语义色：成功（绿）---------- */
+  --green-50: #e8f5ec;
+  --green-100:#d3ebd9;
+  --green-600:#0f9d58;
+  --green-700:#1a7f37;
+
+  /* ---------- 语义色：警告（橙）---------- */
+  --amber-50: #fff8e6;
+  --amber-200:#f0dca8;
+  --amber-900:#8a5a00;
+
+  /* ---------- 语义色：危险（红）---------- */
+  --red-50:  #fdecec;
+  --red-200: #f6c9c9;
+  --red-700: #b3261e;
+
+  /* ---------- 语义色：强调（紫，用于社区聚类等）---------- */
+  --purple-50: #f2eefb;
+  --purple-100:#e9e2f7;
+  --purple-200:#d9cef0;
+  --purple-700:#6b4fa8;
+
+  /* ---------- 角色标签配色（全站唯一口径）----------
+     基石节点挖掘的六个角色，analysis.html 与 graph.html 必须完全一致。
+     改这里之前先确认：两页的 .tag.* / .role-* 规则、图例、详情面板都读同一组值。
+     analysis.html 与 graph.html 曾各写一套 —— bridge/foundation 颜色反了、
+     isolated 一个红一个灰，用户同一角色看到两种颜色。现已收口到这里。 */
+  --role-cornerstone-bg: #fef3c7;  --role-cornerstone-fg: #92400e;  /* 暖黄：基石 */
+  --role-hub-bg:         #dbeafe;  --role-hub-fg:         #1e40af;  /* 蓝：高频被引 */
+  --role-bridge-bg:      #e9d5ff;  --role-bridge-fg:      #6b21a8;  /* 紫：跨社区桥接 */
+  --role-foundation-bg:  #d1fae5;  --role-foundation-fg:  #065f46;  /* 绿：基础件 */
+  --role-fringe-bg:      #f3f4f6;  --role-fringe-fg:      #5c6672;  /* 灰：边缘 */
+  --role-isolated-bg:    #f3f4f6;  --role-isolated-fg:    #5c6672;  /* 灰：孤立（不抢眼，但要看得清）
+     原值 #9ca3af 在 #f3f4f6 上只有 2.31:1，"孤立"两字本身看不清；
+     #5c6672 与 --text-muted 同值，实测 5.30:1，既保持"灰化不抢眼"的语义，又过了 WCAG AA。 */
+
+  /* ---------- 暖色底（去重提示框等"需要一点暖意"的非告警区块）---------- */
+  --bg-warm: #fffdf3;
+
+  /* ---------- 大面板投影（弹窗比卡片浮得更高，单独一档）---------- */
+  --shadow-overlay: 0 20px 60px rgba(15, 23, 42, .24);
+
+  /* ---------- 图表专用：坐标轴与网格 ----------
+     图表里的轴线、网格线、坐标文字也走变量。它们本质是「图表内部的界面色」，
+     与 --border-* / --text-* 同源，但单独开一组是因为图表需要更淡的网格，
+     而界面上的边框不能淡到这个程度。 */
+  --chart-axis:     #d5dbe5;   /* 轴线 */
+  --chart-grid:     #f1f4f8;   /* 网格线 */
+  --chart-label:    #5c6672;   /* 坐标轴刻度文字 */
+  --chart-label-2:  #9ca3af;   /* 轴名、次级标签 */
+
+  /* ---------- 图表色：ECharts / matplotlib 数据配色 ----------
+     这一组**故意**不跟界面色联动。图表配色是数据语义（社区 0/1/2、类目 A/B/C），
+     界面色一改就重刷图表，会让「同一张图昨天今天颜色不一样」。
+     改这里之前先想清楚：ECharts 主题、matplotlib 导出、图例文字三处都要同步。
+     前 3 色是引用图谱社区聚类的固定色，其余沿用 matplotlib tab10。 */
+  --chart-brand:  #1a73e8;   /* 新近且被引 / 主数据序列 */
+  --chart-accent: #9333ea;   /* 跨社区桥接 */
+  --chart-danger: #dc2626;   /* 未被接入 */
+  --chart-c1: #1f77b4;
+  --chart-c2: #ff7f0e;
+  --chart-c3: #2ca02c;
+  --chart-c4: #d62728;
+  --chart-c5: #9467bd;
+  --chart-c6: #8c564b;
+  --chart-c7: #e377c2;
+  --chart-c8: #7f7f7f;
+  --chart-c9: #bcbd22;
+  --chart-c10:#17becf;
+  --chart-ring: #f5a623;     /* 基石节点外圈高亮 */
+
+  /* ---------- 界面语义：背景 ---------- */
+  --bg-page:      var(--gray-100);   /* 页面底色 */
+  --bg-surface:   var(--gray-0);     /* 卡片 / 面板 */
+  --bg-surface-2: var(--gray-50);    /* 卡片内的次级区块、表头 */
+  --bg-muted:     var(--gray-150);   /* 标签、代码行、悬停底 */
+  --bg-hover:     var(--gray-100);   /* 列表项悬停 */
+  --bg-active:    var(--gray-200);   /* 列表项按下 / 选中 */
+  --bg-overlay:   rgba(15, 23, 42, .42);
+  --bg-overlay-soft: rgba(15, 23, 42, .35);  /* 弹层背后的轻遮罩（阅读页版式面板） */
+  --bg-toast:     rgba(17, 24, 39, .92);     /* 浮在正文上的提示条 */
+  --bg-surface-translucent: rgba(255, 255, 255, .85);  /* 页码牌等需要半透明的白 */
+  --bg-page-translucent: rgba(245, 246, 248, .92);     /* 浮层压住页面时的底色 */
+  --bg-brand-soft:var(--blue-50);
+
+  /* ---------- 文本层高亮（阅读页 PDF 上的覆盖块）----------
+     这几组是半透明色，叠在 PDF 原文上，**不能**换成不透明语义色，
+     否则正文被遮住。取值保持一致即可，改之前先看 reader.html 的用途。 */
+  --hl-cite:           rgba(26, 115, 232, .16);   /* 普通引用 [12] */
+  --hl-cite-hover:     rgba(26, 115, 232, .34);
+  --hl-cite-n-hover:   rgba(26, 115, 232, .42);   /* 数字型引用 */
+  --hl-hover:          rgba(26, 115, 232, .14);   /* 悬停翻译命中的句子 */
+  --hl-find:           rgba(26, 115, 232, .28);   /* 全文搜索结果 */
+  --hl-find-ring:      rgba(26, 115, 232, .35);
+  --hl-land-ring:      rgba(26, 115, 232, .50);   /* 跨页跳转后落点页外框 */
+  --hl-author:         rgba(16, 145, 96, .18);    /* 作者/机构引用 */
+  --hl-author-hover:   rgba(16, 145, 96, .44);
+  --hl-author-hit:     rgba(16, 145, 96, .34);
+  --hl-author-ring:    rgba(16, 145, 96, .35);
+  --hl-ref:            rgba(124, 58, 237, .16);   /* 参考文献回链 */
+  --hl-ref-hover:      rgba(124, 58, 237, .36);
+  --hl-find-text:      rgba(255, 214, 0, .42);    /* 搜索命中的正文底 */
+  --hl-find-current:   rgba(255, 140, 0, .62);    /* 当前那一处 */
+  --hl-find-current-ring: rgba(216, 92, 0, .85);
+
+  /* ---------- 界面语义：文字 ---------- */
+  --text-primary:   var(--gray-800);  /* 标题、正文 */
+  --text-secondary: var(--gray-700);  /* 次级正文 */
+  --text-muted:     var(--gray-600);  /* 辅助说明、时间戳、标签文字 */
+  --text-subtle:    var(--gray-500);  /* 占位符、禁用（对比度不足，仅限非关键） */
+  --text-inverse:   var(--gray-0);    /* 深色底上的文字 */
+  --text-brand:     var(--blue-600);
+  --text-on-brand:  var(--gray-0);
+
+  /* ---------- 界面语义：边框 ---------- */
+  --border-color:     var(--gray-200);  /* 默认分割线 / 卡片边 */
+  --border-color-alt: var(--gray-150);  /* 极淡分割线（列表项之间） */
+  --border-strong:    var(--gray-300);  /* 输入框、按钮的可见边 */
+  --border-brand:     var(--blue-500);
+  --border-focus:     var(--blue-500);
+
+  /* ---------- 界面语义：品牌 ----------
+     注意：--brand 及其派生量的**最终值**在文件末尾「主题层 · 方案 B」里覆盖，
+     这里保留第一阶段声明只是为了让变量定义顺序可读、也便于回退。
+     想回到蓝色主题：删掉末尾主题层里的 --brand / --brand-hover 等几行即可。 */
+  --brand:        var(--blue-500);
+  --brand-hover:  var(--blue-600);
+  --brand-active: var(--blue-700);
+  --brand-soft:   var(--blue-50);
+  --brand-2:      var(--purple-700);   /* 渐变第二色；第二阶段的最终值在主题层 */
+  --brand-grad:   linear-gradient(135deg, var(--blue-500) 0%, var(--purple-700) 100%);
+  --brand-ring:   rgba(26, 115, 232, .22);
+  --brand-text:   var(--blue-600);
+
+  /* ---------- 界面语义：状态 ---------- */
+  --success:      var(--green-700);
+  --success-bg:   var(--green-50);
+  --success-border: var(--green-100);
+
+  --warning:      var(--amber-900);
+  --warning-bg:   var(--amber-50);
+  --warning-border: var(--amber-200);
+
+  --danger:       var(--red-700);
+  --danger-bg:    var(--red-50);
+  --danger-border: var(--red-200);
+
+  --accent:       var(--purple-700);  /* 已弃用：保留给旧引用，新代码请用 --cluster */
+  --cluster:      var(--purple-700);
+  --cluster-bg:   var(--purple-50);
+
+  /* ---------- 圆角 ---------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ---------- 阴影（统一 4 级）---------- */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, .04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, .08);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, .10);
+  --shadow-lg: 0 8px 28px rgba(15, 23, 42, .16);
+
+  /* ---------- 间距（4px 基准栅格）---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ---------- 字号 ---------- */
+  --font-xs:   11px;
+  --font-sm:   12px;
+  --font-base: 13px;
+  --font-md:   14px;
+  --font-lg:   15px;
+  --font-xl:   18px;
+  --font-2xl:  22px;
+  --font-3xl:  28px;
+
+  /* ---------- 字体族 ---------- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
+               "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+
+  /* ---------- 行高 ---------- */
+  --leading-tight: 1.35;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+
+  /* ---------- 动效 ---------- */
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --dur-fast: 120ms;
+  --dur-normal: 200ms;
+
+  /* ---------- 层级 ---------- */
+  --z-sticky: 20;
+  --z-float: 60;
+  --z-modal: 80;
+  --z-toast: 90;
+
+  /* ---------- 布局 ---------- */
+  --content-width: 820px;
+  --content-width-wide: 1100px;
+  /* 对话正文宽度：由对话页右侧的竖向拖拽条改写（--chat-w）。
+     侧栏宽度 --sidebar-w 同理由侧栏右边缘的拖拽条改写。
+     两个都写在 :root 上，所以刷新后首帧就能按用户上次拖到的宽度排版。 */
+  --chat-w: var(--content-width);
+  --chat-w-min: 520px;
+  --chat-w-max: 1400px;
+
+  /* ======================================================================
+     主题层 · 方案 B「现代卡片」
+     ----------------------------------------------------------------------
+     上面那套 --blue-* / --brand 是第一阶段的收敛结果（保持原页面外观）。
+     这一段是第二阶段选定的视觉方向：蓝色品牌 + 大圆角 + 双层阴影 + 状态胶囊。
+     品牌色原为紫色 #4f46e5 / #7c3aed，后按需求整体换成蓝色系。
+
+     为什么单独起 --brand / --brand-2 而不是直接改 --blue-500：
+       --blue-500 同时被 --hl-cite / --chart-brand / table.cmp 表头等位置引用，
+       改它会连带改掉阅读页高亮和图表主色。主题色只走 --brand / --brand-2 两个入口，
+       将来做「颜色自选」时只需换这两个变量的值，其他全站自动跟随。
+
+     对比度实测（WCAG AA，换成蓝色后重算）
+       --brand      #1a73e8 on #ffffff = 4.51:1  ✓
+       --brand-2    #0ea5e9 on #ffffff = 3.02:1  —— 仅渐变点缀，不承载文字
+       --brand-text #0b57d0 在 --brand-soft #e8f0fe 上 = 7.66:1 ✓
+     ====================================================================== */
+
+  /* ---------- 主题：品牌蓝 ---------- */
+  /* 对比度实测（WCAG AA）
+       --brand      #1a73e8 on #ffffff = 4.51:1  ✓（白字压 #1a73e8 = 4.51:1，正文临界，按钮上加粗即可）
+       --brand-2    #0ea5e9 on #ffffff = 3.02:1  —— 只用于渐变点缀，不承载文字
+       --brand-text #0b57d0 在 --brand-soft #e8f0fe 上 = 7.66:1 ✓ */
+  --brand:        #1a73e8;
+  --brand-hover:  #1b66c9;
+  --brand-active: #1558ad;
+  --brand-soft:   #e8f0fe;   /* 品牌色浅底：选中态、徽章、渐变的浅端 */
+  --brand-2:      #0ea5e9;   /* 渐变第二色，只用于标题块这类点缀 */
+  --brand-text:   #0b57d0;   /* 压在 --brand-soft 上的品牌文字 */
+  --text-brand:   #0b57d0;
+  --text-on-brand: #ffffff;
+  --border-brand: #1a73e8;
+  --border-focus: #1a73e8;
+  --bg-brand-soft: #e8f0fe;
+  --brand-ring:   rgba(26, 115, 232, .22);   /* 输入框聚焦光圈 */
+  --brand-grad:   linear-gradient(135deg, #1a73e8 0%, #0ea5e9 100%);
+  /* 焦点环颜色统一到品牌色后，::selection 也跟着走，避免蓝紫混用 */
+
+  /* ---------- 主题：大圆角（卡片 18px / 控件 10px）---------- */
+  --radius-card: 18px;
+  --radius-control: 10px;
+  --radius-chip: 999px;
+
+  /* ---------- 主题：双层阴影（每个都是一近一远两层）---------- */
+  --shadow-card:       0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px rgba(16, 24, 40, .06);
+  --shadow-card-hover: 0 2px 4px rgba(16, 24, 40, .05), 0 14px 32px rgba(16, 24, 40, .10);
+  --shadow-hero:       0 10px 30px rgba(26, 115, 232, .28), 0 2px 6px rgba(26, 115, 232, .16);
+  --shadow-pop:        0 16px 48px rgba(16, 24, 40, .16), 0 2px 8px rgba(16, 24, 40, .06);
+
+  /* ---------- 主题：页面底色（比灰色更冷一点，衬托白色卡片）---------- */
+  --bg-page: #f6f7fb;
+  --bg-surface-2: #f7f8fc;
+  --bg-muted: #f1f3f9;
+  --bg-hover: #f4f5fa;
+  --bg-active: #e9ecf5;
+  --border-color: #e6e8f0;
+  --border-color-alt: #eef0f6;
+  --border-strong: #d6dae6;
+}
+
+/* ==========================================================================
+   基础重置
+   ========================================================================== */
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-md);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 600; line-height: var(--leading-tight); }
+p { margin: 0; }
+a { color: var(--text-brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; display: block; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea, select { font-family: inherit; }
+
+/* 键盘聚焦可见（鼠标点击不显示）*/
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+::selection { background: var(--blue-100); color: var(--text-primary); }
+
+/* 滚动条：统一细灰，避免各页三种滚动条并存 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--gray-400); background-clip: content-box; }
+
+/* ==========================================================================
+   通用组件
+   ========================================================================== */
+
+/* ---------- 按钮 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 8px 14px;
+  font-size: var(--font-base);
+  font-weight: 500;
+  line-height: 1.4;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: var(--brand);
+  color: var(--text-on-brand);
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+  white-space: nowrap;
+}
+.btn:hover { background: var(--brand-hover); }
+.btn:active { background: var(--brand-active); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn--secondary {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+.btn--secondary:hover { background: var(--bg-surface-2); border-color: var(--gray-400); }
+.btn--secondary:active { background: var(--bg-hover); }
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+}
+.btn--ghost:hover { background: var(--bg-muted); color: var(--text-secondary); }
+.btn--ghost:active { background: var(--bg-active); }
+
+.btn--danger { background: var(--danger); }
+.btn--danger:hover { background: var(--red-700); filter: brightness(.92); }
+
+.btn--sm { padding: 5px 10px; font-size: var(--font-sm); border-radius: var(--radius-sm); }
+.btn--block { width: 100%; }
+
+/* ---------- 卡片 ---------- */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+.card--flush { box-shadow: none; }
+.card--pad { padding: var(--space-4); }
+
+/* ---------- 输入框 ---------- */
+.field {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: var(--font-base);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.field::placeholder { color: var(--text-subtle); }
+.field:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--blue-100);
+}
+.field:disabled { background: var(--bg-muted); cursor: not-allowed; }
+
+textarea.field { resize: vertical; line-height: var(--leading-normal); }
+select.field { cursor: pointer; }
+
+/* ---------- 标签 / 徽章 ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: var(--font-xs);
+  line-height: 1.5;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.tag--brand   { background: var(--brand-soft);   color: var(--text-brand); }
+.tag--success { background: var(--success-bg);   color: var(--success); }
+.tag--warning { background: var(--warning-bg);   color: var(--warning); }
+.tag--danger  { background: var(--danger-bg);    color: var(--danger); }
+.tag--accent  { background: var(--cluster-bg);   color: var(--cluster); }
+
+/* ---------- 页面容器 ---------- */
+.page-header {
+  width: 100%;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+}
+.page-header__inner {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.page-title {
+  font-size: var(--font-xl);
+  color: var(--text-primary);
+}
+.page-sub {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ---------- 导航链接（五个页面统一写法）---------- */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition: background var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+  text-decoration: none;
+}
+.nav-link:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.nav-link.is-active {
+  background: var(--brand-soft);
+  color: var(--text-brand);
+  font-weight: 500;
+}
+
+/* ---------- 空状态 ---------- */
+.empty-state {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-base);
+}
+
+/* ---------- 分割线 ---------- */
+.divider {
+  height: 1px;
+  background: var(--border-color-alt);
+  border: 0;
+  margin: var(--space-3) 0;
+}
+
+/* ---------- 工具类 ---------- */
+.mono { font-family: var(--font-mono); }
+.text-muted { color: var(--text-muted); }
+.text-subtle { color: var(--text-subtle); }
+.is-hidden { display: none !important; }
+
+/* ---------- 主题：渐变标题块（hero）----------
+   方案 B 的标志性元素。刻意只用在页面顶部这一条，不铺满整页 ——
+   设置页里大量红绿告警，大面积的紫色会和它们抢注意力。 */
+.hero {
+  background: var(--brand-grad);
+  color: var(--text-on-brand);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hero);
+  padding: var(--space-5) var(--space-6);
+}
+.hero__eyebrow {
+  font-size: var(--font-xs);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  opacity: .82;
+  margin-bottom: 6px;
+}
+.hero__title {
+  font-size: var(--font-2xl);
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: var(--text-on-brand);
+}
+.hero__sub {
+  margin-top: 8px;
+  font-size: var(--font-base);
+  line-height: var(--leading-relaxed);
+  opacity: .92;
+  max-width: 620px;
+}
+
+/* ---------- 主题：状态胶囊 ----------
+   左边一个小圆点 + 文字，比纯文字状态更容易被扫到。
+   kind: ok / bad / warn / pending（默认灰）*/
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  border-radius: var(--radius-chip);
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+.status-pill--ok   { background: var(--success-bg); color: var(--success); }
+.status-pill--bad  { background: var(--danger-bg);  color: var(--danger); }
+.status-pill--warn { background: var(--warning-bg); color: var(--warning); }
+
+/* ---------- 主题：区块图标（区块标题左上的浅紫小方块）---------- */
+.sec-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-control);
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(26, 115, 232, .12);
+}
+
+/* ---------- 减少动效（尊重系统偏好）---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   深色主题（第二阶段启用，当前不激活）
+   --------------------------------------------------------------------------
+   留位说明：把 [data-theme="dark"] 的变量集写全后再放开设置中心的开关。
+   第一阶段不出现任何深色规则，避免"能切但读不清"。
+   ========================================================================== */
+/* ==========================================================================
+   侧栏布局组件 · DeepSeek 官网式左栏（2026-10-30）
+   --------------------------------------------------------------------------
+   位置说明：本该并进上面的「主题层」，但为了不动已验收的那段样式，
+   单独作为追加段落在文件末尾。它自己带 :root，选择器特性度与主题层相同、
+   出现更晚，所以这里的变量值最终生效。
+   结构：body.app > aside.sidebar + div.app__main
+     aside.sidebar
+       .sb-head      logo + 折叠（折叠后收成 .sb-head-act）
+       .sb-new       开启新对话（主按钮）
+       .sb-nav       功能入口（论文库 / 发现 / 引用图谱 / 论文分析 / 写作助手）
+       .sb-history   对话历史（今天 / 7 天内 / 30 天内）
+       .sb-foot      设置齿轮
+     div.app__main
+       .main__scroll 消息流
+       .dock         底部输入坞（空状态时居中大版）
+   折叠规则：给 body 加 app--collapsed，侧栏宽度由 --sidebar-w 收到 64px，
+   只留图标。类名带 sb- 前缀，避免和页面里已有的 .row / .chat 撞车。
+   ========================================================================== */
+
+:root {
+  --sidebar-w: 264px;
+  --sidebar-w-collapsed: 64px;
+  --sidebar-bg: var(--gray-50);
+  --sidebar-item-h: 38px;
+}
+
+body.app {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg-page);
+}
+
+/* ---------- 侧栏 ---------- */
+.sidebar {
+  flex: 0 0 var(--sidebar-w);
+  width: var(--sidebar-w);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+  transition: width var(--dur-fast) var(--ease), flex-basis var(--dur-fast) var(--ease);
+  overflow: hidden;
+}
+
+.sb-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 10px;
+  flex: 0 0 auto;
+}
+.sb-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+/* 品牌图标：logo.svg 自带渐变，外面不再铺 --brand-grad 底，否则蓝色渐变叠在蓝色底上会糊成一团 */
+.sb-logo__mark {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+.sb-logo__name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+.sb-toggle {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  box-shadow: none;
+  cursor: pointer;
+}
+.sb-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sb-head-act { display: none; }
+
+/* 新对话 */
+.sb-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.sb-new:hover { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-active); }
+.sb-new__plus { font-size: 15px; font-weight: 600; line-height: 1; }
+
+/* 功能入口 / 历史列表通用行 */
+.sb-group { display: flex; flex-direction: column; gap: 1px; }
+.sb-group--nav { flex: 0 0 auto; }
+.sb-label {
+  padding: 12px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+.sb-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--sidebar-item-h);
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: none;
+  width: 100%;
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.sb-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sb-item__ico {
+  flex: 0 0 18px;
+  width: 18px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1;
+}
+.sb-item__txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 历史区：能滚动，吃满剩余高度 */
+.sb-history {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding-bottom: 6px;
+}
+.sb-history::-webkit-scrollbar { width: 6px; }
+.sb-history::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+.sb-hist {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-control);
+  transition: background var(--dur-fast) var(--ease);
+}
+.sb-hist:hover { background: var(--bg-hover); }
+.sb-hist.on { background: var(--brand-soft); }
+.sb-hist.on .sb-item__txt { color: var(--brand-active); font-weight: 500; }
+.sb-hist__open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--sidebar-item-h);
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  cursor: pointer;
+  box-shadow: none;
+  text-align: left;
+}
+.sb-hist.on .sb-hist__open { color: var(--brand-active); }
+.sb-hist__del {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 0;
+}
+.sb-hist:hover .sb-hist__del, .sb-hist__del:focus-visible { opacity: 1; }
+.sb-hist__del:hover { background: var(--danger-bg); color: var(--danger); }
+
+.sb-foot {
+  flex: 0 0 auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color-alt);
+}
+
+/* ---------- 折叠态 ---------- */
+.app--collapsed .sidebar {
+  flex-basis: var(--sidebar-w-collapsed);
+  width: var(--sidebar-w-collapsed);
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.app--collapsed .sb-logo,
+.app--collapsed .sb-label,
+.app--collapsed .sb-item__txt,
+.app--collapsed .sb-new__txt,
+.app--collapsed .sb-history { display: none; }
+.app--collapsed .sb-head { padding-left: 0; padding-right: 0; justify-content: center; }
+.app--collapsed .sb-head-act { display: flex; }
+.app--collapsed .sb-item,
+.app--collapsed .sb-new { justify-content: center; padding: 0; }
+.app--collapsed .sb-toggle { margin-left: 0; }
+
+/* ---------- 主区 ---------- */
+.app__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+.main__scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 16px 12px;
+}
+.main__inner {
+  width: 100%;
+  /* 正文宽度由右侧拖拽条控制（--chat-w）；--content-width 只是它的默认值 */
+  max-width: var(--chat-w);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 独立内容页（论文库 / 发现）用宽版：它们复用对话页的 .main__inner 骨架，
+ * 但 --chat-w 是给单列对话排版的窄口径（820px），用来放论文列表和推荐流太挤。
+ * 这里改成和论文分析页一致的 --content-width-wide（1100px）——这两页有左侧栏，
+ * 比写作助手那种没侧栏、直接吃满的排版窄一档更合适。
+ * 不直接改 .main__inner 默认值：对话页还在用 --chat-w，那条链路不能动。
+ * 也能排到 .main__inner 前面没什么用，靠后面的行序 + 多一个类来取胜。 */
+.main__inner--wide { max-width: var(--content-width-wide); }
+
+/* 顶部服务状态条：小圆点 + 文字，不抢视线 */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 0 0;
+  white-space: nowrap;
+}
+.status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray-400);
+  flex: 0 0 auto;
+}
+.status.ok { color: var(--text-secondary); }
+.status.ok::before { background: var(--success); }
+.status.bad { color: var(--danger); }
+.status.bad::before { background: var(--danger); }
+
+/* ---------- 输入坞 ---------- */
+.dock {
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 8px 16px 18px;
+}
+.dock__inner {
+  width: 100%;
+  /* 和正文同宽：右侧拖拽条一动，答句和输入框一起变宽/变窄 */
+  max-width: var(--chat-w);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 空状态：居中招呼语 */
+.greeting {
+  display: none;
+  text-align: center;
+  margin: 0 auto 2px;
+}
+.greeting__mark {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 14px;
+  display: block;
+}
+.greeting__title {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--text-primary);
+}
+.greeting__sub {
+  margin-top: 8px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+/* 空状态：招呼语和输入坞一起居中
+ * 只对「有输入坞的对话页」生效。原来写成 body.app:not(.has-conv) 是全局的，
+ * 论文库 / 发现这类没有 .dock 的独立页没有 has-conv 类，正文区会被
+ * display:none 直接吃掉——页面能打开但一片空白（2026-10-30 实测踩到）。
+ * :has() 现在 Chrome 105+ / Safari 15.4+ / Firefox 121+ 都支持。 */
+body.app:not(.has-conv):has(.dock) .app__main { justify-content: center; }
+body.app:not(.has-conv):has(.dock) .main__scroll { display: none; }
+body.app:not(.has-conv):has(.dock) .greeting { display: block; }
+
+/* 输入坞外壳：圆角大框，内含 textarea + 工具行 */
+.dock__box {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
+  padding: 12px 14px 10px;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.dock__box:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring), var(--shadow-card); }
+
+.dock__ta {
+  width: 100%;
+  min-height: 30px;
+  max-height: 40vh;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  padding: 2px 0;
+}
+.dock__ta::placeholder { color: var(--text-subtle); }
+
+.dock__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+/* 智能搜索：这是真开关（on = 三路召回，关 = BM25 + 哈希两路），所以要有明显的开/关两态。
+ * 「深度思考」按钮已删除——多智能体协作每轮都跑，做成开关就是关不掉的假开关。 */
+.chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-chip);
+  background: var(--bg-surface-2);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.3;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+.chip-toggle__ico { font-size: 12px; color: var(--text-subtle); transition: color var(--dur-fast) var(--ease); }
+.chip-toggle:hover { border-color: var(--border-strong); background: var(--bg-hover); }
+.chip-toggle.on {
+  background: var(--brand-soft);
+  border-color: var(--brand-ring);
+  color: var(--brand-text);
+  font-weight: 600;
+}
+.chip-toggle.on .chip-toggle__ico { color: var(--brand); }
+
+.dock__spacer { flex: 1 1 auto; min-width: 8px; }
+
+.icon-btn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.dock__send {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--brand-grad);
+  color: var(--text-on-brand);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(26, 115, 232, .30);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dock__send:disabled { background: var(--border-strong); cursor: not-allowed; box-shadow: none; }
+
+/* 论文选择：空状态时藏在坞上方，正常对话时也在坞内工具行 */
+.dock .pick > summary {
+  padding: 6px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-chip);
+  background: var(--bg-surface-2);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+.dock .pick[open] > summary { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+/* 选择器在坞里，弹层必须往上方弹，否则被视口裁掉 */
+.dock .pick-list { bottom: 42px; }
+
+@media (max-width: 900px) {
+  :root { --sidebar-w: 216px; }
+  .greeting__title { font-size: 22px; }
+}
+/* ==========================================================================
+   滚动条：默认隐形，悬停才浮现（2026-10-30）
+   --------------------------------------------------------------------------
+   常驻滚动条在浅色长列表里很扎眼，DeepSeek 的做法是平时藏起来、悬停时淡淡出现。
+   Firefox 用 scrollbar-width: thin + transparent 色，Chromium/Safari 用 ::-webkit-scrollbar。
+   注意：这里只改"看得见看不见"，不改可滚动性，滚轮和键盘照样能用。
+   ========================================================================== */
+.main__scroll,
+#chat,
+.sb-history,
+.dock .pick-list {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 160ms var(--ease);
+}
+.main__scroll:hover,
+#chat:hover,
+.sb-history:hover,
+.dock .pick-list:hover {
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.main__scroll::-webkit-scrollbar,
+#chat::-webkit-scrollbar,
+.sb-history::-webkit-scrollbar,
+.dock .pick-list::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.main__scroll::-webkit-scrollbar-track,
+#chat::-webkit-scrollbar-track,
+.sb-history::-webkit-scrollbar-track,
+.dock .pick-list::-webkit-scrollbar-track { background: transparent; }
+.main__scroll::-webkit-scrollbar-thumb,
+#chat::-webkit-scrollbar-thumb,
+.sb-history::-webkit-scrollbar-thumb,
+.dock .pick-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.main__scroll:hover::-webkit-scrollbar-thumb,
+#chat:hover::-webkit-scrollbar-thumb,
+.sb-history:hover::-webkit-scrollbar-thumb,
+.dock .pick-list:hover::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  background-clip: padding-box;
+}
+.main__scroll::-webkit-scrollbar-thumb:hover,
+#chat::-webkit-scrollbar-thumb:hover,
+.sb-history::-webkit-scrollbar-thumb:hover,
+.dock .pick-list::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+  background-clip: padding-box;
+}
+
+/* ==========================================================================
+   侧栏拖拽调宽（2026-10-30）
+   --------------------------------------------------------------------------
+   抓手是贴在侧栏右内边上的 .sb-resizer（宽 8px，透明）。拖完把宽度写进
+   localStorage(campus-agent-sidebar-w-v1)，刷新时由 index.html 的内联脚本
+   在首帧前写进 :root 的 --sidebar-w，避免"先 264px 再跳"。
+   折叠态下手柄隐藏——64px 的窄条没必要再调宽。
+   ========================================================================== */
+.sidebar { position: relative; }
+
+.sb-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 5;
+  touch-action: none;
+}
+/* 悬停/拖动时画一条 2px 的竖线，告诉用户"这里能拉" */
+.sb-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background: transparent;
+  transition: background 120ms var(--ease);
+}
+.sb-resizer:hover::after,
+.sb-resizer.dragging::after { background: var(--brand); }
+
+.app--collapsed .sb-resizer { display: none; }
+
+/* 拖动时禁掉文本选择与 hover 特效，避免拖到一半选中的一片蓝 */
+body.is-resizing { cursor: col-resize; user-select: none; }
+body.is-resizing .sidebar { transition: none; }
+
+/* ---------- 对话正文宽度拖动（右侧竖向拖拽条） ----------
+ * 交互照 DeepSeek Harness：主区右边贴一条 8px 宽、平时透明的竖条，
+ * 长按向左拖 = 正文变窄，向右拖 = 变宽。宽度写进 :root 的 --chat-w，
+ * .main__inner（正文）和 .dock__inner（输入坞）同时跟随，两者始终保持同宽——
+ * 只改正文不改输入坞的话，输入框会比答句宽一截，看起来是错位的。
+ * 抓手的位置由下面的 --chat-gutter 计算：正文居中后，左边缘距主区左边界
+ * 恰好是 (主区宽 - 正文宽) / 2；抓手贴在主区右边界上，往左移同样的距离，
+ * 视觉上就正好贴在正文右边缘。
+ */
+.main__resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 5;
+  touch-action: none;
+  transform: translateX(calc((100% - var(--chat-w)) / 2 - 100%));
+}
+.main__resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 3px;
+  width: 2px;
+  height: 100%;
+  background: transparent;
+  transition: background 120ms var(--ease);
+}
+.main__resizer:hover::after,
+.main__resizer.dragging::after { background: var(--brand); }
+
+/* 空状态（还没有对话）时主区是居中的欢迎页，没有可调宽的正文，抓手先藏起来 */
+body.app:not(.has-conv) .main__resizer { display: none; }
+body.is-resizing .sb-resizer { cursor: col-resize; }

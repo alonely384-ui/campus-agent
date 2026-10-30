@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>论文库 · 科研小助手</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="design-system.css" />
+  <!-- 侧栏宽度要在首帧之前就填进 :root，否则会先按默认 264px 画一帧再跳到用户设的宽度 -->
+  <script>
+    (function () {
+      try {
+        var w = parseInt(localStorage.getItem('campus-agent-sidebar-w-v1') || '', 10);
+        if (w >= 200 && w <= 480) document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+      } catch (e) { /* 隐私模式读不到，用默认宽度 */ }
+    })();
+  </script>
+  <style>
+    /* 整页内容区：和对话页用同一套 .main__scroll / .main__inner 骨架 */
+    .page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+    .page-head h1 { font-size: 22px; font-weight: 600; letter-spacing: -.2px; margin: 0; }
+    .page-head .count { font-size: 12.5px; color: var(--text-muted); }
+    .page-sub { font-size: 13px; color: var(--text-secondary); margin: 6px 0 18px; line-height: 1.7; }
+    .page-sub b { color: var(--text-primary); font-weight: 600; }
+
+    .panel {
+      background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card); padding: 18px 20px; margin-bottom: 16px;
+    }
+
+    #dropZone {
+      border: 2px dashed var(--border-strong); border-radius: var(--radius-card); padding: 22px; text-align: center;
+      color: var(--text-secondary); font-size: 14px; transition: .15s; background: var(--bg-surface-2);
+    }
+    #dropZone.hot { border-color: var(--brand); background: var(--brand-soft); }
+    #dropZone .hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+    .btn-sm { padding: 7px 14px; border-radius: var(--radius-control); font-size: 13px;
+              background: var(--bg-muted); color: var(--text-secondary); }
+    .btn-sm:hover { background: var(--bg-active); }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover { background: var(--brand-hover); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger-border); }
+
+    #upStatus { margin-top: 10px; font-size: 12.5px; color: var(--text-secondary); white-space: pre-line; }
+
+    .lib-list { display: flex; flex-direction: column; gap: 6px; }
+    .lib-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-color);
+               border-radius: var(--radius-control); font-size: 13px; background: var(--bg-surface-2); }
+    .lib-row:hover { border-color: var(--border-brand); }
+    .lib-row .meta { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+    .lib-row .act { display: flex; gap: 6px; }
+    .lib-row a { font-size: 12px; color: var(--brand); text-decoration: none; padding: 5px 8px;
+                 border-radius: var(--radius-sm); }
+    .lib-row a:hover { background: var(--brand-soft); }
+
+    .pill { font-size: 11px; padding: 1px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
+    .pill.dup { background: var(--warning-bg); color: var(--warning); }
+    .pill.ok { background: var(--success-bg); color: var(--success); }
+    .pill.keep { background: var(--brand-soft); color: var(--brand-active); font-weight: 600; }
+
+    .dup-box { margin-top: 12px; border: 1px solid var(--warning-border); background: var(--bg-warm);
+               border-radius: 10px; padding: 10px 12px; }
+    .dup-box h3 { font-size: 13px; margin: 0 0 8px; color: var(--warning); }
+    .dup-row { border-top: 1px dashed var(--warning-border); padding: 8px 0; font-size: 13px; }
+    .dup-row:first-of-type { border-top: none; }
+    .dup-row .choices { display: flex; gap: 14px; margin-top: 6px; flex-wrap: wrap; font-size: 12.5px;
+                        color: var(--text-secondary); }
+    .dup-row .choices label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+    .empty { font-size: 13px; color: var(--text-muted); padding: 18px 4px; text-align: center; }
+
+    /* ---- 主题筛选栏 ---- */
+    .topic-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .topic-bar__label { font-size: 12.5px; color: var(--text-muted); margin-right: 2px; }
+    .topic-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: var(--radius-pill); font-size: 13px; cursor: pointer;
+      border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .topic-chip:hover { border-color: var(--border-brand); color: var(--text-primary); }
+    .topic-chip.on {
+      background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600;
+    }
+    .topic-chip__n { font-size: 11.5px; opacity: .75; }
+    .topic-chip.on .topic-chip__n { opacity: .9; }
+
+    /* ---- 标题行：真实标题 + 文件名副信息 ---- */
+    .lib-row .titlewrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .lib-row .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lib-row .file { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono);
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lib-row .cited { font-size: 11px; color: var(--text-subtle); white-space: nowrap; }
+
+    /* ---- 分页器 ---- */
+    .pager { display: flex; align-items: center; justify-content: center; gap: 6px;
+             flex-wrap: wrap; padding: 16px 0 4px; }
+    .pager__btn {
+      min-width: 34px; padding: 6px 10px; border-radius: var(--radius-control); font-size: 13px;
+      border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .pager__btn:hover:not(:disabled):not(.on) { border-color: var(--border-brand); color: var(--text-primary); }
+    .pager__btn.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+    .pager__btn:disabled { opacity: .45; cursor: not-allowed; }
+    .pager__info { font-size: 12.5px; color: var(--text-muted); margin-left: 6px; }
+    .pager__gap { color: var(--text-subtle); padding: 0 2px; }
+
+    @media (max-width: 720px) {
+      .lib-row { flex-wrap: wrap; }
+      .lib-row .titlewrap { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body class="app" data-nav="library">
+  <!-- 左侧栏：与对话页完全一致（同一份 HTML 结构 + sidebar.js 驱动） -->
+  <aside class="sidebar" id="sidebar" aria-label="功能导航与对话历史">
+    <div class="sb-head">
+      <a class="sb-logo" href="index.html" title="科研小助手">
+        <img class="sb-logo__mark" src="logo.svg" alt="" width="26" height="26">
+        <span class="sb-logo__name">科研小助手</span>
+      </a>
+      <button class="sb-toggle" id="sbToggle" title="收起侧栏（Ctrl+Shift+B）" aria-label="收起侧栏">☰</button>
+      <button class="sb-toggle sb-head-act" id="sbToggleAct" title="展开侧栏（Ctrl+Shift+B）" aria-label="展开侧栏">☰</button>
+    </div>
+
+    <button class="sb-new" id="newChat" title="回到对话页开启新的会话">
+      <span class="sb-new__plus">＋</span>
+      <span class="sb-new__txt">开启新对话</span>
+    </button>
+
+    <div class="sb-group sb-group--nav">
+      <a class="sb-item" data-nav="library" href="library.html" title="上传、查看、删除论文（支持批量，自动查重）">
+        <span class="sb-item__ico">▤</span><span class="sb-item__txt">论文库</span>
+      </a>
+      <a class="sb-item" data-nav="discover" href="discover.html" title="按论文名下载、批量下参考文献、看新论文推荐（1.4）">
+        <span class="sb-item__ico">◎</span><span class="sb-item__txt">发现</span>
+      </a>
+      <a class="sb-item" data-nav="graph" href="graph.html" title="论文引用关系图谱：谁引用了谁、哪些是基石节点（1.5）">
+        <span class="sb-item__ico">◈</span><span class="sb-item__txt">引用图谱</span>
+      </a>
+      <a class="sb-item" data-nav="analysis" href="analysis.html" title="论文分析：自动综述与前沿探索（1.5）">
+        <span class="sb-item__ico">◧</span><span class="sb-item__txt">论文分析</span>
+      </a>
+      <a class="sb-item" data-nav="writing" href="writing.html" title="写作助手：框架生成、架构图、数据可视化、中译英（1.6）">
+        <span class="sb-item__ico">✎</span><span class="sb-item__txt">写作助手</span>
+      </a>
+    </div>
+
+    <div class="sb-history" id="sbHistory"></div>
+
+    <div class="sb-foot">
+      <a class="sb-item" data-nav="settings" href="settings.html" title="设置中心：模型、检索参数、定时刷新、知识库">
+        <span class="sb-item__ico">⚙︎</span><span class="sb-item__txt">设置</span>
+      </a>
+    </div>
+
+    <div class="sb-resizer" id="sbResizer" title="拖动调整侧栏宽度（双击恢复默认）" role="separator"
+         aria-orientation="vertical" aria-label="拖动调整侧栏宽度"></div>
+  </aside>
+
+  <div class="app__main">
+    <div class="main__scroll">
+      <div class="main__inner main__inner--wide" style="padding: 26px 30px 40px">
+        <div class="page-head">
+          <h1>论文库</h1>
+          <span class="count" id="libCount"></span>
+        </div>
+        <div class="page-sub">
+          上传的 PDF 会自动解析章节结构、写入检索索引并查重。跟库里已有论文重复时，会先问你要保留哪一版。
+        </div>
+
+        <div class="panel">
+          <div id="dropZone">
+            <div>把 PDF 拖到这里，或 <button class="btn-sm btn-primary" id="pickFiles">选择文件</button>（支持多选）</div>
+            <div class="hint">单篇 ≤ 30MB。上传后自动解析结构并查重。</div>
+            <input type="file" id="fileInput" accept="application/pdf,.pdf" multiple hidden />
+          </div>
+          <div id="upStatus"></div>
+          <div class="dup-box" id="dupBox" hidden></div>
+        </div>
+
+        <!-- 按引用图谱社区分的主题筛选；「全部」始终在最前 -->
+        <div class="topic-bar" id="topicBar">
+          <span class="topic-bar__label">主题</span>
+        </div>
+
+        <div class="lib-list" id="libList"></div>
+        <div class="pager" id="pager"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="sidebar.js?v=202610302331"></script>
+  <script>
+    const libListEl = document.getElementById('libList');
+    const libCountEl = document.getElementById('libCount');
+    const dropZoneEl = document.getElementById('dropZone');
+    const fileInputEl = document.getElementById('fileInput');
+    const upStatusEl = document.getElementById('upStatus');
+    const dupBoxEl = document.getElementById('dupBox');
+    const topicBarEl = document.getElementById('topicBar');
+    const pagerEl = document.getElementById('pager');
+
+    // 分页与主题筛选状态。page 从 1 开始；topicId 用 'all' 表示不筛。
+    const ALL_TOPIC = 'all';
+    let allPapers = [];        // /papers 的原始结果（含 title / topic_id）
+    let pageSize = 12;         // 由后端 /papers/topics 下发的 page_size 覆盖
+    let curPage = 1;
+    let curTopic = ALL_TOPIC;
+    let topicCounts = [];      // [{id, name, count}]，来自 /papers/topics
+
+    let pendingDups = [];
+
+    function escapeHtml(text) {
+      return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function fmtSize(n) {
+      if (!n) return '0 B';
+      if (n > 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+      return Math.round(n / 1024) + ' KB';
+    }
+
+    /** 当前主题下的论文。'all' 就是全部。 */
+    function papersOfTopic() {
+      if (curTopic === ALL_TOPIC) return allPapers;
+      return allPapers.filter(p => String(p.topic_id) === String(curTopic));
+    }
+
+    /** 当前页要显示的那一条切。页码越界时自动夹回来。 */
+    function papersOfPage() {
+      const list = papersOfTopic();
+      const pages = Math.max(1, Math.ceil(list.length / pageSize));
+      if (curPage > pages) curPage = pages;
+      if (curPage < 1) curPage = 1;
+      const start = (curPage - 1) * pageSize;
+      return list.slice(start, start + pageSize);
+    }
+
+    function renderTopicBar() {
+      const total = allPapers.length;
+      const list = papersOfTopic();
+      const parts = ['<span class="topic-bar__label">主题</span>'];
+      const allOn = curTopic === ALL_TOPIC ? ' on' : '';
+      parts.push(
+        `<button class="topic-chip${allOn}" data-topic="${ALL_TOPIC}">全部` +
+        `<span class="topic-chip__n">${total}</span></button>`
+      );
+      topicCounts.forEach(t => {
+        const on = String(curTopic) === String(t.id) ? ' on' : '';
+        parts.push(
+          `<button class="topic-chip${on}" data-topic="${escapeHtml(t.id)}" ` +
+          `title="${escapeHtml(t.name)}">${escapeHtml(t.name)}` +
+          `<span class="topic-chip__n">${t.count}</span></button>`
+        );
+      });
+      // 把当前筛选后的篇数也摆出来，避免"筛完只剩几篇"被误以为论文丢了
+      parts.push(`<span class="topic-chip__n" style="margin-left:4px">当前 ${list.length} 篇</span>`);
+      topicBarEl.innerHTML = parts.join('');
+      topicBarEl.querySelectorAll('[data-topic]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = btn.dataset.topic;
+          if (next === curTopic) return;
+          curTopic = next;
+          curPage = 1;              // 换主题回到第一页
+          renderTopicBar();
+          renderList();
+          renderPager();
+          scrollToListTop();
+        });
+      });
+    }
+
+    /** 页码序列：1 … 4 5 [6] 7 8 … 10。页数少时全列。 */
+    function pageNumbers(cur, pages) {
+      if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+      const set = new Set([1, pages, cur, cur - 1, cur + 1]);
+      if (cur <= 3) [2, 3, 4].forEach(n => set.add(n));
+      if (cur >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach(n => set.add(n));
+      const nums = [...set].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+      const out = [];
+      nums.forEach((n, i) => {
+        if (i && n - nums[i - 1] > 1) out.push('gap');
+        out.push(n);
+      });
+      return out;
+    }
+
+    function renderPager() {
+      const list = papersOfTopic();
+      const pages = Math.max(1, Math.ceil(list.length / pageSize));
+      if (!list.length) { pagerEl.innerHTML = ''; return; }
+      const parts = [];
+      parts.push(`<button class="pager__btn" data-page="prev" ${curPage <= 1 ? 'disabled' : ''}>上一页</button>`);
+      pageNumbers(curPage, pages).forEach(n => {
+        if (n === 'gap') { parts.push('<span class="pager__gap">…</span>'); return; }
+        parts.push(`<button class="pager__btn${n === curPage ? ' on' : ''}" data-page="${n}">${n}</button>`);
+      });
+      parts.push(`<button class="pager__btn" data-page="next" ${curPage >= pages ? 'disabled' : ''}>下一页</button>`);
+      parts.push(`<span class="pager__info">第 ${curPage} / ${pages} 页 · 每页 ${pageSize} 篇</span>`);
+      pagerEl.innerHTML = parts.join('');
+      pagerEl.querySelectorAll('[data-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const v = btn.dataset.page;
+          const total = Math.max(1, Math.ceil(papersOfTopic().length / pageSize));
+          const next = v === 'prev' ? curPage - 1 : v === 'next' ? curPage + 1 : Number(v);
+          if (next < 1 || next > total || next === curPage) return;
+          curPage = next;
+          renderList();
+          renderPager();
+          scrollToListTop();
+        });
+      });
+    }
+
+    /** 翻页只把列表区滚回可见位置，不整页跳。 */
+    function scrollToListTop() {
+      if (!topicBarEl) return;
+      const rect = topicBarEl.getBoundingClientRect();
+      // 已经可见就不动，避免每次翻页屏幕抖一下
+      if (rect.top < 0 || rect.top > 120) {
+        topicBarEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
+    }
+
+    function badgeOf(p, nameById, keeperIds) {
+      if (p.duplicate_of) {
+        const keeper = nameById.get(p.duplicate_of) || p.duplicate_of;
+        return `<span class="pill dup" title="${escapeHtml(p.duplicate_reason || '与库中论文重复')}，建议保留《${escapeHtml(keeper)}》">重复 · 留 ${escapeHtml(keeper)}</span>`;
+      }
+      if (keeperIds.has(p.paper_id)) {
+        return '<span class="pill keep" title="同一篇论文的多份拷贝里，这份是要保留的">主版本</span>';
+      }
+      return '<span class="pill ok">已入库</span>';
+    }
+
+    /** 只重绘列表区：主题栏和分页器各自管自己，避免互相触发。 */
+    function renderList() {
+      const list = papersOfTopic();
+      if (!allPapers.length) {
+        libListEl.innerHTML = '<div class="empty">论文库还是空的，先在上面拖一份 PDF 进来。</div>';
+        pagerEl.innerHTML = '';
+        return;
+      }
+      if (!list.length) {
+        libListEl.innerHTML = '<div class="empty">这个主题下没有论文，换一个主题看看。</div>';
+        pagerEl.innerHTML = '';
+        return;
+      }
+
+      const nameById = new Map(allPapers.map(p => [p.paper_id, p.filename]));
+      const keeperIds = new Set(allPapers.filter(p => p.duplicate_of).map(p => p.duplicate_of));
+      const sameName = new Map();
+      allPapers.forEach(p => sameName.set(p.filename, (sameName.get(p.filename) || 0) + 1));
+
+      const rows = papersOfPage();
+      libListEl.innerHTML = rows.map(p => {
+        // 有真实标题就显示标题、文件名降级成副信息；没有就退回文件名。
+        // 标题被截断过时，悬停显示完整标题；否则悬停显示文件名。
+        const hasTitle = !!(p.display_title && p.display_title !== p.filename);
+        const primary = hasTitle ? p.display_title : p.filename;
+        const titleAttr = (hasTitle && p.title_truncated) ? p.title : p.filename;
+        const dupId = sameName.get(p.filename) > 1
+          ? `<span class="cited">${escapeHtml(p.paper_id)}</span>` : '';
+        return `
+          <div class="lib-row">
+            <div class="titlewrap">
+              <div class="name" title="${escapeHtml(titleAttr)}">${escapeHtml(primary)}</div>
+              <div class="file">${escapeHtml(p.filename)}</div>
+            </div>
+            <div class="meta">${p.pages || '?'} 页 · ${fmtSize(p.size)}</div>
+            ${dupId}
+            ${badgeOf(p, nameById, keeperIds)}
+            <div class="act">
+              <a href="reader.html?paper=${encodeURIComponent(p.filename)}&page=1" target="_blank" rel="noopener">阅读</a>
+              <button class="btn-sm btn-danger" data-del="${escapeHtml(p.paper_id)}">删除</button>
+            </div>
+          </div>`;
+      }).join('');
+      libListEl.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', () => deletePaper(btn.dataset.del, btn));
+      });
+    }
+
+    async function loadLibrary() {
+      libListEl.innerHTML = '<div class="empty">加载中…</div>';
+      pagerEl.innerHTML = '';
+      try {
+        // 两个接口并行：/papers 给每篇的完整信息，/papers/topics 给主题名与每页条数
+        const [d, t] = await Promise.all([
+          fetch('/papers').then(r => r.json()),
+          fetch('/papers/topics').then(r => r.json()).catch(() => null),
+        ]);
+        allPapers = d.papers || [];
+        libCountEl.textContent = `共 ${allPapers.length} 篇`;
+
+        if (t && Array.isArray(t.topics)) {
+          if (t.page_size) pageSize = t.page_size;
+          topicCounts = t.topics.map(g => ({ id: g.topic_id, name: g.name, count: g.count }));
+        } else {
+          // 主题接口挂了也不能让论文列表跟着挂：退化成只有一个「全部」
+          topicCounts = [];
+          upStatusEl.textContent = '主题分组暂不可用，已按全部论文展示。';
+        }
+        // 上次选的主题可能因为删论文没了，回落到「全部」
+        if (curTopic !== ALL_TOPIC && !topicCounts.some(x => String(x.id) === String(curTopic))) {
+          curTopic = ALL_TOPIC;
+          curPage = 1;
+        }
+        renderTopicBar();
+        renderList();
+        renderPager();
+      } catch (e) {
+        libListEl.innerHTML = `<div class="empty">加载失败：${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    async function deletePaper(paperId, btn) {
+      if (!confirm('确定删除这篇论文？原件、解析结构与检索索引会一起清掉。')) return;
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/papers/' + encodeURIComponent(paperId), { method: 'DELETE' });
+        const d = await resp.json();
+        if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+        upStatusEl.textContent = `已删除，清理索引块 ${d.removed_chunks || 0} 个。`;
+        await loadLibrary();
+      } catch (e) {
+        upStatusEl.textContent = '删除失败：' + e.message;
+        btn.disabled = false;
+      }
+    }
+
+    async function uploadFiles(files) {
+      const list = Array.from(files || []).filter(f => /\.pdf$/i.test(f.name));
+      if (!list.length) { upStatusEl.textContent = '只支持 PDF 文件。'; return; }
+
+      const fd = new FormData();
+      list.forEach(f => fd.append('files', f));
+      upStatusEl.textContent = `正在上传 ${list.length} 个文件…`;
+      dupBoxEl.hidden = true;
+      pendingDups = [];
+
+      try {
+        const resp = await fetch('/papers/upload', { method: 'POST', body: fd });
+        const d = await resp.json();
+        if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+
+        const lines = [];
+        (d.results || []).forEach(r => {
+          if (r.error) lines.push(`✗ ${r.filename}：${r.error}`);
+          else lines.push(`✓ ${r.filename}（${r.paper.pages} 页，索引 ${r.indexed} 块）`);
+        });
+        upStatusEl.textContent = lines.join('\n');
+        pendingDups = (d.results || []).filter(r => r.duplicate).map(r => ({
+          newName: r.filename,
+          newId: r.paper.paper_id,
+          ...r.duplicate,
+        }));
+        if (pendingDups.length) renderDups();
+        await loadLibrary();
+      } catch (e) {
+        upStatusEl.textContent = '上传失败：' + e.message;
+      }
+    }
+
+    function renderDups() {
+      dupBoxEl.hidden = false;
+      dupBoxEl.innerHTML = `<h3>发现 ${pendingDups.length} 处重复，请选择保留哪一版</h3>`;
+      pendingDups.forEach((dup, i) => {
+        const verText = dup.old_version && dup.new_version
+          ? `（库中 v${dup.old_version} → 新上传 v${dup.new_version}${dup.newer ? '，新版' : '，旧版'}）`
+          : '';
+        const row = document.createElement('div');
+        row.className = 'dup-row';
+        row.innerHTML = `
+          <div>《${escapeHtml(dup.newName)}》 与库中《${escapeHtml(dup.filename)}》重复
+            —— 依据：${escapeHtml(dup.reason)}，相似度 ${dup.score} ${verText}</div>
+          <div class="choices">
+            <label><input type="radio" name="dup${i}" value="keep-new" ${dup.newer || !dup.old_version ? 'checked' : ''}>保留新版，删除旧版</label>
+            <label><input type="radio" name="dup${i}" value="keep-both" ${dup.newer || !dup.old_version ? '' : 'checked'}>两个都留</label>
+            <label><input type="radio" name="dup${i}" value="keep-old">保留旧版，删除刚上传的</label>
+          </div>`;
+        dupBoxEl.appendChild(row);
+      });
+      const apply = document.createElement('button');
+      apply.className = 'btn-sm btn-primary';
+      apply.textContent = '按选择处理';
+      apply.addEventListener('click', applyDups);
+      dupBoxEl.appendChild(apply);
+    }
+
+    async function applyDups() {
+      const done = [];
+      for (let i = 0; i < pendingDups.length; i += 1) {
+        const dup = pendingDups[i];
+        const choice = (dupBoxEl.querySelector(`input[name="dup${i}"]:checked`) || {}).value || 'keep-both';
+        if (choice === 'keep-new') {
+          const r = await fetch('/papers/' + encodeURIComponent(dup.paper_id), { method: 'DELETE' });
+          done.push(r.ok ? `已删除旧版 ${dup.filename}` : `删除旧版失败（HTTP ${r.status}）`);
+        } else if (choice === 'keep-old') {
+          const r = await fetch('/papers/' + encodeURIComponent(dup.newId), { method: 'DELETE' });
+          done.push(r.ok ? `已删除新版 ${dup.newName}` : `删除新版失败（HTTP ${r.status}）`);
+        } else {
+          done.push(`保留两版：${dup.newName} / ${dup.filename}`);
+        }
+      }
+      upStatusEl.textContent = done.join('\n');
+      dupBoxEl.hidden = true;
+      pendingDups = [];
+      await loadLibrary();
+    }
+
+    document.getElementById('pickFiles').addEventListener('click', () => fileInputEl.click());
+    fileInputEl.addEventListener('change', () => {
+      uploadFiles(fileInputEl.files);
+      fileInputEl.value = '';
+    });
+    ['dragenter', 'dragover'].forEach(ev => dropZoneEl.addEventListener(ev, e => {
+      e.preventDefault();
+      dropZoneEl.classList.add('hot');
+    }));
+    ['dragleave', 'drop'].forEach(ev => dropZoneEl.addEventListener(ev, e => {
+      e.preventDefault();
+      dropZoneEl.classList.remove('hot');
+    }));
+    dropZoneEl.addEventListener('drop', e => uploadFiles(e.dataTransfer.files));
+
+    loadLibrary();
+  </script>
+</body>
+</html>

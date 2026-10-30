@@ -4,25 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>引用图谱 · 科研小助手</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <!-- 本地 vendor，不走 CDN：演示环境可能断网，赛题也要求能离线跑 -->
   <script src="vendor/echarts/echarts.min.js"></script>
+  <!-- 全站设计系统：变量 + reset + 基础组件。必须在本页 <style> 之前，
+       页面规则才能覆盖它。 -->
+  <link rel="stylesheet" href="design-system.css" />
+  <!-- 图表取色：ECharts 不认 var()，只能把 CSS 变量的计算值读出来再喂给它 -->
+  <script src="chart-colors.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-      background: #f5f6f8; height: 100vh; display: flex; flex-direction: column;
-      color: #1f2937; overflow: hidden;
+      font-family: var(--font-sans);
+      background: var(--bg-page); height: 100vh; display: flex; flex-direction: column;
+      color: var(--text-primary); overflow: hidden;
     }
-    header { padding: 12px 18px; background: #fff; border-bottom: 1px solid #e3e7ee;
+    header { padding: 12px 18px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color);
              display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex-shrink: 0; }
     h1 { font-size: 16px; font-weight: 600; }
-    a.back { font-size: 13px; color: #1a73e8; text-decoration: none; }
+    a.back { font-size: 13px; color: var(--brand); text-decoration: none; }
     a.back:hover { text-decoration: underline; }
-    .pill { font-size: 12px; color: #6b7280; background: #eef1f5; padding: 3px 9px; border-radius: 999px; }
-    .pill b { color: #374151; font-weight: 600; }
+    .pill { font-size: 12px; color: var(--text-muted); background: var(--bg-muted); padding: 3px 9px; border-radius: var(--radius-pill); }
+    .pill b { color: var(--text-secondary); font-weight: 600; }
     .spacer { flex: 1; }
 
-    #hint { font-size: 12px; color: #6b7280; max-width: 640px; line-height: 1.5; }
+    #hint { font-size: 12px; color: var(--text-muted); max-width: 640px; line-height: 1.5; }
 
     main { flex: 1; display: flex; min-height: 0; }
     #chart { flex: 1; min-width: 0; }
@@ -32,114 +38,123 @@
     #chartWrap > #chart { flex: 1; min-width: 0; }
 
     /* ---------- 右侧详情栏 ---------- */
-    aside { width: 320px; flex-shrink: 0; background: #fff; border-left: 1px solid #e3e7ee;
+    aside { width: 320px; flex-shrink: 0; background: var(--bg-surface); border-left: 1px solid var(--border-color);
             overflow-y: auto; padding: 14px 16px 24px; }
     aside[hidden] { display: none; }
     .d-title { font-size: 14px; font-weight: 600; line-height: 1.5; margin-bottom: 10px; }
     .d-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0;
-             border-bottom: 1px dashed #eef1f5; }
-    .d-row span:first-child { color: #6b7280; }
-    .d-row span:last-child { color: #111827; font-variant-numeric: tabular-nums; }
-    .d-open { display: block; margin-top: 14px; text-align: center; background: #1a73e8; color: #fff;
-              font-size: 13px; padding: 9px; border-radius: 8px; text-decoration: none; }
-    .d-open:hover { background: #1558b0; }
-    .d-open.disabled { background: #e5e7eb; color: #9ca3af; pointer-events: none; }
+             border-bottom: 1px dashed var(--border-color-alt); }
+    .d-row span:first-child { color: var(--text-muted); }
+    .d-row span:last-child { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .d-open { display: block; margin-top: 14px; text-align: center; background: var(--brand); color: var(--text-inverse);
+              font-size: 13px; padding: 9px; border-radius: var(--radius-md); text-decoration: none; }
+    .d-open:hover { background: var(--brand-active); }
+    .d-open.disabled { background: var(--gray-200); color: var(--text-subtle); pointer-events: none; }
     /* 关闭按钮：右侧详情曾出现"明明点过却找不到"的情况，给个显式关闭 */
     .d-close { position: absolute; top: 10px; right: 12px; width: 24px; height: 24px;
-               border: 0; border-radius: 6px; background: #f3f4f6; color: #6b7280;
+               border: 0; border-radius: var(--radius-sm); background: var(--bg-muted); color: var(--text-muted);
                font-size: 15px; line-height: 1; cursor: pointer; }
-    .d-close:hover { background: #e5e7eb; color: #1f2937; }
+    .d-close:hover { background: var(--gray-200); color: var(--text-primary); }
     /* 孤立论文角标：与主图区隔，避免被误读成"它也连在引用网里" */
     #isoBox { position: absolute; right: 14px; bottom: 14px; z-index: 5; max-width: 260px;
-              background: #fff; border: 1px dashed #9ca3af; border-radius: 10px;
+              background: var(--bg-surface); border: 1px dashed var(--text-subtle); border-radius: 10px;
               padding: 9px 12px; font-size: 12px; line-height: 1.5;
-              box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+              box-shadow: var(--shadow-sm); }
     #isoBox[hidden] { display: none; }
-    #isoBox .iso-hd { color: #6b7280; margin-bottom: 5px; font-size: 11px; letter-spacing: .04em; }
-    #isoBox a { display: flex; align-items: center; gap: 6px; color: #1f2937;
-                text-decoration: none; padding: 3px 4px; border-radius: 6px; }
-    #isoBox a:hover { background: #f3f4f6; }
+    #isoBox .iso-hd { color: var(--text-muted); margin-bottom: 5px; font-size: 11px; letter-spacing: .04em; }
+    #isoBox a { display: flex; align-items: center; gap: 6px; color: var(--text-primary);
+                text-decoration: none; padding: 3px 4px; border-radius: var(--radius-sm); }
+    #isoBox a:hover { background: var(--bg-muted); }
     #isoBox .iso-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%;
-                       border: 1px dashed #6b7280; background: #2ca02c; }
-    #isoBox .iso-tag { flex-shrink: 0; font-size: 10px; background: #f3f4f6; color: #9ca3af;
-                       padding: 0 5px; border-radius: 4px; }
-    .d-sec { font-size: 12px; color: #9ca3af; margin: 16px 0 6px; letter-spacing: .04em; }
-    .chip { display: inline-block; font-size: 11px; background: #eef1f5; color: #4b5563;
-            padding: 1px 7px; border-radius: 6px; margin: 0 4px 4px 0; }
-    .d-list { font-size: 12px; color: #374151; line-height: 1.6; }
-    .d-list a { color: #1a73e8; text-decoration: none; }
+                       border: 1px dashed var(--text-muted); background: var(--chart-c3); }
+    #isoBox .iso-tag { flex-shrink: 0; font-size: 10px; background: var(--bg-muted); color: var(--text-subtle);
+                       padding: 0 5px; border-radius: var(--radius-sm); }
+    .d-sec { font-size: 12px; color: var(--text-subtle); margin: 16px 0 6px; letter-spacing: .04em; }
+    .chip { display: inline-block; font-size: 11px; background: var(--bg-muted); color: var(--text-secondary);
+            padding: 1px 7px; border-radius: var(--radius-sm); margin: 0 4px 4px 0; }
+    .d-list { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+    .d-list a { color: var(--brand); text-decoration: none; }
     .d-list a:hover { text-decoration: underline; }
 
     /* ---------- 底部待核验区 ---------- */
-    #reviewBar { flex-shrink: 0; background: #fff; border-top: 1px solid #e3e7ee; }
-    #reviewBar summary { cursor: pointer; padding: 9px 18px; font-size: 13px; color: #4b5563;
+    #reviewBar { flex-shrink: 0; background: var(--bg-surface); border-top: 1px solid var(--border-color); }
+    #reviewBar summary { cursor: pointer; padding: 9px 18px; font-size: 13px; color: var(--text-secondary);
                          list-style: none; user-select: none; }
     #reviewBar summary::-webkit-details-marker { display: none; }
-    #reviewBar summary::before { content: "▸ "; color: #9ca3af; }
+    #reviewBar summary::before { content: "▸ "; color: var(--text-subtle); }
     #reviewBar[open] summary::before { content: "▾ "; }
-    #reviewBar summary b { color: #b45309; }
+    #reviewBar summary b { color: var(--warning); }
     .rev-wrap { max-height: 34vh; overflow-y: auto; padding: 0 18px 14px; }
-    .rev { display: flex; gap: 10px; font-size: 12px; padding: 7px 0; border-top: 1px solid #f3f4f6;
+    .rev { display: flex; gap: 10px; font-size: 12px; padding: 7px 0; border-top: 1px solid var(--border-color-alt);
            line-height: 1.5; }
-    .rev .score { flex-shrink: 0; font-variant-numeric: tabular-nums; color: #b45309; width: 42px; }
-    .rev .t { flex: 1; min-width: 0; color: #374151; }
-    .rev .t i { color: #9ca3af; font-style: normal; }
+    .rev .score { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--warning); width: 42px; }
+    .rev .t { flex: 1; min-width: 0; color: var(--text-secondary); }
+    .rev .t i { color: var(--text-subtle); font-style: normal; }
 
     /* ---------- 空态 / 加载 ---------- */
     #empty { flex: 1; display: flex; flex-direction: column; align-items: center;
-             justify-content: center; gap: 10px; color: #6b7280; font-size: 14px; }
+             justify-content: center; gap: 10px; color: var(--text-muted); font-size: 14px; }
     #empty[hidden] { display: none; }
-    #empty code { background: #eef1f5; padding: 3px 8px; border-radius: 6px;
-                  font-family: Consolas, monospace; color: #374151; }
+    #empty code { background: var(--bg-muted); padding: 3px 8px; border-radius: var(--radius-sm);
+                  font-family: var(--font-mono); color: var(--text-secondary); }
 
     /* 图例 */
     .legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
-                   color: #4b5563; margin-right: 12px; }
+                   color: var(--text-secondary); margin-right: 12px; }
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
     /* ---------- 基石节点榜（1.5「基石节点挖掘」的可见产物）---------- */
-    #csBar { flex-shrink: 0; background: #fff; border-bottom: 1px solid #e3e7ee;
+    #csBar { flex-shrink: 0; background: var(--bg-surface); border-bottom: 1px solid var(--border-color);
              padding: 10px 18px 12px; max-height: 30vh; overflow-y: auto; }
-    #csTitle { font-size: 13px; font-weight: 600; color: #111827; margin-bottom: 8px; }
-    #csTitle .sub { font-weight: 400; font-size: 11px; color: #9ca3af; margin-left: 6px; }
+    #csTitle { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+    #csTitle .sub { font-weight: 400; font-size: 11px; color: var(--text-subtle); margin-left: 6px; }
     #csList { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 4px 18px; }
     .cs-row { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 5px;
-              border-radius: 6px; cursor: pointer; line-height: 1.4; }
-    .cs-row:hover { background: #f0f4fa; }
-    .cs-rank { flex-shrink: 0; width: 18px; text-align: right; color: #9ca3af;
+              border-radius: var(--radius-sm); cursor: pointer; line-height: 1.4; }
+    .cs-row:hover { background: var(--bg-surface-2); }
+    .cs-rank { flex-shrink: 0; width: 18px; text-align: right; color: var(--text-subtle);
                font-variant-numeric: tabular-nums; }
-    .cs-row:nth-child(-n+3) .cs-rank { color: #b45309; font-weight: 700; }
-    .cs-score { flex-shrink: 0; width: 34px; color: #6b7280; font-variant-numeric: tabular-nums; }
+    .cs-row:nth-child(-n+3) .cs-rank { color: var(--warning); font-weight: 700; }
+    .cs-score { flex-shrink: 0; width: 34px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .cs-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-               color: #374151; }
-    .role { flex-shrink: 0; font-size: 10px; padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
-    .role-cornerstone { background: #fef3c7; color: #92400e; }
-    .role-hub { background: #dbeafe; color: #1e40af; }
-    .role-bridge { background: #dcfce7; color: #166534; }
-    .role-foundation { background: #f3e8ff; color: #6b21a8; }
-    .role-fringe { background: #f3f4f6; color: #6b7280; }
-    .role-isolated { background: #f3f4f6; color: #9ca3af; }
+               color: var(--text-secondary); }
+    .role { flex-shrink: 0; font-size: 10px; padding: 1px 6px; border-radius: var(--radius-sm); white-space: nowrap; }
+    /* 六个角色标签：全站统一口径，与 analysis.html 的 .tag.* 读同一组 --role-* 变量 */
+    .role-cornerstone { background: var(--role-cornerstone-bg); color: var(--role-cornerstone-fg); }
+    .role-hub         { background: var(--role-hub-bg);         color: var(--role-hub-fg); }
+    .role-bridge      { background: var(--role-bridge-bg);      color: var(--role-bridge-fg); }
+    .role-foundation  { background: var(--role-foundation-bg);  color: var(--role-foundation-fg); }
+    .role-fringe      { background: var(--role-fringe-bg);      color: var(--role-fringe-fg); }
+    .role-isolated    { background: var(--role-isolated-bg);    color: var(--role-isolated-fg); }
     /* 角色下拉：点「角色」那一格的标签，展开判定说明。
        收起/展开用 details/summary 实现，不依赖 JS，也不怕被 showDetail 重写丢失。 */
     .role-dd { display: inline-block; }
+    /* 「角色」那一格：.d-row 用 justify-content: space-between 两栏布局，
+       details 是块级元素会被挤成第二行，让角色行整体靠右 */
+    .d-row > .d-role-cell { text-align: right; }
     .role-dd > summary { list-style: none; cursor: pointer; display: inline-flex;
-                         align-items: center; gap: 4px; }
+                         align-items: center; gap: 4px; flex-wrap: nowrap; }
+    /* summary 的默认 display 是 list-item，只写容器宽会让 ▾ 掉到下一行；
+       这里锁住宽度并禁用换行，标签和箭头始终同一行 */
+    .role-dd > summary > .role { display: inline-block; }
     .role-dd > summary::-webkit-details-marker { display: none; }
-    .role-dd > summary::after { content: "▾"; font-size: 9px; color: #9ca3af; }
+    .role-dd > summary::-moz-list-bullet { list-style: none; }
+    .role-dd > summary::after { content: "▾"; font-size: 9px; color: var(--text-subtle);
+                                flex-shrink: 0; line-height: 1; }
     .role-dd[open] > summary::after { content: "▴"; }
     .role-panel { position: absolute; right: 16px; z-index: 20; width: 250px; margin-top: 6px;
-                  background: #fff; border: 1px solid #e3e7ee; border-radius: 10px;
-                  padding: 10px 12px; font-size: 12px; line-height: 1.6; color: #374151;
-                  box-shadow: 0 6px 22px rgba(0,0,0,.12); text-align: left; }
-    .role-panel .rp-hd { font-size: 11px; color: #9ca3af; letter-spacing: .04em; margin-bottom: 4px; }
-    .role-panel .rp-cur { background: #f8fafc; border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; }
+                  background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+                  padding: 10px 12px; font-size: 12px; line-height: 1.6; color: var(--text-secondary);
+                  box-shadow: var(--shadow-md); text-align: left; }
+    .role-panel .rp-hd { font-size: 11px; color: var(--text-subtle); letter-spacing: .04em; margin-bottom: 4px; }
+    .role-panel .rp-cur { background: var(--bg-surface-2); border-radius: var(--radius-sm); padding: 6px 8px; margin-bottom: 8px; }
     .role-panel ul { list-style: none; }
     .role-panel li { display: flex; gap: 7px; align-items: baseline; padding: 3px 0; }
     .role-panel li .rp-name { flex-shrink: 0; width: 52px; }
-    .role-panel li.is-cur { background: #eff6ff; border-radius: 5px; }
-    .role-panel .rp-rule { color: #6b7280; font-size: 11px; }
-    .role-panel .rp-ft { margin-top: 8px; padding-top: 7px; border-top: 1px dashed #e5e7eb;
-                         color: #9ca3af; font-size: 11px; }
+    .role-panel li.is-cur { background: var(--blue-50); border-radius: 5px; }
+    .role-panel .rp-rule { color: var(--text-muted); font-size: 11px; }
+    .role-panel .rp-ft { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border-color-alt);
+                         color: var(--text-subtle); font-size: 11px; }
   </style>
 </head>
 <body>
@@ -181,8 +196,14 @@
 <script>
 // ---------- 常量与工具 ----------
 const API = '';  // 同源部署：页面挂在 /ui/，接口在根路径
-const COMM_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                     '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+
+/* 社区配色：顺序固定 c1..c10，同一篇论文在两次渲染里必须同色。
+   色值来自 design-system.css 的 --chart-c1..c10（ECharts 不认 var()，
+   只能用 ChartColors 把计算值读出来）。读不到时退回兜底值，
+   与改造前的 COMM_COLORS 完全一致，所以最坏情况只是"没联动"，不会变形。 */
+function communityColors() {
+  return ChartColors.communityPalette(ChartColors.read());
+}
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s)
@@ -243,8 +264,11 @@ function render(data) {
   );
 
   chart = echarts.init($('chart'));
+  // ECharts 不认 CSS 变量，只能先读出计算值再喂给它；读不到时 ChartColors 用兜底值
+  const C = ChartColors.read();
+  const COMMS = ChartColors.communityPalette(C);
   const opt = {
-    backgroundColor: '#f5f6f8',
+    backgroundColor: C.bgPage,
     tooltip: {
       trigger: 'item',
       confine: true,
@@ -254,16 +278,16 @@ function render(data) {
           const s = nodeById.get(e.source) || {};
           const t = nodeById.get(e.target) || {};
           return `<b>${esc(s.title || e.source)}</b><br/>` +
-                 `<span style="color:#6b7280">引用 ↓</span><br/>` +
+                 `<span style="color:${C.textMuted}">引用 ↓</span><br/>` +
                  `<b>${esc(t.title || e.target)}</b>` +
-                 `<br/><span style="color:#9ca3af;font-size:11px">匹配方式：${esc(e.match_method)}</span>`;
+                 `<br/><span style="color:${C.textSubtle};font-size:11px">匹配方式：${esc(e.match_method)}</span>`;
         }
         const d = p.data.meta;
         return `<b>${esc(d.title)}</b><br/>` +
                `被库内引用：${d.cited_by} 篇<br/>` +
                `引用了库内：${d.cites} 篇<br/>` +
                `PageRank：${d.pagerank.toFixed(4)}<br/>` +
-               `<span style="color:#9ca3af;font-size:11px">点击看详情</span>`;
+               `<span style="color:${C.textSubtle};font-size:11px">点击看详情</span>`;
       },
     },
     series: [{
@@ -274,13 +298,13 @@ function render(data) {
       // zoom 留 1，等 force 模拟收敛后由 fitGraph() 按实际点集自适应，
       // 因为力导向每次初始位置随机，写死 zoom 会时大时小、偶尔溢出画布
       zoom: 1,
-      textStyle: { fontSize: 10, color: '#374151' },
+      textStyle: { fontSize: 10, color: C.textSecondary },
       symbolSize: (val, p) => 12 + Math.sqrt(p.data.meta.cited_by / maxCited) * 26,
       label: {
         show: true,
         position: 'right',
         fontSize: 10,
-        color: '#374151',
+        color: C.textSecondary,
         formatter: (p) => truncate(p.data.meta.title, 22),
       },
       labelLayout: { hideOverlap: true },
@@ -315,9 +339,9 @@ function render(data) {
         name: n.title,
         meta: n,
         itemStyle: {
-          color: COMM_COLORS[n.community % COMM_COLORS.length],
+          color: COMMS[n.community % COMMS.length],
           // PageRank 前 3 加金边，把"间接影响力"可视化成一眼能看到的标记
-          borderColor: prRank.has(n.id) ? '#f5a623' : 'rgba(255,255,255,.9)',
+          borderColor: prRank.has(n.id) ? C.chartRing : 'rgba(255,255,255,.9)',
           borderWidth: prRank.has(n.id) ? 4 : 2,
         },
       })),
@@ -492,9 +516,10 @@ function truncate(s, n) {
 
 function renderLegend(sum) {
   const comms = sum.communities || [];
+  const COMMS = ChartColors.communityPalette(ChartColors.read());
   $('legend').innerHTML = comms.map(c => `
     <span class="legend-item">
-      <span class="legend-dot" style="background:${COMM_COLORS[c.id % COMM_COLORS.length]}"></span>
+      <span class="legend-dot" style="background:${COMMS[c.id % COMMS.length]}"></span>
       社区 ${c.id + 1}（${c.size}）
     </span>`).join('');
 }
@@ -609,7 +634,7 @@ function showDetail(n) {
     <div class="d-title">${esc(n.title)}</div>
     ${n.arxiv_id ? `<div class="d-row"><span>arXiv</span><span>${esc(n.arxiv_id)}</span></div>` : ''}
     <div class="d-row"><span>基石分 / 名次</span><span>${fixed(n.cornerstone, 0, 3)}${n.cornerstone_rank ? ' / 第 ' + n.cornerstone_rank + ' 名' : ''}</span></div>
-    <div class="d-row"><span>角色</span><span>
+    <div class="d-row"><span>角色</span><span class="d-role-cell">
       <details class="role-dd">
         <summary><span class="role role-${esc(n.role)}">${esc(ROLE_LABEL[n.role] || n.role)}</span></summary>
         <div class="role-panel">${rolePanelHTML(n.role)}</div>
@@ -629,12 +654,12 @@ function showDetail(n) {
     <div class="d-sec">引用它的论文（${citedByNames.length}）</div>
     <div class="d-list">${citedByNames.length
       ? citedByNames.map(x => `<a href="#" data-goto="${esc(x.id)}">${esc(truncate(x.title, 40))}</a>`).join('<br/>')
-      : '<i style="color:#9ca3af">暂无</i>'}</div>
+      : '<i style="color:var(--text-subtle)">暂无</i>'}</div>
 
     <div class="d-sec">它引用的论文（${citesNames.length}）</div>
     <div class="d-list">${citesNames.length
       ? citesNames.map(x => `<a href="#" data-goto="${esc(x.id)}">${esc(truncate(x.title, 40))}</a>`).join('<br/>')
-      : '<i style="color:#9ca3af">暂无</i>'}</div>
+      : '<i style="color:var(--text-subtle)">暂无</i>'}</div>
 
     <div class="d-sec">匹配方式</div>
     <div>${methods}</div>
@@ -666,7 +691,7 @@ function renderReviews(data) {
     `低置信度匹配（待人工核验）<b>${total}</b> 条 —— 相似度落在阈值之间，<b>没有计入图谱</b>，避免误连`;
 
   if (!list.length) {
-    $('reviewList').innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:8px 0">没有待核验条目。</div>';
+    $('reviewList').innerHTML = '<div style="font-size:12px;color:var(--text-subtle);padding:8px 0">没有待核验条目。</div>';
     return;
   }
   $('reviewList').innerHTML = list.map(r => `

@@ -4,71 +4,78 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>论文分析 · 科研小助手</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <!-- 不走 CDN：演示环境可能断网，赛题也要求能离线跑 -->
   <script src="vendor/echarts/echarts.min.js"></script>
+  <!-- 全站设计系统：变量 + reset + 基础组件。必须在本页 <style> 之前，
+       页面规则才能覆盖它。 -->
+  <link rel="stylesheet" href="design-system.css" />
   <!-- 划词翻译浮钮：选中正文里的一段英文，鼠标旁浮出「译」 -->
   <link rel="stylesheet" href="quick-translate.css" />
   <script src="quick-translate.js"></script>
+  <!-- 图表取色：ECharts 不认 var()，只能把 CSS 变量的计算值读出来再喂给它 -->
+  <script src="chart-colors.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-      background: #f5f6f8; min-height: 100vh; color: #1f2937;
+      font-family: var(--font-sans);
+      background: var(--bg-page); min-height: 100vh; color: var(--text-primary);
     }
     header {
-      padding: 12px 18px; background: #fff; border-bottom: 1px solid #e3e7ee;
+      padding: 12px 18px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color);
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       position: sticky; top: 0; z-index: 10;
     }
     h1 { font-size: 16px; font-weight: 600; }
-    a.back { font-size: 13px; color: #1a73e8; text-decoration: none; }
+    a.back { font-size: 13px; color: var(--brand); text-decoration: none; }
     a.back:hover { text-decoration: underline; }
-    .pill { font-size: 12px; color: #6b7280; background: #eef1f5; padding: 3px 9px; border-radius: 999px; }
-    .pill b { color: #374151; font-weight: 600; }
+    .pill { font-size: 12px; color: var(--text-muted); background: var(--bg-muted); padding: 3px 9px; border-radius: var(--radius-pill); }
+    .pill b { color: var(--text-secondary); font-weight: 600; }
     .spacer { flex: 1; }
     .tab {
-      font-size: 13px; padding: 6px 14px; border: 1px solid #d5dbe5; background: #fff;
-      border-radius: 8px; cursor: pointer; color: #4b5563;
+      font-size: 13px; padding: 6px 14px; border: 1px solid var(--border-strong); background: var(--bg-surface);
+      border-radius: var(--radius-md); cursor: pointer; color: var(--text-secondary);
     }
-    .tab.on { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+    .tab.on { background: var(--brand); border-color: var(--brand); color: var(--text-inverse); }
     select, button.act {
-      font-size: 13px; padding: 6px 10px; border: 1px solid #d5dbe5; border-radius: 8px;
-      background: #fff; color: #374151; cursor: pointer;
+      font-size: 13px; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+      background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
     }
-    button.act { background: #1a73e8; border-color: #1a73e8; color: #fff; }
-    button.act:disabled { background: #9ca3af; border-color: #9ca3af; cursor: default; }
+    button.act { background: var(--brand); border-color: var(--brand); color: var(--text-inverse); }
+    button.act:disabled { background: var(--text-subtle); border-color: var(--text-subtle); cursor: default; }
 
-    main { max-width: 1100px; margin: 0 auto; padding: 20px 18px 60px; }
+    main { max-width: var(--content-width-wide); margin: 0 auto; padding: 20px 18px 60px; }
 
-    .card { background: #fff; border: 1px solid #e3e7ee; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
-    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 10px; color: #111827; }
-    .card h2 .sub { font-size: 12px; font-weight: 400; color: #9ca3af; margin-left: 8px; }
+    .card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 10px; color: var(--text-primary); }
+    .card h2 .sub { font-size: 12px; font-weight: 400; color: var(--text-subtle); margin-left: 8px; }
     .stat-row { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 14px; }
-    .stat { font-size: 12px; color: #6b7280; }
-    .stat b { display: block; font-size: 22px; color: #1a73e8; font-variant-numeric: tabular-nums; font-weight: 600; }
+    .stat { font-size: 12px; color: var(--text-muted); }
+    .stat b { display: block; font-size: 22px; color: var(--brand); font-variant-numeric: tabular-nums; font-weight: 600; }
 
-    .overview { font-size: 14px; line-height: 1.85; color: #374151; background: #f8fbff;
-                border-left: 3px solid #1a73e8; padding: 12px 16px; border-radius: 0 8px 8px 0; }
+    .overview { font-size: 14px; line-height: 1.85; color: var(--text-secondary); background: var(--bg-surface-2);
+                border-left: 3px solid var(--brand); padding: 12px 16px; border-radius: 0 var(--radius-md) var(--radius-md) 0; }
     .sec { margin-top: 18px; }
-    .sec h3 { font-size: 13px; font-weight: 600; color: #111827; margin-bottom: 8px;
-              padding-bottom: 6px; border-bottom: 1px solid #eef1f5; }
-    .sec .body { font-size: 13px; line-height: 1.9; color: #4b5563; white-space: pre-wrap; }
+    .sec h3 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;
+              padding-bottom: 6px; border-bottom: 1px solid var(--border-color-alt); }
+    .sec .body { font-size: 13px; line-height: 1.9; color: var(--text-secondary); white-space: pre-wrap; }
 
     table.lst { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table.lst th { text-align: left; font-weight: 600; color: #6b7280; font-size: 12px;
-                   padding: 8px 10px; background: #f8fafc; border-bottom: 1px solid #e3e7ee; }
-    table.lst td { padding: 9px 10px; border-bottom: 1px solid #f1f4f8; color: #374151; vertical-align: top; }
+    table.lst th { text-align: left; font-weight: 600; color: var(--text-muted); font-size: 12px;
+                   padding: 8px 10px; background: var(--bg-surface-2); border-bottom: 1px solid var(--border-color); }
+    table.lst td { padding: 9px 10px; border-bottom: 1px solid var(--border-color-alt); color: var(--text-secondary); vertical-align: top; }
     table.lst tr:last-child td { border-bottom: none; }
-    table.lst tr:hover td { background: #f8fbff; }
-    table.lst td.num { font-variant-numeric: tabular-nums; text-align: right; color: #1a73e8; font-weight: 600; }
-    .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
-    .tag.cornerstone { background: #fef3c7; color: #92400e; }
-    .tag.hub         { background: #dbeafe; color: #1e40af; }
-    .tag.bridge      { background: #e9d5ff; color: #6b21a8; }
-    .tag.foundation  { background: #d1fae5; color: #065f46; }
-    .tag.fringe      { background: #f3f4f6; color: #6b7280; }
-    .tag.isolated    { background: #fee2e2; color: #991b1b; }
-    a.open { color: #1a73e8; text-decoration: none; font-size: 12px; }
+    table.lst tr:hover td { background: var(--bg-surface-2); }
+    table.lst td.num { font-variant-numeric: tabular-nums; text-align: right; color: var(--brand); font-weight: 600; }
+    .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: var(--radius-sm); white-space: nowrap; }
+    /* 六个角色标签：全站统一口径，与 graph.html 的 .role-* 读同一组 --role-* 变量 */
+    .tag.cornerstone { background: var(--role-cornerstone-bg); color: var(--role-cornerstone-fg); }
+    .tag.hub         { background: var(--role-hub-bg);         color: var(--role-hub-fg); }
+    .tag.bridge      { background: var(--role-bridge-bg);      color: var(--role-bridge-fg); }
+    .tag.foundation  { background: var(--role-foundation-bg);  color: var(--role-foundation-fg); }
+    .tag.fringe      { background: var(--role-fringe-bg);      color: var(--role-fringe-fg); }
+    .tag.isolated    { background: var(--role-isolated-bg);    color: var(--role-isolated-fg); }
+    a.open { color: var(--brand); text-decoration: none; font-size: 12px; }
     a.open:hover { text-decoration: underline; }
 
     #chart { width: 100%; height: 240px; }
@@ -76,33 +83,33 @@
     .kind-head { display: flex; align-items: center; gap: 10px; margin: 20px 0 10px; }
     .kind-head .dot { width: 9px; height: 9px; border-radius: 50%; }
     .kind-head b { font-size: 14px; }
-    .kind-head .desc { font-size: 12px; color: #9ca3af; }
-    .fi { border: 1px solid #eef1f5; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
-    .fi .t { font-size: 13.5px; font-weight: 600; color: #111827; line-height: 1.5; }
-    .fi .basis { font-size: 12px; color: #6b7280; margin-top: 6px; line-height: 1.7; }
-    .fi .foot { margin-top: 8px; display: flex; gap: 14px; font-size: 12px; color: #9ca3af; }
+    .kind-head .desc { font-size: 12px; color: var(--text-subtle); }
+    .fi { border: 1px solid var(--border-color-alt); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+    .fi .t { font-size: 13.5px; font-weight: 600; color: var(--text-primary); line-height: 1.5; }
+    .fi .basis { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.7; }
+    .fi .foot { margin-top: 8px; display: flex; gap: 14px; font-size: 12px; color: var(--text-subtle); }
 
-    .empty { text-align: center; color: #9ca3af; font-size: 13px; padding: 40px 0; }
-    #loading { text-align: center; color: #9ca3af; font-size: 13px; padding: 60px 0; }
+    .empty { text-align: center; color: var(--text-subtle); font-size: 13px; padding: 40px 0; }
+    #loading { text-align: center; color: var(--text-subtle); font-size: 13px; padding: 60px 0; }
     [hidden] { display: none !important; }
 
     /* 英译中 */
     #enInput {
-      width: 100%; border: 1px solid #d5dbe5; border-radius: 8px; padding: 11px 13px;
+      width: 100%; border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 11px 13px;
       font: inherit; font-size: 13.5px; line-height: 1.75; resize: vertical;
-      color: #1f2937; background: #fff;
+      color: var(--text-primary); background: var(--bg-surface);
     }
-    #enInput:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,.12); }
+    #enInput:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--blue-100); }
     .tr-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
-    button.ghost-btn { background: #fff; border-color: #d5dbe5; color: #4b5563; }
-    button.ghost-btn:hover:not(:disabled) { background: #f8fafc; }
-    .tr-hint { font-size: 12px; color: #9ca3af; }
-    .tr-hint.err { color: #c62828; }
-    .tr-hint.ok { color: #1a7f37; }
+    button.ghost-btn { background: var(--bg-surface); border-color: var(--border-strong); color: var(--text-secondary); }
+    button.ghost-btn:hover:not(:disabled) { background: var(--bg-surface-2); }
+    .tr-hint { font-size: 12px; color: var(--text-subtle); }
+    .tr-hint.err { color: var(--danger); }
+    .tr-hint.ok { color: var(--success); }
     .tr-out {
-      font-size: 13.5px; line-height: 1.95; color: #374151; white-space: pre-wrap;
-      background: #f8fafc; border-left: 3px solid #1a73e8; padding: 13px 16px;
-      border-radius: 0 8px 8px 0;
+      font-size: 13.5px; line-height: 1.95; color: var(--text-secondary); white-space: pre-wrap;
+      background: var(--bg-surface-2); border-left: 3px solid var(--brand); padding: 13px 16px;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
     }
   </style>
 </head>
@@ -134,7 +141,7 @@
       <div class="card">
         <h2>发展脉络</h2>
         <div id="chart"></div>
-        <div id="timelineNote" style="font-size:12px;color:#9ca3af;margin-top:8px;"></div>
+        <div id="timelineNote" style="font-size:12px;color:var(--text-subtle);margin-top:8px;"></div>
       </div>
       <div class="card">
         <h2>主题聚类与代表性工作</h2>
@@ -176,7 +183,21 @@
       cornerstone: '基石', hub: '枢纽', bridge: '桥接',
       foundation: '基础件', fringe: '边缘', isolated: '孤立'
     };
-    const KIND_COLOR = { recent_cited: '#1a73e8', bridge: '#9333ea', island: '#dc2626' };
+
+    /* ECharts 不认 CSS 的 var()，图表颜色只能读变量的计算值再喂给它。
+       ChartColors.read() 内部带兜底值，读不到变量时退回与改造前完全相同的色值，
+       所以 design-system.css 万一没加载，图表也不会黑掉或白掉。
+       这里不在顶层取色，是因为 <script src="chart-colors.js"> 的加载顺序
+       不保证早于本段内联脚本；放在渲染函数里取，必定发生在 CSS 就绪之后。 */
+    function chartKindColors() {
+      const C = ChartColors.read();
+      return {
+        recent_cited: C.chartBrand,
+        bridge:       C.chartAccent,
+        island:       C.chartDanger,
+        fallback:     C.textSubtle
+      };
+    }
 
     let surveyData = null;
     let frontierData = null;
@@ -211,6 +232,7 @@
       const years = (d.timeline || []);
       if (chart) { chart.dispose(); chart = null; }
       if (years.length) {
+        const C = ChartColors.read();
         chart = echarts.init($('chart'));
         chart.setOption({
           grid: { left: 44, right: 20, top: 26, bottom: 30 },
@@ -224,18 +246,18 @@
           },
           xAxis: {
             type: 'category', data: years.map(y => y.year),
-            axisLine: { lineStyle: { color: '#d5dbe5' } },
-            axisLabel: { color: '#6b7280', fontSize: 11 }
+            axisLine: { lineStyle: { color: C.chartAxis } },
+            axisLabel: { color: C.chartLabel, fontSize: 11 }
           },
           yAxis: {
-            type: 'value', name: '篇', nameTextStyle: { color: '#9ca3af', fontSize: 11 },
-            splitLine: { lineStyle: { color: '#f1f4f8' } },
-            axisLabel: { color: '#9ca3af', fontSize: 11 }
+            type: 'value', name: '篇', nameTextStyle: { color: C.chartLabel2, fontSize: 11 },
+            splitLine: { lineStyle: { color: C.chartGrid } },
+            axisLabel: { color: C.chartLabel2, fontSize: 11 }
           },
           series: [{
             type: 'bar', data: years.map(y => y.count), barWidth: '52%',
-            itemStyle: { color: '#1a73e8', borderRadius: [4, 4, 0, 0] },
-            label: { show: true, position: 'top', color: '#6b7280', fontSize: 11 }
+            itemStyle: { color: C.chartBrand, borderRadius: [4, 4, 0, 0] },
+            label: { show: true, position: 'top', color: C.chartLabel, fontSize: 11 }
           }]
         });
       }
@@ -288,13 +310,14 @@
       (d.items || []).forEach(it => { (byKind[it.kind] = byKind[it.kind] || []).push(it); });
 
       const order = ['recent_cited', 'bridge', 'island'];
+      const KC = chartKindColors();
       let html = '';
       order.forEach(kind => {
         const arr = byKind[kind] || [];
         if (!arr.length) return;
         const lg = legend[kind] || {};
         html += `<div class="kind-head">
-            <span class="dot" style="background:${KIND_COLOR[kind] || '#999'}"></span>
+            <span class="dot" style="background:${KC[kind] || KC.fallback}"></span>
             <b>${esc(lg.label || kind)}</b>
             <span class="desc">${esc(lg.desc || '')}</span>
           </div>`;

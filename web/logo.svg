@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="科研小助手">
+  <!-- 科研小助手 logo：蓝色圆角方块 + 中心主节点与三个卫星节点连成的知识图谱。
+       造型是纯几何，没有具体形象，缩到 26px 侧栏尺寸下依然锐利。
+       主色与 brand 变量同源（#1a73e8 到 #22a8f0），换主题色时同步改这两处即可。
+       注意：XML 注释内不能出现连续两个减号，所以这里不写 CSS 变量名。 -->
+  <defs>
+    <linearGradient id="lgBase" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a73e8"/>
+      <stop offset="100%" stop-color="#22a8f0"/>
+    </linearGradient>
+    <linearGradient id="lgSheen" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity=".22"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角方块底 -->
+  <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="url(#lgBase)"/>
+  <!-- 顶部高光，给纯色底一点层次 -->
+  <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="url(#lgSheen)"/>
+
+  <!-- 连线：中心往外三条 -->
+  <path d="M32 32 20.5 20.5M32 32 45 20.5M32 32 32 46.5"
+        stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>
+  <!-- 中心主节点 -->
+  <circle cx="32" cy="32" r="7.2" fill="#ffffff"/>
+  <!-- 三个卫星节点 -->
+  <circle cx="20.5" cy="20.5" r="4.1" fill="#ffffff" opacity=".92"/>
+  <circle cx="45" cy="20.5" r="4.1" fill="#ffffff" opacity=".92"/>
+  <circle cx="32" cy="46.5" r="4.1" fill="#ffffff" opacity=".92"/>
+  <!-- 主节点中心的透镜孔，避免整块白糊成一片 -->
+  <circle cx="32" cy="32" r="2.7" fill="url(#lgBase)"/>
+</svg>
