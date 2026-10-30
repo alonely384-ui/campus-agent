@@ -119,6 +119,45 @@ function escapeAttr(text) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ---------- 窄屏抽屉（900px 以下） ----------
+// 2026-10-31 加。窄屏下侧栏是 position:fixed 的覆盖式抽屉，靠 body.sb-open 控制进出。
+// 桌面端这套类名不产生任何效果（对应的 CSS 全在 @media (max-width:900px) 里），
+// 所以 mnavBtn / sbMask 在桌面上是隐藏元素，点了也只会留个无害的类。
+function sbSetDrawer(open) {
+  document.body.classList.toggle('sb-open', !!open);
+  const btn = document.getElementById('mnavBtn');
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function sbDrawerOpen() {
+  return document.body.classList.contains('sb-open');
+}
+
+function sbInitDrawer() {
+  const btn = document.getElementById('mnavBtn');
+  const mask = document.getElementById('sbMask');
+  if (btn) btn.addEventListener('click', () => sbSetDrawer(!sbDrawerOpen()));
+  if (mask) mask.addEventListener('click', () => sbSetDrawer(false));
+
+  // Esc 关抽屉。只在真的开着的时候拦，避免抢走输入框自己的 Esc 行为
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && sbDrawerOpen()) sbSetDrawer(false);
+  });
+
+  // 窄屏里点任何一个导航项都该把抽屉收回去，否则新页面盖在抽屉底下看不见
+  document.querySelectorAll('.sidebar a.sb-item, .sb-new').forEach(el => {
+    el.addEventListener('click', () => {
+      if (window.matchMedia('(max-width: 900px)').matches) sbSetDrawer(false);
+    });
+  });
+
+  // 从窄屏转回桌面时，抽屉状态要清掉，否则 .sb-open 会残留在 body 上
+  const mq = window.matchMedia('(max-width: 900px)');
+  const onMq = () => { if (!mq.matches) sbSetDrawer(false); };
+  if (mq.addEventListener) mq.addEventListener('change', onMq);
+  else if (mq.addListener) mq.addListener(onMq);
+}
+
 // ---------- 折叠 ----------
 function sbSetCollapsed(on) {
   document.body.classList.toggle('app--collapsed', !!on);
@@ -204,6 +243,7 @@ function sbInitSidebar() {
     newChat.addEventListener('click', () => { location.href = 'index.html'; });
   }
 
+  sbInitDrawer();
   sbRenderHistory();
 }
 
