@@ -47,6 +47,15 @@ logger = get_logger(__name__)
 # Graphviz 自带的 Times-Roman 不含 CJK 字形，不显式指定就渲染成方框。
 CJK_FONT = "Microsoft YaHei"
 
+# Mermaid 走 Chromium 渲染，字体由 CSS 决定，得给一个**候选族**：
+# 列表越靠前越优先，找不到就往后 fallback。Windows 上命中微软雅黑，
+# Ubuntu 上装 fonts-noto-cjk 后命中 Noto Sans CJK SC。
+# 只写一个字体名是不够的——单写 Microsoft YaHei 在 Linux 上一个都匹配不到。
+CJK_FONT_STACK = (
+    '"Microsoft YaHei", "Microsoft JhengHei", "Noto Sans CJK SC", '
+    '"Noto Sans SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif'
+)
+
 # mmdc / dot 是 npm 包和 Graphviz 安装出来的可执行文件，不在虚拟环境里，
 # 而且 Windows 下常常有 .cmd 后缀。这里按固定顺序找，找不到就报清晰的错。
 #
@@ -382,6 +391,32 @@ def _puppeteer_config() -> Path | None:
         return None
 
 
+def _ensure_mermaid_font(code: str) -> str:
+    """给 Mermaid 代码注入中文字体族，否则 Linux 上中文渲染成方框。
+
+    **为什么 Mermaid 需要单独处理、而 Graphviz 不用**：Graphviz 是本地二进制，
+    字体由 ``fontname`` 属性决定；Mermaid 走 Chromium 渲染，字体由 CSS 决定，
+    默认是 ``"trebuchet ms", verdana, arial, sans-serif``——**列表里没有一个
+    CJK 字体**。Windows 上浏览器会做 font fallback 找到微软雅黑，所以本地看着
+    正常；Ubuntu 服务器默认不含中文字形，fallback 找不到就直接画空心方框
+    （实测生产环境截图：节点文字全变成 □□）。
+
+    修法是在图定义前插一条 Mermaid 的 init 指令，把 fontFamily 显式写成
+    「Noto Sans CJK SC（Linux）／Microsoft YaHei（Windows）」的候选族。
+    两个都列上，哪个系统有哪个就用，跨平台都正确。
+
+    仅当代码里已经有 ``%%{init`` 时才跳过——模型自己指定了主题就尊重它。
+    """
+    if "%%{init" in code:
+        return code
+    # fontFamily 的值本身是一串带引号的 CSS 字体名，直接拼进 JSON 会把引号
+    # 弄坏（实测产出 "fontFamily": ""Microsoft YaHei", ..."" 这种非法 JSON，
+    # Mermaid 解析时报语法错）。用 json.dumps 统一转义成合法字符串。
+    stack_literal = json.dumps(CJK_FONT_STACK, ensure_ascii=False)
+    directive = '%%{init: {"themeVariables": {"fontFamily": ' + stack_literal + "}}}%%\n"
+    return directive + code
+
+
 def render_mermaid(code: str, out_dir: Path) -> tuple[bytes | None, str]:
     """把 Mermaid 代码渲染成 PNG。返回 (图片字节, 错误信息)。
 
@@ -389,8 +424,11 @@ def render_mermaid(code: str, out_dir: Path) -> tuple[bytes | None, str]:
     起 node.exe，服务若是被测试框架/IDE 拉起来的，PATH 里不一定有 node 目录，
     就会报 ``'"node"' is not recognized as an internal or external command``。
     找不到 cli.js 才退回直接调 mmdc。
+
+    渲染前会调 ``_ensure_mermaid_font`` 注入中文字体族，否则 Linux 上中文全是方框。
     """
     out_dir.mkdir(parents=True, exist_ok=True)
+    code = _ensure_mermaid_font(code)
     with tempfile.TemporaryDirectory() as td:
         src = Path(td) / "g.mmd"
         dst = Path(td) / "g.png"

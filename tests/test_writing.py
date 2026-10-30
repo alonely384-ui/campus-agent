@@ -11,6 +11,9 @@
 
 from __future__ import annotations
 
+import json
+import re
+
 import pytest
 
 from app import chart as ch
@@ -224,6 +227,47 @@ def test_graphviz_font_not_overridden_when_author_specified():
 def test_graphviz_font_leaves_invalid_code_alone():
     """不是 digraph 开头的乱码不能被插坏，否则错误信息会变得莫名其妙。"""
     assert dg._ensure_font("flowchart TD\n A-->B") == "flowchart TD\n A-->B"
+
+
+def test_mermaid_font_injected_for_chinese():
+    """Mermaid 走 Chromium，字体由 CSS 决定，不注入在 Linux 上就是一堆方框。
+
+    实测：生产服务器 Ubuntu 24.04 未装中文字体时，节点文字全部渲染成 □□。
+    """
+    out = dg._ensure_mermaid_font("flowchart TD\n    A[输入] --> B[编码器]")
+    assert out.startswith("%%{init:")
+    assert "flowchart TD" in out
+
+
+def test_mermaid_font_directive_is_valid_json():
+    """fontFamily 的值自带引号，拼进 JSON 必须转义，否则 Mermaid 直接报语法错。
+
+    回归背景：初版用 f-string 拼接产出 ``"fontFamily": ""Microsoft YaHei""``，
+    这是非法 JSON，渲染时整条指令被丢弃。
+    """
+    out = dg._ensure_mermaid_font("flowchart TD\n A-->B")
+    first = out.splitlines()[0]
+    m = re.match(r"%%\{init: (.*)\}%%$", first)
+    assert m, f"init 指令格式不对: {first}"
+    cfg = json.loads(m.group(1))
+    font = cfg["themeVariables"]["fontFamily"]
+    # 值应当是完整的 CSS 字体族串，多个候选按顺序列出
+    assert "Microsoft YaHei" in font
+    assert "Noto Sans CJK SC" in font
+
+
+def test_mermaid_font_not_injected_when_author_specified():
+    """模型自己写了 init 主题就尊重它，不再插一条去打架。"""
+    code = '%%{init: {"theme": "dark"}}%%\nflowchart TD\n A-->B'
+    assert dg._ensure_mermaid_font(code) == code
+
+
+def test_mermaid_font_injected_before_graph_keyword():
+    """init 指令必须在图类型关键字之前，插到后面 Mermaid 不认。"""
+    out = dg._ensure_mermaid_font("graph LR\n  A --> B")
+    lines = out.splitlines()
+    assert lines[0].startswith("%%{init:")
+    assert lines[1].startswith("graph LR")
 
 
 def test_prompt_differs_between_renderers():
