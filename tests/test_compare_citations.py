@@ -69,7 +69,7 @@ async def test_citation_chunk_gets_marker_in_context(monkeypatch):
 
     monkeypatch.setattr(agent_module, "_search_query", _fake_query)
     monkeypatch.setattr(
-        agent_module, "retrieve_scored", lambda q, top_k, source=None: [(fake_chunk, 0.5, ["dense"])]
+        agent_module, "retrieve_scored", lambda q, top_k, source=None, use_dense=True: [(fake_chunk, 0.5, ["dense"])]
     )
     context, evidence = await agent_module._rag_context_with_evidence("推荐一篇强化学习的论文")
     assert "【参考文献列表片段" in context

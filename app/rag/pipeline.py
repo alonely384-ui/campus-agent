@@ -182,21 +182,49 @@ _BM25_FILE = "bm25.json"
 _BM25: dict | None = None
 # 三路检索的 RRF 权重（可用环境变量覆盖，做消融实验用）：
 #   RAG_W_DENSE / RAG_W_HASH / RAG_W_BM25
-_W_DENSE = float(os.getenv("RAG_W_DENSE", "2.0"))
-_W_HASH = float(os.getenv("RAG_W_HASH", "0.5"))
-_W_BM25 = float(os.getenv("RAG_W_BM25", "1.0"))
+#
+# 取值优先用 config.settings（由 pydantic-settings 从 .env 读），
+# 读不到才退回环境变量、最后退回代码默认值。原因见 app/config.py 顶部
+# 「为什么 RAG 参数走 settings 而不直接 os.getenv」：.env 里写的值
+# 进程启动时并不会自动进 os.environ，只 getenv 等于忽略用户在设置页做的修改。
+def _env_setting(name: str, default: str) -> str:
+    """按 环境变量 → settings 字段 → 默认值 的顺序取一个字符串配置。
+
+    顺序必须和 pydantic-settings 一致（环境变量 > .env > 默认值）。
+
+    为什么不能只读 os.getenv：pydantic-settings 读 .env 只是把值填进
+    Settings 对象，**不会**把 .env 的键写进 os.environ。所以用户在 .env 里
+    写 RAG_W_DENSE=3.25（或在设置页保存），os.getenv 是拿不到的，
+    参数会静默退回代码默认值，重启后用户的修改就白改了。
+    两个来源都要看，且环境变量在前。
+    """
+    env = os.getenv(name)
+    if env is not None and env != "":
+        return env
+
+    field = name.lower()
+    if field in type(settings).model_fields:
+        value = getattr(settings, field, None)
+        if value is not None and str(value) != "":
+            return str(value)
+    return default
+
+
+_W_DENSE = float(_env_setting("RAG_W_DENSE", "2.0"))
+_W_HASH = float(_env_setting("RAG_W_HASH", "0.5"))
+_W_BM25 = float(_env_setting("RAG_W_BM25", "1.0"))
 # RRF 的 k 常数（可用 RAG_RRF_K 覆盖）：越大名次差异被抹得越平，
 # 越小头部名次越吃重。常见取值 60；短查询、库小的时候 20–30 有时更好。
-_RRF_K = int(os.getenv("RAG_RRF_K", "60"))
+_RRF_K = int(_env_setting("RAG_RRF_K", "60"))
 
 # 交叉编码器重排：RAG_RERANK=0 关闭；RAG_RERANK_POOL 决定拿多少候选去重排。
 # 实测 pool=10/15/20 的 R@1 分别是 28/31/30（38 题），差异在噪声内；
 # 取 15 是"质量不吃亏、候选少 1/4"的折中。
-_RERANK_ENABLED = os.getenv("RAG_RERANK", "1") != "0"
-_RERANK_POOL = int(os.getenv("RAG_RERANK_POOL", "15"))
+_RERANK_ENABLED = _env_setting("RAG_RERANK", "1").strip().lower() not in ("0", "false", "off", "no")
+_RERANK_POOL = int(_env_setting("RAG_RERANK_POOL", "15"))
 # 每路召回取多深：太浅（12）会把"排第 15 的正确块"直接漏掉，重排也无从救；
 # 太深受重排成本限制。50 是 38 题集上把 GPT-3 参数题捞回来的最小代价点。
-_RECALL_DEPTH = int(os.getenv("RAG_RECALL_DEPTH", "50"))
+_RECALL_DEPTH = int(_env_setting("RAG_RECALL_DEPTH", "50"))
 
 # 参考文献列表片段：形如 "Author et al. Title. arXiv:2312.14925, 2023." 或 "In Proceedings of ACL"。
 # 这类片段是"某论文引用过它"，不是论文正文；实测它们会抢到强化学习/对比类问题的 top1，
@@ -206,7 +234,7 @@ _CITATION_RE = re.compile(
     r"|EMNLP|NAACL|ACL|CVPR|ICCV|AAAI|Advances in Neural",
     re.IGNORECASE,
 )
-_CITATION_PENALTY = float(os.getenv("RAG_CITATION_PENALTY", "0.6"))
+_CITATION_PENALTY = float(_env_setting("RAG_CITATION_PENALTY", "0.6"))
 
 
 def _looks_like_citation(text: str) -> bool:
@@ -243,10 +271,32 @@ def _build_bm25(chunks: list[Chunk]) -> dict:
 
 
 def _save_bm25(index: dict) -> None:
+    """原子写 BM25 索引。
+
+    为什么不能直接 open(..., "w")：那会先把原文件截断成 0 字节再写。
+    写到一半进程被杀 / 磁盘满，磁盘上就只剩半截 JSON；下次启动
+    _load_bm25 的 json.load 抛 ValueError，被 except 吞掉后返回 None，
+    整条 BM25 召回通道就此静默消失（RAG 变成两路，且没有任何报错）。
+    写临时文件再 os.replace 才能保证"要么旧索引、要么新索引"。
+    """
     global _BM25
     os.makedirs(settings.chroma_dir, exist_ok=True)
-    with open(_bm25_path(), "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False)
+    target = _bm25_path()
+    tmp = target + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(index, f, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except BaseException:
+        # 失败时清理半截临时文件，磁盘上的正式索引保持原样
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            logger.warning("清理 BM25 临时文件失败：%s", tmp, exc_info=True)
+        raise
     _BM25 = index
 
 
@@ -794,6 +844,14 @@ def remove_source(source: str) -> int:
 
     只删文件不删索引，会出现"论文已删除、AI 还能引用它"（P0-2 实测确认过）：
     PDF 和文本缓存没了，但向量库和 BM25 里的块还在，检索照样命中。
+
+    删除顺序是**故意**安排的：最容易失败的一步（docs_dense）放最后。
+        BM25 是本地 JSON 文件，前两步（读 docs、删 docs）已完成后再算，失败概率最低；
+        docs_dense 是外部服务，失败概率最高，放最后一步，
+        这样一旦抛异常，已经改动的范围最小，残留块最少。
+    注意 docs 与 BM25 都已经删了、docs_dense 才失败时，三路仍会不一致：
+    这是无法真正回滚的（docs 的原始块已被删除），只能如实抛错、记日志，
+    由设置页的「健康检查」再次暴露出来，允许重试。
     """
     import chromadb
 
@@ -805,12 +863,7 @@ def remove_source(source: str) -> int:
     if ids:
         collection.delete(where=where)
 
-    try:
-        dense = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
-        dense.delete(where=where)
-    except Exception:  # noqa: BLE001 —— 稠密集合异常不该阻断删除，但会留下未清理块
-        pass
-
+    # BM25 放在 docs_dense 之前：本地文件操作，比外部向量库更容易成功
     index = _load_bm25()
     if index:
         pruned, bm_removed = _prune_bm25(index, source)
@@ -818,6 +871,13 @@ def remove_source(source: str) -> int:
             _save_idf(_dfs_from_postings(pruned["postings"]), len(pruned["docs"]))
             _save_bm25(pruned)
         removed = max(removed, bm_removed)
+
+    try:
+        dense = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
+        dense.delete(where=where)
+    except Exception as exc:  # noqa: BLE001 —— 稠密集合失败不能当成删干净了，必须让人知道
+        logger.warning("删除 docs_dense 中 %s 的块失败（docs 与 BM25 已删，此处残留）", source, exc_info=True)
+        raise RuntimeError(f"删除 docs_dense 失败: {type(exc).__name__}: {exc}") from exc
 
     return removed
 
@@ -877,7 +937,7 @@ def _fuse_ids(
 
 
 def retrieve_scored(
-    question: str, top_k: int = 4, source: str | None = None
+    question: str, top_k: int = 4, source: str | None = None, use_dense: bool = True
 ) -> list[tuple[Chunk, float, list[str]]]:
     """[4] 混合检索，返回 (块, RRF 分数, 命中通道)。
 
@@ -886,6 +946,10 @@ def retrieve_scored(
 
     容错策略：三路召回各自 try/except——哪一路挂了就跳过这一路并记日志，
     其余通道继续融合；全挂才返回 []，绝不让检索异常把整轮问答打崩。
+
+    use_dense=False 时跳过稠密向量那一路（前端「智能搜索」关掉就是这个意思）：
+    只剩哈希 + BM25。少了语义相似召回，同义改写的问题会差一些，但不用加载
+    ONNX embedding 模型，响应更快。这不是降级容错，是用户显式选择，所以记 info 而非 warning。
     """
     import chromadb
 
@@ -920,12 +984,15 @@ def retrieve_scored(
 
     # 通道二：稠密向量（ONNX MiniLM，语义相似）
     dense_ids: list[str] = []
-    try:
-        dense_col = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
-        dense_res = dense_col.query(query_texts=[question], n_results=n, where=where)
-        dense_ids = (dense_res.get("ids") or [[]])[0]
-    except Exception:  # noqa: BLE001
-        logger.exception("稠密召回失败，降级为哈希 + BM25")
+    if use_dense:
+        try:
+            dense_col = client.get_or_create_collection(name="docs_dense", embedding_function=_dense())
+            dense_res = dense_col.query(query_texts=[question], n_results=n, where=where)
+            dense_ids = (dense_res.get("ids") or [[]])[0]
+        except Exception:  # noqa: BLE001
+            logger.exception("稠密召回失败，降级为哈希 + BM25")
+    else:
+        logger.info("用户关闭了智能搜索，本次跳过稠密召回，只用哈希 + BM25")
 
     # 通道三：BM25（关键词精确匹配）
     bm25_ids: list[str] = []
@@ -991,9 +1058,13 @@ def retrieve_scored(
     return penalized[:top_k]
 
 
-def retrieve(question: str, top_k: int = 4, source: str | None = None) -> list[Chunk]:
+def retrieve(
+    question: str, top_k: int = 4, source: str | None = None, use_dense: bool = True
+) -> list[Chunk]:
     """[4] 混合检索：向量召回 + BM25 精排，RRF 融合后取前 top_k（只返回块）。"""
-    return [chunk for chunk, _score, _ch in retrieve_scored(question, top_k, source)]
+    return [
+        chunk for chunk, _score, _ch in retrieve_scored(question, top_k, source, use_dense=use_dense)
+    ]
 
 
 # 页级兜底用：数值类问题的答案常在表格里，块内可能只剩一个孤零零的数字，

@@ -100,7 +100,7 @@ class _FakeChunk:
         self.text, self.source, self.page = text, source, page
 
 
-def _fake_retrieve(question: str, top_k: int = 4, source: str | None = None):
+def _fake_retrieve(question: str, top_k: int = 4, source: str | None = None, use_dense: bool = True):
     chunk = _FakeChunk("We used 8 NVIDIA V100 GPUs for training.", source or "dpo.pdf", 5)
     return [(chunk, 0.05, ["dense", "bm25"])]
 

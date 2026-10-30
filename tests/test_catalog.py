@@ -63,7 +63,7 @@ async def test_catalog_question_injects_block_and_evidence(tmp_path, monkeypatch
     items = [{"file": "a.pdf", "title": "A", "year": 2017, "category": "cs.CL", "indexed": True}]
     _use_catalog(monkeypatch, tmp_path, items)
     # 检索为空也要能回答"多少篇"：清单不依赖向量检索
-    monkeypatch.setattr(agent_module, "retrieve_scored", lambda q, top_k=4, source=None: [])
+    monkeypatch.setattr(agent_module, "retrieve_scored", lambda q, top_k=4, source=None, use_dense=True: [])
 
     context, evidence = await _rag_context_with_evidence("这里一共有多少篇论文？")
 
@@ -79,7 +79,7 @@ async def test_normal_question_gets_no_catalog_block(tmp_path, monkeypatch):
     monkeypatch.setattr(
         agent_module,
         "retrieve_scored",
-        lambda q, top_k=4, source=None: [
+        lambda q, top_k=4, source=None, use_dense=True: [
             (Chunk(text="8 NVIDIA P100 GPUs", source="a.pdf", page=7), 0.05, ["dense"])
         ],
     )
