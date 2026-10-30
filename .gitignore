@@ -92,3 +92,11 @@ docs/writing-assistant-research.md
 docs/citation-graph-frontend-research.md
 docs/补课-核心设计讲稿.md
 docs/DEMO-SCRIPT.md
+
+# ---- 本地学习页面（不上传公开仓库）----
+# 三份是我自己看的笔记/导览/进度表，含大量源码摘录，写在这里而不是
+# .git/info/exclude，是因为那个文件不随仓库走——换台机器 clone 后，
+# 这三个文件会突然出现在 git status 里，容易被 git add -A 误提交。
+web/guide.html
+web/project-tour.html
+web/study-plan.html

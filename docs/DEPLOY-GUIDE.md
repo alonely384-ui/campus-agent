@@ -133,9 +133,12 @@ fc-match sans-serif:lang=zh
 装完之后重启服务（字体缓存被清理时 Chromium 可能还握着旧句柄）：
 
 ```bash
-pkill -f "uvicorn app.main:app"; sleep 2
-nohup .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+systemctl restart campus-agent
 ```
+
+> **注意**：这一步假设你已经做完第 6 步（配 systemd）。如果服务还是手动跑的，
+> 正确做法是**先去第 6 步配 systemd**，再回来执行重启——用 `pkill + nohup` 手动重启
+> 会和 systemd 抢进程，最终两个 uvicorn 抢同一个 chroma SQLite。
 
 验证方式：调一次 `/writing/diagram`，**把返回的 PNG 下载下来用眼睛看**——只看 `ok: true` 是不够的，中文成方块时接口照样返回成功。
 
@@ -216,6 +219,9 @@ python3.11 -m venv .venv
 
 **别急着配常驻，先确认能跑起来。**
 
+> 这一步是**临时调试**，跑完按 `Ctrl+C` 停掉，再进第 6 步配 systemd。
+> 长期跑请用 systemd——手动 `nohup` 起的进程不会开机自启、崩了也不会自己回来。
+
 ```bash
 cd /opt/campus-agent
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -260,52 +266,108 @@ free -h
 
 ## 第 6 步 · 配成常驻服务（5 分钟）
 
+> 这一节的单元文件与**生产环境实际运行的配置一致**（2026-10-30 实测六项验收全过）。
+> 跑服务的账号用 `root`：项目数据目录 `/opt/campus-agent/data` 由 root 创建，
+> 换普通用户会踩一堆权限问题，而这是一份演示用单机服务，没有多租户需求。
+
 ```bash
 cat > /etc/systemd/system/campus-agent.service << 'EOF'
 [Unit]
-Description=campus-agent 科研小助手
-After=network.target
+Description=Campus Agent - 科研小助手
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=appuser
-Group=appuser
+User=root
 WorkingDirectory=/opt/campus-agent
-Environment="PATH=/opt/campus-agent/.venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/opt/campus-agent/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+EnvironmentFile=/opt/campus-agent/.env
+ExecStart=/opt/campus-agent/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
+StartLimitBurst=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=campus-agent
 MemoryMax=3G
-StandardOutput=append:/var/log/campus-agent.log
-StandardError=append:/var/log/campus-agent.log
+MemorySwapMax=1G
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-chown -R appuser:appuser /opt/campus-agent
-touch /var/log/campus-agent.log
-chown appuser:appuser /var/log/campus-agent.log
+# 每天凌晨 4:00 UTC（北京时间 12:00）定时重启一次
+cat > /etc/systemd/system/campus-agent-restart.service << 'EOF'
+[Unit]
+Description=Nightly restart of Campus Agent (防内存泄漏)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart campus-agent
+EOF
+
+cat > /etc/systemd/system/campus-agent-restart.timer << 'EOF'
+[Unit]
+Description=每天 4:00 重启 Campus Agent
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
 
 systemctl daemon-reload
-systemctl enable campus-agent
-systemctl start campus-agent
+systemctl enable --now campus-agent
+systemctl enable --now campus-agent-restart.timer
+
+sleep 10
 systemctl status campus-agent --no-pager
 ```
 
-### 关键一句解释
+### 关键参数解释（答辩可能被问）
 
-`MemoryMax=3G` 是保险丝：内存超过 3G 会被杀掉，然后 `Restart=always` 自动拉起。
-**好过一次卡死整机不响应。**
+| 参数 | 为什么这么设 |
+|---|---|
+| `Restart=always` + `RestartSec=5` | 进程挂了自动拉起，隔 5 秒重试，避免疯狂重启把 CPU 打满 |
+| **`StartLimitBurst=0`** | systemd 默认启动失败 5 次就**永久放弃**。这里设成无限次：哪怕密钥过期在日志里刷错，也不能让服务死掉 |
+| `EnvironmentFile=.env` | 密钥不写进单元文件（单元文件在 `/etc` 下，权限比项目目录宽松） |
+| `MemoryMax=3G` | 保险丝。实测一次问答峰值 876MB，3G 有 3.4 倍余量；超限直接重启而不是拖垮整机 |
+| 定时重启选 `04:00 UTC` | 对应北京时间 12:00。评审可能在任何时候点开地址，白天重启有风险 |
+| `TimeoutStopSec=20` | 给 chroma SQLite 留足关闭时间，硬杀可能损坏索引 |
 
-### ✅ 验证
+> ⚠️ `EnvironmentFile` **不剥行内注释**。`.env` 里如果写成 `KEY=xxx  # 注释`，
+> 注释会被当成密钥的一部分。值必须独占一行，注释另起一行用 `#` 开头。
+
+### ✅ 验证（六项，全部要过）
 
 ```bash
-systemctl status campus-agent --no-pager
-# 期望：Active: active (running)
+# 1. 状态
+systemctl is-active campus-agent          # 期望：active
+systemctl is-enabled campus-agent         # 期望：enabled
 
-curl http://localhost:8000/health
-# 期望：{"status":"ok",...}
+# 2. 进程数（必须是 1，两个就说明有旧进程没杀干净）
+pkill -f "uvicorn app.main:app" 2>/dev/null; systemctl restart campus-agent; sleep 10
+pgrep -f "uvicorn app.main:app" | wc -l   # 期望：1
+
+# 3. 定时器已排期
+systemctl list-timers campus-agent-restart.timer --no-pager
+
+# 4. 健康检查
+curl -s http://127.0.0.1:8000/health
+# 期望：{"status":"ok","model":"deepseek-chat","version":"0.1.0"}
+
+# 5. 崩溃自愈（关键一项，必须测）
+PID=$(pgrep -f "uvicorn app.main:app" | head -1); kill -9 $PID; sleep 8
+systemctl is-active campus-agent          # 期望：active（自己回来了）
+pgrep -f "uvicorn app.main:app" | wc -l   # 期望：1
+
+# 6. 手动重启 + 内存
+systemctl restart campus-agent; sleep 10
+systemctl show campus-agent -p MemoryCurrent --value | awk '{printf "%.0f MB\n", $1/1024/1024}'
+# 期望：150 MB 左右（空闲态）
 ```
 
 ---
@@ -392,7 +454,7 @@ curl -s -X POST http://127.0.0.1:8000/writing/diagram \
 ### 服务起不来
 
 ```bash
-tail -50 /var/log/campus-agent.log
+systemctl status campus-agent --no-pager
 journalctl -u campus-agent -n 50 --no-pager
 ```
 
@@ -410,7 +472,6 @@ scp -r app root@<IP>:/opt/campus-agent/
 ```
 ```bash
 # 服务器
-chown -R appuser:appuser /opt/campus-agent
 systemctl restart campus-agent
 ```
 
@@ -432,7 +493,7 @@ free -h
 ```bash
 ssh root@<IP>                                        # 连服务器
 systemctl status campus-agent --no-pager             # 服务状态
-tail -f /var/log/campus-agent.log                    # 看日志
+journalctl -u campus-agent -n 50 --no-pager          # 看日志
 systemctl restart campus-agent                       # 重启
 free -h                                              # 看内存
 curl http://localhost:8000/health                    # 健康检查
