@@ -76,3 +76,19 @@ logs/
 *.orig
 !.env.example
 _public/
+
+# ---- 本地工作资料（不上传公开仓库）----
+# 开发日志、会话交接、调研笔记、差距清单、补课讲稿、路线图
+# 这些只在本地保留，不对外发布；文件本身仍留在磁盘上。
+docs/PROGRESS.md
+docs/LEARNING-LOG.md
+docs/ROADMAP.md
+docs/CODE-REVIEW-GUIDE.md
+docs/GAP-VS-OFFICIAL.md
+docs/HANDOFF-*.md
+docs/RESEARCH-MEMORY-COUNT.md
+docs/multi-agent-research.md
+docs/writing-assistant-research.md
+docs/citation-graph-frontend-research.md
+docs/补课-核心设计讲稿.md
+docs/DEMO-SCRIPT.md
