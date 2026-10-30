@@ -19,13 +19,13 @@
 | 计算 Louvain + 中介中心性 | 211 MB |
 | **跑一次完整问答（召回 + ONNX 重排 + LLM）** | **876 MB** |
 
-跑一次问答涨了 **665 MB**，主要是 ONNX Runtime 加载重排模型（22 MB 的 model.onnx，展开到内存后 200-300 MB）加上 chromadb 把 26596 条向量读进内存。
+跑一次问答涨了 **665 MB**，主要是 ONNX Runtime 加载重排模型（22 MB 的 model.onnx，展开到内存后 200-300 MB）加上 chromadb 把 25562 条向量读进内存。
 
 ### 1.2 磁盘占用
 
 | 目录 | 大小 |
 |---|---|
-| `data/chroma`（向量索引，26596 条） | **299.1 MB** |
+| `data/chroma`（向量索引，25562 条） | **299.1 MB** |
 | `data/papers`（39 篇 PDF） | 129.7 MB |
 | `data/models`（重排模型） | 22.7 MB |
 | `data/meta`（结构/图谱 JSON） | 4.4 MB |

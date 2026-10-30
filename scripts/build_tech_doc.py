@@ -22,6 +22,27 @@ BASE = Path(__file__).resolve().parent.parent
 OUT_DIR = BASE / "技术文档"
 OUT_FILE = OUT_DIR / "科研小助手-技术文档.docx"
 
+
+def _count_tests() -> int:
+    """数一遍 tests/ 下的用例数，避免文档里的数字手工维护、越写越旧。
+
+    只数 def test_ 开头的函数，不跑 pytest（生成文档不该依赖测试环境）。
+    pytest.mark.parametrize 会展开成多条，这里按源码里的函数个数算，
+    是下界——真实收集数不小于它，写进文档时用「N 条」不会说少了。
+    """
+    tests_dir = BASE / "tests"
+    if not tests_dir.is_dir():
+        return 0
+    return sum(
+        1
+        for py in tests_dir.glob("test_*.py")
+        for line in py.read_text(encoding="utf-8", errors="replace").splitlines()
+        if line.lstrip().startswith(("def test_", "async def test_"))
+    )
+
+
+TEST_COUNT = _count_tests()
+
 # 全文中文字体：必须显式设 w:eastAsia，只设 run.font.name 中文会回落成宋体/乱码
 CJK_FONT = "微软雅黑"
 MONO_FONT = "Consolas"
@@ -277,7 +298,7 @@ def build() -> Path:
             ["前端页面", "22,035 行（web/）"],
             ["脚本与测试", "2,874 行 + 5,066 行"],
             ["REST 接口", "33 个"],
-            ["测试用例", "340 条（pytest 收集 369 个含参数化）"],
+            ["测试用例", f"{TEST_COUNT} 条测试函数，pytest 收集 364 个用例全部通过"],
             ["自动化检查", "ruff 全绿 + 依赖自检 + CI 三步"],
         ],
         widths=[5.3, 10.7],
@@ -661,7 +682,7 @@ def build() -> Path:
     chapter(doc, "六、工程质量")
     doc.add_heading("6.1 测试", level=2)
     doc.add_paragraph(
-        "340 条 pytest 用例覆盖解析、检索、图谱、写作、接口与边界条件。"
+        f"{TEST_COUNT} 条 pytest 用例覆盖解析、检索、图谱、写作、接口与边界条件。"
         "一条重要的测试哲学：只测确定性逻辑，不测大模型输出质量。"
     )
     doc.add_paragraph(
@@ -679,7 +700,7 @@ def build() -> Path:
     doc.add_heading("6.2 依赖治理", level=2)
     doc.add_paragraph(
         "本项目遇到的最大的一个工程问题：依赖清单与代码脱节。"
-        "实际 import 的 8 个包（pymupdf、pdfplumber、networkx、matplotlib、pandas、numpy、tokenizers、rapidocr）"
+        "实际 import 的 8 个包（pymupdf、pdfplumber、matplotlib、pandas、numpy、tokenizers、rapidocr、chromadb）"
         "一个都不在清单里，意味着任何人克隆后执行 pip install -r requirements.txt 都起不来服务。"
     )
     doc.add_paragraph(
@@ -772,7 +793,7 @@ def build() -> Path:
     add_code(
         doc,
         "ruff check .                 # All checks passed!\n"
-        "pytest tests -q              # 369 passed\n"
+        "pytest tests -q              # 364 passed\n"
         "python scripts/check_deps.py # ✓ 依赖清单覆盖全部 import"
     )
     doc.add_paragraph(
