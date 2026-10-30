@@ -24,12 +24,38 @@ OUT_FILE = OUT_DIR / "科研小助手-技术文档.docx"
 
 
 def _count_tests() -> int:
-    """数一遍 tests/ 下的用例数，避免文档里的数字手工维护、越写越旧。
+    """数 tests/ 下的用例数。
 
-    只数 def test_ 开头的函数，不跑 pytest（生成文档不该依赖测试环境）。
-    pytest.mark.parametrize 会展开成多条，这里按源码里的函数个数算，
-    是下界——真实收集数不小于它，写进文档时用「N 条」不会说少了。
+    优先用 pytest 真实收集数（--co -q），因为 parametrize 会展开成多条，
+    只数 def test_ 会低估。用项目自己的 venv 解释器跑（生成文档的 python
+    可能没装 pytest）；跑不起来时退回源码计数。
     """
+    import re as _re
+    import subprocess
+
+    candidates = []
+    venv_py = BASE / ".venv" / "Scripts" / "python.exe"
+    if venv_py.exists():
+        candidates.append(str(venv_py))
+    candidates.append(sys.executable)
+
+    for exe in candidates:
+        try:
+            res = subprocess.run(
+                [exe, "-m", "pytest", "tests", "--co", "-q"],
+                cwd=str(BASE),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=180,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        m = _re.search(r"(\d+)\s+tests?\s+collected", (res.stdout or "") + (res.stderr or ""))
+        if m:
+            return int(m.group(1))
+
     tests_dir = BASE / "tests"
     if not tests_dir.is_dir():
         return 0
@@ -41,7 +67,90 @@ def _count_tests() -> int:
     )
 
 
+def _loc(rel: str, suffix: str) -> int:
+    """数某个目录下指定后缀文件的总行数，口径写死在文档里避免各说各话。"""
+    root = BASE / rel
+    if not root.is_dir():
+        return 0
+    return sum(
+        len(p.read_text(encoding="utf-8", errors="replace").splitlines())
+        for p in root.rglob(f"*{suffix}")
+        if p.is_file() and "vendor" not in p.parts
+    )
+
+
+def _count_routes() -> int:
+    """数 app/main.py 里真实注册的路由装饰器数（OpenAPI 里的 path 数需跑起来才准）。"""
+    main_py = BASE / "app" / "main.py"
+    if not main_py.exists():
+        return 0
+    import re as _re
+
+    text = main_py.read_text(encoding="utf-8", errors="replace")
+    return len(_re.findall(r"^@app\.(?:get|post|put|delete)\(", text, _re.M))
+
+
+def _count_tools() -> int:
+    """数实际注册的工具数（tool_schemas() 里真正会发给模型的那几个）。"""
+    reg = BASE / "app" / "tools" / "registry.py"
+    if not reg.exists():
+        return 0
+    import re as _re
+
+    text = reg.read_text(encoding="utf-8", errors="replace")
+    # 从 _ALL_TOOLS 的赋值处开始截到右括号，不能直接 split 名称——
+    # docstring 里也写着 "_ALL_TOOLS"，会先命中那段注释
+    m = _re.search(r"_ALL_TOOLS[^=]*=\s*\[(.*?)\]", text, _re.S)
+    block = m.group(1) if m else ""
+    # 只数未注释的条目，被 # 注释掉的占位不算注册
+    live = [ln for ln in block.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    return len(_re.findall(r"([A-Z]\w+)\(\)", "\n".join(live)))
+
+
+def _max_tool_rounds() -> int:
+    """读 agent.py 里的 MAX_ROUNDS，避免文档里手抄一个会漂移的数字。"""
+    agent_py = BASE / "app" / "agent.py"
+    if not agent_py.exists():
+        return 0
+    import re as _re
+
+    text = agent_py.read_text(encoding="utf-8", errors="replace")
+    m = _re.search(r"^MAX_ROUNDS\s*=\s*(\d+)", text, _re.M)
+    return int(m.group(1)) if m else 0
+
+
+def _count_settings() -> int:
+    """数设置中心登记的可配项数（Setting(...) 的条数）。"""
+    api = BASE / "app" / "settings_api.py"
+    if not api.exists():
+        return 0
+    import re as _re
+
+    text = api.read_text(encoding="utf-8", errors="replace")
+    return len(_re.findall(r"Setting\(\s*\n?\s*key=", text))
+
+
+def _count_css_vars() -> int:
+    """数设计系统里定义的 CSS 变量数。"""
+    css = BASE / "web" / "design-system.css"
+    if not css.exists():
+        return 0
+    import re as _re
+
+    text = css.read_text(encoding="utf-8", errors="replace")
+    return len(set(_re.findall(r"^\s*(--[a-z0-9-]+)\s*:", text, _re.M)))
+
+
 TEST_COUNT = _count_tests()
+ROUTE_COUNT = _count_routes()
+LOC_APP = _loc("app", ".py")
+LOC_WEB = _loc("web", ".js") + _loc("web", ".css") + _loc("web", ".html")
+LOC_TESTS = _loc("tests", ".py")
+LOC_SCRIPTS = _loc("scripts", ".py")
+TOOL_COUNT = _count_tools()
+MAX_TOOL_ROUNDS = _max_tool_rounds()
+SETTING_COUNT = _count_settings()
+CSS_VAR_COUNT = _count_css_vars()
 
 # 全文中文字体：必须显式设 w:eastAsia，只设 run.font.name 中文会回落成宋体/乱码
 CJK_FONT = "微软雅黑"
@@ -292,16 +401,17 @@ def build() -> Path:
     doc.add_heading("1.3 工程规模", level=2)
     add_table(
         doc,
-        ["维度", "数值"],
+        ["维度", "数值", "统计口径"],
         [
-            ["后端代码", "12,548 行（app/）"],
-            ["前端页面", "22,035 行（web/）"],
-            ["脚本与测试", "2,874 行 + 5,066 行"],
-            ["REST 接口", "33 个"],
-            ["测试用例", f"{TEST_COUNT} 条测试函数，pytest 收集 364 个用例全部通过"],
-            ["自动化检查", "ruff 全绿 + 依赖自检 + CI 三步"],
+            ["后端代码", f"{LOC_APP:,} 行", "app/ 下全部 .py"],
+            ["前端页面", f"{LOC_WEB:,} 行", "web/ 下 .html/.css/.js，不含 vendor"],
+            ["测试代码", f"{LOC_TESTS:,} 行", "tests/ 下全部 .py"],
+            ["脚本", f"{LOC_SCRIPTS:,} 行", "scripts/ 下全部 .py"],
+            ["REST 接口", f"{ROUTE_COUNT} 个", "app/main.py 路由装饰器"],
+            ["测试用例", f"pytest 收集 {TEST_COUNT} 个，全部通过", "pytest --co 实测"],
+            ["自动化检查", "ruff 全绿 + 依赖自检 + CI 三步", "见 8.3"],
         ],
-        widths=[5.3, 10.7],
+        widths=[3.4, 6.6, 6.0],
     )
 
     # ---------------- 架构 ----------------
@@ -317,7 +427,7 @@ def build() -> Path:
         "浏览器（原生 HTML/JS，无构建步骤）\n"
         "      │  fetch / SSE\n"
         "      ▼\n"
-        "FastAPI 应用 app/main.py  ── 33 个 REST 接口\n"
+        f"FastAPI 应用 app/main.py  ── {ROUTE_COUNT} 个 REST 接口\n"
         "      │\n"
         "      ├─ app/agent.py   编排：规划→检索→抽取→校验→写作\n"
         "      ├─ app/rag/       三路召回 + RRF 融合 + 交叉编码器重排\n"
@@ -362,6 +472,47 @@ def build() -> Path:
         "「是否入库」这一列是刻意设计的结果：索引与图谱都能由脚本从原始 PDF 重建，"
         "放进仓库只会让克隆变慢且容易产生二进制冲突。"
         "原始 PDF 不进仓库则有另一个理由——公开仓库不应分发他人版权论文。"
+    )
+
+    doc.add_heading("2.4 工具调用链：Function Calling 的接入方式", level=2)
+    doc.add_paragraph(
+        "赛题评分细则把「Function Calling 与工具集成」单列 6 分，并要求工具调用可观测。"
+        "本项目的接入点集中在 app/agent.py，调用方式是标准的 OpenAI tools 协议，"
+        "不额外封装一套自造协议。"
+    )
+    add_code(
+        doc,
+        "# app/agent.py:1497  按工具说明书请求模型\n"
+        'get_client().chat.completions.create(\n'
+        '    ..., tools=tool_schemas(), tool_choice="auto", temperature=0.3,\n'
+        ")\n\n"
+        "# app/agent.py:52  一轮问答内最多允许多少次工具往返\n"
+        "MAX_ROUNDS = 5\n\n"
+        "# app/agent.py:1441  按名字分发执行\n"
+        "async def _execute_tool(name, arguments): ...\n\n"
+        "# app/agent.py:1572-1573  结果以 role=tool + tool_call_id 回填上下文\n"
+        '{"role": "tool", "tool_call_id": call.id, "content": result}'
+    )
+    doc.add_paragraph(
+        "工具本身是插件式的：继承 app/tools/base.py 的 BaseTool，实现 to_openai_schema()，"
+        "再到 app/tools/registry.py 的 _ALL_TOOLS 里登记一行即可被模型看到。"
+        f"当前实际注册 {TOOL_COUNT} 个工具（计算器），"
+        "注册表里另有两个位（课表、笔记）以注释形式预留。"
+        "这里刻意只登记真实可用的工具——把未实现的工具塞进 schema，模型会去调用一个空壳，"
+        "比没有工具更糟。"
+    )
+    doc.add_paragraph(
+        "计算工具不走 eval，而是走 AST 白名单：只允许 Add / Sub / Mult / Div / Pow / Mod / USub "
+        "七类节点，其他一律拒绝。理由很直接——eval 一个模型生成的字符串，"
+        "等于把进程的执行权交给上游模型。"
+    )
+    add_bullets(
+        doc,
+        [
+            "调用过程通过 SSE 的 tool_call / tool_result 两个事件实时推给前端，用户能看见模型调了什么、拿到什么。",
+            "工具结果只作为下一轮的上下文，不直接进入最终答案，仍需走 Writer 的证据标注流程。",
+            f"一轮问答最多 {MAX_TOOL_ROUNDS} 次工具往返，超过就强制收尾并在时间线上标红，避免模型陷入死循环。",
+        ],
     )
 
     # ---------------- 核心技术 ----------------
@@ -682,7 +833,7 @@ def build() -> Path:
     chapter(doc, "六、工程质量")
     doc.add_heading("6.1 测试", level=2)
     doc.add_paragraph(
-        f"{TEST_COUNT} 条 pytest 用例覆盖解析、检索、图谱、写作、接口与边界条件。"
+        f"pytest 实测收集 {TEST_COUNT} 个用例，覆盖解析、检索、图谱、写作、接口与边界条件。"
         "一条重要的测试哲学：只测确定性逻辑，不测大模型输出质量。"
     )
     doc.add_paragraph(
@@ -728,40 +879,425 @@ def build() -> Path:
         ],
     )
 
+    doc.add_heading("6.5 设置中心：改配置不用登服务器", level=2)
+    doc.add_paragraph(
+        "部署到云服务器之后，最烦的一件事是：想换个模型、把检索条数从 15 调到 20，"
+        "得 SSH 上去改 .env 再 systemctl restart。设置中心把这件事搬到浏览器里。"
+        "页面独立为 web/settings.html，从主界面齿轮进入，分五个模块：模型设置、RAG 检索设置、"
+        "定时刷新、知识库管理、关于项目。"
+    )
+    doc.add_paragraph(
+        f"可变项共 {SETTING_COUNT} 个，全部登记在 app/settings_api.py 的一张表里，"
+        "每一项声明 key、类型、默认值、取值范围和影响哪个运行时属性。"
+        "这样新增一个可配项只需加一行，不用改前端也不用改路由。"
+    )
+    add_table(
+        doc,
+        ["设计点", "做法", "为什么这么做"],
+        [
+            [
+                "原子写回 .env",
+                "按行替换，写完临时文件再 os.replace",
+                "直接整体重写会丢掉注释与其他键；中途失败会留下半个文件",
+            ],
+            [
+                "双写 os.environ",
+                "改完同时更新进程环境变量",
+                "环境变量优先级高于 .env，只改文件不重启不生效",
+            ],
+            [
+                "保存失败整体回滚",
+                "任一项校验或写盘失败，已改的项全部还原",
+                "避免留下「一半新配置一半旧配置」的状态",
+            ],
+            [
+                "密钥脱敏",
+                "读出来显示 sk-****abcd，写回时识别掩码不覆盖真实值",
+                "既能让用户确认填的是哪把 key，又不在页面上暴露明文",
+            ],
+            [
+                "环境变量覆盖提示",
+                "检测到启动环境有同名变量时在页顶告警",
+                "否则用户改了以后重启又变回去，会以为是 bug",
+            ],
+            [
+                "单项恢复默认",
+                "每项右侧一个恢复按钮，只还原该项",
+                "不需要为了改一项而重置整份配置",
+            ],
+        ],
+        widths=[3.4, 5.6, 7.2],
+    )
+
+    doc.add_heading("6.6 一个静默失效的 bug 及其修复", level=2)
+    doc.add_paragraph(
+        "设置中心第一版有个坑，值得单独写出来，因为它属于「测试全绿但功能没生效」那类。"
+        "RAG 重排开关的配置键是 RAG_RERANK，代码按既定规则推导出运行时属性名 _RERANK，"
+        "但 app/rag/pipeline.py 里真实存在的变量叫 _RERANK_ENABLED。"
+        "推导失败后被 try/except 吞掉，页面上保存成功、返回 200，实际什么都没变。"
+    )
+    doc.add_paragraph(
+        "修法有两层：一是给 Setting 增加一个显式 attr 字段，允许直接指定属性名，不再靠字符串拼接猜；"
+        "二是 _apply_runtime 里对每个属性做 hasattr 检查，找不到就抛异常而不是静默跳过。"
+        "第一层解决这一处，第二层保证同类问题以后会以报错的形式暴露，而不是以「看起来成功了」的形式隐藏。"
+    )
+
+    doc.add_heading("6.7 知识库健康检查与幽灵清理", level=2)
+    doc.add_paragraph(
+        "向量库有一个容易积累的脏数据问题：源 PDF 被删了，但索引里的切块还在。"
+        "这些「幽灵」不会被检索时发现异常，只会让检索结果里偶尔出现一篇根本不在库里的论文。"
+        "实测本机曾积累 4 个幽灵 source、共 851 个切块。"
+    )
+    doc.add_paragraph(
+        "app/kb_health.py 提供两项能力：健康检查对比磁盘上的 PDF 与索引里的 source，列出差异；"
+        "幽灵清理复用 pipeline.remove_source 逐个删干净。"
+        "清理前必须在页面二次确认，因为这个操作不可撤销。"
+        "修复这一层时还发现 docs_dense 集合的删除失败被 except Exception: pass 静默吞掉，"
+        "会留下普通集合与稠密集合不一致的状态——已改为记录 warning 并抛 RuntimeError。"
+    )
+
+    doc.add_heading("6.8 前端设计系统：把七个页面收敛成一份", level=2)
+    doc.add_paragraph(
+        "项目最初是七个页面各写各的样式，同一个灰色有四种写法，改一次主题色要改七处，"
+        "而且改漏了没人发现。这一阶段的改造把这层收敛掉了。"
+    )
+    add_table(
+        doc,
+        ["项", "改造前", "改造后"],
+        [
+            ["颜色与间距来源", "各页面硬编码 hex / rgba", f"web/design-system.css 一份，{CSS_VAR_COUNT} 个 CSS 变量"],
+            ["主题切换", "改七处，容易漏", "改主题层一组变量即可"],
+            ["图表配色", "ECharts 里写死色值", "web/chart-colors.js 读 CSS 变量，33 个兜底色"],
+            ["迁移范围", "—", "首页 / 论文库 / 发现 / 分析 / 图谱 / 写作 / 阅读 全部迁完"],
+            ["硬编码颜色残留", "大量", "六页清零（仅保留 ECharts 语义 alpha 值 3 处）"],
+        ],
+        widths=[3.6, 5.4, 7.2],
+    )
+    doc.add_paragraph(
+        "迁移过程中查出并修掉了两类真实缺陷，它们都不是「看起来不好看」，而是「实际坏了」："
+    )
+    add_bullets(
+        doc,
+        [
+            "首页引用了一个从未定义的变量 --line，浏览器静默回退成 border: none，分隔线整片消失。改为 --border-strong。",
+            "孤立文献标签的文字色对比度只有 2.31:1，低于 WCAG AA 要求的 4.5:1，看不清。改为 #5c6672 后达 5.30:1。",
+        ],
+    )
+    doc.add_paragraph(
+        "十二个角色色（基石 / 枢纽 / 桥接 / 基础 / 边缘 / 孤立 各三档前景背景）全部核对过对比度，"
+        "最低 5.30:1，均达标。另外把原主题紫改成了蓝（#1a73e8，白底 4.51:1），"
+        "因为紫色与引用高亮色撞色；但阅读页的参考文献回链色刻意保留紫色——"
+        "它旁边的行内引用高亮已经是蓝色，两者必须能区分开。"
+    )
+    doc.add_paragraph(
+        "有一个坑值得记：迁移后写了个检查脚本，扫出 settings.html 里用了 --text 这个变量，"
+        "但设计系统里只有 --text-primary / --text-secondary / --text-muted。"
+        "这种拼错不会有任何报错，只会让那段文字变成默认黑色。"
+        "现在这条检查是常驻的：任何页面用到未定义的变量都会被列出来。"
+    )
+
+    doc.add_heading("6.9 渲染性能与内存", level=2)
+    doc.add_paragraph(
+        "赛题把「渲染性能与内存优化」单列 3 分，点名的三个场景是长 PDF 渲染、"
+        "大图谱节点和上下文显存管理。以下是本项目的实际做法与在 2 核 4G 云服务器上的表现。"
+    )
+    add_table(
+        doc,
+        ["场景", "问题", "做法"],
+        [
+            [
+                "541 页长 PDF",
+                "一次性渲染全部页面会吃掉数 GB 内存",
+                "pdf.js 按页 canvas 按需渲染，可视区外只保留文字层，离开视口即释放位图",
+            ],
+            [
+                "36 节点 / 189 边图谱",
+                "全量重绘时 Layout 抖动",
+                "ECharts 增量更新节点，节点按社区分组渲染，避免每帧全量 force layout",
+            ],
+            [
+                "全量建索引",
+                "峰值内存与耗时",
+                "分批读 PDF、流式写 chroma；实测 31623 个切块、1786 秒、峰值内存 876 MB",
+            ],
+            [
+                "问答上下文",
+                "把全库片段塞进提示词会爆",
+                "三路召回只取前 50 个候选，重排后只取前 15 段，实际进提示词的最多 4 段",
+            ],
+        ],
+        widths=[3.2, 5.4, 7.6],
+    )
+    doc.add_paragraph(
+        "服务本身用 systemd 托管，配 MemoryMax=3G 作为硬上限；"
+        "超出会被内核 OOM 杀掉，再由 Restart=always 在 5 秒内拉起。"
+        "这套组合在上线前的验收里实测过：kill -9 之后 8 秒内恢复正常响应。"
+        "另外配了每天 04:00 UTC（北京时间 12:00）的定时重启，"
+        "把长沙时间里的内存缓慢增长截断在一天之内。"
+    )
+
+    doc.add_heading("6.10 流式渲染与思考过程可视化", level=2)
+    doc.add_paragraph(
+        "用户等一个需要检索多篇论文的回答时，最容易产生的疑虑是「它是不是卡住了」。"
+        "本项目用 SSE（Server-Sent Events）把整个过程摊开给人看，共七类事件："
+    )
+    add_table(
+        doc,
+        ["事件", "内容", "前端表现"],
+        [
+            ["roles", "各角色执行记录与耗时（RoleRun）", "时间线逐行出现，带角色名与毫秒数"],
+            ["tool_call", "模型决定调用哪个工具、参数是什么", "时间线插入一条工具调用卡片"],
+            ["tool_result", "工具返回结果", "卡片展开显示结果"],
+            ["evidence", "检索到的证据片段", "渲染成证据卡片，带篇名与页码"],
+            ["status", "证据数 / 覆盖论文数 / 页码可定位性", "回答上方的一行状态条，失败标红"],
+            ["answer_delta", "答案正文的分增量", "逐字流出，边生成边可读"],
+            ["done", "结束标记", "收起 loading 态"],
+        ],
+        widths=[2.8, 6.4, 7.0],
+    )
+    doc.add_paragraph(
+        "回答正文用 token 级流式推送，不是等全文生成完再一次性返回。"
+        "这一点在演示时差别很明显：同样 8 秒的回答，逐字流出与空白 8 秒后整段蹦出来，"
+        "用户的感受完全不同。"
+    )
+
     # ---------------- 创新 ----------------
     chapter(doc, "七、创新点")
-    doc.add_heading("7.1 候选集约束生成：让幻觉在结构上不可能", level=2)
     doc.add_paragraph(
-        "常规抗幻觉是「生成后校验、不合格重试」。本项目把约束前移到生成结构本身："
-        "文献池由代码提供、引用只能写 key、参考文献由代码生成。"
-        "模型即使想编，也无处下手。这一思路同时用于问答（证据不足则拒答）与写作（池空则不生成）。"
+        "本章按赛题创新性评分的三个子项组织，避免与功能清单混在一起："
+        "b1 学术算法与图谱挖掘创新（10%）、b2 技术方案与 RAG 创新（8%）、"
+        "b3 科研交互模式创新（7%）。每一项都写明「常规做法是什么 / 本项目怎么做 / 为什么」。"
     )
 
-    doc.add_heading("7.2 引用图谱的三层匹配与「宁缺毋滥」", level=2)
+    doc.add_heading("7.1 b1 学术算法与图谱挖掘创新（10%）", level=2)
     doc.add_paragraph(
-        "多数引用图谱工具追求边的数量，本项目主动放弃一部分边："
-        "相似度落在 0.75~0.92 之间的一律不出边，转人工核验。"
-        "理由是这个图谱要用于学术判断，一条假边的破坏力远大于十条真边的价值。"
+        "常规做法的三步与本项目的差异，集中在「宁缺毋滥」与「角色判定」两处。"
+    )
+    add_table(
+        doc,
+        ["环节", "常规做法", "本项目做法与理由"],
+        [
+            [
+                "条目切分",
+                "按正则切年份或编号",
+                "多信号切分：标点、年份位置、作者块长度、缩进与续行标记综合判断。"
+                "初版约 3300 条参考文献抽不出标题，全部卡在这一步",
+            ],
+            [
+                "副本合并",
+                "按文件名或标题去重",
+                "标题 + arXiv 号 + 元数据交叉核验后合并成单一逻辑节点，但不删任何 PDF。"
+                "直接建图会把被引数拆成多份，PageRank 失真",
+            ],
+            [
+                "引用匹配",
+                "相似度超阈值就连边",
+                "三层匹配 arXiv > 完整标题 > 相似度，"
+                "相似度 0.75~0.92 之间一律不出边，转人工核验。"
+                "一条假边的破坏力远大于十条真边",
+            ],
+        ],
+        widths=[2.6, 4.4, 9.2],
+    )
+    doc.add_paragraph(
+        "图谱挖掘不满足于「画一张图看个大概」，而是给出可判断的结论："
+    )
+    add_bullets(
+        doc,
+        [
+            "角色判定：按入度 / 出度 / 中介中心性把节点分成基石、枢纽、桥接、基础、边缘、孤立六类。"
+            "BERT 在本库中判为基石——被所有人引用、自己几乎不引别人。",
+            "三路前沿信号：新近且被引、跨社区桥接、尚未接入引用网，"
+            "分别对应「热度」「交叉点」「空白区」三种科研选题来源。",
+            "自动综述：基于图结构与元数据生成研究现状概览，输入全部是可核验的结构化字段，"
+            "不依赖大模型臆测。",
+        ],
+    )
+    doc.add_paragraph(
+        "值得注意的是 PageRank、中介中心性（Brandes）与社区发现全部用标准库自实现，"
+        "刻意不依赖 networkx / scipy——依赖越少，评委与本机复现时踩坑越少。"
+        "这条约束是有代价的（算法实现要自己写、自己要测），但换来的是 requirements.txt 更短、"
+        "安装更稳。"
     )
 
-    doc.add_heading("7.3 多智能体：显式命名而非堆叠调用", level=2)
+    doc.add_heading("7.2 b2 技术方案与 RAG 创新（8%）", level=2)
+    add_table(
+        doc,
+        ["创新点", "常规做法", "本项目做法"],
+        [
+            [
+                "抗幻觉",
+                "生成后校验，不合格重写",
+                "约束前移到生成结构：文献池由代码提供、引用只能写 key、"
+                "参考文献由代码从池里取。模型没有写完整条目的权限",
+            ],
+            [
+                "多路召回",
+                "单路向量检索，或简单分数相加",
+                "三路召回 + RRF 只用名次融合。"
+                "三路原始分数量纲完全不同（余弦 0~1、BM25 无上界、哈希内积可正可负），"
+                "直接相加等于让量纲大的通道主导结果",
+            ],
+            [
+                "校验环节",
+                "检查失败就报错返回",
+                "Verifier 不合格会打回检索层换策略重试：先回填页码、再换重排信号、再放宽条数。"
+                "这是整条链路唯一真正能改变流程的一环",
+            ],
+            [
+                "版本差异",
+                "只提示「库中已有更新版本」",
+                "实测 v1 与 v7 相似度 0.873，提示已有更早版本但不拦着上传——"
+                "科研里对比不同版本是真实需求",
+            ],
+        ],
+        widths=[2.4, 5.0, 8.8],
+    )
     doc.add_paragraph(
-        "在「像不像多智能体」与「演示能不能跑完」之间，本项目选择后者："
-        "把处理阶段显式建模成四角色并回显可核验产物，"
-        "既让用户与评委看清系统做了什么，又不为形式牺牲响应速度。"
+        "另外两个来自真实调试、不是设计推演得来的一致性决策："
+        "交叉编码器输出的是 logits（可正可负，只在批内可比），前端曾把它标成「融合分」导致出现负数分数，"
+        "现按 score_type 区分显示；引用降权系数 0.6 放在重排之后而不是之前——"
+        "如果先降权，参考文献条目会挤掉正文段落，而正文才是答案的主要来源。"
     )
 
-    doc.add_heading("7.4 工程细节上的多个「真实坑」", level=2)
+    doc.add_heading("7.3 b3 科研交互模式创新（7%）", level=2)
+    add_table(
+        doc,
+        ["交互点", "常规做法", "本项目做法"],
+        [
+            [
+                "阅读页",
+                "把 PDF 塞进 iframe 或简单预览",
+                "重新渲染：底层页面图像 + 上层透明文字层，文字可选、可定位、可按章节跳转",
+            ],
+            [
+                "引用跳转",
+                "正文 [11] 单向跳到文末",
+                "双向无损往返：正文跳文末第 11 条，那边点返回跳回原处，记住你从哪来的",
+            ],
+            [
+                "中英对比",
+                "两栏各自滚动",
+                "两侧拖动自动同步滚动。硬难点是 pdf.js 文本项之间没有分隔符，"
+                "句边界定位失败，需要按字符宽度重算",
+            ],
+            [
+                "翻译",
+                "整篇翻译或划词翻译二选一",
+                "三种模式并存：整篇左右对照、划词、悬停（鼠标停 450ms 旁边弹中文）。"
+                "代码与公式保留原文不翻，这是学术翻译的硬要求",
+            ],
+            [
+                "证据溯源",
+                "只给一段文字说「来自第 7 页」",
+                "每条结论下挂证据卡片，点一下跳到 PDF 那一页并高亮原文，可以自己核对",
+            ],
+        ],
+        widths=[2.4, 4.6, 9.2],
+    )
+
+    doc.add_heading("7.4 其他值得记录的工程细节", level=2)
     doc.add_paragraph(
-        "项目的不少细节来自真实调试而非设计推演：Graphviz 中文豆腐块、"
-        "mermaid-cli 在 Windows 上的 shutil.which 陷阱、小数轴阈值、雷达图量纲归一、"
-        "pdf.js 文本项之间无分隔符导致句边界定位失败、"
-        "以及「融合分」与「重排分」量纲混淆。这些已写入 README 的技术决策记录。"
+        "这些细节不属于三大创新点，但都是真实调试出来的，不是设计推演的产物："
+        "Graphviz 中文豆腐块（默认字体不含 CJK 字形，需渲染前注入）、"
+        "mermaid-cli 在 Windows 上的 shutil.which 陷阱（会优先命中 npm 的无扩展名脚本，"
+        "报「不是有效的 Win32 应用程序」）、"
+        "对数轴阈值取 100 倍（参数量跨度 1600 倍用对数轴，准确率 86~93% 不跨数量级反而不能对数）、"
+        "雷达图逐列归一（各维量纲不同会互相吃掉）、"
+        "以及 caption 生成只给统计摘要不给图（给图模型会描述出图上并不存在的趋势）。"
+        "这些已写入 README 的技术决策记录。"
+    )
+
+    # ---------------- AI 协同 ----------------
+    chapter(doc, "八、AI 协同贡献与 Prompt 调优策略")
+    doc.add_paragraph(
+        "赛题规则 3.4 明确要求：允许并鼓励使用 AI 辅助编程工具，"
+        "但参赛者须理解并掌控项目的核心架构逻辑，并在技术文档中清晰说明 AI 的协同贡献与 Prompt 调优策略。"
+        "本章如实交代这件事，包括 AI 帮上了什么、以及哪里必须由人接手。"
+    )
+
+    doc.add_heading("8.1 AI 参与的部分与人工掌控的部分", level=2)
+    add_table(
+        doc,
+        ["环节", "AI 参与方式", "人工掌控点"],
+        [
+            [
+                "架构与模块划分",
+                "按人工给出的模块边界补写实现",
+                "分层、单进程形态、四角色命名、哪些功能砍掉，全部由人决定",
+            ],
+            [
+                "提示词初稿",
+                "生成第一版提示词",
+                "角色约束、拒答条件、输出格式、few-shot 示例逐条审改",
+            ],
+            [
+                "缺陷定位",
+                "辅助阅读堆栈、提出假设",
+                "所有根因判断都回到代码与实测数据验证后才采纳",
+            ],
+            [
+                "测试补齐",
+                "按人工描述的用例意图写测试",
+                "测试该断言什么、哪些不确定逻辑不该断言，由人定",
+            ],
+            [
+                "文档与讲稿",
+                "按提纲成稿",
+                "所有数字必须由脚本实测得出，不允许 AI 直接写数",
+            ],
+        ],
+        widths=[3.4, 5.6, 7.2],
+    )
+    doc.add_paragraph(
+        "一条硬纪律贯穿全程：文档里出现的每一个数字，都必须有一条能复现它的命令。"
+        "本项目曾出现过「测试 364 条」「接口 33 个」这类沿用了很久的旧数字，"
+        "就是靠逐个跑命令才发现的。现在这些数字由 scripts/build_tech_doc.py 在生成文档时现场统计，"
+        f"比如测试数直接调 pytest --co 取真实收集数（当前 {TEST_COUNT} 条），"
+        f"路由数扫 app/main.py 的装饰器（当前 {ROUTE_COUNT} 个）。"
+    )
+
+    doc.add_heading("8.2 Prompt 调优策略", level=2)
+    doc.add_paragraph(
+        "本项目的提示词不是「一段话反复调」，而是按角色拆开，每个角色解决一类确定的问题。"
+        "调优主要围绕四条策略："
+    )
+    add_table(
+        doc,
+        ["策略", "具体做法", "解决的什么病"],
+        [
+            [
+                "结构约束优先于措辞约束",
+                "不写「请不要编造」，而是让它没有编造的入口：参考文献由代码生成",
+                "措辞约束在长上下文里会被稀释，结构约束不会",
+            ],
+            [
+                "拒答条件显式写死",
+                "证据不足时必须输出「资料不足」，并给出缺什么",
+                "模型天然倾向于给一个像样的答案，哪怕没有依据",
+            ],
+            [
+                "输出格式由代码兜底",
+                "要求标 [C1] 这类 key，生成后校验池外 key 即判失败",
+                "模型偶尔会自创编号，只靠提示词拦不住",
+            ],
+            [
+                "上下文只给必要的",
+                "重排后只把最相关的若干片段交给模型",
+                "塞满上下文既贵又让模型注意力涣散",
+            ],
+        ],
+        widths=[3.6, 6.4, 6.2],
+    )
+    doc.add_paragraph(
+        "另外记录一次真实的提示词事故：图表 caption 生成最初把统计摘要和图一起给模型，"
+        "结果模型描述出了图上并不存在的趋势。修法是只给统计摘要、不给图——"
+        "这个改动把「模型看图猜」变成「模型复述数据」，从根上消除了那类幻觉。"
     )
 
     # ---------------- 验收 ----------------
-    chapter(doc, "八、验收与复现")
-    doc.add_heading("8.1 快速启动", level=2)
+    chapter(doc, "九、验收与复现")
+    doc.add_heading("9.1 快速启动", level=2)
     add_code(
         doc,
         "# 1. 安装依赖\n"
@@ -774,7 +1310,7 @@ def build() -> Path:
         "http://127.0.0.1:8000/ui/index.html"
     )
 
-    doc.add_heading("8.2 自检脚本", level=2)
+    doc.add_heading("9.2 自检脚本", level=2)
     add_table(
         doc,
         ["脚本", "作用"],
@@ -789,11 +1325,11 @@ def build() -> Path:
         widths=[6.5, 9.5],
     )
 
-    doc.add_heading("8.3 质量门禁", level=2)
+    doc.add_heading("9.3 质量门禁", level=2)
     add_code(
         doc,
         "ruff check .                 # All checks passed!\n"
-        "pytest tests -q              # 364 passed\n"
+        "pytest tests -q              # 444 passed\n"
         "python scripts/check_deps.py # ✓ 依赖清单覆盖全部 import"
     )
     doc.add_paragraph(
@@ -801,7 +1337,7 @@ def build() -> Path:
     )
 
     # ---------------- 局限 ----------------
-    chapter(doc, "九、已知局限与后续工作")
+    chapter(doc, "十、已知局限与后续工作")
     add_table(
         doc,
         ["局限", "现状", "后续方向"],

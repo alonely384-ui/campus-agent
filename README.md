@@ -4,9 +4,8 @@
 >
 > 第九届传智杯 · AI大模型创新应用挑战赛 · 个人赛 · B 组参赛作品
 
-<!-- ⚠️ 下面两行是你要填的。项目没上线之前先留着占位，别删。 -->
-**🔗 在线体验**：（待部署后填入）
-**🎬 演示视频**：（待上传后填入）
+**🔗 在线体验**：http://156.239.2.206:8000/ui/ （公网可访问，无需登录）
+**🎬 演示视频**：（录制后填入 B 站链接）
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -109,6 +108,30 @@
 - **图表自动选型**：数值列跨度 ≥ 100 倍才上对数轴（参数量 0.34B~540B 是 1600 倍，线性轴下小模型全挤原点；而准确率 86~93 不跨数量级，用对数轴反而误导）；雷达图必须逐列归一化到 0-1，否则大数值维度会吃掉整张图。
 - **Fig Caption 只给模型统计摘要、不给图**，避免它描述出图上不存在的趋势；实测生成的 caption 里每个数字都能在统计摘要里对上。
 
+### 6. 设置中心：改配置不用登服务器、不用重启
+
+科研场景里最烦的一件事是「想换个模型、想调一下检索条数，就得 SSH 上去改 `.env` 再重启服务」——重启会中断正在跑的翻译/写作任务，改错一个键还会让服务直接起不来。
+
+**做法**（`app/settings_api.py` + `app/config.py`）：13 项配置在线可改，保存即生效。
+
+1. **行级原子写 `.env`**：只改目标那一行，其余原样保留；写临时文件再 `os.replace()`，避免写一半得到半截文件；
+2. **两条路一起写**：`os.environ` 优先级高于 `.env`，只写文件的话本进程读到的还是旧值——所以 `_reload_setting()` 两处都更新；
+3. **密钥脱敏**：`GET /settings` 只返回 `sk-****abcd` 形式的掩码，前端拿不到明文；
+4. **保存失败回滚**：逐项 `canonical()` 归一化 + 类型/枚举校验全部通过才落盘，中途失败整体回滚，不留半套配置；
+5. **单项恢复默认**：`POST /settings/restore` 只重置指定 key，不做「一键全清」。
+
+热更新踩到的一个真 bug 值得记：`RAG_RERANK` 按规则推导出的属性名是 `_RERANK`，但管道里真实的属性叫 `_RERANK_ENABLED`——**推错了不会报错，只会静默改成默认值**。现在 `Setting` 多了显式 `attr` 字段，并在 `_apply_runtime` 里 `hasattr` 检查，对不上就抛异常，不允许静默。
+
+### 7. 前端设计系统：162 个 CSS 变量统一六个页面
+
+七个页面各写各的颜色，改一次主题要改七处，改完必然有几个漏网。改成**单一事实源**：
+
+- `web/design-system.css` 定义 **162 个 CSS 变量**（品牌色/语义色/间距/圆角/阴影/字号/角色色/图表色）；
+- `web/chart-colors.js` 让 ECharts 直接读 CSS 变量，图表配色跟着主题走，不再手写十六进制；
+- 六个页面全部迁移完成，剩余硬编码 `hex` **0 处**、`rgba` **0 处**；
+- 迁移时顺手修了两个真缺陷：`index.html` 引用了未定义的 `--line`（改为 `--border-strong`）；`--role-isolated-fg` 对比度只有 **2.31:1**（改为 `#5c6672`，**5.30:1**）；
+- 十二个角色标签的对比度全部实测 **≥ 4.5:1**（cornerstone 6.37 / hub 7.15 / bridge 6.41 / foundation 6.78 / fringe 5.30 / isolated 5.30）。
+
 ## 快速开始
 
 ```bash
@@ -145,7 +168,7 @@ docker run -p 8000:8000 --env-file .env research-agent
 用户浏览器 (web/*.html)
    │  SSE / REST
    ▼
- FastAPI (app/main.py, 33 个接口)
+ FastAPI (app/main.py, 41 个接口)
    │
    ├─► Agent 主循环 (app/agent.py)        四角色：规划 → 检索 → 抽取 → 校验 → 写作
    │     └─► LLM (app/llm.py)             DeepSeek / 任意 OpenAI 兼容接口
@@ -157,6 +180,17 @@ docker run -p 8000:8000 --env-file .env research-agent
    ├─► 论文库   (app/papers.py)           内容级去重 + 版本归并
    └─► 文献发现 (app/online.py, recommend.py, topics.py, scheduler.py)
 ```
+
+### 工程规模（全部实测，可复现）
+
+| 项 | 数据 | 复现命令 |
+|---|---|---|
+| 接口数 | **41 个 path** | `GET /openapi.json` |
+| 代码规模 | `app/` 11438 · `web/` 22276 · `tests/` 4497 · `scripts/` 4188 行 | `scripts/check_deps.py` 同源统计 |
+| 自动化测试 | **444 passed** | `pytest tests -q` |
+| 静态检查 | 全绿 | `ruff check .` |
+| 论文库 | 39 篇 / 1971 页（含 541 页专著）/ 961 章节 / 282 表 / 287 图 | `data/meta/structures.json` |
+| 引用图谱 | 36 逻辑节点 / 189 边 / 3 社区 / 4234 条参考文献条目 | `data/meta/citation-graph.json` |
 
 ## 技术决策记录
 
@@ -193,14 +227,16 @@ docker run -p 8000:8000 --env-file .env research-agent
 - [x] 多智能体四角色时间线 + 状态回显
 - [x] 真实浏览器端到端验证（六个模块全走一遍，控制台除 favicon 外无报错）
 - [ ] Docker 镜像构建验证（本机未安装 Docker，Dockerfile 已提供但未实跑）
-- [ ] 公网部署 + HTTPS
+- [x] 公网部署（雨云香港节点，systemd 托管 + 每日 04:00 UTC 自动重启，走通 HTTP；HTTPS 待配）
+- [x] 设置中心（模型 / RAG / 定时 / 知识库健康 / 关于，五项均可在线改且立即生效，无需重启）
+- [x] 前端设计系统（`web/design-system.css`，162 个 CSS 变量，六个页面全部迁移，对比度全部 ≥ 4.5:1）
 
 ## 已知问题
 
 - **引用图谱有 48 条低置信度匹配待人工核验**（相似度落在阈值之间，未计入图谱，避免误连）
 - 跨章节提问时召回效果仍可优化（切分策略按段落，未按语义切）
 - 对话历史暂存在前端，服务端未持久化
-- `/favicon.ico` 返回 404（未放图标文件，不影响功能，浏览器会自动请求）
+- `/favicon.ico` 返回 404（未放图标文件，不影响功能，浏览器会自动请求）—— 实际已放 `web/favicon.svg` 并在页面里引用，浏览器不再回退请求 `.ico`
 - 扫描件 PDF 依赖 OCR，速度比文本型 PDF 慢一个量级
 
 ## 目录结构
@@ -208,10 +244,12 @@ docker run -p 8000:8000 --env-file .env research-agent
 ```
 campus-agent/
 ├── app/
-│   ├── main.py            # FastAPI 入口 + 33 个接口
+│   ├── main.py            # FastAPI 入口 + 41 个接口
 │   ├── agent.py           # ⭐ 手写 Agent 循环 + 四角色时间线
 │   ├── llm.py             # LLM 客户端封装
-│   ├── config.py          # 配置中心（读 .env）
+│   ├── config.py          # 配置中心（读 .env + 行级原子写回）
+│   ├── settings_api.py    # 设置中心：热更新 / 密钥脱敏 / 单项恢复默认
+│   ├── kb_health.py       # 知识库健康检查与幽灵 source 清理
 │   ├── rag/               # RAG：pipeline（混合检索+RRF）/ rerank（交叉编码器）
 │   ├── structure.py       # 细粒度解析：章节/表格/图/公式/参考文献
 │   ├── ocr.py             # 扫描件 OCR（RapidOCR）
@@ -229,12 +267,18 @@ campus-agent/
 │   ├── reader.py          # 阅读器后端
 │   └── tools/             # 工具注册（calculator / registry）
 ├── web/                   # 前端页面（原生 HTML/JS，无构建）
-│   ├── index.html         # 对话
+│   ├── index.html         # 对话（+ 侧栏历史）
+│   ├── library.html       # 论文库（分页 + 按主题分组）
+│   ├── discover.html      # 文献发现
 │   ├── reader.html        # 阅读器
 │   ├── graph.html         # 引用图谱
 │   ├── analysis.html      # 论文分析
 │   ├── writing.html       # 写作助手
-│   ├── quick-translate.js # 划词浮钮组件（分析页/写作助手复用）
+│   ├── settings.html      # 设置中心（模型/RAG/定时/知识库/关于）
+│   ├── design-system.css  # 设计系统（162 个 CSS 变量，六页共用）
+│   ├── chart-colors.js    # ECharts 读 CSS 变量，图表配色与主题联动
+│   ├── sidebar.js         # 侧栏会话历史与折叠
+│   ├── quick-translate.js # 划词/悬停浮钮组件（阅读页/分析页/写作助手复用）
 │   └── vendor/            # pdf.js、ECharts（本地化，不依赖 CDN）
 ├── tests/                 # 测试（不需要联网/API Key）
 ├── scripts/               # 构建与辅助脚本
@@ -261,7 +305,7 @@ campus-agent/
 | pdf.js | 前端 PDF 渲染 | Apache-2.0 |
 | ECharts | 图表可视化 | Apache-2.0 |
 | numpy / pandas / matplotlib | 数据处理与图表导出 | BSD-3-Clause |
-| networkx | 图算法（PageRank / 社区发现） | BSD-3-Clause |
+| networkx | ~~图算法（PageRank / 社区发现）~~ **已于 2026-10 移除** | BSD-3-Clause |
 | sse-starlette | SSE 流式输出 | MIT |
 | pytest / ruff | 测试与静态检查 | MIT |
 
