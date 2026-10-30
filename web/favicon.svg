@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 站点图标：一本翻开的书，与页头 📚 语义一致。
+       用内联路径而不是文字，避免依赖系统 emoji 字体（Linux 服务器上常常没有）。 -->
+  <rect width="32" height="32" rx="7" fill="#1a73e8"/>
+  <path d="M7 9.6c2.4-1 4.6-1 6.6-.2 1 .4 1.7.9 2.4 1.5v13.4c-.7-.6-1.4-1.1-2.4-1.5-2-.8-4.2-.8-6.6.2V9.6z"
+        fill="#ffffff" opacity=".95"/>
+  <path d="M25 9.6c-2.4-1-4.6-1-6.6-.2-1 .4-1.7.9-2.4 1.5v13.4c.7-.6 1.4-1.1 2.4-1.5 2-.8 4.2-.8 6.6.2V9.6z"
+        fill="#ffffff" opacity=".72"/>
+  <path d="M16 11.4v12.4" stroke="#1a73e8" stroke-width="1.1" stroke-linecap="round" opacity=".55"/>
+</svg>

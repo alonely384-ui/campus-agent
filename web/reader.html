@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>论文阅读页 · 科研小助手</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <!--
   1.3.2 论文阅读页：左侧章节树 + 右侧 PDF 正文 + 正文 [n] 引用跳转到 References。
   为什么不用现成的 pdf.js viewer.html：
@@ -12,30 +13,48 @@
     评审现场可能断网，CDN 一挂阅读页就白屏。vendor/pdfjs/ 里是 pdfjs-dist 3.11.174 的 legacy 构建，
     老一点的浏览器也能跑。
 -->
+<link rel="stylesheet" href="design-system.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* 本页局部变量 = 全站 design-system.css 语义变量的别名（方案 A）。
+     页面里 42 处 var(--blue) / var(--line) / var(--muted) 一处不改，
+     但色值来源统一到设计系统。 */
   :root {
-    --blue: #1a73e8;
-    --blue-soft: #eef4fd;
-    --line: #e3e7ee;
-    --muted: #6b7280;
-    --bg: #f5f6f8;
+    --blue: var(--brand);
+    --blue-soft: var(--blue-50);
+    --line: var(--border-color);
+    --muted: var(--text-muted);
+    --bg: var(--bg-page);
+    /* 语义色集中命名，避免同一含义的色值在正文里散落 */
+    --ink: var(--text-primary);        /* 正文色 */
+    --ink-2: var(--text-secondary);    /* 次级正文 */
+    --ink-3: var(--text-muted);        /* 说明文字 */
+    --ink-4: var(--text-subtle);       /* 极淡：页码、占位 */
+    --surface: var(--bg-surface);
+    --surface-2: var(--bg-surface-2);
+    --surface-3: var(--bg-muted);
+    --hover-bg: var(--bg-hover);
+    --accent-ref: var(--purple-700);   /* 参考文献条目的紫 */
+    --accent-ref-bg: var(--purple-50);
+    --accent-ref-line: var(--purple-200);
+    --accent-ref-hover: var(--purple-100);
+    --accent-green: var(--green-600);           /* 单栏标识绿 */
   }
   html, body { height: 100%; }
   body {
     font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-    background: var(--bg); color: #1a1a1a;
+    background: var(--bg); color: var(--ink);
     display: flex; flex-direction: column; overflow: hidden;
   }
 
   /* ---------- 顶栏 ---------- */
   header.topbar {
     flex: 0 0 auto; height: 54px; display: flex; align-items: center; gap: 10px;
-    padding: 0 12px; background: #fff; border-bottom: 1px solid var(--line); z-index: 30;
+    padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--line); z-index: 30;
   }
   .back {
     color: var(--muted); text-decoration: none; font-size: 13px; padding: 7px 10px;
-    border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; background: #fff;
+    border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; background: var(--surface);
   }
   .back:hover { color: var(--blue); border-color: var(--blue); }
   .doc { min-width: 0; flex: 1; }
@@ -46,13 +65,13 @@
   .tools { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
   .tools select, .tools input {
     font-size: 12px; padding: 6px 8px; border: 1px solid var(--line);
-    border-radius: 8px; background: #fff; color: #374151; outline: none;
+    border-radius: 8px; background: var(--surface); color: var(--ink-2); outline: none;
   }
   .tools select { max-width: 210px; }
   .tools input { width: 56px; text-align: center; }
   .tools input:focus, .tools select:focus { border-color: var(--blue); }
   .icon-btn {
-    border: 1px solid var(--line); background: #fff; color: #374151; font-size: 13px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 13px;
     border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 1;
   }
   .icon-btn:hover { border-color: var(--blue); color: var(--blue); }
@@ -66,7 +85,7 @@
   /* ---------- 主体：左侧章节树 + 右侧正文 ---------- */
   #stage { flex: 1 1 auto; display: flex; min-height: 0; position: relative; }
   aside#sidebar {
-    flex: 0 0 272px; width: 272px; background: #fff; border-right: 1px solid var(--line);
+    flex: 0 0 272px; width: 272px; background: var(--surface); border-right: 1px solid var(--line);
     overflow-y: auto; padding: 12px; z-index: 20;
   }
   #sidebar h2 {
@@ -74,7 +93,7 @@
     margin: 4px 0 8px; text-transform: uppercase;
   }
   #sidebar .abs {
-    font-size: 12px; line-height: 1.6; color: #4b5563; background: #fafbfd;
+    font-size: 12px; line-height: 1.6; color: var(--ink-2); background: var(--surface-2);
     border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px;
     max-height: 96px; overflow: hidden; cursor: pointer;
   }
@@ -83,82 +102,82 @@
   nav#toc { display: flex; flex-direction: column; }
   nav#toc a {
     display: flex; gap: 6px; align-items: baseline; text-decoration: none;
-    color: #374151; font-size: 13px; line-height: 1.45; padding: 5px 8px;
+    color: var(--ink-2); font-size: 13px; line-height: 1.45; padding: 5px 8px;
     border-radius: 6px; border-left: 2px solid transparent;
   }
-  nav#toc a:hover { background: #f4f7fb; }
+  nav#toc a:hover { background: var(--hover-bg); }
   nav#toc a.active { background: var(--blue-soft); color: var(--blue);
                      border-left-color: var(--blue); font-weight: 600; }
   nav#toc a .no { color: var(--muted); font-size: 11px; min-width: 18px; }
-  nav#toc a .pg { margin-left: auto; color: #9aa3af; font-size: 11px; }
+  nav#toc a .pg { margin-left: auto; color: var(--ink-4); font-size: 11px; }
   nav#toc a.lvl2 { padding-left: 22px; font-size: 12.5px; }
   nav#toc a.lvl3 { padding-left: 36px; font-size: 12px; }
-  nav#toc a.refs { color: #7c3aed; }
+  nav#toc a.refs { color: var(--accent-ref); }
   /* 章节树改成可折叠的嵌套树：一级带 ▾，收起时只留一级（赛题 1.3.2 第 1 条） */
   nav#toc .sec { display: flex; flex-direction: column; }
   nav#toc .sec > .kids { display: flex; flex-direction: column; }
   nav#toc .sec.collapsed > .kids { display: none; }
   nav#toc .caret {
-    border: none; background: transparent; color: #9aa3af; cursor: pointer;
+    border: none; background: transparent; color: var(--ink-4); cursor: pointer;
     font-size: 10px; line-height: 1; padding: 2px 3px; margin-right: 1px;
     border-radius: 4px; flex: 0 0 auto;
   }
-  nav#toc .caret:hover { background: #eef1f6; color: var(--blue); }
-  #tocEmpty { font-size: 12px; color: #9aa3af; padding: 6px 8px; line-height: 1.6; }
+  nav#toc .caret:hover { background: var(--hover-bg); color: var(--blue); }
+  #tocEmpty { font-size: 12px; color: var(--ink-4); padding: 6px 8px; line-height: 1.6; }
   #tocNote {
-    font-size: 11px; color: #6b7280; background: #f3f4f6; border-radius: 6px;
+    font-size: 11px; color: var(--ink-3); background: var(--surface-3); border-radius: 6px;
     padding: 5px 8px; margin: 0 0 6px; line-height: 1.5;
   }
 
   /* ---------- 1.3.1 版式：徽章 + 面板 + 表格/公式清单 ---------- */
   #layoutBadge { font-size: 11px; }
-  #layoutBadge.two { border-color: #7c3aed; color: #7c3aed; }
-  #layoutBadge.one { border-color: #0f9d58; color: #0f9d58; }
+  #layoutBadge.two { border-color: var(--accent-ref); color: var(--accent-ref); }
+  #layoutBadge.one { border-color: var(--accent-green); color: var(--accent-green); }
   #layoutPanel {
     position: fixed; top: 52px; right: 12px; z-index: 60; width: 230px;
-    max-height: 60vh; overflow-y: auto; background: #fff; border: 1px solid var(--line);
-    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.16); padding: 8px;
+    max-height: 60vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: var(--shadow-lg); padding: 8px;
   }
   #layoutPanel[hidden] { display: none; }
   #layoutPanel .hint { color: var(--muted); font-size: 11px; line-height: 1.5; padding: 2px 6px 6px; }
   #layoutPanel .row {
     display: flex; justify-content: space-between; gap: 8px; padding: 4px 6px;
-    border-radius: 6px; cursor: pointer; font-size: 12px; color: #374151;
+    border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--ink-2);
   }
-  #layoutPanel .row:hover { background: #f4f7fb; }
-  #layoutPanel .row .lab { color: #7c3aed; font-size: 11px; }
-  #layoutPanel .row .lab.one { color: #0f9d58; }
+  #layoutPanel .row:hover { background: var(--hover-bg); }
+  #layoutPanel .row .lab { color: var(--accent-ref); font-size: 11px; }
+  #layoutPanel .row .lab.one { color: var(--accent-green); }
   #sidebar .list-head { display: flex; align-items: baseline; justify-content: space-between; }
   #sidebar .list-head .cnt {
-    font-size: 11px; color: #9aa3af; font-weight: 400; letter-spacing: 0; text-transform: none;
+    font-size: 11px; color: var(--ink-4); font-weight: 400; letter-spacing: 0; text-transform: none;
   }
   #sidebar .rlist { display: flex; flex-direction: column; margin-bottom: 14px; }
   #sidebar .rlist a {
-    display: flex; gap: 6px; align-items: baseline; text-decoration: none; color: #374151;
+    display: flex; gap: 6px; align-items: baseline; text-decoration: none; color: var(--ink-2);
     font-size: 12px; line-height: 1.45; padding: 4px 8px; border-radius: 6px;
   }
-  #sidebar .rlist a:hover { background: #f4f7fb; }
-  #sidebar .rlist a .tag { color: #7c3aed; font-size: 11px; flex: 0 0 auto; }
+  #sidebar .rlist a:hover { background: var(--hover-bg); }
+  #sidebar .rlist a .tag { color: var(--accent-ref); font-size: 11px; flex: 0 0 auto; }
   #sidebar .rlist a .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #sidebar .rlist a .pg { margin-left: auto; color: #9aa3af; font-size: 11px; flex: 0 0 auto; }
-  #sidebar .rlist .empty { font-size: 11.5px; color: #9aa3af; padding: 2px 8px 6px; }
+  #sidebar .rlist a .pg { margin-left: auto; color: var(--ink-4); font-size: 11px; flex: 0 0 auto; }
+  #sidebar .rlist .empty { font-size: 11.5px; color: var(--ink-4); padding: 2px 8px 6px; }
   /* 图表清单带缩略图：图是矢量时后端会退回「整页预览」，同样能看 */
   #sidebar .rlist a.fig { align-items: flex-start; gap: 8px; padding: 6px 8px; }
   #sidebar .rlist a.fig img {
     width: 44px; height: 44px; flex: 0 0 auto; border-radius: 4px;
-    border: 1px solid #e3e7ee; background: #fff; object-fit: cover;
+    border: 1px solid var(--border-color); background: var(--surface); object-fit: cover;
   }
   #sidebar .rlist a.fig .cap { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   #sidebar .rlist a.fig .cap .txt { white-space: normal; line-height: 1.35; }
   /* 摘要下面的一行快捷入口：章节树很长，表格/公式清单在侧栏底部，先给个"有 7 张表"的提示 */
   #miniLists { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 10px; }
   #miniLists a {
-    font-size: 11px; color: #7c3aed; background: #f5f3ff; border: 1px solid #ddd6fe;
+    font-size: 11px; color: var(--accent-ref); background: var(--accent-ref-bg); border: 1px solid var(--accent-ref-line);
     border-radius: 999px; padding: 2px 9px; text-decoration: none;
   }
-  #miniLists a:hover { background: #ede9fe; }
+  #miniLists a:hover { background: var(--accent-ref-hover); }
   /* 从表格/公式清单跳过去：把整页圈一下，眼睛能立刻找到 */
-  .page.land { box-shadow: 0 0 0 3px rgba(26,115,232,.5), 0 1px 4px rgba(0,0,0,.14); }
+  .page.land { box-shadow: 0 0 0 3px var(--hl-land-ring), var(--shadow-xs); }
 
   main#viewer {
     flex: 1 1 auto; padding: 18px 16px 40px;
@@ -169,13 +188,13 @@
     scroll-behavior: auto;
   }
   .page {
-    position: relative; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.14);
+    position: relative; background: var(--surface); box-shadow: var(--shadow-xs);
     border-radius: 2px; overflow: hidden; flex: 0 0 auto;
   }
   .page > canvas { display: block; }
   .page .pno {
-    position: absolute; right: 6px; bottom: 4px; font-size: 10px; color: #b9c0c9;
-    background: rgba(255,255,255,.85); padding: 0 4px; border-radius: 3px; pointer-events: none;
+    position: absolute; right: 6px; bottom: 4px; font-size: 10px; color: var(--ink-4);
+    background: var(--bg-surface-translucent); padding: 0 4px; border-radius: 3px; pointer-events: none;
   }
   /* 文本层：透明文字叠在 canvas 上，只为"选中 + 引用定位"，视觉上不重影 */
   .textLayer {
@@ -187,74 +206,74 @@
     color: transparent; pointer-events: auto; cursor: text;
   }
   .textLayer span.cite {
-    color: transparent; background: rgba(26,115,232,.16); border-radius: 2px;
+    color: transparent; background: var(--hl-cite); border-radius: 2px;
     cursor: pointer;
   }
-  .textLayer span.cite:hover { background: rgba(26,115,232,.34); }
+  .textLayer span.cite:hover { background: var(--hl-cite-hover); }
   /* [38, 24, 15] 这种组合引用：每个数字各自可点，点谁跳谁 */
   .textLayer span.cite-n {
-    color: transparent; background: rgba(26,115,232,.16); border-radius: 2px;
+    color: transparent; background: var(--hl-cite); border-radius: 2px;
     cursor: pointer;
   }
-  .textLayer span.cite-n:hover { background: rgba(26,115,232,.42); }
+  .textLayer span.cite-n:hover { background: var(--hl-cite-n-hover); }
   /* 作者-年份引用：[Ioffe and Szegedy, 2015]，点它按 姓氏+年份 找 References 条目 */
   .textLayer span.cite-a {
-    color: transparent; background: rgba(16,145,96,.18); border-radius: 2px;
+    color: transparent; background: var(--hl-author); border-radius: 2px;
     cursor: pointer;
   }
-  .textLayer span.cite-a:hover { background: rgba(16,145,96,.44); }
-  .textLayer span.cite-a.hit { background: rgba(16,145,96,.34); box-shadow: 0 0 0 2px rgba(16,145,96,.35); }
+  .textLayer span.cite-a:hover { background: var(--hl-author-hover); }
+  .textLayer span.cite-a.hit { background: var(--hl-author-hit); box-shadow: 0 0 0 2px var(--hl-author-ring); }
   /* References 页上每条条目的 [n] 编号：点它跳回正文里第一次引用它的位置 */
   .textLayer span.ref-link {
-    color: transparent; background: rgba(124,58,237,.16); border-radius: 2px;
+    color: transparent; background: var(--hl-ref); border-radius: 2px;
     cursor: pointer;
   }
-  .textLayer span.ref-link:hover { background: rgba(124,58,237,.36); }
+  .textLayer span.ref-link:hover { background: var(--hl-ref-hover); }
   /* 跳过去之后把目标行闪一下，眼睛才跟得上 */
   .textLayer span.hit {
-    background: rgba(26,115,232,.28);
-    box-shadow: 0 0 0 2px rgba(26,115,232,.35);
+    background: var(--hl-find);
+    box-shadow: 0 0 0 2px var(--hl-find-ring);
     border-radius: 2px;
   }
   /* 全篇搜索高亮：独立图层 + pointer-events:none，不拦 textLayer 的选字和引用点击 */
   .searchLayer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
   .searchLayer mark {
     position: absolute; border-radius: 2px; pointer-events: none;
-    background: rgba(255,214,0,.42); mix-blend-mode: multiply;
+    background: var(--hl-find-text); mix-blend-mode: multiply;
   }
   .searchLayer mark.cur {
-    background: rgba(255,140,0,.62);
-    box-shadow: inset 0 0 0 1.5px rgba(216,92,0,.85);
+    background: var(--hl-find-current);
+    box-shadow: inset 0 0 0 1.5px var(--hl-find-current-ring);
   }
   /* 搜索条：浮在正文顶上，Ctrl+F 或点顶栏「找」呼出 */
   #findBar {
     position: fixed; top: 62px; left: 50%; transform: translateX(-50%); z-index: 70;
     display: flex; align-items: center; gap: 6px; padding: 7px 8px;
-    background: #fff; border: 1px solid var(--line); border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0,0,0,.16);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: var(--shadow-lg);
   }
   #findBar[hidden] { display: none; }
   #findBar input {
     width: 224px; font-size: 13px; padding: 6px 9px; border: 1px solid var(--line);
-    border-radius: 8px; outline: none; color: #1a1a1a; background: #fff;
+    border-radius: 8px; outline: none; color: var(--ink); background: var(--surface);
   }
   #findBar input:focus { border-color: var(--blue); }
   #findCount { font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 78px; }
-  #findCount.none { color: #c0392b; }
-  #findBar .icon-btn:disabled { opacity: .45; cursor: default; border-color: var(--line); color: #9aa3af; }
+  #findCount.none { color: var(--danger); }
+  #findBar .icon-btn:disabled { opacity: .45; cursor: default; border-color: var(--line); color: var(--ink-4); }
 
   /* 返回原位置：从引用跳转跳到 References 后浮出来 */
   #backJump {
     position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
-    background: #111827; color: #fff; border: none; font-size: 13px;
+    background: var(--gray-900); color: var(--text-inverse); border: none; font-size: 13px;
     padding: 10px 16px; border-radius: 999px; cursor: pointer; z-index: 40;
-    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    box-shadow: var(--shadow-lg);
   }
-  #backJump b { color: #93c5fd; }
+  #backJump b { color: var(--blue-200); }
   #backJump[hidden] { display: none; }
 
   #scrim {
-    position: fixed; inset: 54px 0 0 0; background: rgba(15,23,42,.35); z-index: 15;
+    position: fixed; inset: 54px 0 0 0; background: var(--bg-overlay-soft); z-index: 15;
     display: none;
   }
   #scrim.show { display: block; }
@@ -262,7 +281,7 @@
   /* 浮层提示 */
   #toast {
     position: fixed; left: 50%; top: 68px; transform: translateX(-50%);
-    background: rgba(17,24,39,.92); color: #fff; font-size: 13px; padding: 8px 14px;
+    background: var(--bg-toast); color: var(--text-inverse); font-size: 13px; padding: 8px 14px;
     border-radius: 8px; z-index: 50; transition: opacity .25s; pointer-events: none;
   }
   #toast[hidden] { display: none; }
@@ -270,7 +289,7 @@
   /* 加载 / 空状态 */
   #overlay {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(245,246,248,.92); z-index: 12; font-size: 13px; color: var(--muted);
+    background: var(--bg-page-translucent); z-index: 12; font-size: 13px; color: var(--muted);
   }
   #overlay[hidden] { display: none; }
   .papers {
@@ -280,15 +299,15 @@
   .papers h2 { font-size: 15px; margin-bottom: 4px; }
   .papers a {
     display: flex; justify-content: space-between; gap: 10px; text-decoration: none;
-    color: #374151; font-size: 13px; background: #fff; border: 1px solid var(--line);
+    color: var(--ink-2); font-size: 13px; background: var(--surface); border: 1px solid var(--line);
     border-radius: 8px; padding: 10px 12px;
   }
   .papers a:hover { border-color: var(--blue); color: var(--blue); }
-  .papers a span.pg { color: #9aa3af; font-size: 12px; white-space: nowrap; }
+  .papers a span.pg { color: var(--ink-4); font-size: 12px; white-space: nowrap; }
 
   /* ---------- 中文翻译（1.3.3）：右侧译文栏，可开可关 ---------- */
   #transPane {
-    flex: 0 0 420px; width: 420px; background: #fff; border-left: 1px solid var(--line);
+    flex: 0 0 420px; width: 420px; background: var(--surface); border-left: 1px solid var(--line);
     display: none; flex-direction: column; min-height: 0; z-index: 18;
   }
   #transPane.open { display: flex; }
@@ -301,34 +320,34 @@
                  text-overflow: ellipsis; white-space: nowrap; }
   #transBody {
     flex: 1 1 auto; overflow-y: scroll; padding: 14px 16px 60px;
-    font-size: 13.5px; line-height: 1.85; color: #1f2937;
+    font-size: 13.5px; line-height: 1.85; color: var(--ink);
   }
   #transBody h1, #transBody h2, #transBody h3 { font-size: 14px; margin: 14px 0 6px; }
   #transBody h1 { font-size: 15px; }
   #transBody p { margin: 0 0 10px; }
   #transBody ul, #transBody ol { margin: 0 0 10px; padding-left: 20px; }
   #transBody li { margin: 2px 0; }
-  #transBody code { background: #f3f4f6; border-radius: 4px; padding: 0 4px; font-size: 12px; }
+  #transBody code { background: var(--surface-3); border-radius: 4px; padding: 0 4px; font-size: 12px; }
   #transBody pre {
-    background: #f8fafc; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
     padding: 8px 10px; overflow-x: auto; font-size: 12px; margin: 0 0 10px;
   }
   #transBody .tpage { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 14px; }
   #transBody .tpage:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
   #transBody .tpage > .tno {
-    font-size: 10px; color: #9aa3af; letter-spacing: .08em; margin-bottom: 6px;
+    font-size: 10px; color: var(--ink-4); letter-spacing: .08em; margin-bottom: 6px;
   }
-  #transBody .tempty { color: #9aa3af; font-size: 12px; line-height: 1.7; }
+  #transBody .tempty { color: var(--ink-4); font-size: 12px; line-height: 1.7; }
   #transBody .sel {
-    background: #f0f7ff; border: 1px solid #d6e6fb; border-radius: 8px;
+    background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: 8px;
     padding: 10px 12px; margin-bottom: 14px;
   }
-  #transBody .sel .src { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
+  #transBody .sel .src { font-size: 11px; color: var(--ink-3); margin-bottom: 6px; }
   /* 划词翻译的小浮钮：选中正文里的一段话后浮在鼠标旁边 */
   #selBtn {
-    position: fixed; z-index: 60; background: #111827; color: #fff; border: none;
+    position: fixed; z-index: 60; background: var(--gray-900); color: var(--text-inverse); border: none;
     border-radius: 6px; font-size: 12px; padding: 6px 10px; cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    box-shadow: var(--shadow-lg);
   }
   #selBtn[hidden] { display: none; }
 
@@ -337,29 +356,29 @@
   #hoverCard {
     position: fixed; z-index: 62; width: min(420px, calc(100vw - 24px));
     max-height: min(360px, calc(100vh - 90px)); overflow: auto;
-    background: #fff; border: 1px solid #e3e7ee; border-radius: 10px;
-    box-shadow: 0 8px 28px rgba(15,23,42,.16); padding: 10px 12px;
-    font-size: 13px; color: #1f2937; line-height: 1.6;
+    background: var(--surface); border: 1px solid var(--border-color); border-radius: 10px;
+    box-shadow: var(--shadow-lg); padding: 10px 12px;
+    font-size: 13px; color: var(--ink); line-height: 1.6;
   }
   #hoverCard[hidden] { display: none; }
   #hoverCard .hc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  #hoverCard .hc-tag { font-size: 11px; color: #1a7f37; background: #e8f5ec;
+  #hoverCard .hc-tag { font-size: 11px; color: var(--success); background: var(--success-bg);
                        border-radius: 6px; padding: 1px 7px; }
   #hoverCard .hc-pin, #hoverCard .hc-x {
-    border: none; background: #eef1f5; color: #374151; border-radius: 6px;
+    border: none; background: var(--gray-150); color: var(--ink-2); border-radius: 6px;
     font-size: 11px; padding: 2px 8px; cursor: pointer; line-height: 1.6;
   }
   #hoverCard .hc-pin { margin-left: auto; }
-  #hoverCard .hc-pin.on { background: #1a73e8; color: #fff; }
-  #hoverCard .hc-pin:hover, #hoverCard .hc-x:hover { background: #e2e8f0; }
-  #hoverCard .hc-pin.on:hover { background: #1558b0; }
-  #hoverCard .hc-src { font-size: 11.5px; color: #6b7280; margin-bottom: 6px;
-                       padding-left: 7px; border-left: 2px solid #e3e7ee; }
-  #hoverCard .hc-out { color: #1f2937; }
-  #hoverCard .hc-out .tempty { color: #9aa3af; }
-  #hoverCard .hc-out strong { color: #1a73e8; }
+  #hoverCard .hc-pin.on { background: var(--brand); color: var(--text-inverse); }
+  #hoverCard .hc-pin:hover, #hoverCard .hc-x:hover { background: var(--gray-200); }
+  #hoverCard .hc-pin.on:hover { background: var(--brand-active); }
+  #hoverCard .hc-src { font-size: 11.5px; color: var(--ink-3); margin-bottom: 6px;
+                       padding-left: 7px; border-left: 2px solid var(--border-color); }
+  #hoverCard .hc-out { color: var(--ink); }
+  #hoverCard .hc-out .tempty { color: var(--ink-4); }
+  #hoverCard .hc-out strong { color: var(--brand); }
   /* 悬停中的句子给个淡淡的底色，让用户知道"译的是这一句" */
-  .textLayer span.hover-hit { background: rgba(26,115,232,.14); }
+  .textLayer span.hover-hit { background: var(--hl-hover); }
   /* 悬停模式打开时，光标提示这块能悬停 */
   #pages.hover-on .textLayer span { cursor: help; }
 
@@ -367,14 +386,14 @@
   @media (max-width: 900px) {
     aside#sidebar {
       position: fixed; top: 54px; bottom: 0; left: 0; transform: translateX(-100%);
-      transition: transform .22s ease; box-shadow: 4px 0 18px rgba(0,0,0,.12);
+      transition: transform .22s ease; box-shadow: var(--shadow-md);
     }
     aside#sidebar.open { transform: translateX(0); }
     main#viewer { padding: 12px 8px 32px; gap: 12px; }
     /* 窄屏上译文栏改成盖住半屏的浮层，不挤压 PDF */
     #transPane.open {
       position: fixed; top: 54px; bottom: 0; right: 0; width: min(92vw, 460px);
-      box-shadow: -8px 0 22px rgba(0,0,0,.18);
+      box-shadow: var(--shadow-lg);
     }
     .doc .t { font-size: 13px; }
     .tools select { max-width: 120px; }
@@ -2208,7 +2227,7 @@ selBtnEl.addEventListener('click', async () => {
     }
     const data = await r.json();
     state.trans.selHtml = '<div class="sel"><div class="src">选中的原文</div>' +
-      `<p style="font-size:12px;color:#6b7280;margin:0 0 8px">${escapeHtml(text.slice(0, 240))}${text.length > 240 ? '…' : ''}</p>` +
+      `<p style="font-size:12px;color:var(--ink-3);margin:0 0 8px">${escapeHtml(text.slice(0, 240))}${text.length > 240 ? '…' : ''}</p>` +
       `${mdToHtml(data.markdown || '')}</div>`;
     transStatus(`划词翻译完成 · ${text.length} 字`);
   } catch (e) {

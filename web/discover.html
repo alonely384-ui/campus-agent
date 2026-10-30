@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>发现 · 科研小助手</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="design-system.css" />
+  <!-- 侧栏宽度要在首帧之前就填进 :root -->
+  <script>
+    (function () {
+      try {
+        var w = parseInt(localStorage.getItem('campus-agent-sidebar-w-v1') || '', 10);
+        if (w >= 200 && w <= 480) document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+      } catch (e) { /* 隐私模式读不到，用默认宽度 */ }
+    })();
+  </script>
+  <style>
+    .page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+    .page-head h1 { font-size: 22px; font-weight: 600; letter-spacing: -.2px; margin: 0; }
+    .page-sub { font-size: 13px; color: var(--text-secondary); margin: 6px 0 18px; line-height: 1.7; }
+
+    .panel {
+      background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card); padding: 18px 20px; margin-bottom: 16px;
+    }
+    .panel h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .panel h2 .sub { font-size: 11.5px; color: var(--text-subtle); font-weight: 400; }
+    .panel .spacer { flex: 1; margin-left: auto; }
+
+    .btn-sm { padding: 7px 14px; border-radius: var(--radius-control); font-size: 13px;
+              background: var(--bg-muted); color: var(--text-secondary); }
+    .btn-sm:hover { background: var(--bg-active); }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover { background: var(--brand-hover); }
+    .btn-primary:disabled { background: var(--text-subtle); cursor: default; }
+
+    .disc-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .disc-row input[type=text], .disc-row select, .disc-row input[type=number] {
+      padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 9px; font-size: 13.5px;
+      outline: none; background: var(--bg-surface); color: var(--text-primary); }
+    .disc-row input[type=text]:focus, .disc-row select:focus { border-color: var(--brand); }
+    .disc-row .num { width: 64px; }
+    .disc-row label.sub { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+
+    #discStatus, #refStatus { margin-top: 10px; font-size: 12.5px; color: var(--text-secondary);
+                              white-space: pre-line; line-height: 1.7; }
+
+    .rec-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .rec-row { border: 1px solid var(--border-color); border-radius: var(--radius-control); padding: 12px 14px;
+               font-size: 13px; background: var(--bg-surface-2); }
+    .rec-row:hover { border-color: var(--border-brand); }
+    .rec-row .rec-title { font-weight: 600; color: var(--text-primary); line-height: 1.45; }
+    .rec-row .rec-title a { color: var(--text-primary); text-decoration: none; }
+    .rec-row .rec-title a:hover { color: var(--brand); }
+    .rec-src { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 5px;
+               font-size: 10.5px; font-weight: 600; vertical-align: 1px; }
+    .rec-src.cited { background: var(--brand-soft); color: var(--brand-active); }
+    .rec-src.recent { background: var(--success-bg); color: var(--success); }
+    .rec-row .rec-reason { margin: 6px 0; color: var(--text-secondary); line-height: 1.6; }
+    .rec-row .rec-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+                         font-size: 11.5px; color: var(--text-muted); }
+    .rec-row .rec-meta .score { color: var(--brand); font-weight: 600; }
+    .rec-row .act { display: flex; gap: 6px; margin-left: auto; }
+    .rec-row .act button { padding: 5px 10px; border-radius: 7px; font-size: 12px; }
+    .vote-btn { background: var(--bg-muted); color: var(--text-secondary); }
+    .vote-btn.on { background: var(--success-bg); color: var(--success); }
+    .vote-btn.down.on { background: var(--danger-bg); color: var(--danger); }
+
+    .meta-line { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+    .offline-tip { font-size: 11.5px; color: var(--warning); background: var(--warning-bg);
+                   border: 1px solid var(--warning-border); border-radius: var(--radius-control);
+                   padding: 6px 9px; margin-top: 8px; }
+    .empty { font-size: 13px; color: var(--text-muted); padding: 14px 4px; text-align: center; }
+
+    @media (max-width: 720px) {
+      .disc-row > * { flex: 1 1 auto; }
+    }
+  </style>
+</head>
+<body class="app" data-nav="discover">
+  <aside class="sidebar" id="sidebar" aria-label="功能导航与对话历史">
+    <div class="sb-head">
+      <a class="sb-logo" href="index.html" title="科研小助手">
+        <img class="sb-logo__mark" src="logo.svg" alt="" width="26" height="26">
+        <span class="sb-logo__name">科研小助手</span>
+      </a>
+      <button class="sb-toggle" id="sbToggle" title="收起侧栏（Ctrl+Shift+B）" aria-label="收起侧栏">☰</button>
+      <button class="sb-toggle sb-head-act" id="sbToggleAct" title="展开侧栏（Ctrl+Shift+B）" aria-label="展开侧栏">☰</button>
+    </div>
+
+    <button class="sb-new" id="newChat" title="回到对话页开启新的会话">
+      <span class="sb-new__plus">＋</span>
+      <span class="sb-new__txt">开启新对话</span>
+    </button>
+
+    <div class="sb-group sb-group--nav">
+      <a class="sb-item" data-nav="library" href="library.html" title="上传、查看、删除论文（支持批量，自动查重）">
+        <span class="sb-item__ico">▤</span><span class="sb-item__txt">论文库</span>
+      </a>
+      <a class="sb-item" data-nav="discover" href="discover.html" title="按论文名下载、批量下参考文献、看新论文推荐（1.4）">
+        <span class="sb-item__ico">◎</span><span class="sb-item__txt">发现</span>
+      </a>
+      <a class="sb-item" data-nav="graph" href="graph.html" title="论文引用关系图谱：谁引用了谁、哪些是基石节点（1.5）">
+        <span class="sb-item__ico">◈</span><span class="sb-item__txt">引用图谱</span>
+      </a>
+      <a class="sb-item" data-nav="analysis" href="analysis.html" title="论文分析：自动综述与前沿探索（1.5）">
+        <span class="sb-item__ico">◧</span><span class="sb-item__txt">论文分析</span>
+      </a>
+      <a class="sb-item" data-nav="writing" href="writing.html" title="写作助手：框架生成、架构图、数据可视化、中译英（1.6）">
+        <span class="sb-item__ico">✎</span><span class="sb-item__txt">写作助手</span>
+      </a>
+    </div>
+
+    <div class="sb-history" id="sbHistory"></div>
+
+    <div class="sb-foot">
+      <a class="sb-item" data-nav="settings" href="settings.html" title="设置中心：模型、检索参数、定时刷新、知识库">
+        <span class="sb-item__ico">⚙︎</span><span class="sb-item__txt">设置</span>
+      </a>
+    </div>
+
+    <div class="sb-resizer" id="sbResizer" title="拖动调整侧栏宽度（双击恢复默认）" role="separator"
+         aria-orientation="vertical" aria-label="拖动调整侧栏宽度"></div>
+  </aside>
+
+  <div class="app__main">
+    <div class="main__scroll">
+      <div class="main__inner main__inner--wide" style="padding: 26px 30px 40px">
+        <div class="page-head">
+          <h1>发现</h1>
+        </div>
+        <div class="page-sub">
+          自动下载论文、顺着参考文献找重点、看新论文推荐。下载走的都是 arXiv，首次搜索可能要 20 秒左右。
+        </div>
+
+        <!-- 1.4.1 按论文名下载 -->
+        <div class="panel">
+          <h2>按论文名下载 <span class="sub">输入标题或 arXiv 号（如 1607.06450）</span></h2>
+          <div class="disc-row">
+            <input type="text" id="discQuery" placeholder="Layer normalization" style="flex:1;min-width:200px" />
+            <button class="btn-sm btn-primary" id="discGo">下载入库</button>
+          </div>
+          <div id="discStatus"></div>
+        </div>
+
+        <!-- 1.4.2 顺着参考文献下载 -->
+        <div class="panel">
+          <h2>顺着参考文献下载 <span class="sub">按正文引用次数挑重点，去掉为引用而引用的</span></h2>
+          <div class="disc-row">
+            <select id="refPaper" style="flex:1;min-width:180px"></select>
+            <label class="sub">最多 <input type="number" class="num" id="refLimit" value="3" min="1" max="20" /> 篇</label>
+            <label class="sub">引用 ≥ <input type="number" class="num" id="refMin" value="2" min="1" max="30" /> 次</label>
+            <button class="btn-sm btn-primary" id="refGo">开始下载</button>
+          </div>
+          <div id="refStatus"></div>
+        </div>
+
+        <!-- 1.4.3 新论文推荐 -->
+        <div class="panel">
+          <h2>新论文推荐 <span class="sub" id="recUpdated">还没刷新过</span>
+            <span class="spacer"></span>
+            <label class="sub" title="每日=只看近 7 天上架，每周=看近 14 天">周期
+              <select id="recPeriod" style="padding:4px 6px;border:1px solid var(--border-strong);border-radius:6px">
+                <option value="daily">每日</option>
+                <option value="weekly">每周</option>
+              </select>
+            </label>
+            <button class="btn-sm" id="recRefresh">刷新</button>
+          </h2>
+          <div class="meta-line" id="recSched"></div>
+          <div class="offline-tip" id="recOffline" hidden></div>
+          <div class="rec-list" id="recList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="sidebar.js?v=202610302331"></script>
+  <script>
+    const discQueryEl = document.getElementById('discQuery');
+    const discGoEl = document.getElementById('discGo');
+    const discStatusEl = document.getElementById('discStatus');
+    const refPaperEl = document.getElementById('refPaper');
+    const refLimitEl = document.getElementById('refLimit');
+    const refMinEl = document.getElementById('refMin');
+    const refGoEl = document.getElementById('refGo');
+    const refStatusEl = document.getElementById('refStatus');
+    const recListEl = document.getElementById('recList');
+    const recUpdatedEl = document.getElementById('recUpdated');
+    const recRefreshEl = document.getElementById('recRefresh');
+    const recOfflineEl = document.getElementById('recOffline');
+    const recPeriodEl = document.getElementById('recPeriod');
+    const recSchedEl = document.getElementById('recSched');
+
+    function escapeHtml(text) {
+      return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // 1.4.3 ④：这台机器上一个"用户"，反馈与协同画像按它分桶（localStorage 里持久化）
+    const REC_USER = (() => {
+      let id = '';
+      try { id = localStorage.getItem('recUser') || ''; } catch (e) { id = ''; }
+      if (!id) {
+        id = 'u' + Math.random().toString(36).slice(2, 8);
+        try { localStorage.setItem('recUser', id); } catch (e) { /* 隐身模式就算了 */ }
+      }
+      return id;
+    })();
+
+    async function loadSchedule() {
+      try {
+        const d = await (await fetch('/recommendations/schedule')).json();
+        if (!d || d.mode === 'off') {
+          recSchedEl.textContent = '定时刷新：未开启（DISCOVER_SCHEDULE=off 或未启动）';
+          return;
+        }
+        const next = d.next_run ? d.next_run.replace('T', ' ').slice(5, 16) : '—';
+        const last = d.last_run ? d.last_run.replace('T', ' ').slice(5, 16) : '';
+        recSchedEl.textContent = `定时刷新：${d.mode === 'weekly' ? '每周一' : '每日'} ${String(d.hour).padStart(2, '0')}:00`
+          + `，下次 ${next}` + (last ? `（上次 ${last}）` : '') + (d.last_error ? `，上次失败：${d.last_error}` : '');
+      } catch (e) {
+        recSchedEl.textContent = '';
+      }
+    }
+
+    function fmtTime(text) {
+      if (!text) return '还没刷新过';
+      const t = String(text).replace('T', ' ');
+      return '上次刷新：' + t.slice(0, 19);
+    }
+
+    async function loadRefPapers() {
+      try {
+        const d = await (await fetch('/papers/files')).json();
+        const files = d.files || d.papers || [];
+        refPaperEl.innerHTML = files.map(f => {
+          const name = typeof f === 'string' ? f : (f.filename || '');
+          return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+        }).join('');
+      } catch (e) {
+        refPaperEl.innerHTML = '<option value="">加载失败</option>';
+      }
+    }
+
+    async function downloadByName() {
+      const query = discQueryEl.value.trim();
+      if (!query) { discQueryEl.focus(); return; }
+      discGoEl.disabled = true;
+      discStatusEl.textContent = '正在 arXiv 搜索（首次可能要 20 秒左右）…';
+      try {
+        const resp = await fetch('/library/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        });
+        const d = await resp.json();
+        if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+        if (!d.downloaded) {
+          discStatusEl.textContent = `没有重复下载：${d.detail}\n库里已有：${d.filename}（${d.title}）`;
+        } else {
+          discStatusEl.textContent =
+            `✓ 已入库 ${d.paper.filename}（${d.paper.pages} 页，索引 ${d.indexed} 块）\n` +
+            `来源：arXiv ${d.arxiv_id} · ${d.title}` +
+            (d.duplicate_hit ? `\n注意：与 ${d.duplicate_hit} 内容重复（相似度 ${d.duplicate_score}）` : '');
+        }
+        await loadRefPapers();
+      } catch (e) {
+        discStatusEl.textContent = '下载失败：' + e.message;
+      } finally {
+        discGoEl.disabled = false;
+      }
+    }
+
+    async function downloadReferences() {
+      const filename = refPaperEl.value;
+      if (!filename) { refStatusEl.textContent = '先选一篇论文。'; return; }
+      refGoEl.disabled = true;
+      refStatusEl.textContent = '正在取引用关系并挑重点引用…';
+      try {
+        const resp = await fetch(`/paper/${encodeURIComponent(filename)}/references/download`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: Number(refLimitEl.value) || 3, min_cites: Number(refMinEl.value) || 2 }),
+        });
+        const d = await resp.json();
+        if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+        const lines = [`候选 ${d.candidates} 篇（正文引用 ≥${d.min_cites} 次的才下）`];
+        (d.results || []).forEach(r => {
+          const mark = r.status === '已入库' ? '✓' : r.status === '已有' ? '·' : '✗';
+          lines.push(`${mark} [${r.cites} 次] ${r.arxiv_id} ${r.status}` +
+            (r.filename ? ` → ${r.filename}（索引 ${r.indexed} 块）` : '') +
+            (r.error ? `：${r.error}` : ''));
+        });
+        refStatusEl.textContent = lines.join('\n');
+        await loadRefPapers();
+      } catch (e) {
+        refStatusEl.textContent = '下载失败：' + e.message;
+      } finally {
+        refGoEl.disabled = false;
+      }
+    }
+
+    function renderRecs(payload) {
+      recUpdatedEl.textContent = fmtTime(payload.updated_at);
+      recUpdatedEl.dataset.updated = payload.updated_at || recUpdatedEl.dataset.updated || '';
+      if (payload.offline) {
+        recOfflineEl.hidden = false;
+        recOfflineEl.textContent = '这次没能连上 arXiv / Semantic Scholar，下面显示的是上次抓到的结果' +
+          (payload.detail ? `（${payload.detail}）` : '') + '。';
+      } else {
+        recOfflineEl.hidden = true;
+      }
+      const items = payload.items || [];
+      if (!items.length) {
+        recListEl.innerHTML = '<div class="empty">还没有推荐。点上面的「刷新」抓一轮。</div>';
+        return;
+      }
+      recListEl.innerHTML = items.map(item => {
+        const key = escapeHtml(item.key || item.arxiv_id || '');
+        const title = escapeHtml(item.title || '');
+        const link = item.arxiv_id ? `https://arxiv.org/abs/${encodeURIComponent(item.arxiv_id)}` : (item.url || '');
+        const code = item.github
+          ? `<a href="${escapeHtml(item.github)}" target="_blank" rel="noopener" style="color:var(--success)">代码</a>`
+          : '无代码';
+        const cited = (item.cited_by || []).join('、');
+        const upOn = item.vote === 'up' ? ' on' : '';
+        const downOn = item.vote === 'down' ? ' on' : '';
+        const isRecent = item.source === 'recent';
+        const srcTag = isRecent
+          ? '<span class="rec-src recent" title="arXiv 近期上架，还没有人引用它，靠主题相似度选出来的">新上架</span>'
+          : '<span class="rec-src cited" title="它引用了你库里的论文">引用扩展</span>';
+        return `<div class="rec-row" data-key="${key}" data-arxiv="${escapeHtml(item.arxiv_id || '')}">
+          <div class="rec-title">${srcTag}${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" data-open="1">${title}</a>` : title}</div>
+          <div class="rec-reason">${escapeHtml(item.reason || '')}</div>
+          <div class="rec-meta">
+            <span class="score">${(item.score || 0).toFixed(3)}</span>
+            <span>${escapeHtml(item.arxiv_id || '无 arXiv 号')}</span>
+            <span>${item.year || '?'}</span>
+            <span title="${escapeHtml(cited)}">引用库内 ${(item.cited_by || []).length} 篇</span>
+            <span>最像：${escapeHtml((item.topic_of || '—').slice(0, 36))}</span>
+            <span>${code}</span>
+            <span class="act">
+              <button class="vote-btn${upOn}" data-vote="up" title="有用，以后多推这类">👍</button>
+              <button class="vote-btn down${downOn}" data-vote="down" title="不感兴趣，降权">👎</button>
+              <button class="btn-sm" data-get="1" title="把这个 arXiv 论文下载入库">下载入库</button>
+            </span>
+          </div>
+        </div>`;
+      }).join('');
+
+      recListEl.querySelectorAll('.rec-row').forEach(row => {
+        row.querySelectorAll('[data-vote]').forEach(btn => {
+          btn.addEventListener('click', () => voteRec(row.dataset.key, btn.dataset.vote));
+        });
+        const getBtn = row.querySelector('[data-get]');
+        if (getBtn) {
+          getBtn.addEventListener('click', async () => {
+            const target = row.dataset.arxiv || row.querySelector('.rec-title').textContent.trim();
+            discQueryEl.value = target;
+            discQueryEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await downloadByName();
+          });
+        }
+      });
+    }
+
+    async function loadRecs() {
+      try {
+        const d = await (await fetch(`/recommendations?user=${encodeURIComponent(REC_USER)}`)).json();
+        renderRecs(d);
+        loadSchedule();
+      } catch (e) {
+        recListEl.innerHTML = `<div class="empty">读取推荐失败：${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    async function refreshRecs() {
+      recRefreshEl.disabled = true;
+      recRefreshEl.textContent = '刷新中…';
+      const period = recPeriodEl.value || 'daily';
+      recUpdatedEl.textContent = `正在抓取：引用关系 + arXiv 近期上架（${period === 'weekly' ? '近两周' : '近一周'}），通常 20~60 秒`;
+      try {
+        const url = `/recommendations/refresh?max_papers=6&period=${encodeURIComponent(period)}&user=${encodeURIComponent(REC_USER)}`;
+        const resp = await fetch(url, { method: 'POST' });
+        const d = await resp.json();
+        if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+        renderRecs(d);
+      } catch (e) {
+        recListEl.innerHTML = `<div class="empty">刷新失败：${escapeHtml(e.message)}</div>`;
+      } finally {
+        recRefreshEl.disabled = false;
+        recRefreshEl.textContent = '刷新';
+      }
+    }
+
+    async function voteRec(key, vote) {
+      if (!key) return;
+      try {
+        const resp = await fetch(`/recommendations/${encodeURIComponent(key)}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vote, user: REC_USER }),
+        });
+        const d = await resp.json();
+        if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+        renderRecs({ updated_at: recUpdatedEl.dataset.updated || '', items: d.items, offline: false });
+      } catch (e) {
+        recOfflineEl.hidden = false;
+        recOfflineEl.textContent = '反馈没存上：' + e.message;
+      }
+    }
+
+    discGoEl.addEventListener('click', downloadByName);
+    discQueryEl.addEventListener('keydown', e => { if (e.key === 'Enter') downloadByName(); });
+    refGoEl.addEventListener('click', downloadReferences);
+    recRefreshEl.addEventListener('click', refreshRecs);
+
+    Promise.all([loadRefPapers(), loadRecs()]);
+  </script>
+</body>
+</html>
