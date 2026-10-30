@@ -903,6 +903,9 @@ body.app {
  * 也能排到 .main__inner 前面没什么用，靠后面的行序 + 多一个类来取胜。 */
 .main__inner--wide { max-width: var(--content-width-wide); }
 
+/* 窄屏开抽屉按钮：默认不存在，只有 900px 以下那一段媒体查询把它打开 */
+.mnav-btn { display: none; }
+
 /* 顶部服务状态条：小圆点 + 文字，不抢视线 */
 .status {
   display: inline-flex;
@@ -1095,6 +1098,7 @@ body.app:not(.has-conv):has(.dock) .greeting { display: block; }
   :root { --sidebar-w: 216px; }
   .greeting__title { font-size: 22px; }
 }
+
 /* ==========================================================================
    滚动条：默认隐形，悬停才浮现（2026-10-30）
    --------------------------------------------------------------------------
@@ -1230,3 +1234,87 @@ body.is-resizing .sidebar { transition: none; }
 /* 空状态（还没有对话）时主区是居中的欢迎页，没有可调宽的正文，抓手先藏起来 */
 body.app:not(.has-conv) .main__resizer { display: none; }
 body.is-resizing .sb-resizer { cursor: col-resize; }
+
+/* ==========================================================================
+   窄屏（手机）：侧栏收成抽屉，主区独占整宽
+   --------------------------------------------------------------------------
+   2026-10-31 实测 390px 视口：.sidebar 是 flex: 0 0 216px 不收缩，390 - 216 = 174
+   全给了 .app__main 里的 .main__scroll 16px 内边距，主区内容宽度被挤到 0；
+   同时 .dock__inner 的 max-width 仍是 --chat-w（820px）撑出去，.pick-list 又是
+   固定 width: 360px，整个文档 scrollWidth 446 > clientWidth 390，横向溢出 56px。
+
+   做法：900px 以下把侧栏从文档流里摘出来改成抽屉（position: fixed + transform），
+   主区因此独占整宽；再加一层遮罩，点遮罩或按 Esc 关。
+   不收成 64px 折叠态——手机上没有横向空间留一条图标栏。
+   桌面端（>900px）一行都不受影响，这条规则整体包在媒体查询里。
+   ========================================================================== */
+@media (max-width: 900px) {
+  /* 侧栏变成覆盖式抽屉，默认移出屏幕左侧 */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 300;
+    width: min(278px, 86vw);
+    flex-basis: auto;
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform var(--dur-base, 220ms) var(--ease, ease);
+    box-shadow: var(--shadow-pop);
+    /* 抽屉展开时内容不能被它自己的 overflow:hidden 裁掉，这里的超宽兜底靠外层 */
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  body.app.sb-open .sidebar { transform: translateX(0); }
+
+  /* 抽屉遮罩：盖住主区，点击关闭 */
+  .sb-mask {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 290;
+    background: rgba(17, 24, 39, .32);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body.app.sb-open .sb-mask { display: block; }
+
+  /* 主区独占整宽 */
+  .app__main { width: 100%; }
+
+  /* 窄屏专用开抽屉按钮：桌面端整体 display:none，不占位 */
+  .mnav-btn {
+    display: inline-flex;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 40;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md, 10px);
+    cursor: pointer;
+    box-shadow: var(--shadow-card, none);
+  }
+  .mnav-btn:active { background: var(--bg-surface-2); }
+
+  /* 正文与输入坞的左右留白在窄屏收窄，max-width 不再是瓶颈 */
+  .main__scroll { padding: 14px 12px 8px; }
+  .dock { padding: 6px 12px 12px; }
+  .main__inner,
+  .dock__inner { max-width: 100%; }
+
+  /* 空状态招呼语在窄屏缩一档 */
+  .greeting__mark { width: 44px; height: 44px; margin-bottom: 10px; }
+  .greeting__title { font-size: 19px; }
+  .greeting__sub { font-size: 12.5px; }
+
+  /* 正文里可能很宽的表格/代码块允许横向滚动，别把整页撑开 */
+  .msg__body table,
+  .msg__body pre { max-width: 100%; overflow-x: auto; }
+}

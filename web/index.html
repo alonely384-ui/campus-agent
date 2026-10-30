@@ -101,7 +101,7 @@
     .pick { position: relative; }
     .pick > summary { list-style: none; cursor: pointer; white-space: nowrap; user-select: none; }
     .pick > summary::-webkit-details-marker { display: none; }
-    .pick-list { position: absolute; left: 0; width: 360px; max-height: 260px; overflow: auto;
+    .pick-list { position: absolute; left: 0; width: 360px; max-width: calc(100vw - 24px); max-height: 260px; overflow: auto;
                  background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-card);
                  box-shadow: var(--shadow-pop); padding: 6px; z-index: 10; }
     .pick-list label { display: flex; gap: 8px; align-items: center; padding: 6px 8px; font-size: 13px;
@@ -180,7 +180,15 @@
          aria-orientation="vertical" aria-label="拖动调整侧栏宽度"></div>
   </aside>
 
+  <!-- 抽屉遮罩：只在 900px 以下的窄屏生效，点它关闭侧栏抽屉 -->
+  <div class="sb-mask" id="sbMask" aria-hidden="true"></div>
+
   <div class="app__main">
+    <!-- 窄屏才显示：用来把侧栏抽屉拉出来。桌面端由 CSS 隐藏，标题栏衔接处常驻。 -->
+    <button class="mnav-btn" id="mnavBtn" aria-label="打开导航菜单" title="导航菜单">
+      <span aria-hidden="true">☰</span>
+    </button>
+
     <div class="main__scroll" id="chatScroll">
       <div class="main__inner" id="chat"></div>
     </div>
@@ -228,7 +236,7 @@
        这里原来的两个弹层在 2026-10-30 移除：弹窗里放不下论文列表和推荐流，
        而且和其余五个整页页面交互不一致。 -->
 
-<script src="sidebar.js?v=202610302331"></script>
+<script src="sidebar.js?v=20261031mobile"></script>
 
 <script>
 const chatEl = document.getElementById('chat');
