@@ -60,6 +60,21 @@
     .pill.ok { background: var(--success-bg); color: var(--success); }
     .pill.keep { background: var(--brand-soft); color: var(--brand-active); font-weight: 600; }
 
+    /* 重复副本折叠：主版本一行 + 一个「已合并 N 份副本」开关，展开才占版面。
+       评委翻论文库时第一眼看到的是干净的主清单，点开才看到同一篇论文的其它版本。 */
+    .dup-group { display: flex; flex-direction: column; }
+    .dup-toggle { display: flex; align-items: center; gap: 6px; align-self: flex-start;
+                  margin: 2px 0 6px 12px; padding: 3px 8px; border: none; background: none;
+                  font-size: 11.5px; color: var(--brand); cursor: pointer; border-radius: var(--radius-sm); }
+    .dup-toggle:hover { background: var(--brand-soft); }
+    .dup-toggle__caret { display: inline-block; width: 9px; font-size: 10px; }
+    .dup-toggle__hint { color: var(--text-muted); }
+    .dup-sub { display: flex; flex-direction: column; gap: 6px; margin: 0 0 6px 12px;
+               padding-left: 10px; border-left: 2px solid var(--border-color); }
+    .dup-sub[hidden] { display: none; }
+    .lib-row--sub { background: var(--bg-surface); font-size: 12.5px; }
+    .lib-row--sub .name { font-weight: 400; }
+
     .dup-box { margin-top: 12px; border: 1px solid var(--warning-border); background: var(--bg-warm);
                border-radius: 10px; padding: 10px 12px; }
     .dup-box h3 { font-size: 13px; margin: 0 0 8px; color: var(--warning); }
@@ -232,6 +247,44 @@
       return allPapers.filter(p => String(p.topic_id) === String(curTopic));
     }
 
+    /**
+     * 把当前主题下的论文按「主版本 + 副本」聚合成行。
+     *
+     * 为什么要在前端聚合：`duplicate_of` 指向的主版本不一定排在副本前面，
+     * 分页又是按扁平列表切的，于是会出现"第 1 页三条重复副本、主版本在第 4 页"
+     * 的情况——评委翻到第 1 页只看到三条一样的"重复"，找不到谁是真身。
+     * 聚合之后分页按"组"切，主版本和它的副本永远在同一页。
+     *
+     * 返回 [{keeper, dups: [...]}],keeper 是主版本，dups 是它的所有副本。
+     */
+    function groupsOfTopic() {
+      const list = papersOfTopic();
+      const byId = new Map(list.map(p => [p.paper_id, p]));
+      const dupsOf = new Map();     // keeperId -> [副本...]
+      const keepers = [];
+      list.forEach(p => {
+        if (p.duplicate_of && byId.has(p.duplicate_of)) {
+          // 主版本也在当前主题里，才挂到它名下
+          if (!dupsOf.has(p.duplicate_of)) dupsOf.set(p.duplicate_of, []);
+          dupsOf.get(p.duplicate_of).push(p);
+        } else {
+          // 没有重复标记，或主版本不在当前主题里（这时副本自己当一行，不能凭空消失）
+          keepers.push(p);
+        }
+      });
+      return keepers.map(k => ({ keeper: k, dups: dupsOf.get(k.paper_id) || [] }));
+    }
+
+    /** 当前页要显示的组。页码越界时自动夹回来。 */
+    function groupsOfPage() {
+      const groups = groupsOfTopic();
+      const pages = Math.max(1, Math.ceil(groups.length / pageSize));
+      if (curPage > pages) curPage = pages;
+      if (curPage < 1) curPage = 1;
+      const start = (curPage - 1) * pageSize;
+      return groups.slice(start, start + pageSize);
+    }
+
     /** 当前页要显示的那一条切。页码越界时自动夹回来。 */
     function papersOfPage() {
       const list = papersOfTopic();
@@ -292,9 +345,10 @@
     }
 
     function renderPager() {
-      const list = papersOfTopic();
-      const pages = Math.max(1, Math.ceil(list.length / pageSize));
-      if (!list.length) { pagerEl.innerHTML = ''; return; }
+      // 分页按「组」算：重复副本不单独占页位，跟着主版本一起显示
+      const groups = groupsOfTopic();
+      const pages = Math.max(1, Math.ceil(groups.length / pageSize));
+      if (!groups.length) { pagerEl.innerHTML = ''; return; }
       const parts = [];
       parts.push(`<button class="pager__btn" data-page="prev" ${curPage <= 1 ? 'disabled' : ''}>上一页</button>`);
       pageNumbers(curPage, pages).forEach(n => {
@@ -307,7 +361,7 @@
       pagerEl.querySelectorAll('[data-page]').forEach(btn => {
         btn.addEventListener('click', () => {
           const v = btn.dataset.page;
-          const total = Math.max(1, Math.ceil(papersOfTopic().length / pageSize));
+          const total = Math.max(1, Math.ceil(groupsOfTopic().length / pageSize));
           const next = v === 'prev' ? curPage - 1 : v === 'next' ? curPage + 1 : Number(v);
           if (next < 1 || next > total || next === curPage) return;
           curPage = next;
@@ -328,15 +382,32 @@
       }
     }
 
-    function badgeOf(p, nameById, keeperIds) {
-      if (p.duplicate_of) {
-        const keeper = nameById.get(p.duplicate_of) || p.duplicate_of;
-        return `<span class="pill dup" title="${escapeHtml(p.duplicate_reason || '与库中论文重复')}，建议保留《${escapeHtml(keeper)}》">重复副本 · 保留 ${escapeHtml(keeper)}</span>`;
-      }
-      if (keeperIds.has(p.paper_id)) {
-        return '<span class="pill keep" title="同一篇论文的多份拷贝里，这份是要保留的">主版本</span>';
-      }
-      return '<span class="pill ok">已入库</span>';
+    
+
+    /**
+     * 渲染一行的主体（标题、页数、徽标、操作按钮）。
+     * 主版本和展开后的副本共用这套，只是徽标和缩进不同。
+     */
+    function rowHtml(p, opts) {
+      const o = opts || {};
+      // 有真实标题就显示标题、文件名降级成副信息；没有就退回文件名。
+      // 标题被截断过时，悬停显示完整标题；否则悬停显示文件名。
+      const hasTitle = !!(p.display_title && p.display_title !== p.filename);
+      const primary = hasTitle ? p.display_title : p.filename;
+      const titleAttr = (hasTitle && p.title_truncated) ? p.title : p.filename;
+      return `
+          <div class="lib-row${o.isSub ? ' lib-row--sub' : ''}">
+            <div class="titlewrap">
+              <div class="name" title="${escapeHtml(titleAttr)}">${escapeHtml(primary)}</div>
+              <div class="file">${escapeHtml(p.filename)}</div>
+            </div>
+            <div class="meta">${p.pages || '?'} 页 · ${fmtSize(p.size)}</div>
+            ${o.badge || ''}
+            <div class="act">
+              <a href="reader.html?paper=${encodeURIComponent(p.filename)}&page=1" target="_blank" rel="noopener">阅读</a>
+              <button class="btn-sm btn-danger" data-del="${escapeHtml(p.paper_id)}">删除</button>
+            </div>
+          </div>`;
     }
 
     /** 只重绘列表区：主题栏和分页器各自管自己，避免互相触发。 */
@@ -353,37 +424,53 @@
         return;
       }
 
-      const nameById = new Map(allPapers.map(p => [p.paper_id, p.filename]));
-      const keeperIds = new Set(allPapers.filter(p => p.duplicate_of).map(p => p.duplicate_of));
       const sameName = new Map();
       allPapers.forEach(p => sameName.set(p.filename, (sameName.get(p.filename) || 0) + 1));
 
-      const rows = papersOfPage();
-      libListEl.innerHTML = rows.map(p => {
-        // 有真实标题就显示标题、文件名降级成副信息；没有就退回文件名。
-        // 标题被截断过时，悬停显示完整标题；否则悬停显示文件名。
-        const hasTitle = !!(p.display_title && p.display_title !== p.filename);
-        const primary = hasTitle ? p.display_title : p.filename;
-        const titleAttr = (hasTitle && p.title_truncated) ? p.title : p.filename;
-        const dupId = sameName.get(p.filename) > 1
-          ? `<span class="cited">${escapeHtml(p.paper_id)}</span>` : '';
+      libListEl.innerHTML = groupsOfPage().map(({ keeper, dups }) => {
+        const dupId = sameName.get(keeper.filename) > 1
+          ? `<span class="cited">${escapeHtml(keeper.paper_id)}</span>` : '';
+        const badge = dups.length
+          ? '<span class="pill keep" title="同一篇论文的多份拷贝里，这份是要保留的">主版本</span>'
+          : (keeper.duplicate_of
+              // 主版本不在当前主题里时，副本自己成一行，仍要标出它重复的是谁
+              ? `<span class="pill dup" title="${escapeHtml(keeper.duplicate_reason || '与库中论文重复')}">重复副本 · 保留 ${escapeHtml(keeper.duplicate_of)}</span>`
+              : '<span class="pill ok">已入库</span>');
+        if (!dups.length) return rowHtml(keeper, { badge });
+
+        // 有副本：主版本下面挂一个可展开的分组，默认收起
+        const subRows = dups.map(d => {
+          // 同名同大小 = 同一个文件被重新上传过一次。这种副本点开看到的内容
+          // 和主版本一模一样，不说明一句，评委会以为是重复入库的 bug。
+          const sameFile = d.filename === keeper.filename && d.size === keeper.size;
+          const tip = sameFile ? '同一个文件重新上传过，内容和主版本相同' : (d.duplicate_reason || '与主版本重复');
+          return rowHtml(d, {
+            isSub: true,
+            badge: `<span class="pill dup" title="${escapeHtml(tip)}">${sameFile ? '同文件重传' : '副本'}</span>`,
+          });
+        }).join('');
         return `
-          <div class="lib-row">
-            <div class="titlewrap">
-              <div class="name" title="${escapeHtml(titleAttr)}">${escapeHtml(primary)}</div>
-              <div class="file">${escapeHtml(p.filename)}</div>
-            </div>
-            <div class="meta">${p.pages || '?'} 页 · ${fmtSize(p.size)}</div>
-            ${dupId}
-            ${badgeOf(p, nameById, keeperIds)}
-            <div class="act">
-              <a href="reader.html?paper=${encodeURIComponent(p.filename)}&page=1" target="_blank" rel="noopener">阅读</a>
-              <button class="btn-sm btn-danger" data-del="${escapeHtml(p.paper_id)}">删除</button>
-            </div>
+          <div class="dup-group">
+            ${rowHtml(keeper, { badge })}
+            <button class="dup-toggle" data-dup-toggle="1" aria-expanded="false">
+              <span class="dup-toggle__caret">▸</span>
+              已合并 ${dups.length} 份副本<span class="dup-toggle__hint">（同篇论文的其他版本，点开查看）</span>
+            </button>
+            <div class="dup-sub" hidden>${subRows}</div>
           </div>`;
       }).join('');
+
       libListEl.querySelectorAll('[data-del]').forEach(btn => {
         btn.addEventListener('click', () => deletePaper(btn.dataset.del, btn));
+      });
+      libListEl.querySelectorAll('.dup-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const box = btn.nextElementSibling;
+          const open = btn.getAttribute('aria-expanded') === 'true';
+          btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+          btn.querySelector('.dup-toggle__caret').textContent = open ? '▸' : '▾';
+          if (box) box.hidden = open;
+        });
       });
     }
 
