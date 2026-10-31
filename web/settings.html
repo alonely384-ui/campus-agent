@@ -284,15 +284,23 @@
   }
 
   function renderRow(item, idPrefix, extraHtml) {
+    // 顶部摘要行。2026-10-31 之前的做法是非密钥项一律显示「当前 <值>」，
+    // 而输入框里本来就带着同一个值——两处重复，而且那行灰色 mono 小字太像
+    // 「只读展示」，用户会误以为这一项改不了。现在只保留真正有信息量的两种情况：
+    //   密钥：显示脱敏值与「已配置 / 未配置」徽标
+    //   值被系统环境变量覆盖：说明「当前生效值来自系统环境变量」，用户需知道重启后的差异
     let current = '';
     if (item.secret) {
       current = item.has_key
         ? '<span class="mono">' + esc(item.masked) + '</span> <span class="status-pill status-pill--ok">已配置</span>'
         : '<span class="status-pill status-pill--bad">未配置</span>';
-    } else if (item.defense) {
-      current = '<span class="mono">当前 ' + esc(item.value) + '</span>';
-    } else {
-      current = '<span class="mono">当前 ' + esc(item.value) + '</span>';
+    } else if (item.env_override) {
+      // 后端只回 env_override + env_value，没有单独的文件值字段，所以这里只说明
+      // 「当前生效值来自系统环境变量」，不硬编一个后端没给的数字。
+      current = '<span class="mono">生效值 ' + esc(item.value) +
+        '（来自系统环境变量）</span>';
+    } else if (item.value === '' || item.value === null || item.value === undefined) {
+      current = '<span class="mono" style="color:var(--text-muted)">未设置</span>';
     }
 
     const range = item.defense
@@ -311,11 +319,25 @@
         '</div>'
       : '';
 
+    // 摘要行只在真有内容时才占位，避免空 div 撑出一段空白
+    const currentHtml = current
+      ? '<div class="mono" style="color:var(--text-muted);margin-bottom:6px">' + current + '</div>'
+      : '';
+
+    // 可改提示：除密钥和下拉框外，其余项都是一个直接可填的输入框。
+    // 2026-10-31 加这段文案，起因是用户看到灰色的「当前 2.0」以为这一项改不了。
+    const editableTip = (!item.secret && item.kind !== 'bool' && item.kind !== 'enum')
+      ? '<div class="hint" style="color:var(--brand-text);margin-top:2px;margin-bottom:6px">' +
+          '✎ 可直接在下面输入框里修改，改完点「保存」立即生效' +
+        '</div>'
+      : '';
+
     return '' +
       '<div class="row">' +
         '<div class="k">' + esc(item.label) + '</div>' +
         '<div class="v">' +
-          '<div class="mono" style="color:var(--text-muted);margin-bottom:4px">' + current + '</div>' +
+          currentHtml +
+          editableTip +
           fieldInput(item, idPrefix) +
           '<div class="btnrow">' +
             '<button class="act primary" data-save="' + esc(item.key) + '">保存</button>' +
