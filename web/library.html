@@ -331,7 +331,7 @@
     function badgeOf(p, nameById, keeperIds) {
       if (p.duplicate_of) {
         const keeper = nameById.get(p.duplicate_of) || p.duplicate_of;
-        return `<span class="pill dup" title="${escapeHtml(p.duplicate_reason || '与库中论文重复')}，建议保留《${escapeHtml(keeper)}》">重复 · 留 ${escapeHtml(keeper)}</span>`;
+        return `<span class="pill dup" title="${escapeHtml(p.duplicate_reason || '与库中论文重复')}，建议保留《${escapeHtml(keeper)}》">重复副本 · 保留 ${escapeHtml(keeper)}</span>`;
       }
       if (keeperIds.has(p.paper_id)) {
         return '<span class="pill keep" title="同一篇论文的多份拷贝里，这份是要保留的">主版本</span>';
