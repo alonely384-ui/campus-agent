@@ -50,6 +50,12 @@ COPY scripts/ ./scripts/
 # 数据目录。本地开发时这里放论文 PDF、解析结果、索引；容器里用 volume 挂载持久化
 RUN mkdir -p /app/data/papers /app/data/meta /app/data/chroma /app/data/uploads
 
+# 论文元数据清单（39 篇的标题/年份/分类，13 KB）。
+# 它不是运行产生的数据，而是随代码发布的静态清单，所以 .dockerignore 里专门留了例外。
+# 不带它的话，按 README 的 docker run（不挂 volume）启动后容器里没有这份清单，
+# "库里有哪些论文 / 一共多少篇"这类问题会退化成数检索片段，答案直接失真。
+COPY data/catalog.json ./data/catalog.json
+
 ENV APP_HOST=0.0.0.0 \
     APP_PORT=8000 \
     CHROMA_DIR=/app/data/chroma \

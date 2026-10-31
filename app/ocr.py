@@ -12,7 +12,12 @@ from pathlib import Path
 
 import pymupdf
 
-OCR_DIR = Path(os.getenv("RAG_OCR_DIR", "data/papers/ocr"))
+from app.papers import BASE_DIR
+
+# 默认值走 BASE_DIR，不写成相对路径：相对路径按进程 CWD 解析，
+# 换个目录启动就会去 ./data/papers/ocr 找缓存，找不到就重跑 OCR（慢且无提示）。
+# 环境变量 RAG_OCR_DIR 仍然优先，且允许传绝对路径。
+OCR_DIR = Path(os.getenv("RAG_OCR_DIR") or (BASE_DIR / "data" / "papers" / "ocr"))
 DPI = int(os.getenv("RAG_OCR_DPI", "200"))
 
 _ENGINE = None

@@ -13,24 +13,16 @@ name = "campus-agent"
 version = "0.1.0"
 description = "校园智能助手 Agent：RAG 问答 + 工具调用 + 流式输出"
 requires-python = ">=3.11"
-dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.32",
-    "python-multipart>=0.0.12",
-    "sse-starlette>=2.1",
-    "pydantic>=2.9",
-    "pydantic-settings>=2.5",
-    "openai>=1.50",
-    "chromadb>=0.5",
-    "pypdf>=5.0",
-    "pdfplumber>=0.11",
-    "tiktoken>=0.8",
-    "redis>=5.0",
-    "sqlalchemy>=2.0",
-    "pymysql>=1.1",
-    "httpx>=0.27",
-    "aiohttp>=3.10",
-]
+# 依赖只有 requirements.txt 一处真源，这里刻意不重复写。
+#
+# 为什么删掉原来的 dependencies 列表：它和 requirements.txt 是两套互相矛盾的清单——
+# 这边缺了 pymupdf / numpy / pandas / matplotlib / rapidocr / onnxruntime / tokenizers，
+# 多了两边早就从代码里删掉的 redis / sqlalchemy / pymysql / aiohttp / sse-starlette / tiktoken。
+# 结果 `pip install -e .` 装完 import fitz 直接 ImportError。
+# 重复维护两套清单必然再次走偏，所以这里留空，装依赖一律走：
+#     pip install -r requirements.txt
+# 依赖是否与 app/ 的实际 import 对齐，由 scripts/check_deps.py 核对（已挂 CI）。
+dependencies = []
 
 [dependency-groups]
 dev = [

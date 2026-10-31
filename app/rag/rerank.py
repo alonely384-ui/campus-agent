@@ -34,10 +34,16 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from app.logging_config import get_logger
+from app.papers import BASE_DIR
 
 logger = get_logger(__name__)
 
-_MODEL_DIR = Path(os.getenv("RAG_RERANK_DIR", "data/models/ms-marco-MiniLM-L-6-v2"))
+# 默认值走 BASE_DIR 而不是相对路径：相对路径按进程 CWD 解析，
+# 换目录启动就会找不到重排模型权重，然后静默降级成不重排——
+# 检索质量悄悄变差，界面上看不出任何异常。
+_MODEL_DIR = Path(
+    os.getenv("RAG_RERANK_DIR") or (BASE_DIR / "data" / "models" / "ms-marco-MiniLM-L-6-v2")
+)
 # 文档截断长度：cross-encoder 的输入是「问题 + 文档」，512 是 BERT 类模型的上限
 _MAX_LEN = 512
 

@@ -7,9 +7,12 @@
 启动后打开 http://127.0.0.1:8000/docs 就能看到自动生成的接口文档。
 """
 
+import asyncio
+import contextlib
 import difflib
 import json
 import re
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import fitz
@@ -39,6 +42,7 @@ from app.online import (
     write_cache,
 )
 from app.papers import (
+    BASE_DIR,
     PAPERS_DIR,
     delete_paper,
     delete_structure,
@@ -76,8 +80,27 @@ from app.zh2en import parse_glossary, translate_zh2en
 setup_logging()
 logger = get_logger(__name__)
 
-# 单一版本号来源：FastAPI 元数据、/health、设置页「关于」都读它
-VERSION = "0.1.0"
+# 版本号只从 pyproject.toml 读，不在代码里第二次硬编码。
+# 原来这里写死 VERSION = "0.1.0"，pyproject 里也写一份，两处迟早对不上
+# （改了一处忘了另一处，/health 报的版本和包里装的对不上）。
+# 包没安装时（比如直接 `python -m app.main` 跑源码）退回读一次 pyproject，
+# 两条路都不通才给 "unknown"，不抛异常——版本号不该拦住服务启动。
+def _read_version() -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("campus-agent")
+    except PackageNotFoundError:
+        pass
+    with contextlib.suppress(Exception):
+        import tomllib
+
+        with (BASE_DIR / "pyproject.toml").open("rb") as fh:
+            return str(tomllib.load(fh)["project"]["version"])
+    return "unknown"
+
+
+VERSION = _read_version()
 
 app = FastAPI(
     title="Campus Agent",
@@ -85,16 +108,148 @@ app = FastAPI(
     version=VERSION,
 )
 
-UPLOAD_DIR = Path("data/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# 所有数据路径都从 BASE_DIR 拼，**绝不写 Path("data/...")**。
+#
+# 为什么：相对路径是按「进程当前工作目录」解析的，不是按代码位置解析的。
+# 线上 systemd 设了 WorkingDirectory 所以一直没事；但评委或老师用 IDE
+# 从别的目录启动时，程序会安安静静地在那个目录下新建一套空 data/，
+# 论文库是空的、/ui 直接 404，而日志里一个字都不报——这种失败最难查。
+DATA_DIR = BASE_DIR / "data"
+UPLOAD_DIR = DATA_DIR / "uploads"
+META_DIR = DATA_DIR / "meta"
+META_CHARTS_DIR = META_DIR / "charts"
+META_DIAGRAMS_DIR = META_DIR / "diagrams"
+
+for _d in (UPLOAD_DIR, META_CHARTS_DIR, META_DIAGRAMS_DIR):
+    _d.mkdir(parents=True, exist_ok=True)
+
+# 静态页面目录。找不到时明确警告一句，而不是让 /ui 404 得不明不白。
+WEB_DIR = BASE_DIR / "web"
+if not WEB_DIR.is_dir():
+    logger.warning("找不到 web 目录（%s），/ui 会 404；请确认代码是否完整", WEB_DIR)
+
+# SSE 保活间隔（秒）。长推理、长翻译时上游可能几十秒一个字都不吐，
+# Nginx 默认 proxy_read_timeout 60s 会直接把这条连接掐掉，前端表现成「卡住不动」。
+# 所以只要超过这个时间没有真实事件，就先推一行 SSE 注释行顶住。
+SSE_HEARTBEAT_SECONDS = 15.0
+
+
+async def sse_with_heartbeat(
+    source: AsyncIterator[object],
+    *,
+    interval: float = SSE_HEARTBEAT_SECONDS,
+) -> AsyncIterator[str]:
+    """把任意异步事件流包装成 SSE 文本流，长时间没有事件时自动插一行心跳注释。
+
+    为什么用心跳行 `: ping\\n\\n` 而不是自定义事件：
+    SSE 规范里以冒号开头的行是注释，浏览器 EventSource 和我们的前端解析器
+    都会直接跳过，不会污染事件序列，也就不会让前端多出一个看不懂的 type。
+
+    为什么要包一层后台任务而不是 asyncio.wait_for：
+    wait_for 超时会取消内层迭代，而这里的迭代器前面挂着正在跑的模型请求和
+    已经吐了一半的数据，取消它等于把用户好不容易等到的一半内容扔掉。
+    改成「后台任务自己往里灌队列、主循环只负责带超时地取」，
+    超时只影响我这一侧取值，不会打断源头。
+
+    为什么 finally 里要 cancel：
+    客户端断开时外层生成器会被 GC，若不主动取消后台任务，
+    它会继续跑完整条链路（还在调模型、还在写缓存），白烧额度。
+    """
+    queue: asyncio.Queue[object] = asyncio.Queue()
+    done = object()  # 哨兵：区分「队列空了」和「源头结束了」
+
+    async def pump() -> None:
+        try:
+            async for event in source:
+                await queue.put(event)
+        except Exception:  # noqa: BLE001 —— 转成队列里的异常，交给外层统一处理
+            await queue.put(_StreamFailure())
+        finally:
+            await queue.put(done)
+
+    task = asyncio.create_task(pump())
+    try:
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=interval)
+            except TimeoutError:
+                # 到点了还没事件：推一行注释顶住代理的超时，继续等
+                yield ": ping\n\n"
+                continue
+            if item is done:
+                break
+            if isinstance(item, _StreamFailure):
+                raise _StreamFailed
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+    finally:
+        if not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+
+class _StreamFailure:
+    """队列里代表「源头抛异常了」的占位对象。"""
+
+
+class _StreamFailed(Exception):
+    """由 sse_with_heartbeat 抛出，供调用方走既有的 except 分支写错误事件。"""
+
+
+# 上传分块大小。传大文件时不再把整个文件堆进内存，
+# 一边读一边写盘，累计超过上限立刻中止并删掉半截文件。
+_UPLOAD_CHUNK = 1024 * 1024
+UPLOAD_MAX_BYTES = 20 * 1024 * 1024
+
+
+async def _save_upload_limited(file: UploadFile, dest: Path, *, limit: int) -> int:
+    """分块把上传流写进 dest，超过 limit 字节就中止。返回实际写入的字节数。
+
+    为什么要分块：原来写的是 `content = await file.read()` 再判断长度，
+    等于先把整个请求体啃进内存再看大小——传 2 GB 文件时进程内存先爆，
+    判断大小的那行代码根本没机会执行。改成计数式读取，超限当场抛。
+    """
+    written = 0
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with dest.open("wb") as fh:
+            while True:
+                chunk = await file.read(_UPLOAD_CHUNK)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > limit:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"文件超过 {limit // (1024 * 1024)}MB",
+                    )
+                fh.write(chunk)
+    except BaseException:
+        # 半截文件留在磁盘上会让后续解析读到坏 PDF，必须清掉
+        dest.unlink(missing_ok=True)
+        raise
+    return written
 
 
 # ---------------- 请求 / 响应模型 ----------------
+# 历史消息的两道上限：
+#   HISTORY_MAX_TURNS  字段层硬上限，超过直接 422（挡住异常大的请求体）
+#   HISTORY_KEEP_TURNS 真正参与生成的上限，只取最近的（控制每一次的上下文成本）
+HISTORY_MAX_TURNS = 50
+HISTORY_KEEP_TURNS = 12
+
+
 class ChatRequest(BaseModel):
     """POST /chat 的请求体。Pydantic 会自动校验字段，写错了直接返回 422。"""
 
     message: str = Field(..., min_length=1, max_length=2000, description="用户问题")
-    history: list[dict] = Field(default_factory=list, description="历史消息，可留空")
+    history: list[dict] = Field(
+        default_factory=list,
+        max_length=HISTORY_MAX_TURNS,
+        description="历史消息，可留空。超过 "
+        f"{HISTORY_MAX_TURNS} 条会被拒绝；服务端还会保留最后 "
+        f"{HISTORY_KEEP_TURNS} 条参与生成",
+    )
     source: str | None = Field(default=None, description="只在这篇论文里检索（单篇问答）")
     sources: list[str] | None = Field(
         default=None, description="多篇对比：只在这些论文里检索（每篇各取 3 块）"
@@ -103,6 +258,24 @@ class ChatRequest(BaseModel):
         default=True,
         description="是否启用稠密向量召回。前端「智能搜索」关掉时传 false，只跑哈希 + BM25",
     )
+
+
+def trim_history(history: list[dict] | None) -> list[dict]:
+    """只留最近 HISTORY_KEEP_TURNS 条历史，并剔掉结构不对、内容为空的消息。
+
+    为什么两层都要限：`message` 限了 2000 字，但 history 原来是一个不限长的 list，
+    客户端可以一次塞进十万条，既直接抬高每次请求的 token 成本，
+    也能被拿来当放大器。字段层的 max_length 挡住异常大的请求（返回 422），
+    这里再兜一次底：正常客户端传 40 条也只取最近 12 条去拼提示词。
+    """
+    if not history:
+        return []
+    clean = [
+        m
+        for m in history
+        if isinstance(m, dict) and isinstance(m.get("content"), str) and m["content"].strip()
+    ]
+    return clean[-HISTORY_KEEP_TURNS:]
 
 
 class ChatResponse(BaseModel):
@@ -160,7 +333,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     try:
         result = await run_agent(
             req.message,
-            req.history,
+            trim_history(req.history),
             source=req.source,
             sources=req.sources,
             use_dense=req.use_dense,
@@ -197,14 +370,16 @@ async def chat_stream(req: ChatRequest) -> StreamingResponse:
 
     async def event_generator():
         try:
-            async for event in run_agent_stream(
-                req.message,
-                req.history,
-                source=req.source,
-                sources=req.sources,
-                use_dense=req.use_dense,
+            async for chunk in sse_with_heartbeat(
+                run_agent_stream(
+                    req.message,
+                    trim_history(req.history),
+                    source=req.source,
+                    sources=req.sources,
+                    use_dense=req.use_dense,
+                )
             ):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                yield chunk
         except Exception:
             logger.exception("流式处理失败")
             err = {"type": "error", "message": "服务器处理失败"}
@@ -239,15 +414,10 @@ async def upload(file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail="只支持 pdf / md / txt")
 
     dest = UPLOAD_DIR / safe_name
-    content = await file.read()
+    size = await _save_upload_limited(file, dest, limit=UPLOAD_MAX_BYTES)
+    logger.info("已保存上传文件: %s (%d 字节)", dest, size)
 
-    if len(content) > 20 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="文件超过 20MB")
-
-    dest.write_bytes(content)
-    logger.info("已保存上传文件: %s (%d 字节)", dest, len(content))
-
-    return {"filename": safe_name, "size": len(content), "saved_to": str(dest)}
+    return {"filename": safe_name, "size": size, "saved_to": str(dest)}
 
 
 # ---------------- 论文库 ----------------
@@ -603,8 +773,10 @@ async def paper_translate(filename: str, pages: str = "all", force: bool = False
 
     async def event_generator():
         try:
-            async for event in translate_pages(filename, path, pages=wanted, force=force):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            async for chunk in sse_with_heartbeat(
+                translate_pages(filename, path, pages=wanted, force=force)
+            ):
+                yield chunk
         except Exception:
             logger.exception("翻译失败: %s", filename)
             err = {"type": "error", "message": "翻译失败，请稍后重试"}
@@ -1064,7 +1236,20 @@ async def writing_paper_figures(paper: str, keyword: str = "architecture", limit
 @app.post("/writing/chart", summary="CSV 数据可视化（1.6.3）")
 async def writing_chart(file: UploadFile, kind: str = "", note: str = "") -> dict:
     """上传 CSV，返回 ECharts 配置 + 导出的 PNG + 自动写的英文 caption。"""
-    raw = await file.read()
+    # 同样改成计数式分块读取：CSV 一直读到内存里（make_chart 要 bytes），
+    # 但超限时立刻中止，不会先把整个文件啃进来再判断。
+    buf = bytearray()
+    while True:
+        chunk = await file.read(_UPLOAD_CHUNK)
+        if not chunk:
+            break
+        buf.extend(chunk)
+        if len(buf) > UPLOAD_MAX_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"文件超过 {UPLOAD_MAX_BYTES // (1024 * 1024)}MB",
+            )
+    raw = bytes(buf)
     if not raw:
         raise HTTPException(status_code=400, detail="上传的 CSV 是空的")
     try:
@@ -1075,7 +1260,7 @@ async def writing_chart(file: UploadFile, kind: str = "", note: str = "") -> dic
 
 @app.get("/writing/chart/{name}", summary="导出的图表 PNG（1.6.3）")
 async def writing_chart_png(name: str) -> FileResponse:
-    path = Path("data") / "meta" / "charts" / Path(name).name
+    path = META_CHARTS_DIR / Path(name).name
     if not path.exists():
         raise HTTPException(status_code=404, detail="图表不存在")
     return FileResponse(path, media_type="image/png")
@@ -1083,7 +1268,7 @@ async def writing_chart_png(name: str) -> FileResponse:
 
 @app.get("/writing/diagram/{name}", summary="渲染出的架构图 PNG（1.6.2）")
 async def writing_diagram_png(name: str) -> FileResponse:
-    path = Path("data") / "meta" / "diagrams" / Path(name).name
+    path = META_DIAGRAMS_DIR / Path(name).name
     if not path.exists():
         raise HTTPException(status_code=404, detail="图不存在")
     return FileResponse(path, media_type="image/png")
@@ -1215,9 +1400,11 @@ async def settings_index_cleanup(req: IndexCleanupRequest | None = None) -> dict
 
 
 # ---------------- 前端页面 ----------------
-# 把 web/ 目录挂到 /ui，这样访问 http://127.0.0.1:8000/ui/ 就能看到聊天页面
-if Path("web").exists():
-    app.mount("/ui", StaticFiles(directory="web", html=True), name="web")
+# 把 web/ 目录挂到 /ui，这样访问 http://127.0.0.1:8000/ui/ 就能看到聊天页面。
+# 用绝对路径 WEB_DIR：`Path("web")` 是按 CWD 找的，换个目录启动就挂不上，
+# 表现是 /ui 直接 404 而日志里什么都不说（顶部已经 warning 过一句）。
+if WEB_DIR.is_dir():
+    app.mount("/ui", StaticFiles(directory=WEB_DIR, html=True), name="web")
 
 # ---------------- 定时刷新推荐（1.4.2） ----------------
 # 默认每天跑一次；`DISCOVER_SCHEDULE=off` 可关掉，`weekly` 改每周一。
@@ -1232,15 +1419,25 @@ except Exception as _exc:  # 定时器起不来不影响主服务
 
 # 直接 `python -m app.main` 时走这里
 if __name__ == "__main__":
+    import os
+
     import uvicorn
+
+    # reload 默认关。原来这里写死 reload=True，而模块 docstring 说「两种都行」，
+    # 结果有人在生产环境用这条命令起服务，uvicorn 多起一个 file watcher
+    # 监视整个目录并常驻占内存；机器上文件一多，光扫描就能吃掉大几百 MB。
+    # 开发时想自动重启用：set APP_RELOAD=1
+    _reload = os.getenv("APP_RELOAD", "").strip().lower() in ("1", "true", "yes", "on")
 
     logger.info("服务启动中: http://127.0.0.1:%d", settings.app_port)
     logger.info("接口文档: http://127.0.0.1:%d/docs", settings.app_port)
     logger.info("聊天页面: http://127.0.0.1:%d/ui/", settings.app_port)
+    if _reload:
+        logger.info("热重载已开启（APP_RELOAD=1），仅用于开发")
 
     uvicorn.run(
         "app.main:app",
         host=settings.app_host,
         port=settings.app_port,
-        reload=True,
+        reload=_reload,
     )

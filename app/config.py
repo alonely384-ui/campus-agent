@@ -90,9 +90,10 @@ class Settings(BaseSettings):
     # ---- 向量库 ----
     chroma_dir: str = "./data/chroma"
 
-    # ---- 数据库 ----
-    redis_url: str = "redis://localhost:6379/0"
-    mysql_url: str = "mysql+pymysql://root:password@localhost:3306/campus_agent"
+    # 注：redis_url / mysql_url 两个字段已删除。
+    # 它们只有声明、代码里零引用（数据全存 JSON），却让 .env.example 看起来
+    # 可以「换数据库」——照着 example 填完 MySQL 连接串，程序根本不会用它。
+    # 留着就是误导，删掉。
 
     # ---- 服务 ----
     app_host: str = "0.0.0.0"
