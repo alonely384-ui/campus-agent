@@ -40,6 +40,26 @@ logger = logging.getLogger(__name__)
 # .env 所在路径。默认是进程工作目录下的 .env；测试里可以指到临时文件。
 ENV_FILE = Path(".env")
 
+# 进程**启动那一刻**操作系统里本来就有的环境变量名（只记名字，不记值）。
+#
+# 为什么需要：set_env_value() 为了让新值立刻生效，会把值同步写进 os.environ。
+# 于是"这个键在 os.environ 里"就不再等于"用户/系统真的设置了这个环境变量"——
+# 用户每保存一次，这一项就把自己伪装成被系统环境变量覆盖，
+# 设置页于是弹出一条假的"重启后会被盖回去"警告。
+#
+# 判定"是否被系统环境变量覆盖"必须以**启动时**为准：启动后才出现的键一定是
+# 我们自己写进去的，不算数。想判断某键是否在快照里，用 was_in_system_env()。
+_SYSTEM_ENV_AT_BOOT: frozenset[str] = frozenset(os.environ)
+
+
+def was_in_system_env(key: str) -> bool:
+    """``key`` 在进程启动时是否已存在于操作系统环境变量中。
+
+    只有返回 True，才算"用户在系统层面设置了这个变量"（systemd Environment=、
+    Docker -e、shell export 等），才值得警告"重启后会被盖回去"。
+    """
+    return key in _SYSTEM_ENV_AT_BOOT
+
 # 写 .env 时的互斥锁：两个标签页同时点保存，不能交错写同一个文件
 _ENV_LOCK_MUTEX = None
 

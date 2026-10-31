@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -26,6 +27,22 @@ def env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("RAG_W_DENSE", raising=False)
     monkeypatch.delenv("DISCOVER_SCHEDULE", raising=False)
     return path
+
+
+@pytest.fixture
+def system_env(monkeypatch):
+    """模拟「进程启动时操作系统里就有这些变量」。
+
+    config._SYSTEM_ENV_AT_BOOT 是模块导入时固定的 frozenset。测试里用
+    monkeypatch.setenv 设置的变量晚于快照生成，**不会**被当成系统环境变量——
+    这正是我们要修的 bug 的判据（保存动作写 os.environ 不该算系统覆盖）。
+    需要真实覆盖语义的测试，用本夹具直接改快照本身。
+    """
+
+    def _set(*keys: str) -> None:
+        monkeypatch.setattr(config, "_SYSTEM_ENV_AT_BOOT", frozenset(keys))
+
+    return _set
 
 
 # ---------------------------------------------------------------- A 模型设置
@@ -368,9 +385,10 @@ def test_scheduler_hour_reads_settings(env_file, monkeypatch):
 # ---------------------------------------------------------------- 环境变量优先级提示
 
 
-def test_env_override_is_reported(env_file, monkeypatch):
+def test_env_override_is_reported(env_file, monkeypatch, system_env):
     """系统环境变量覆盖 .env 时，快照必须明说，别让用户以为改动生效了。"""
     monkeypatch.setenv("RAG_W_DENSE", "9.5")
+    system_env("RAG_W_DENSE")  # 声明它确实来自启动时的系统环境
     snap = settings_api.snapshot()
     assert "RAG_W_DENSE" in snap["env_overrides"], "被覆盖的项没在 env_overrides 里报告"
 
@@ -384,9 +402,10 @@ def test_env_override_is_reported(env_file, monkeypatch):
                 assert it["env_override"] is False
 
 
-def test_env_override_hides_secret_value(env_file, monkeypatch):
+def test_env_override_hides_secret_value(env_file, monkeypatch, system_env):
     """被环境变量覆盖的 API Key 也不能把明文放进快照。"""
     monkeypatch.setenv("LLM_API_KEY", "sk-envsecret-zzzz9999")
+    system_env("LLM_API_KEY")
     snap = settings_api.snapshot()
     text = json.dumps(snap, ensure_ascii=False)
 
@@ -397,11 +416,44 @@ def test_env_override_hides_secret_value(env_file, monkeypatch):
     assert "env_value" not in key_item or not key_item.get("env_value")
 
 
-def test_no_override_when_clean(env_file, monkeypatch):
+def test_no_override_when_clean(env_file, monkeypatch, system_env):
     """没设环境变量时 env_overrides 必须为空，不能虚报。"""
     for k in list(settings_api.SETTINGS):
         monkeypatch.delenv(k, raising=False)
+    system_env()
     assert settings_api.snapshot()["env_overrides"] == []
+
+
+def test_saving_does_not_fake_system_override(env_file, system_env):
+    """保存一项设置后，它不能被自己标成「被系统环境变量覆盖」。
+
+    回归用：set_env_value() 为了让新值立刻生效会同步写 os.environ；
+    若拿 os.environ 当覆盖判据，用户每保存一次就多一条假警告——
+    改什么就警告什么，真的警告反而淹没在里面。
+    """
+    system_env()  # 启动时系统里没有任何相关变量
+    assert settings_api.snapshot()["env_overrides"] == []
+
+    settings_api.save("RAG_W_BM25", "1.5")  # 保存动作会写 os.environ
+
+    assert os.environ.get("RAG_W_BM25") == "1.5", "保存没写进 os.environ，测试前提不成立"
+    snap = settings_api.snapshot()
+    assert snap["env_overrides"] == [], f"保存后出现假覆盖报告: {snap['env_overrides']}"
+    item = next(i for i in snap["groups"]["rag"] if i["key"] == "RAG_W_BM25")
+    assert item["env_override"] is False
+    assert item["value"] == "1.5", "值本身仍应是刚保存的新值"
+
+
+def test_save_keeps_real_system_override_visible(env_file, monkeypatch, system_env):
+    """真·系统环境变量覆盖时，保存别的项之后仍要警告，别把真警告一起修没了。"""
+    monkeypatch.setenv("RAG_RERANK_POOL", "12")
+    system_env("RAG_RERANK_POOL")
+
+    settings_api.save("RAG_W_BM25", "1.5")  # 存别的项，不应影响真覆盖的判定
+
+    snap = settings_api.snapshot()
+    assert "RAG_RERANK_POOL" in snap["env_overrides"], "真覆盖被误伤，警告消失了"
+    assert "RAG_W_BM25" not in snap["env_overrides"], "普通保存项混进了覆盖列表"
 
 
 # ---------------------------------------------------------------- 读写同源 & 定时器同步
