@@ -1,0 +1,970 @@
+{
+ "saved_at": "2026-10-31T05:00:06+00:00",
+ "data": {
+  "offset": 0,
+  "next": 25,
+  "data": [
+   {
+    "citingPaper": {
+     "paperId": "2887647c17f92ee51d21f9133a1342c0c4d5fc89",
+     "externalIds": {
+      "DBLP": "journals/pami/SuoMSZWZW26",
+      "DOI": "10.1109/TPAMI.2026.3669188",
+      "CorpusId": 286225535,
+      "PubMed": "41770977"
+     },
+     "title": "Semi-Supervised VQA Multi-Modal Explanation via Self-Critical Learning",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/TPAMI.2026.3669188?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/TPAMI.2026.3669188, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2134989055",
+       "name": "Wei Suo"
+      },
+      {
+       "authorId": "2302475019",
+       "name": "Ji Ma"
+      },
+      {
+       "authorId": "2115371943",
+       "name": "Mengyang Sun"
+      },
+      {
+       "authorId": "2298982598",
+       "name": "Hanwang Zhang"
+      },
+      {
+       "authorId": "2279282868",
+       "name": "Peng Wang"
+      },
+      {
+       "authorId": "2290443425",
+       "name": "Yan-Ning Zhang"
+      },
+      {
+       "authorId": "2167223085",
+       "name": "Qi Wu"
+      }
+     ],
+     "abstract": "VQA explanation task aims to explain the decision-making process of VQA models in a way that is easily understandable to humans. Existing methods mostly use visual location or natural language explanation approaches to generate corresponding rationales. Although significant progress has been made, these frameworks are bottlenecked by the following challenges: 1) Uni-modal paradigm inevitably leads to semantic ambiguity of explanations. 2) The reasoning process cannot be faithfully responded to and suffers from logical inconsistency. 3) Human-annotated explanations are expensive and time-consuming to collect. In this paper, we introduce a new Semi-supervised VQA Multi-modal Explanation (SME) method via self-critical learning, which addresses the above challenges by leveraging both visual and textual explanations to comprehensively reveal the inference process of the model. Meanwhile, in order to improve the logical consistency between answers and rationales, we design a novel self-critical strategy to evaluate candidate explanations based on answer reward scores. More importantly, our method can benefit from a tremendous amount of samples without human-annotated explanations with semi-supervised learning. Extensive automatic measures and human evaluations all show the effectiveness of our method. Finally, the framework achieves a new state-of-the-art performance on the three VQA explanation datasets."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "b2554110b745bcc983b5415f125bb58e7e19cda9",
+     "externalIds": {
+      "DOI": "10.1109/ICDSAAI65575.2025.11011588",
+      "CorpusId": 279002153
+     },
+     "title": "Cognitive Large Language Model in Social Media with Local Memory",
+     "year": 2025,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/ICDSAAI65575.2025.11011588?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/ICDSAAI65575.2025.11011588, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2364181508",
+       "name": "Vigneshwaran N"
+      },
+      {
+       "authorId": "2277660666",
+       "name": "A. Vijayaraj"
+      },
+      {
+       "authorId": "2308296185",
+       "name": "V. P. Murugan"
+      },
+      {
+       "authorId": "49165631",
+       "name": "R. Kumar"
+      },
+      {
+       "authorId": "2277658233",
+       "name": "N. Mageshkumar"
+      },
+      {
+       "authorId": "2308296320",
+       "name": "R. Megavannan"
+      }
+     ],
+     "abstract": "Enter the era of social media reimagined! This research taps into an interesting combination of advanced Artificial Intelligence, with large language models such as ChatGPT and GEMINI your favorite social platform. Personal information of each user is armed with voice commands and LLM. But this is the first. LLM talk to each other, exchange information. face recognition adds an extra layer in the mass layer the excitement of your Chatbot sharing only the right information Your account security level private, reserved or public. When it comes to security. We got you covered Choose between playing low key or just sharing just the right number of juicy details. Plus, all the classic features It's still fun, like scrolls and scrolls."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "e62e0494084d2ce854b39cb118e5eabe1cb21a15",
+     "externalIds": {
+      "DBLP": "conf/ic3i/DasAVMLS24",
+      "DOI": "10.1109/IC3I61595.2024.10828787",
+      "CorpusId": 275545667
+     },
+     "title": "Advanced Techniques in Training and Applying Large Language Models",
+     "year": 2024,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1109/IC3I61595.2024.10828787?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1109/IC3I61595.2024.10828787, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "47472462",
+       "name": "Lipsa Das"
+      },
+      {
+       "authorId": "2281344788",
+       "name": "Pooja Anand"
+      },
+      {
+       "authorId": "9224990",
+       "name": "Swati Vashisht"
+      },
+      {
+       "authorId": "2340228863",
+       "name": "Neelanjan Mukherji"
+      },
+      {
+       "authorId": "49244135",
+       "name": "B. Lohani"
+      },
+      {
+       "authorId": "2287972484",
+       "name": "Akanksha Singh"
+      }
+     ],
+     "abstract": "This research, examines the progress and use of large language models (LLMs). The research analyses the development process of LLMs, concentrating on the many models now accessible. We will begin by addressing fundamental concepts, including the mathematical models used in the process. Large Language Models provide a robust basis for the development of forthcoming applications in artificial intelligence and natural language processing."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "507fdd0fb25e46dcdfd0af0ef32b016d56d32d2b",
+     "externalIds": {
+      "DBLP": "journals/ijcv/SunSWNLLZW24",
+      "DOI": "10.1007/s11263-024-02094-8",
+      "CorpusId": 269848429
+     },
+     "title": "An Adaptive Correlation Filtering Method for Text-Based Person Search",
+     "year": 2024,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1007/s11263-024-02094-8?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1007/s11263-024-02094-8, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2115371943",
+       "name": "Mengyang Sun"
+      },
+      {
+       "authorId": "2134989055",
+       "name": "Wei Suo"
+      },
+      {
+       "authorId": "2155302795",
+       "name": "Peng Wang"
+      },
+      {
+       "authorId": "2290387268",
+       "name": "Kai Niu"
+      },
+      {
+       "authorId": "2301970275",
+       "name": "Le Liu"
+      },
+      {
+       "authorId": "2287982995",
+       "name": "Guosheng Lin"
+      },
+      {
+       "authorId": "2290443425",
+       "name": "Yan-Ning Zhang"
+      },
+      {
+       "authorId": "2167223085",
+       "name": "Qi Wu"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "866dec836ea1733952b7b99a0a57e290ff54a114",
+     "externalIds": {
+      "ArXiv": "2403.11818",
+      "DBLP": "conf/aaai/LuSP24",
+      "DOI": "10.1609/aaai.v38i4.28181",
+      "CorpusId": 268531355
+     },
+     "title": "TCNet: Continuous Sign Language Recognition from Trajectories and Correlated Regions",
+     "year": 2024,
+     "openAccessPdf": {
+      "url": "https://ojs.aaai.org/index.php/AAAI/article/download/28181/28360",
+      "status": "GOLD",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2403.11818, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2233736708",
+       "name": "Hui Lu"
+      },
+      {
+       "authorId": "1764521",
+       "name": "A. A. Salah"
+      },
+      {
+       "authorId": "2256152339",
+       "name": "Ronald Poppe"
+      }
+     ],
+     "abstract": "A key challenge in continuous sign language recognition (CSLR) is to efficiently capture long-range spatial interactions over time from the video input. To address this challenge, we propose TCNet, a hybrid network that effectively models spatio-temporal information from Trajectories and Correlated regions. TCNet's trajectory module transforms frames into aligned trajectories composed of continuous visual tokens. This facilitates extracting region trajectory patterns. In addition, for a query token, self-attention is learned along the trajectory. As such, our network can also focus on fine-grained spatio-temporal patterns, such as finger movement, of a region in motion. TCNet's correlation module utilizes a novel dynamic attention mechanism that filters out irrelevant frame regions. Additionally, it assigns dynamic key-value tokens from correlated regions to each query. Both innovations significantly reduce the computation cost and memory. We perform experiments on four large-scale datasets: PHOENIX14, PHOENIX14-T, CSL, and CSL-Daily. Our results demonstrate that TCNet consistently achieves state-of-the-art performance. For example, we improve over the previous state-of-the-art by 1.5\\% and 1.0\\% word error rate on PHOENIX14 and PHOENIX14-T, respectively. Code is available at https://github.com/hotfinda/TCNet"
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "533f5ec8d126408247ad9c9ec5830ed00bfc7501",
+     "externalIds": {
+      "DBLP": "conf/emnlp/ZhaoY0024",
+      "ArXiv": "2311.06985",
+      "PubMedCentral": "12833938",
+      "DOI": "10.18653/v1/2024.findings-emnlp.961",
+      "CorpusId": 265149973,
+      "PubMed": "41602485"
+     },
+     "title": "Large Language Models are In-context Teachers for Knowledge Reasoning",
+     "year": 2023,
+     "openAccessPdf": {
+      "url": "https://aclanthology.org/2024.findings-emnlp.961.pdf",
+      "status": "HYBRID",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2311.06985, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2275190736",
+       "name": "Jia-Chen Zhao"
+      },
+      {
+       "authorId": "1576489304",
+       "name": "Zonghai Yao"
+      },
+      {
+       "authorId": "2322987613",
+       "name": "Zhichao Yang"
+      },
+      {
+       "authorId": "2261455807",
+       "name": "Hong Yu"
+      }
+     ],
+     "abstract": "In this work, we study in-context teaching (ICT), where a teacher provides in-context example rationales to teach a student to reason over unseen cases. Human teachers are usually required to craft in-context demonstrations, which are costly and have high variance. We ask whether a large language model (LLM) can serve as a more effective in-context teacher for itself or other LLMs, compared to humans. Inspired by the Encoding Specificity Hypothesis from human episodic memory, we hypothesize that in-context exemplars crafted by the teacher should match the training data of the student. This hypothesis motivates us to propose Self-Explain where an LLM’s self-elicited explanations are used as in-context demonstrations for prompting it as they are generalized from the model’s training examples. Self-Explain is shown to significantly outperform using human-crafted exemplars and other baselines. Furthermore, we reveal that for ICT, rationales from different teacher LLMs or human experts that more resemble the student LLM’s self-explanations are better in-context demonstrations. This supports our encoding specificity hypothesis. We then propose Teach-Back that aligns a teacher LLM with the student to enhance the ICT performance. For example, Teach-Back enables a 7B model to teach the much larger GPT-3.5 in context, surpassing human teachers by around 5% in test accuracy on medical question answering."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "453277762bc0e794667c97880110a0c4feabc374",
+     "externalIds": {
+      "DBLP": "journals/corr/abs-2311-03498",
+      "ArXiv": "2311.03498",
+      "DOI": "10.48550/arXiv.2311.03498",
+      "CorpusId": 265043228
+     },
+     "title": "In-Context Exemplars as Clues to Retrieving from Large Associative Memory",
+     "year": 2023,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2311.03498, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2275190736",
+       "name": "Jia-Chen Zhao"
+      }
+     ],
+     "abstract": "Recently, large language models (LLMs) have made remarkable progress in natural language processing. The most representative ability of LLMs is in-context learning (ICL), which enables LLMs to learn patterns from in-context exemplars without training. The performance of ICL greatly depends on the exemplars used. However, how to choose exemplars remains unclear due to the lack of understanding of how in-context learning works. In this paper, we present a novel perspective on ICL by conceptualizing it as contextual retrieval from a model of associative memory. We establish a theoretical framework of ICL based on Hopfield Networks. Based on our framework, we look into how in-context exemplars influence the performance of ICL and propose more efficient active exemplar selection. Our study sheds new light on the mechanism of ICL by connecting it to memory retrieval, with potential implications for advancing the understanding of LLMs."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "1b492746ee3a304a13950cad1a59861b9ee44645",
+     "externalIds": {
+      "ArXiv": "2303.11717",
+      "DBLP": "journals/corr/abs-2303-11717",
+      "DOI": "10.48550/arXiv.2303.11717",
+      "CorpusId": 257636561
+     },
+     "title": "A Complete Survey on Generative AI (AIGC): Is ChatGPT from GPT-4 to GPT-5 All You Need?",
+     "year": 2023,
+     "openAccessPdf": {
+      "url": "http://arxiv.org/pdf/2303.11717",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2303.11717, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2258888709",
+       "name": "Chao-Ning Zhang"
+      },
+      {
+       "authorId": "48934876",
+       "name": "Chen-Shuang Zhang"
+      },
+      {
+       "authorId": "2211960167",
+       "name": "Sheng Zheng"
+      },
+      {
+       "authorId": "2209185953",
+       "name": "Yu Qiao"
+      },
+      {
+       "authorId": "2128662588",
+       "name": "Chenghao Li"
+      },
+      {
+       "authorId": "2394146422",
+       "name": "Meng-Chun Zhang"
+      },
+      {
+       "authorId": "1642047032",
+       "name": "S. K. Dam"
+      },
+      {
+       "authorId": "2053849768",
+       "name": "Chu Myaet Thwal"
+      },
+      {
+       "authorId": "49935726",
+       "name": "Ye Lin Tun"
+      },
+      {
+       "authorId": "2516729592",
+       "name": "Le Luang Huy"
+      },
+      {
+       "authorId": "2504141002",
+       "name": "D. Kim"
+      },
+      {
+       "authorId": "40547898",
+       "name": "S. Bae"
+      },
+      {
+       "authorId": "2188647130",
+       "name": "Lik-Hang Lee"
+      },
+      {
+       "authorId": "2152283122",
+       "name": "Yang Yang"
+      },
+      {
+       "authorId": "2291084154",
+       "name": "Heng-Tao Shen"
+      },
+      {
+       "authorId": "2398271",
+       "name": "In-So Kweon"
+      },
+      {
+       "authorId": "2159807650",
+       "name": "Choong-Seon Hong"
+      }
+     ],
+     "abstract": "As ChatGPT goes viral, generative AI (AIGC, a.k.a AI-generated content) has made headlines everywhere because of its ability to analyze and create text, images, and beyond. With such overwhelming media coverage, it is almost impossible for us to miss the opportunity to glimpse AIGC from a certain angle. In the era of AI transitioning from pure analysis to creation, it is worth noting that ChatGPT, with its most recent language model GPT-4, is just a tool out of numerous AIGC tasks. Impressed by the capability of the ChatGPT, many people are wondering about its limits: can GPT-5 (or other future GPT variants) help ChatGPT unify all AIGC tasks for diversified content creation? Toward answering this question, a comprehensive review of existing AIGC tasks is needed. As such, our work comes to fill this gap promptly by offering a first look at AIGC, ranging from its techniques to applications. Modern generative AI relies on various technical foundations, ranging from model architecture and self-supervised pretraining to generative modeling methods (like GAN and diffusion models). After introducing the fundamental techniques, this work focuses on the technological development of various AIGC tasks based on their output type, including text, images, videos, 3D content, etc., which depicts the full potential of ChatGPT's future. Moreover, we summarize their significant applications in some mainstream industries, such as education and creativity content. Finally, we discuss the challenges currently faced and present an outlook on how generative AI might evolve in the near future."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "2b8672c002f22119ef0aa1e9385c206ce1f565b3",
+     "externalIds": {
+      "DBLP": "journals/corr/abs-2209-09647",
+      "ArXiv": "2209.09647",
+      "DOI": "10.48550/arXiv.2209.09647",
+      "CorpusId": 252383522
+     },
+     "title": "A Multi-Layer Regression based Predicable Function Fitting Network",
+     "year": 2022,
+     "openAccessPdf": {
+      "url": "http://arxiv.org/pdf/2209.09647",
+      "status": "GREEN",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2209.09647, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "144641144",
+       "name": "Chang-Ling Wan"
+      },
+      {
+       "authorId": "2110395559",
+       "name": "Zhong-Zhi Shi"
+      }
+     ],
+     "abstract": "Function plays an important role in mathematics and many science branches. As the fast development of computer technology, more and more study on computational function analysis, e.g., Fast Fourier Transform, Wavelet Transform, Curve Function, are presented in these years. However, there are two main problems in these approaches: 1) hard to handle the complex functions of stationary and non-stationary, periodic and non-periodic, high order and low order; 2) hard to generalize the ﬁtting functions from training data to test data. In this paper, a multiple regression based function ﬁtting network that solves the two main problems is introduced as a predicable function ﬁtting technique. This technique constructs the network includes three main parts: 1) the stationary transform layer, 2) the feature encoding layers, and 3) the ﬁne tuning regression layer. The stationary transform layer recognizes the order of input function data, and transforms nonstationary function to stationary function. The feature encoding layers encode the raw input sequential data to a novel linear regression feature that can capture both the structural and the temporal characters of the sequential data. The ﬁne tuning regression layer then ﬁts the features to the target ahead values. The ﬁtting network with the linear regression feature layers and a non-linear regression layer come up with high quality ﬁtting results and generalizable predictions. The experiments of both mathematic function examples and the real word function examples veriﬁes the eﬃciency of the proposed technique."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "858bf51cb8275935e1bb50e2579a59413cd88869",
+     "externalIds": {
+      "DBLP": "journals/bigdata/GligorijevicGF22",
+      "DOI": "10.1089/big.2021.0320",
+      "CorpusId": 248403987,
+      "PubMed": "35475707"
+     },
+     "title": "Predicting Actions of Users Using Heterogeneous Online Signals",
+     "year": 2022,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1089/big.2021.0320?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1089/big.2021.0320, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2486589",
+       "name": "Djordje Gligorijevic"
+      },
+      {
+       "authorId": "50371776",
+       "name": "J. Gligorijević"
+      },
+      {
+       "authorId": "144944214",
+       "name": "Aaron Flores"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "9a29c977dc29699867fdc5428fc8bdf76b490376",
+     "externalIds": {
+      "DBLP": "conf/hicss/TidaH22",
+      "ArXiv": "2202.03480",
+      "DOI": "10.24251/hicss.2022.921",
+      "CorpusId": 246652217
+     },
+     "title": "Universal Spam Detection using Transfer Learning of BERT Model",
+     "year": 2022,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.24251/hicss.2022.921",
+      "status": "HYBRID",
+      "license": "CCBYNCND",
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2202.03480, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2106930160",
+       "name": "Vijay Srinivas Tida"
+      },
+      {
+       "authorId": "2153721459",
+       "name": "Sonya Hsu"
+      }
+     ],
+     "abstract": "Deep learning transformer models become important by training on text data based on self-attention mechanisms. This manuscript demonstrated a novel universal spam detection model using pre-trained Google's Bidirectional Encoder Representations from Transformers (BERT) base uncased models with four datasets by efficiently classifying ham or spam emails in real-time scenarios. Different methods for Enron, Spamassain, Lingspam, and Spamtext message classification datasets, were used to train models individually in which a single model was obtained with acceptable performance on four datasets. The Universal Spam Detection Model (USDM) was trained with four datasets and leveraged hyperparameters from each model. The combined model was finetuned with the same hyperparameters from these four models separately. When each model using its corresponding dataset, an F1-score is at and above 0.9 in individual models. An overall accuracy reached 97%, with an F1 score of 0.96. Research results and implications were discussed."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "5e2180e4ce9d218cccb1c78a93a863d5f967d907",
+     "externalIds": {
+      "DBLP": "journals/cvm/XuWLDSZTDHX22",
+      "DOI": "10.1007/s41095-021-0247-3",
+      "CorpusId": 240006659
+     },
+     "title": "Transformers in computational visual media: A survey",
+     "year": 2021,
+     "openAccessPdf": {
+      "url": "https://link.springer.com/content/pdf/10.1007/s41095-021-0247-3.pdf",
+      "status": "GOLD",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1007/s41095-021-0247-3?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1007/s41095-021-0247-3, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2125063007",
+       "name": "Yi-Fan Xu"
+      },
+      {
+       "authorId": "2152788915",
+       "name": "Huapeng Wei"
+      },
+      {
+       "authorId": "1506975125",
+       "name": "Min-Xuan Lin"
+      },
+      {
+       "authorId": "49873367",
+       "name": "Yingying Deng"
+      },
+      {
+       "authorId": "2126419",
+       "name": "Kekai Sheng"
+      },
+      {
+       "authorId": "2516588",
+       "name": "Meng-Dan Zhang"
+      },
+      {
+       "authorId": "1443761295",
+       "name": "Fan Tang"
+      },
+      {
+       "authorId": "38690089",
+       "name": "Weiming Dong"
+      },
+      {
+       "authorId": "1835006",
+       "name": "Fei-Yue Huang"
+      },
+      {
+       "authorId": "145194969",
+       "name": "Chang-Sheng Xu"
+      }
+     ],
+     "abstract": "Transformers, the dominant architecture for natural language processing, have also recently attracted much attention from computational visual media researchers due to their capacity for long-range representation and high performance. Transformers are sequence-to-sequence models, which use a self-attention mechanism rather than the RNN sequential structure. Thus, such models can be trained in parallel and can represent global information. This study comprehensively surveys recent visual transformer works. We categorize them according to task scenario: backbone design, high-level vision, low-level vision and generation, and multimodal learning. Their key ideas are also analyzed. Differing from previous surveys, we mainly focus on visual transformer methods in low-level vision and generation. The latest works on backbone design are also reviewed in detail. For ease of understanding, we precisely describe the main contributions of the latest works in the form of tables. As well as giving quantitative comparisons, we also present image results for low-level vision and generation tasks. Computational costs and source code links for various important works are also given in this survey to assist further development."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "11e89a3b2ae25575cb3efa1d7cd0af78c074859d",
+     "externalIds": {
+      "DOI": "10.31534/engmod.2021.2.ri.02d",
+      "CorpusId": 240806211
+     },
+     "title": "Multi-turn Dialogue Model Based on the Improved Hierarchical Recurrent Attention Network",
+     "year": 2021,
+     "openAccessPdf": {
+      "url": "https://hrcak.srce.hr/file/379467",
+      "status": "GOLD",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://hrcak.srce.hr/file/379467, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "38895226",
+       "name": "Jia-Wei Miao"
+      },
+      {
+       "authorId": "2145136638",
+       "name": "Jiansheng Wu"
+      }
+     ],
+     "abstract": "SUMMARY When considering the multi-turn dialogue systems, the model needs to generate a natural and contextual response. At present, HRAN, one of the most advanced models for multi-turn dialogue problems, uses a hierarchical recurrent encoder-decoder combined with a hierarchical attention mechanism. However, for complex conversations, the traditional attention-based RNN does not fully understand the context, which results in attention to the wrong context that generates irrelevant responses. To solve this problem, we proposed an improved hierarchical recurrent attention network, a self-attention network (HSAN), instead of RNN, to learn word representations and utterances representations. Empirical studies on both Chinese and English datasets show that the proposed model has achieved significant improvement."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "3849605aab03c2f75fc74b30c0056111ba68d7bd",
+     "externalIds": {
+      "MAG": "3080292009",
+      "DOI": "10.3390/app10175819",
+      "CorpusId": 225298705
+     },
+     "title": "Memory-Based Deep Neural Attention (mDNA) for Cognitive Multi-Turn Response Retrieval in Task-Oriented Chatbots",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "https://www.mdpi.com/2076-3417/10/17/5819/pdf",
+      "status": "GOLD",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.3390/app10175819?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.3390/app10175819, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "81677212",
+       "name": "Jen-Hui Chen"
+      },
+      {
+       "authorId": "1500659664",
+       "name": "Obinna Agbodike"
+      },
+      {
+       "authorId": "2152511695",
+       "name": "Lei Wang"
+      }
+     ],
+     "abstract": "One of the important criteria used in judging the performance of a chatbot is the ability to provide meaningful and informative responses that correspond with the context of a user’s utterance. Nowadays, the number of enterprises adopting and relying on task-oriented chatbots for profit is increasing. Dialog errors and inappropriate response to user queries by chatbots can result in huge cost implications. To achieve high performance, recent AI chatbot models are increasingly adopting the Transformer positional encoding and the attention-based architecture. While the transformer performs optimally in sequential generative chatbot models, recent studies has pointed out the occurrence of logical inconsistency and fuzzy error problems when the Transformer technique is adopted in retrieval-based chatbot models. Our investigation discovers that the encountered errors are caused by information losses. Therefore, in this paper, we address this problem by augmenting the Transformer-based retrieval chatbot architecture with a memory-based deep neural attention (mDNA) model by using an approach similar to late data fusion. The mDNA is a simple encoder-decoder neural architecture that comprises of bidirectional long short-term memory (Bi-LSTM), attention mechanism, and a memory for information retention in the encoder. In our experiments, we trained the model extensively on a large Ubuntu dialog corpus, and the results from recall evaluation scores show that the mDNA augmentation approach slightly outperforms selected state-of-the-art retrieval chatbot models. The results from the mDNA augmentation approach are quite impressive."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "21f74e2617d8d8f5fc117ff2ad6e58a540541f6d",
+     "externalIds": {
+      "ArXiv": "2007.08970",
+      "MAG": "3043172396",
+      "DBLP": "journals/corr/abs-2007-08970",
+      "CorpusId": 220633286
+     },
+     "title": "Compositional Generalization in Semantic Parsing: Pre-training vs. Specialized Architectures",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2007.08970, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2362932",
+       "name": "Daniel Furrer"
+      },
+      {
+       "authorId": "2807540",
+       "name": "Marc van Zee"
+      },
+      {
+       "authorId": "1471909492",
+       "name": "Nathan Scales"
+      },
+      {
+       "authorId": "1821614764",
+       "name": "Nathanael Schärli"
+      }
+     ],
+     "abstract": "While mainstream machine learning methods are known to have limited ability to compositionally generalize, new architectures and techniques continue to be proposed to address this limitation. We investigate state-of-the-art techniques and architectures in order to assess their effectiveness in improving compositional generalization in semantic parsing tasks based on the SCAN and CFQ datasets. We show that masked language model (MLM) pre-training rivals SCAN-inspired architectures on primitive holdout splits. On a more complex compositional task, we show that pre-training leads to significant improvements in performance vs. comparable non-pre-trained models, whereas architectures proposed to encourage compositional generalization on SCAN or in the area of algorithm learning fail to lead to significant improvements. We establish a new state of the art on the CFQ compositional generalization benchmark using MLM pre-training together with an intermediate representation."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "2aceab5956df2a8b3075a8033136188f9b07a44a",
+     "externalIds": {
+      "MAG": "3035922389",
+      "DOI": "10.1007/s11831-020-09449-7",
+      "CorpusId": 220503853
+     },
+     "title": "Machine Translation Systems for Indian Languages: Review of Modelling Techniques, Challenges, Open Issues and Future Research Directions",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: The following paper fields have been elided by the publisher: {'abstract'}. Paper or abstract available at https://api.unpaywall.org/v2/10.1007/s11831-020-09449-7?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1007/s11831-020-09449-7, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2110413453",
+       "name": "Muskaan Singh"
+      },
+      {
+       "authorId": "2109226441",
+       "name": "Ravinder Kumar"
+      },
+      {
+       "authorId": "1920204",
+       "name": "Inderveer Chana"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "8db8a2659cba1f6fdcdebe13bdccbae82be8394b",
+     "externalIds": {
+      "MAG": "3033717329",
+      "CorpusId": 260438135
+     },
+     "title": "Learning Algorithmic Solutions to Symbolic Planning Tasks with a Neural Computer Architecture.",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null
+     },
+     "authors": [
+      {
+       "authorId": "4338399",
+       "name": "Daniel Tanneberg"
+      },
+      {
+       "authorId": "35739127",
+       "name": "Elmar Rueckert"
+      },
+      {
+       "authorId": "145197867",
+       "name": "Jan Peters"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "4d5018c8bdf61129ca06a333ddbbe32dd84e50c2",
+     "externalIds": {
+      "DBLP": "conf/mir/0001CHH20",
+      "MAG": "3033733952",
+      "DOI": "10.1145/3372278.3390674",
+      "CorpusId": 219167681
+     },
+     "title": "Forward and Backward Multimodal NMT for Improved Monolingual and Multilingual Cross-Modal Retrieval",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "https://dl.acm.org/doi/pdf/10.1145/3372278.3390674",
+      "status": "BRONZE",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1145/3372278.3390674?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1145/3372278.3390674, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2319973",
+       "name": "Po-Yao (Bernie) Huang"
+      },
+      {
+       "authorId": "144950946",
+       "name": "Xiao-Jun Chang"
+      },
+      {
+       "authorId": "7661726",
+       "name": "Alexander Hauptmann"
+      },
+      {
+       "authorId": "144547315",
+       "name": "E. Hovy"
+      }
+     ],
+     "abstract": "We explore methods to enrich the diversity of captions associated with pictures for learning improved visual-semantic embeddings (VSE) in cross-modal retrieval. In the spirit of \"A picture is worth a thousand words\", it would take dozens of sentences to parallel each picture's content adequately. But in fact, real-world multimodal datasets tend to provide only a few (typically, five) descriptions per image. For cross-modal retrieval, the resulting lack of diversity and coverage prevents systems from capturing the fine-grained inter-modal dependencies and intra-modal diversities in the shared VSE space. Using the fact that the encoder-decoder architectures in neural machine translation (NMT) have the capacity to enrich both monolingual and multilingual textual diversity, we propose a novel framework leveraging multimodal neural machine translation (MMT) to perform forward and backward translations based on salient visual objects to generate additional text-image pairs which enables training improved monolingual cross-modal retrieval (English-Image) and multilingual cross-modal retrieval (English-Image and German-Image) models. Experimental results show that the proposed framework can substantially and consistently improve the performance of state-of-the-art models on multiple datasets. The results also suggest that the models with multilingual VSE outperform the models with monolingual VSE."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "93948a2aac559fcaf4314f8f472a0f122f465411",
+     "externalIds": {
+      "DBLP": "journals/corr/abs-2004-04662",
+      "ArXiv": "2004.04662",
+      "MAG": "3016004348",
+      "DOI": "10.1609/aaai.v35i8.16890",
+      "CorpusId": 215548749
+     },
+     "title": "Residual Shuffle-Exchange Networks for Fast Processing of Long Sequences",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "https://doi.org/10.1609/aaai.v35i8.16890",
+      "status": "GOLD",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2004.04662, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2111872099",
+       "name": "Andis Draguns"
+      },
+      {
+       "authorId": "150989416",
+       "name": "Emils Ozolins"
+      },
+      {
+       "authorId": "2868722",
+       "name": "A. Šostaks"
+      },
+      {
+       "authorId": "1621629753",
+       "name": "Matiss Apinis"
+      },
+      {
+       "authorId": "2295280",
+       "name": "Kārlis Freivalds"
+      }
+     ],
+     "abstract": "Attention is a commonly used mechanism in sequence processing, but it is of O(n^2) complexity which prevents its application to long sequences. The recently introduced neural Shuffle-Exchange network offers a computation-efficient alternative, enabling the modelling of long-range dependencies in O(n log n) time. The model, however, is quite complex, involving a sophisticated gating mechanism derived from the Gated Recurrent Unit. In this paper, we present a simple and lightweight variant of the Shuffle-Exchange network, which is based on a residual network employing GELU and Layer Normalization. The proposed architecture not only scales to longer sequences but also converges faster and provides better accuracy. It surpasses the Shuffle-Exchange network on the LAMBADA language modelling task and achieves state-of-the-art performance on the MusicNet dataset for music transcription while being efficient in the number of parameters. We show how to combine the improved Shuffle-Exchange network with convolutional layers, establishing it as a useful building block in long sequence processing applications."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "e42e3e09af8a56381c65aa8a8ddaee63fb321936",
+     "externalIds": {
+      "DBLP": "journals/corr/abs-2003-04974",
+      "ArXiv": "2003.04974",
+      "CorpusId": 212657723
+     },
+     "title": "Transformer++",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2003.04974, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "1557931630",
+       "name": "Prakhar Thapak"
+      },
+      {
+       "authorId": "1557917362",
+       "name": "P. Hore"
+      }
+     ],
+     "abstract": "Recent advancements in attention mechanisms have replaced recurrent neural networks and its variants for machine translation tasks. Transformer using attention mechanism solely achieved state-of-the-art results in sequence modeling. Neural machine translation based on the attention mechanism is parallelizable and addresses the problem of handling long-range dependencies among words in sentences more effectively than recurrent neural networks. One of the key concepts in attention is to learn three matrices, query, key, and value, where global dependencies among words are learned through linearly projecting word embeddings through these matrices. Multiple query, key, value matrices can be learned simultaneously focusing on a different subspace of the embedded dimension, which is called multi-head in Transformer. We argue that certain dependencies among words could be learned better through an intermediate context than directly modeling word-word dependencies. This could happen due to the nature of certain dependencies or lack of patterns that lend them difficult to be modeled globally using multi-head self-attention. In this work, we propose a new way of learning dependencies through a context in multi-head using convolution. This new form of multi-head attention along with the traditional form achieves better results than Transformer on the WMT 2014 English-to-German and English-to-French translation tasks. We also introduce a framework to learn POS tagging and NER information during the training of encoder which further improves results achieving a new state-of-the-art of 32.1 BLEU, better than existing best by 1.4 BLEU, on the WMT 2014 English-to-German and 44.6 BLEU, better than existing best by 1.1 BLEU, on the WMT 2014 English-to-French translation tasks. We call this Transformer++."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "3fa8d2a9e9a9cf3ee9626424a157888580dcfaba",
+     "externalIds": {
+      "DBLP": "journals/corr/abs-2002-07526",
+      "ArXiv": "2002.07526",
+      "MAG": "3005724337",
+      "CorpusId": 211146401
+     },
+     "title": "A Survey of Deep Learning Techniques for Neural Machine Translation",
+     "year": 2020,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2002.07526, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2307176170",
+       "name": "Shuoheng Yang"
+      },
+      {
+       "authorId": "2115828967",
+       "name": "Yu-Xin Wang"
+      },
+      {
+       "authorId": "51502693",
+       "name": "Xiao-Wen Chu"
+      }
+     ],
+     "abstract": "In recent years, natural language processing (NLP) has got great development with deep learning techniques. In the sub-field of machine translation, a new approach named Neural Machine Translation (NMT) has emerged and got massive attention from both academia and industry. However, with a significant number of researches proposed in the past several years, there is little work in investigating the development process of this new technology trend. This literature survey traces back the origin and principal development timeline of NMT, investigates the important branches, categorizes different research orientations, and discusses some future research trends in this field."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "7b0c42e4076104e8ffa4981350af7019fe5447f1",
+     "externalIds": {
+      "ArXiv": "1912.11959",
+      "DBLP": "journals/corr/abs-1912-11959",
+      "MAG": "2997101510",
+      "CorpusId": 209500587
+     },
+     "title": "Is Attention All What You Need? - An Empirical Investigation on Convolution-Based Active Memory and Self-Attention",
+     "year": 2019,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/1912.11959, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "118838347",
+       "name": "Thomas Dowdell"
+      },
+      {
+       "authorId": "46702864",
+       "name": "Hong-Yu Zhang"
+      }
+     ],
+     "abstract": "The key to a Transformer model is the self-attention mechanism, which allows the model to analyze an entire sequence in a computationally efficient manner. Recent work has suggested the possibility that general attention mechanisms used by RNNs could be replaced by active-memory mechanisms. In this work, we evaluate whether various active-memory mechanisms could replace self-attention in a Transformer. Our experiments suggest that active-memory alone achieves comparable results to the self-attention mechanism for language modelling, but optimal results are mostly achieved by using both active-memory and self-attention mechanisms together. We also note that, for some specific algorithmic tasks, active-memory mechanisms alone outperform both self-attention and a combination of the two."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "4d08dcd2cc1e9691defe664a10f021424a896a1e",
+     "externalIds": {
+      "MAG": "2992693294",
+      "DBLP": "journals/corr/abs-1912-02047",
+      "ArXiv": "1912.02047",
+      "DOI": "10.1613/JAIR.1.12007",
+      "CorpusId": 208617582
+     },
+     "title": "Neural Machine Translation: A Review",
+     "year": 2019,
+     "openAccessPdf": {
+      "url": "https://jair.org/index.php/jair/article/download/12007/26611",
+      "status": "GOLD",
+      "license": "CCBY",
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/1912.02047, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "48404632",
+       "name": "Felix Stahlberg"
+      }
+     ],
+     "abstract": "The field of machine translation (MT), the automatic translation of written text from one natural language into another, has experienced a major paradigm shift in recent years. Statistical MT, which mainly relies on various count-based models and which used to dominate MT research for decades, has largely been superseded by neural machine translation (NMT), which tackles translation with a single neural network. In this work we will trace back the origins of modern NMT architectures to word and sentence embeddings and earlier examples of the encoder-decoder network family. We will conclude with a short survey of more recent trends in the field."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "2ac4ab4047eecbb512aab0f93ea7727fa0f8e736",
+     "externalIds": {
+      "DBLP": "journals/corr/abs-1911-00926",
+      "MAG": "2987428723",
+      "ArXiv": "1911.00926",
+      "CorpusId": 207870266
+     },
+     "title": "Learning Algorithmic Solutions to Symbolic Planning Tasks with a Neural Computer",
+     "year": 2019,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/1911.00926, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "4338399",
+       "name": "Daniel Tanneberg"
+      },
+      {
+       "authorId": "35739127",
+       "name": "Elmar Rueckert"
+      },
+      {
+       "authorId": "145197867",
+       "name": "Jan Peters"
+      }
+     ],
+     "abstract": "A key feature of intelligent behavior is the ability to learn abstract strategies that transfer to unfamiliar problems. Therefore, we present a novel architecture, based on memory-augmented networks, that is inspired by the von Neumann and Harvard architectures of modern computers. This architecture enables the learning of abstract algorithmic solutions via Evolution Strategies in a reinforcement learning setting. Applied to Sokoban, sliding block puzzle and robotic manipulation tasks, we show that the architecture can learn algorithmic solutions with strong generalization and abstraction: scaling to arbitrary task configurations and complexities, and being independent of both the data representation and the task domain."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "4501f6aaf19746c6c58bf7cefa0aaa323971343e",
+     "externalIds": {
+      "MAG": "2969389652",
+      "DBLP": "journals/corr/abs-1908-08835",
+      "ArXiv": "1908.08835",
+      "CorpusId": 51885769
+     },
+     "title": "Deep Learning Based Chatbot Models",
+     "year": 2019,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/1908.08835, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "119310638",
+       "name": "Richard Csaky"
+      }
+     ],
+     "abstract": "A conversational agent (chatbot) is a piece of software that is able to communicate with humans using natural language. Modeling conversation is an important task in natural language processing and artificial intelligence. While chatbots can be used for various tasks, in general they have to understand users' utterances and provide responses that are relevant to the problem at hand. \nIn my work, I conduct an in-depth survey of recent literature, examining over 70 publications related to chatbots published in the last 3 years. Then, I proceed to make the argument that the very nature of the general conversation domain demands approaches that are different from current state-of-of-the-art architectures. Based on several examples from the literature I show why current chatbot models fail to take into account enough priors when generating responses and how this affects the quality of the conversation. In the case of chatbots, these priors can be outside sources of information that the conversation is conditioned on like the persona or mood of the conversers. In addition to presenting the reasons behind this problem, I propose several ideas on how it could be remedied. \nThe next section focuses on adapting the very recent Transformer model to the chatbot domain, which is currently state-of-the-art in neural machine translation. I first present experiments with the vanilla model, using conversations extracted from the Cornell Movie-Dialog Corpus. Secondly, I augment the model with some of my ideas regarding the issues of encoder-decoder architectures. More specifically, I feed additional features into the model like mood or persona together with the raw conversation data. Finally, I conduct a detailed analysis of how the vanilla model performs on conversational data by comparing it to previous chatbot models and how the additional features affect the quality of the generated responses."
+    }
+   }
+  ]
+ }
+}

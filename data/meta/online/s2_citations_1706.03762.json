@@ -1,5 +1,5 @@
 {
- "saved_at": "2026-10-27T03:20:50+00:00",
+ "saved_at": "2026-10-31T05:00:07+00:00",
  "data": {
   "offset": 0,
   "next": 25,
@@ -31,6 +31,46 @@
       {
        "authorId": "51415209",
        "name": "Min Chae Kim"
+      }
+     ],
+     "abstract": null
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "a1adb1eb39b7b97399220503080556737bae6d1d",
+     "externalIds": {
+      "DOI": "10.1016/j.future.2026.108762",
+      "CorpusId": 291309020
+     },
+     "title": "Conductor: Dynamically orchestrating pipeline parallelism with multi-granularity control",
+     "year": 2027,
+     "openAccessPdf": {
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.future.2026.108762?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.future.2026.108762, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2358189458",
+       "name": "Xingbo Dong"
+      },
+      {
+       "authorId": "2458997847",
+       "name": "Zi-Yuan Liu"
+      },
+      {
+       "authorId": "2342914899",
+       "name": "Yuezhe Yang"
+      },
+      {
+       "authorId": "3401020",
+       "name": "Yenlung Lai"
+      },
+      {
+       "authorId": "2185947941",
+       "name": "Zhe Jin"
       }
      ],
      "abstract": null
@@ -944,54 +984,6 @@
       {
        "authorId": "2378234151",
        "name": "M. Naser"
-      }
-     ],
-     "abstract": null
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "7736a7bc95af64d6200525f6f007200bb7a60651",
-     "externalIds": {
-      "DOI": "10.1016/j.aei.2026.105370",
-      "CorpusId": 293566556
-     },
-     "title": "PF-HDiffBEV: Bird’s eye view feature enhancement mechanism based on potential field-guided hierarchical conditional diffusion model for autonomous driving",
-     "year": 2027,
-     "openAccessPdf": {
-      "url": "",
-      "status": "CLOSED",
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.1016/j.aei.2026.105370?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.1016/j.aei.2026.105370, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "2351815993",
-       "name": "Bing Zhu"
-      },
-      {
-       "authorId": "2515060310",
-       "name": "Wei-Guang Cao"
-      },
-      {
-       "authorId": "1491634246",
-       "name": "Dong-Jian Song"
-      },
-      {
-       "authorId": "4539079",
-       "name": "Jia-Yi Han"
-      },
-      {
-       "authorId": "2375709432",
-       "name": "Jian Zhao"
-      },
-      {
-       "authorId": "2514970064",
-       "name": "Jing-Wei Xue"
-      },
-      {
-       "authorId": "2515136561",
-       "name": "Ming-Hui Yao"
       }
      ],
      "abstract": null

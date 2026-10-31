@@ -1,46 +1,48 @@
 {
- "saved_at": "2026-10-28T09:19:20+00:00",
+ "saved_at": "2026-10-31T05:03:47+00:00",
  "data": {
-  "updated_at": "2026-10-28T17:19:20+08:00",
-  "library_size": 39,
+  "updated_at": "2026-10-31T13:03:47+08:00",
+  "library_size": 41,
   "items": [
    {
-    "key": "2610.25991",
-    "arxiv_id": "2610.25991",
-    "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
+    "key": "2610.33420",
+    "arxiv_id": "2610.33420",
+    "title": "An Empirical Study of Reinforcement Learning Scaling Laws",
     "year": 2026,
-    "abstract": "Designing capable neural policies for multi-agent pathfinding (MAPF), which map local observations to action distributions, represents an important challenge in multi-agent learning, with practical relevance to scalable collective automation problems such as warehouse logistics. In contrast to prior studies focusing primarily on individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based MAPF. Specifically, given a collection of compact yet high-performing experts specialised for different map distributions, our architecture learns a router that selectively fuses their outputs according to each agent's local situation. We instantiate and validate this MoE approach with a commonly used graph neural network-based policy as well as a newly developed recursive action-token refinement model. Combined with supervised and reinforcement learning fine-tuning of the experts, our experiments show that MoE generally improves upon the pretrained policy and outperforms existing leading methods. At the same time, our findings reveal that appropriately trained, parameter-matched monolithic models still outperform MoE, highlighting a nuanced role f",
+    "abstract": "The discovery of scaling laws enables prediction of the performance, the optimal resource allocation strategy, and the best hyperparameter configuration of a large-scale training job based on inexpensive experiments at smaller scales. Guided by these empirical scaling laws, the deep learning community has achieved great success in training large (self-)supervised models on Internet-scale datasets. In contrast, despite its potential and wide application, reinforcement learning (RL) has yet to find a guiding principle for predictable scaling. In this work, we conduct an empirical study of RL scaling laws of an actor-critic algorithm in two procedurally generated environments, Starpilot and Craftax. We discover empirical scaling laws with strong predictive performance in both environments. The discovered scaling laws accurately predict the aforementioned three quantities for larger-scale training jobs up to two orders of magnitude in total training compute. In particular, we employ a variant of Elo scores for the single-agent RL paradigm as an alternative performance metric than the commonly used mean episode return. Our results show that the Elo score is a much more predictable metri",
     "authors": [
-     "Fumimaro Suzuki",
-     "Keisuke Okumura"
+     "Ze-Yu Zheng",
+     "Clare Lyle",
+     "Khimya Khetarpal",
+     "Will Dabney"
     ],
-    "url": "https://arxiv.org/abs/2610.25991",
+    "url": "https://arxiv.org/abs/2610.33420",
     "cited_by": [
      "Layer Normalization"
     ],
     "source": "cited",
     "github": "",
     "overlap": 0.333,
-    "topic": 0.317,
-    "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+    "topic": 0.308,
+    "topic_of": "Scaling Laws for Neural Language Models",
     "topic_top": [
      {
-      "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-      "sim": 0.361
+      "title": "Scaling Laws for Neural Language Models",
+      "sim": 0.337
      },
      {
-      "title": "DeepSeek-V3 Technical Report",
+      "title": "GPT-4 Technical Report",
+      "sim": 0.258
+     },
+     {
+      "title": "Qwen2.5 Technical Report",
       "sim": 0.226
-     },
-     {
-      "title": "Training language models to follow instructions with human feedback",
-      "sim": 0.205
      }
     ],
-    "base": 0.3444,
-    "score": 0.3444,
+    "base": 0.3413,
+    "score": 0.3413,
     "vote": "",
-    "reason": "在《Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity》的稀疏专家路由基础上，将MoE引入多智能体路径规划，区别在于按地图分布设计专家以生成动作分布。"
+    "reason": "在《Scaling Laws for Neural Language Models》的基础上把缩放规律从预训练损失扩展到强化学习训练，区别在于研究对象换成了 RL 场景下的性能预测与资源分配。"
    },
    {
     "key": "2610.32142",
@@ -59,12 +61,12 @@
     "source": "cited",
     "github": "",
     "overlap": 0.333,
-    "topic": 0.264,
+    "topic": 0.265,
     "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
     "topic_top": [
      {
       "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
-      "sim": 0.28
+      "sim": 0.281
      },
      {
       "title": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models",
@@ -72,170 +74,207 @@
      },
      {
       "title": "Improving Language Understanding by Generative Pre-Training",
-      "sim": 0.22
+      "sim": 0.221
      }
     ],
-    "base": 0.3256,
-    "score": 0.3256,
+    "base": 0.326,
+    "score": 0.326,
     "vote": "",
-    "reason": "与库内LoRA类低秩适配工作方向相近但相似度不足0.30，本文不设计新变体，而是重新审视LoRA初始化以提升对非对称学习率的鲁棒性，属参数高效微调方向。"
+    "reason": "属相邻方向，聚焦 LoRA 初始化与学习率鲁棒性，指出学习率调好后原版 LoRA 仍有竞争力，从而把问题从设计新变体转向初始化与学习率匹配。"
    },
    {
-    "key": "2610.37041",
-    "arxiv_id": "2610.37041",
-    "title": "Guided-RLVR: Guided Exploration in Reinforcement Learning with Verifiable Rewards",
-    "year": 2026,
-    "abstract": "Reinforcement learning with verifiable rewards (RLVR) has shown strong empirical gains in improving the reasoning ability of large language models (LLMs) on tasks such as mathematics and programming. However, recent studies have shown that RLVR rollouts often collapse onto a narrow set of reasoning trajectories, limiting the explored reasoning space. Motivated by findings that thinking tokens at critical steps serve as critical structural elements in LLM reasoning pathways, we propose Guided-RLVR, a novel approach that augments RLVR with a lightweight controller. The controller strategically injects semantically meaningful steering tokens into the sampling distribution, encouraging the model to approach problems from multiple reasoning perspectives and thereby expanding the exploration space. Experiments on mathematical reasoning and code generation benchmarks show that Guided-RLVR consistently outperforms existing RLVR methods while producing more diverse reasoning trajectories.",
-    "authors": [],
-    "url": "https://arxiv.org/abs/2610.37041",
-    "cited_by": [],
-    "source": "recent",
-    "posted": "Wed, 28 Oct 2026",
-    "category": "cs.CL",
-    "github": "",
-    "overlap": 0.0,
-    "topic": 0.343,
-    "topic_of": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
-    "topic_top": [
-     {
-      "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
-      "sim": 0.372
-     },
-     {
-      "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
-      "sim": 0.325
-     },
-     {
-      "title": "Qwen2.5 Technical Report",
-      "sim": 0.23
-     }
-    ],
-    "base": 0.2202,
-    "score": 0.2202,
-    "vote": "",
-    "reason": "在《DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning》的RLVR路线上，针对rollout坍缩到狭窄推理模式的问题引入引导式探索，区别在于探索策略设计。"
-   },
-   {
-    "key": "2610.37481",
-    "arxiv_id": "2610.37481",
-    "title": "Follow the Gradient: Tracing Safety Degradation Back to Training Data",
-    "year": 2026,
-    "abstract": "Fine-tuning Large Language Models (LLMs) on instruction data can quietly erode their safety, even when no training example looks harmful. Because this safety-degrading data looks benign, standard content filters struggle to catch it. We tackle this problem by developing SimpleLoRIF, a scalable gradient embedding method that identifies fine-tuning examples whose gradients align with unsafe behavior. By simplifying a low-rank attribution method and restricting backpropagation to the final four transformer blocks, SimpleLoRIF can embed datasets on the order of a million examples, boosting gradient attribution from a small-scale analysis tool into a practical filter for full post-training datasets. We first validate it on emergent misalignment, where we find that gradients can connect insecure-code training data to the broadly harmful behaviors that appear after fine-tuning, with AUC as high as 0.865 in the gradient space of misaligned models. We then use SimpleLoRIF to build SafeTulu, a version of Tulu 3 with the 20% of examples most gradient-aligned with unsafe responses removed. Training on SafeTulu reduces GCG attack success rate by up to 22% across Qwen, Llama, and Olmo, outperfor",
-    "authors": [],
-    "url": "https://arxiv.org/abs/2610.37481",
-    "cited_by": [],
-    "source": "recent",
-    "posted": "Wed, 28 Oct 2026",
-    "category": "cs.CL",
-    "github": "",
-    "overlap": 0.0,
-    "topic": 0.262,
-    "topic_of": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-    "topic_top": [
-     {
-      "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
-      "sim": 0.267
-     },
-     {
-      "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
-      "sim": 0.266
-     },
-     {
-      "title": "The Llama 3 Herd of Models",
-      "sim": 0.236
-     }
-    ],
-    "base": 0.1917,
-    "score": 0.1917,
-    "vote": "",
-    "reason": "与库内稀疏专家与规模训练工作相似度不足0.30，本文属LLM安全对齐方向，用梯度信号SimpleLoRIF追踪看似无害却侵蚀安全的指令微调数据，差异在安全诊断任务。"
-   },
-   {
-    "key": "2610.36572",
-    "arxiv_id": "2610.36572",
-    "title": "Learning from Points and Patches: A Pre-trained Hybrid Attention Transformer for Time Series Analysis",
-    "year": 2026,
-    "abstract": "Time-series data generated by Web services and connected systems support applications such as user activity analysis, service monitoring, and resource management. However, learning transferable representations from heterogeneous time series remains challenging due to diverse temporal patterns, variable sequence lengths, and limited high-quality annotations. Despite the success of pre-training in natural language processing and computer vision, effective time-series pre-training requires strategies tailored to temporal data. We propose TimeHAT (Hybrid Attention Transformer), a general-purpose pre-training framework for time-series analysis that addresses two complementary questions: what to learn and how to learn. For what to learn, we introduce a Unified Point-Patch Masking Strategy (UPPMS) that integrates point-level and patch-level supervision within a unified framework for contextual reconstruction and causal extrapolation, enabling the model to capture both fine-grained temporal variations and broader temporal patterns. For how to learn, we develop a Hybrid Attention Encoder (HAE) that combines prefix-constrained bidirectional attention in initial layers with directional hybrid",
-    "authors": [],
-    "url": "https://arxiv.org/abs/2610.36572",
-    "cited_by": [],
-    "source": "recent",
-    "posted": "Wed, 28 Oct 2026",
-    "category": "cs.LG",
-    "github": "",
-    "overlap": 0.0,
-    "topic": 0.261,
-    "topic_of": "Qwen2.5 Technical Report",
-    "topic_top": [
-     {
-      "title": "Qwen2.5 Technical Report",
-      "sim": 0.281
-     },
-     {
-      "title": "Instruction Pre-Training: Language Models are Supervised Multitask Learners",
-      "sim": 0.227
-     },
-     {
-      "title": "Learning Transferable Visual Models From Natural Language Supervision",
-      "sim": 0.201
-     }
-    ],
-    "base": 0.1914,
-    "score": 0.1914,
-    "vote": "",
-    "reason": "与库内Qwen2.5技术报告相似度不足0.30，本文属时间序列预训练方向，提出点与片段混合注意力Transformer学习可迁移表示，差异在模态与预训练目标。"
-   },
-   {
-    "key": "trainingareasoninglargelanguagemodelforimprovingpowerflowconvergence",
-    "arxiv_id": "",
-    "title": "Training a Reasoning Large Language Model for Improving Power Flow Convergence",
-    "year": 2026,
-    "abstract": "Power flow convergence is a critical and long-standing challenge in power system operations, where “black-box” data-driven approaches often lack the generalization and interpretability required for critical applications. This paper explores a new paradigm by leveraging the advanced reasoning capabilities of Large Language Models (LLMs) to address complex power system control problems, using power flow convergence as a key demonstration. We introduce a reinforcement learning framework to train a specialized LLM agent that makes sequential adjustments to system parameters. By employing a Chain-of-Thought (CoT) process, the agent emulates an expert’s analytical steps, navigating the system from a non-convergent to a convergent state while providing a transparent decision-making trail. The framework features a two-stage training process: Supervised Fine-Tuning (SFT) to instill the desired reasoning format, followed by Reinforcement Learning with Verifiable Rewards (RLVR) to refine the decision-making policy. Case studies demonstrate that the trained LLM not only successfully guides non-convergent cases to a solution but also offers a high degree of interpretability by explicitly articu",
+    "key": "1912.11959",
+    "arxiv_id": "1912.11959",
+    "title": "Is Attention All What You Need? - An Empirical Investigation on Convolution-Based Active Memory and Self-Attention",
+    "year": 2019,
+    "abstract": "The key to a Transformer model is the self-attention mechanism, which allows the model to analyze an entire sequence in a computationally efficient manner. Recent work has suggested the possibility that general attention mechanisms used by RNNs could be replaced by active-memory mechanisms. In this work, we evaluate whether various active-memory mechanisms could replace self-attention in a Transformer. Our experiments suggest that active-memory alone achieves comparable results to the self-attention mechanism for language modelling, but optimal results are mostly achieved by using both active-memory and self-attention mechanisms together. We also note that, for some specific algorithmic tasks, active-memory mechanisms alone outperform both self-attention and a combination of the two.",
     "authors": [
-     "Yun-Qi Yan",
-     "Ying Chen",
-     "Tan-Nan Xiao"
+     "Thomas Dowdell",
+     "Hong-Yu Zhang"
     ],
-    "url": "",
+    "url": "https://arxiv.org/abs/1912.11959",
     "cited_by": [
-     "Proximal Policy Optimization Algorithms"
+     "Can Active Memory Replace Attention?"
     ],
     "source": "cited",
     "github": "",
     "overlap": 0.333,
-    "topic": 0.286,
-    "topic_of": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+    "topic": 0.425,
+    "topic_of": "Can Active Memory Replace Attention?",
     "topic_top": [
      {
-      "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
-      "sim": 0.311
+      "title": "Can Active Memory Replace Attention?",
+      "sim": 0.487
      },
      {
-      "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
-      "sim": 0.252
+      "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness",
+      "sim": 0.326
      },
      {
-      "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
-      "sim": 0.207
+      "title": "Attention Is All You Need",
+      "sim": 0.238
      }
     ],
-    "base": 0.3335,
-    "score": 0.3335,
+    "base": 0.2822,
+    "score": 0.2822,
     "vote": "",
-    "reason": "在《Proximal Policy Optimization Algorithms》的强化学习训练思路启发下，将推理大模型用于电力潮流收敛，区别在于把RL推理能力迁移到电力系统数值求解任务。"
+    "reason": "在《Can Active Memory Replace Attention?》的基础上做实证检验，区别在于用卷积式主动记忆与自注意力直接对比，回答注意力是否真的不可替代。"
+   },
+   {
+    "key": "2003.04974",
+    "arxiv_id": "2003.04974",
+    "title": "Transformer++",
+    "year": 2020,
+    "abstract": "Recent advancements in attention mechanisms have replaced recurrent neural networks and its variants for machine translation tasks. Transformer using attention mechanism solely achieved state-of-the-art results in sequence modeling. Neural machine translation based on the attention mechanism is parallelizable and addresses the problem of handling long-range dependencies among words in sentences more effectively than recurrent neural networks. One of the key concepts in attention is to learn three matrices, query, key, and value, where global dependencies among words are learned through linearly projecting word embeddings through these matrices. Multiple query, key, value matrices can be learned simultaneously focusing on a different subspace of the embedded dimension, which is called multi-head in Transformer. We argue that certain dependencies among words could be learned better through an intermediate context than directly modeling word-word dependencies. This could happen due to the nature of certain dependencies or lack of patterns that lend them difficult to be modeled globally using multi-head self-attention. In this work, we propose a new way of learning dependencies through",
+    "authors": [
+     "Prakhar Thapak",
+     "P. Hore"
+    ],
+    "url": "https://arxiv.org/abs/2003.04974",
+    "cited_by": [
+     "Can Active Memory Replace Attention?"
+    ],
+    "source": "cited",
+    "github": "",
+    "overlap": 0.333,
+    "topic": 0.294,
+    "topic_of": "Attention Is All You Need",
+    "topic_top": [
+     {
+      "title": "Attention Is All You Need",
+      "sim": 0.295
+     },
+     {
+      "title": "Attention Is All You Need",
+      "sim": 0.292
+     },
+     {
+      "title": "Attention Is All You Need",
+      "sim": 0.292
+     }
+    ],
+    "base": 0.2362,
+    "score": 0.2362,
+    "vote": "",
+    "reason": "属相邻方向，围绕纯注意力 Transformer 在机器翻译上的改进展开，与库内《Attention Is All You Need》同属序列建模，但侧重对原架构的增强而非提出新架构。"
+   },
+   {
+    "key": "2610.40091",
+    "arxiv_id": "2610.40091",
+    "title": "Upcycling Language Models for Multiple Specialized Domains",
+    "year": 2026,
+    "abstract": "Effective multi-domain adaptation of large language models requires prioritizing relevant domain knowledge while minimizing interference from irrelevant domains. Existing approaches commonly use Low-Rank Adaptation (LoRA) to train a separate adapter for each domain and combine these adapters within one model. However, they either weight adapters equally regardless of the input domain or dynamically weight adapters while still activating all of them including irrelevant ones. Additionally, while efficient, their low-rank structure limits performance. In contrast, upcycling is a model expansion method that adds experts and a router to a dense Transformer layer offering larger capacity than LoRA approaches. In this paper, we propose Domain-Specialized Upcycling (DS-Upcycling) for multi-domain adaptation. We introduce a new domain-aware supervision that allows the router to effectively learn to distinguish domains by selecting the appropriate experts. During fine-tuning on each new domain, we update only the corresponding expert and router while freezing all other parameters. Experiments show that our method achieves the highest average performance across the adapted domains compared t",
+    "authors": [],
+    "url": "https://arxiv.org/abs/2610.40091",
+    "cited_by": [],
+    "source": "recent",
+    "posted": "Fri, 30 Oct 2026",
+    "category": "cs.CL",
+    "github": "",
+    "overlap": 0.0,
+    "topic": 0.322,
+    "topic_of": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+    "topic_top": [
+     {
+      "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+      "sim": 0.374
+     },
+     {
+      "title": "Improving Language Understanding by Generative Pre-Training",
+      "sim": 0.201
+     },
+     {
+      "title": "GPT-4 Technical Report",
+      "sim": 0.198
+     }
+    ],
+    "base": 0.2126,
+    "score": 0.2126,
+    "vote": "",
+    "reason": "属相邻方向，研究多领域专业化适配，用 LoRA 为各领域训练独立适配器再组合，与库内参数高效微调工作方向接近，但目标是多域知识整合与干扰抑制。"
+   },
+   {
+    "key": "2610.39455",
+    "arxiv_id": "2610.39455",
+    "title": "Sparse Fine-Tuning for Parameter-Efficient Adversarial Training",
+    "year": 2026,
+    "abstract": "Deep neural networks achieve strong performance across many tasks but remain vulnerable to adversarial perturbations. Adversarial training (AT) is one of the most effective defenses, yet it suffers from high memory cost on large models and the persistent clean-robust accuracy trade-off. Recent work introduces parameter-efficient fine-tuning, such as LoRA, into AT, but this constraint induces a notable robustness gap relative to full-parameter AT. In this work, we revisit parameter-efficient adversarial fine-tuning from a parameter space perspective. Through gradient analysis, we find that adversarial optimization is highly concentrated on a small subset of parameters, which we call Robustness-Critical Parameters (RCPs), suggesting that robustness is encoded in a sparse subspace. Building on this observation, we propose Sparse Adversarial Fine-Tuning (SAFT), which identifies RCPs via adversarial gradient saliency and performs AT by updating only these parameters while freezing the rest. Across architectures and datasets, SAFT outperforms LoRA-based methods in both clean and robust accuracy with fewer trainable parameters, and approaches or surpasses full parameter AT in robustness w",
+    "authors": [],
+    "url": "https://arxiv.org/abs/2610.39455",
+    "cited_by": [],
+    "source": "recent",
+    "posted": "Fri, 30 Oct 2026",
+    "category": "cs.LG",
+    "github": "",
+    "overlap": 0.0,
+    "topic": 0.308,
+    "topic_of": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+    "topic_top": [
+     {
+      "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+      "sim": 0.312
+     },
+     {
+      "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+      "sim": 0.301
+     },
+     {
+      "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+      "sim": 0.294
+     }
+    ],
+    "base": 0.2077,
+    "score": 0.2077,
+    "vote": "",
+    "reason": "属相邻方向，把稀疏微调用于对抗训练以降低大模型显存开销，与库内大模型微调工作方向接近，区别在于关注鲁棒性防御与干净—鲁棒精度权衡。"
+   },
+   {
+    "key": "2610.40345",
+    "arxiv_id": "2610.40345",
+    "title": "A Unified Hessian-Guided Framework for Post-Training Quantization",
+    "year": 2026,
+    "abstract": "Low-bit quantization enables efficient deployment of large language models by reducing memory footprint and computational cost. Achieving high accuracy at low precision requires selecting quantization ranges, linear transformations, and weight rounding decisions. Existing approaches typically optimize these components independently using local reconstruction objectives, which fail to account for the varying impact of quantization errors on downstream predictions. Direct optimization of task-level metrics would provide a more faithful objective, but is challenging due to the discontinuous nature of quantization operations and the high computational cost of evaluating their downstream effects. In this work, we derive a Hessian-guided approximation of the output change induced by joint weight and activation quantization. Based on a tractable Fisher approximation, we formulate a unified post-training quantization framework that enables the joint optimization of quantization ranges, linear transformations, and weight rounding under a common output-sensitivity objective. The resulting method remains practical for modern large language models and consistently outperforms state-of-the-art ",
+    "authors": [],
+    "url": "https://arxiv.org/abs/2610.40345",
+    "cited_by": [],
+    "source": "recent",
+    "posted": "Fri, 30 Oct 2026",
+    "category": "cs.LG",
+    "github": "",
+    "overlap": 0.0,
+    "topic": 0.266,
+    "topic_of": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+    "topic_top": [
+     {
+      "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+      "sim": 0.28
+     },
+     {
+      "title": "QLORA: Efficient Finetuning of Quantized LLMs",
+      "sim": 0.265
+     },
+     {
+      "title": "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Eﬃcient Sparsity",
+      "sim": 0.201
+     }
+    ],
+    "base": 0.193,
+    "score": 0.193,
+    "vote": "",
+    "reason": "属相邻方向，做低比特训练后量化，用 Hessian 信息统一选择量化范围、线性变换与舍入，与库内推理与提示方向相距较远，属模型压缩部署方向。"
    }
   ],
   "errors": [],
   "offline": false,
-  "candidates": 112,
-  "without_arxiv": 1,
+  "candidates": 87,
+  "without_arxiv": 0,
   "sources": {
-   "cited": 3,
-   "recent": 4,
+   "cited": 4,
+   "recent": 7,
    "github": 0
   },
   "recent_scanned": 12,
-  "user": "uqa8j6r",
+  "user": "default",
   "period": "daily"
  }
 }

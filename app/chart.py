@@ -156,13 +156,26 @@ def choose_chart(info: dict[str, Any], df: pd.DataFrame | None = None) -> dict[s
 
 
 def _series(df: pd.DataFrame, x: str, y: str, limit: int = 30) -> tuple[list, list]:
-    """取 x 轴与 y 轴数据，超量截断。"""
+    """取 x 轴与 y 轴数据，超量截断。
+
+    ``y`` 可能是**逗号分隔的多列**（``"train_loss,val_loss,accuracy"``）——
+    ``choose_chart`` 与雷达图分支都会这么给。旧实现直接 ``work[y]``，
+    多列时 ``y in work.columns`` 为假，返回空列表，于是 matplotlib 报
+    ``x and y must have same first dimension, but have shapes (8,) and (0,)``，
+    PNG 静默导出失败、``png_url`` 为空。
+    """
     work = df.head(limit) if len(df) > limit else df
     xs = work[x].tolist() if x and x in work.columns else list(range(len(work)))
+    # 多列时取**第一列**作为导出图的纵轴：一张静态图叠三条量纲不同的曲线
+    # （loss 2.3 与 accuracy 0.5）会互相压扁，看不清任何一条。
+    cols = [c for c in (y or "").split(",") if c]
+    first = cols[0] if cols else ""
+    if not first or first not in work.columns:
+        return xs, []
     try:
-        ys = [None if pd.isna(v) else float(v) for v in work[y]] if y and y in work.columns else []
+        ys = [None if pd.isna(v) else float(v) for v in work[first]]
     except (TypeError, ValueError):
-        ys = work[y].map(str).tolist() if y and y in work.columns else []
+        ys = work[first].map(str).tolist()
     return xs, ys
 
 
@@ -434,12 +447,14 @@ def export_png(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> bytes
         ax.axis("equal")
     else:
         xs, ys = _series(df, x, y)
+        # 纵轴标签只写实际画的那一列（y 可能是多列，_series 取第一列）
+        ylabel = (y or "").split(",")[0].strip()
         if kind == "line":
             ax.plot([str(v) for v in xs], ys, marker="o", markersize=3, color="#2b6cb0")
         else:
             ax.bar([str(v) for v in xs], ys, color="#4a5568")
         ax.set_xlabel(x)
-        ax.set_ylabel(y)
+        ax.set_ylabel(ylabel)
         if len(xs) > 8:
             plt.xticks(rotation=45, ha="right")
 

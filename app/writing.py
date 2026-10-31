@@ -214,11 +214,72 @@ def build_reference_list(cited: list[str], pool: list[lit.Candidate]) -> list[di
 # --------------------------------------------------------------------------- 主流程
 
 
+# 中文虚词表：从检索词里剥掉这些，剩下的才是实义词块。
+# 之所以列成表而不是用分词库，是因为按字数硬切会把「的论文推荐系统」这种
+# 虚词打头的碎片当成检索词（旧实现就是按 4-12 字硬切，实测对 Crossref 全废）。
+_ZH_FUNCTION_WORDS = (
+    "想做一个",
+    "我想",
+    "我们",
+    "想做",
+    "希望",
+    "能够",
+    "可以",
+    "基于",
+    "通过",
+    "利用",
+    "使用",
+    "采用",
+    "本文",
+    "这个",
+    "一种",
+    "一个",
+    "进行",
+    "实现",
+    "以及",
+    "并且",
+    "同时",
+    "因此",
+    "从而",
+    "用于",
+    "关于",
+    "对于",
+    "在",
+    "的",
+    "和",
+    "与",
+    "及",
+    "让",
+    "把",
+    "被",
+    "对",
+    "从",
+    "为",
+    "就",
+)
+
+# 切分中文短语的分隔符：标点 + 上面这些虚词（当作切点）
+_ZH_SPLIT_RE = re.compile(
+    r"[，。；：、！？,.;:!?\s（）()【】\[\]\"'“”‘’]+|"
+    + "|".join(re.escape(w) for w in _ZH_FUNCTION_WORDS)
+)
+
+
 def _tokens_of(idea: str, limit: int = 3) -> list[str]:
-    """从 idea 里粗切几个检索词。
+    """从 idea 里切出能拿去检索的词。
 
     不做真正的关键词抽取（那又要一次 LLM 调用，慢且不稳）。
-    做法：保留英文连续词组与中文 3 字以上的片段，取前几个。
+    做法分两路：
+
+    1. **英文词组**：取长度 >= 3 的英文连续词组（含连字符），这类词检索最准。
+    2. **中文实义词块**：先按标点和虚词（的/基于/可以…）切开，再丢掉不足 2 字
+       的碎片。切完之后每块都是一个完整的名词短语，而不是从前一个虚词尾巴
+       上截下来的半句话。
+
+    旧实现用 ``re.findall(r"[\\u4e00-\\u9fff]{4,12}", idea)`` 按字数硬切，
+    「想做一个基于引用关系图谱的论文推荐系统」会被切成
+    ``['想做一个基于引用关系图谱', '的论文推荐系统', ...]``——第二段以「的」
+    开头，拿去查 Crossref 只能靠字面命中，捞回来的还是别的领域的老论文。
 
     实测「attention mechanism transformer」这类组合检索效果够用；
     真要更准，后面可以让 LLM 出查询词，但那是可选优化。
@@ -228,9 +289,14 @@ def _tokens_of(idea: str, limit: int = 3) -> list[str]:
     # 英文词组（含连字符），取长度 >= 3 的
     for m in re.findall(r"[A-Za-z][A-Za-z\-]{2,}(?:\s+[A-Za-z][A-Za-z\-]{2,}){0,3}", idea):
         q.append(m.strip())
-    # 中文片段：整句去掉标点后按 4-8 字切，取最长几段
-    han = re.findall(r"[\u4e00-\u9fff]{4,12}", idea)
-    q.extend(han)
+    # 中文实义词块：先去虚词、再按标点切。
+    # 门槛设 3 字：2 字块大多是「用户」「改进」「系统」这类泛词或动词，
+    # 拿去检索只会把结果拉向无关领域，宁可不要。
+    for piece in _ZH_SPLIT_RE.split(idea):
+        piece = piece.strip()
+        # 只留纯中文块；纯数字/字母块上一步已经收过了
+        if len(piece) >= 3 and re.fullmatch(r"[\u4e00-\u9fff]+", piece):
+            q.append(piece)
     # 去重保序
     seen: list[str] = []
     for x in q:
@@ -244,6 +310,54 @@ def _tokens_of(idea: str, limit: int = 3) -> list[str]:
 def extract_idea_queries(idea: str) -> list[str]:
     """对外暴露的查询词抽取（测试用）。"""
     return _tokens_of(idea)
+
+
+_ZH_QUERY_PROMPT = (
+    "把下面这组中文检索词翻译成一组英文检索词，用于检索 arXiv 和 Crossref。"
+    "要求：只输出英文，词与词之间用英文逗号分隔，不要编号、不要解释、不要中文。"
+    "每个词保持原意，不要展开成句子，不要超过 6 个词。\n\n{queries}"
+)
+
+
+async def _english_queries(queries: list[str]) -> list[str]:
+    """把中文检索词翻成英文，用于补检索。全英文或翻译失败时返回空列表。
+
+    arXiv 和 Crossref 的索引都不做中文分词：实测「引用关系图谱」「论文推荐系统」
+    「文献推荐」三个查询在 Crossref 返回的是同一批无关结果，arXiv 返回 0 条，
+    而对应的英文 ``citation graph recommendation`` 能打到高相关文献。
+    所以中文 idea 必须多一条英文检索路径，否则候选池里只有标题带「图」字的
+    数学论文，模型照着引用就是引用错文献——比不引用更糟。
+
+    这是**增强**不是必需：模型不可用、超时、返回中文都当失败处理，
+    返回空列表让主流程退回纯中文检索。
+    """
+    zh = [q for q in queries if re.search(r"[\u4e00-\u9fff]", q)]
+    if not zh:
+        return []
+    try:
+        raw = await chat(
+            [{"role": "user", "content": _ZH_QUERY_PROMPT.format(queries="\n".join(zh))}],
+            temperature=0.2,
+        )
+    except Exception as exc:  # noqa: BLE001 - 检索增强，失败就退回中文检索
+        logger.warning("1.6.1 检索词英译失败，只用中文词: %s", exc)
+        return []
+
+    out: list[str] = []
+    for piece in re.split(r"[,，;；\n]+", raw or ""):
+        # 模型常带编号/项目符号（"1. citation graph"、"- citation graph"），
+        # 不剥掉会变成检索词的一部分，把 arXiv 查询打空。
+        piece = re.sub(r"^\s*(?:\d{1,2}\s*[.、)）]|[-*•·])\s*", "", piece)
+        piece = piece.strip().strip("`'\"。.、 ")
+        # 只要纯英文短语：含中文说明模型没按要求输出，直接丢
+        if not piece or re.search(r"[\u4e00-\u9fff]", piece):
+            continue
+        if not re.search(r"[A-Za-z]{3,}", piece):
+            continue
+        if len(piece) > 120 or piece in out:
+            continue
+        out.append(piece)
+    return out[:6]
 
 
 async def generate_framework(idea: str, total_candidates: int = 16) -> dict[str, Any]:
@@ -265,6 +379,18 @@ async def generate_framework(idea: str, total_candidates: int = 16) -> dict[str,
 
     queries = _tokens_of(idea)
     logger.info("1.6.1 检索词: %s", queries)
+
+    # 中文 idea 的检索词打不进 arXiv/Crossref：实测三个不同的中文查询词
+    # （引用关系图谱 / 论文推荐系统 / 文献推荐）在 Crossref 返回的是同一批完全无关的
+    # 结果，arXiv 更是 0 命中——两个源的索引都不做中文分词。于是候选池里只剩
+    # 「关于…的一个猜想」这类标题里带「图」字的数学论文，模型引用它们等于引用错文献。
+    # 补救：把中文检索词翻成英文再检索一遍，英文查询实测能打到高相关文献。
+    # 翻译失败不影响主流程（返回 None 就只用中文词），因为这是增强而非必需。
+    english = await _english_queries(queries)
+    if english:
+        logger.info("1.6.1 英文检索词: %s", english)
+        queries = queries + english
+
     pool = lit.build_candidates(queries, total_limit=total_candidates)
 
     if not pool:

@@ -1,0 +1,21 @@
+{
+ "saved_at": "2026-10-31T05:00:17+00:00",
+ "data": {
+  "arxiv_id": "2610.38282",
+  "title": "Human Evaluation with Automatic Scores: Separating Sampling and Estimation Gains",
+  "authors": [
+   "Yang Liu",
+   "Ran Zou",
+   "Zhengtao Gui",
+   "Chao Xue"
+  ],
+  "abstract": "Automatic judges offer inexpensive information about model outputs, but an evaluation team must decide how to turn that information into fewer human annotations. Scores can guide sampling, correct an estimate, or support adaptive acquisition, and these uses may capture overlapping gains. We compare their incremental value on fixed evaluation pools from three preference datasets, and 19 attributed-question-answering systems. Matched comparisons use the same scores, account for pilot labels and budget rules, and separate acquisition from estimation. Score stratification is a strong reference: after ten-bin stratification, the best fixed local linear correction offers only 1.00--5.27% further MSE reduction in the primary configurations. Unequal allocation offers larger gains in some pools, but can increase error when confident scores conceal variable human outcomes. Comparison on AttributedQA, shrinking learned quotas toward score-only quotas lowers pooled MSE for 17 of 19 systems relative to the score-only procedure, but ordinary pooled 95% intervals cover only 88.09--93.54%. The same shrinkage improves on the score-only reference in only one of eight preference configurations. Ranking experiments further show that lower individual MSE need not improve system selection. These findings support a simple starting procedure, proportional sampling within score strata followed by a stratified human mean, and identify what additional evidence is needed to justify correction or adaptation for the intended evaluation output.",
+  "published": "[Submitted on 28 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.38282",
+  "fetched_at": "2026-10-31T05:00:17+00:00"
+ }
+}
