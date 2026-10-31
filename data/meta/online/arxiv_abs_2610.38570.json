@@ -1,0 +1,20 @@
+{
+ "saved_at": "2026-10-31T05:00:22+00:00",
+ "data": {
+  "arxiv_id": "2610.38570",
+  "title": "Do Audio LLMs HEAR Pain? Tracing Acoustic Evidence from Speech to Language Reasoning",
+  "authors": [
+   "Wenqi Li",
+   "Xiangjue Dong",
+   "Sulaiman Vesal"
+  ],
+  "abstract": "Large audio language models (LALMs) can process speech directly, but it remains unclear how well they use the non-lexical acoustic information that speech carries. We study this question through pain, using TAME-Pain, which contains pain-neutral Harvard sentences and spoken pain ratings recorded at different self-reported pain levels. We introduce HEAR, a four-stage diagnostic framework that traces pain-related information from the speech signal to the model&#39;s prediction, and apply it to seven closed-source and open-weight LALMs. On the Harvard sentences, where pain can only be inferred from the voice, all models perform at chance level, and same-speaker references or few-shot examples improve balanced accuracy by no more than six points. On the spoken ratings, the same models reach 87.5-99.7% balanced accuracy. Layer-wise probing of open-weight LALMs shows that pain can be decoded from early audio representations (74.1% balanced accuracy for binary prediction and 45.0% for three-class severity), but that this information, along with most pain-associated acoustic cues, decreases in deeper layers. In an acoustic perception test, weaker models cannot distinguish even large changes in these cues, whereas stronger models can but still fail to infer pain. Finally, we recover pain-related acoustic cues and directly reinject them as structured text into the prompt, which improves pairwise pain prediction by up to 32 points. These results indicate that current LALMs encode paralinguistic information in early layers that is largely unavailable when the model produces its answer.",
+  "published": "[Submitted on 28 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL) ; Artificial Intelligence (cs.AI); Sound (cs.SD)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.38570",
+  "fetched_at": "2026-10-31T05:00:22+00:00"
+ }
+}

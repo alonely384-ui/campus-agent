@@ -131,6 +131,45 @@ def test_extract_queries_from_chinese_and_english():
     assert len(q) <= 3
 
 
+def test_extract_queries_does_not_start_with_function_word():
+    """中文检索词不能以「的」「基于」「想做一个」这类虚词开头。
+
+    旧实现按 4-12 字硬切，「想做一个基于引用关系图谱的论文推荐系统」会被切成
+    ['想做一个基于引用关系图谱', '的论文推荐系统', ...]，第二段以「的」开头，
+    拿去检索只能靠字面命中，捞回来的是别的领域的老论文。
+    """
+    idea = "想做一个基于引用关系图谱的论文推荐系统，让用户可以顺着参考文献链条发现高价值文献"
+    q = w.extract_idea_queries(idea)
+    assert q, "不能切出空检索词"
+    for x in q:
+        assert not x.startswith("的"), f"检索词以虚词开头: {x}"
+        assert not x.startswith("想让"), f"检索词以虚词开头: {x}"
+        assert "想做一个" not in x, f"检索词含虚词: {x}"
+    # 关键实义词块要能切出来
+    assert "引用关系图谱" in q
+    assert "论文推荐系统" in q
+
+
+def test_extract_queries_keeps_english_terms_before_chinese():
+    """英文术语检索最准，必须排在中文块前面（build_candidates 按顺序消费）。"""
+    q = w.extract_idea_queries("基于 LoRA 的大模型微调效率优化")
+    assert q[0] == "LoRA"
+    assert "大模型微调效率优化" in q
+    # 「的」不能被带进中文块
+    assert all(not x.startswith("的") for x in q)
+
+
+def test_extract_queries_drops_short_generic_blocks():
+    """2 字块（用户/改进/系统）太泛，检索只会把结果拉偏，应被丢掉。"""
+    q = w.extract_idea_queries("用 attention mechanism 改进 Transformer 的长文档摘要")
+    assert "改进" not in q
+    assert "长文档摘要" in q
+
+
+def test_extract_queries_blank_idea_returns_empty():
+    assert w.extract_idea_queries("   ") == []
+
+
 def test_format_reference_includes_arxiv_when_available():
     c = _cand("C1", "T", source="arxiv", arxiv_id="2101.00001")
     assert "arXiv:2101.00001" in w.format_reference(c)
@@ -197,6 +236,70 @@ def test_local_authors_index_returns_empty_when_file_missing(monkeypatch, tmp_pa
 
     monkeypatch.setattr(lit, "STRUCTURES_FILE", tmp_path / "nope.json")
     assert lit.load_local_authors() == {}
+
+
+def test_norm_title_keeps_chinese_characters():
+    """中文标题归一化后不能是空串，否则 _dedupe 的判重键全为空。
+
+    旧实现 ``re.sub(r"[^0-9a-z]+", "", ...)`` 把汉字全删了，纯中文标题归一化
+    得到 ''，而 _dedupe 里 ``if k`` 会把空 key 过滤掉 —— 判重对中文文献完全失效，
+    同一篇论文被两个查询词各捞一次就进池两次，最终参考文献里出现三条一模一样的条目。
+    """
+    from app import literature as lit
+
+    n = lit._norm_title("关于拟阵基图一个猜想的证明")
+    assert n, "中文标题归一化后不能为空"
+    assert "拟阵基图" in n
+    # 全角/半角标点、多余空格不影响结果
+    assert lit._norm_title("关于拟阵基图一个猜想的证明。") == n
+    assert lit._norm_title("  关于拟阵基图一个猜想的证明  ") == n
+
+
+def test_norm_title_handles_mixed_and_english_titles():
+    from app import literature as lit
+
+    # 中英混排：中文和英文都要保留，破折号变体归一后一致
+    a = lit._norm_title("中高职一体化课程体系构建——基于技能图谱视角的实践探索")
+    b = lit._norm_title("中高职一体化课程体系构建—基于技能图谱视角的实践探索")
+    assert a == b and a
+    # 英文标题大小写与空格归一
+    assert lit._norm_title("Attention Is All You Need") == lit._norm_title("attention is all you need")
+
+
+def test_dedupe_removes_duplicate_chinese_titles():
+    """同一篇中文论文被多个查询词各捞一次，去重后只能留一条。"""
+    from app import literature as lit
+
+    def mk(title: str, source: str = lit.SOURCE_CROSSREF, score: float = 1.0) -> lit.Candidate:
+        return lit.Candidate(key="", title=title, source=source, score=score)
+
+    rows = [
+        mk("关于拟阵基图一个猜想的证明"),
+        mk("关于Riemann曲面长度谱的一个猜想"),
+        mk("关于拟阵基图一个猜想的证明"),  # 重复
+        mk("关于拟阵基图一个猜想的证明。"),  # 重复（只有标点不同）
+        mk("中高职一体化课程体系构建——基于技能图谱视角的实践探索"),
+        mk("中高职一体化课程体系构建—基于技能图谱视角的实践探索"),  # 重复
+    ]
+    out = lit._dedupe(rows)
+    titles = [c.title for c in out]
+    assert len(out) == 3, f"应去重到 3 条，实际 {len(out)}: {titles}"
+    assert "关于拟阵基图一个猜想的证明" in titles
+    assert "关于Riemann曲面长度谱的一个猜想" in titles
+    assert len(out) == len({lit._norm_title(t) for t in titles}), "去重后仍有同键条目"
+
+
+def test_dedupe_prefers_local_over_crossref():
+    """本库条目能跳原文，优先级最高。"""
+    from app import literature as lit
+
+    rows = [
+        lit.Candidate(key="", title="Same Paper Title", source=lit.SOURCE_CROSSREF),
+        lit.Candidate(key="", title="same paper title", source=lit.SOURCE_LOCAL),
+    ]
+    out = lit._dedupe(rows)
+    assert len(out) == 1
+    assert out[0].source == lit.SOURCE_LOCAL
 
 
 # --------------------------------------------------------------------------- 1.6.2 架构图
@@ -503,6 +606,53 @@ def test_export_png_produces_png_bytes():
     png = ch.export_png(df, {"kind": "bar", "x": "model", "y": "score"})
     assert png.startswith(b"\x89PNG")
     assert len(png) > 1000
+
+
+def test_export_png_handles_comma_separated_y():
+    """``y`` 是逗号分隔多列时也必须出图。
+
+    choose_chart 给折线/柱状图的就是 ``"train_loss,val_loss,accuracy"`` 这种多列写法。
+    旧实现直接 ``df[y]``，多列时 ``y in df.columns`` 为假、返回空列表，matplotlib 报
+    ``x and y must have same first dimension, but have shapes (8,) and (0,)``，
+    PNG 静默失败、png_url 为空 —— 用户勾了柱状图，导出的图却不存在。
+    """
+    df = ch.load_csv(
+        "epoch,train_loss,val_loss,accuracy\n"
+        "1,2.31,2.28,0.512\n2,1.87,1.92,0.634\n3,1.52,1.71,0.702\n"
+    )
+    for kind in ("line", "bar"):
+        png = ch.export_png(df, {"kind": kind, "x": "epoch", "y": "train_loss,val_loss,accuracy"})
+        assert png.startswith(b"\x89PNG"), f"{kind} 没出图"
+        assert len(png) > 1000, f"{kind} 图太小"
+
+
+def test_series_takes_first_column_of_multi_y():
+    df = ch.load_csv("epoch,a,b\n1,2.0,9.0\n2,3.0,8.0\n")
+    xs, ys = ch._series(df, "epoch", "a,b")
+    assert xs == [1, 2]
+    assert ys == [2.0, 3.0]
+    # 不存在的列返回空，而不是抛异常
+    assert ch._series(df, "epoch", "nope")[1] == []
+
+
+def test_all_chart_kinds_export_png():
+    """六种图型逐个出图，任何一个是空的都说明导出链路断了。"""
+    png_magic = bytes([0x89]) + b"PNG"
+    df = ch.load_csv(
+        "epoch,train_loss,val_loss,accuracy\n"
+        "1,2.31,2.28,0.512\n2,1.87,1.92,0.634\n3,1.52,1.71,0.702\n"
+        "4,1.28,1.65,0.741\n5,1.09,1.66,0.768\n"
+    )
+    info = ch.profile(df)
+    for kind in ch.CHART_KINDS:
+        spec = ch.choose_chart(info, df)
+        spec["kind"] = kind
+        if kind in ("radar", "radar3d"):
+            nums = info.get("numeric", [])
+            spec["y"] = ",".join(nums[:3] if kind == "radar3d" else nums)
+        png = ch.export_png(df, spec)
+        assert png[:4] == png_magic, f"{kind} 没出图"
+        assert len(png) > 1000, f"{kind} 图太小"
 
 
 def test_key_numbers_are_preformatted_strings():

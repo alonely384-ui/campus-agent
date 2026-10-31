@@ -1,5 +1,5 @@
 {
- "saved_at": "2026-10-27T03:20:49+00:00",
+ "saved_at": "2026-10-31T05:00:04+00:00",
  "data": {
   "offset": 0,
   "next": 25,
@@ -122,6 +122,174 @@
    },
    {
     "citingPaper": {
+     "paperId": "95142d9c3505c09d2ae01a9d1a40dadab14b7429",
+     "externalIds": {
+      "ArXiv": "2610.40403",
+      "CorpusId": 295372986
+     },
+     "title": "First-Order Bilevel Optimization for Non-truthful Auction Design",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.40403, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2296000322",
+       "name": "Shing-Hei Ho"
+      },
+      {
+       "authorId": "2162376894",
+       "name": "April Niu"
+      },
+      {
+       "authorId": "1829915",
+       "name": "Ellen Vitercik"
+      },
+      {
+       "authorId": "2393970947",
+       "name": "Kai Wang"
+      }
+     ],
+     "abstract": "Automated mechanism design has enabled the learning of complex auction mechanisms using neural networks. However, designing non-truthful auctions remains challenging because bidders'equilibrium strategies depend on the auction mechanism and thus evolve as the mechanism is optimized. In this work, we formulate auction design as a Stackelberg game with multiple strategic followers and develop a fully first-order algorithm for revenue optimization in non-truthful auctions. We establish non-asymptotic guarantees for hypergradient approximation and show that, under standard smoothness and strong-monotonicity assumptions, our method reaches an $O(\\epsilon)$-stationary point using $\\tilde{\\mathcal{O}}(\\epsilon^{-2})$ first-order oracle calls. Experiments on symmetric and asymmetric single-item auctions, as well as multi-item auctions, show that our method converges faster than second- and zeroth-order baselines and scales better as the number of bidders increases. Our method also discovers auctions that achieve revenue close to truthful baselines. These results provide a scalable framework for automated mechanism design beyond truthful auctions."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "15ba35d0cf365746d4c64880d02641d0dc33a8fc",
+     "externalIds": {
+      "ArXiv": "2610.39050",
+      "CorpusId": 295373020
+     },
+     "title": "BASILISC: Bayesian Alignment of Siamese-Integrated Latents for Inferring Single-cell Correspondence",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.39050, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2128049168",
+       "name": "Sepideh Saran"
+      },
+      {
+       "authorId": "32908270",
+       "name": "Mahsa Ghanbari"
+      },
+      {
+       "authorId": "2269611423",
+       "name": "Uwe Ohler"
+      }
+     ],
+     "abstract": "Single-cell assays study the genome one cell at a time. Unimodal assays measure one molecular layer, the newer multimodal assays measure several. Most data are single-modality, so integrating them relies on models trained on multimodal assays, where the cell correspondence across modalities is known. These models return a matching, but rarely a confidence measure. We present BASILISC (Bayesian Alignment of Siamese-Integrated Latents for Inferring Single-cell Correspondence), a framework for matching single-cell representations with uncertainty on the correspondence itself. A BASILISC model is a probabilistic siamese network over the two modalities with a predictive distribution over the correspondence for a cross-modal pair of cells. We instantiate it at two levels: at the cell-type level the question is whether two cells share a cell type, at the cell level which cell is the partner in the other modality. To our knowledge, this is the first uncertainty score on a learned cross-modal correspondence evaluated against a known ground-truth pairing. BASILISC learns a similarity across modalities that reflects cell lineage: an unseen cell type is matched to its lineage relative, matching still works on such held-out types (balanced accuracy 0.86 on unseen against 0.93 on seen types), and the predictive uncertainty rises on these out-of-distribution cells. The uncertainty score also selects high-quality matches for downstream analysis: discarding the least certain fifth of the pairs raises accuracy from 0.93 to 0.98. At the cell level, a deep ensemble of the deterministic matcher reaches 0.062 matching accuracy on the benchmark test set, above the competition winner; on the Bayesian matcher's assignment, the posterior flags the wrong matches that cross a cell-type boundary better than a deterministic read of the same scores (AUROC 0.68 against 0.64)."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "d3fecdb58a4241de9ef996b7135ec5798bedac64",
+     "externalIds": {
+      "ArXiv": "2610.39068",
+      "CorpusId": 295371914
+     },
+     "title": "Closed Gates Leak: Decomposing Adjacent-Layer Cancellation in Gated Language Models",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.39068, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2266240711",
+       "name": "Harvey Dam"
+      },
+      {
+       "authorId": "2316638300",
+       "name": "Ganesh Gopalakrishnan"
+      }
+     ],
+     "abstract": "In transformer language models with gated multilayer perceptrons (MLPs), adjacent layers write partly against each other into the residual stream. Previous work interpreted this cancellation as layers proposing features and the next layer selectively rejecting the inappropriate ones. We decompose the cancellation by removing the previous layer's write from the input of the next MLP: what the next layer writes along that write splits into what it writes anyway and how much less its MLP writes because the write is present, which we call the damping, and we trace the damping to the neurons that carry it. In gated MLPs the damping is carried by neurons whose gates are closed. SiLU and GELU are slightly negative below zero, so a closed gate still passes a small negative multiple of what the neuron reads, and a neuron whose output weight points along its input weight then subtracts a fraction of the direction it read. Summed over such neurons, closed gates contract the average direction a gated MLP reads, and the previous layer's write is not singled out: the same layer's write at another token is damped as much or more, and the eigenvalue signature from which that work concluded that the correction is selective appears for another token's write as well. Over training the damping grows while what the next layer writes anyway stays flat, and cancellation begins when the damping overtakes it; annealing the negative side of the gate activation away in continued pretraining removes the damping and the cancellation. Adjacent-layer cancellation is therefore weak evidence about which features a model rejects: it is produced by a contraction that gated MLPs apply, on average over directions, to whatever they read."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "afa0016e53fae3f286450cd63dddef54b3f0efa5",
+     "externalIds": {
+      "ArXiv": "2610.36440",
+      "CorpusId": 294523821
+     },
+     "title": "Learning atomic interactions for the thermodynamics of liquid mixtures",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.36440, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2309039107",
+       "name": "M. Hoffmann"
+      },
+      {
+       "authorId": "2225540094",
+       "name": "Sebastian Schmitt"
+      },
+      {
+       "authorId": "2239414431",
+       "name": "Hans Hasse"
+      },
+      {
+       "authorId": "92981587",
+       "name": "F. Jirasek"
+      }
+     ],
+     "abstract": "Predictive models for activity coefficients, which describe the non-ideality of liquid mixtures, are foundational for process design and optimization. Group-contribution methods, such as UNIFAC, are computationally cheap and well established in process simulators. Modern machine learning models, such as HANNA, offer higher accuracy and broader applicability, but their integration into process simulation is expensive or even infeasible. In this work, we introduce COGNAC, a graph neural network that learns atom-level geometry and interaction parameters that depend on the molecular neighborhood and evaluates them in the UNIFAC framework. Trained on about 820,000 experimental data points, COGNAC achieves significantly higher accuracy than UNIFAC and HANNA for binary and multi-component mixtures, reduces error relative to HANNA by 13-63%, reliably predicts multi-phase equilibria and identifies azeotropes, yields interpretable parameters, and is strictly thermodynamically consistent. COGNAC evaluations run at a cost comparable to UNIFAC, thereby unlocking the potential of machine-learning models for process simulations."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "63cf7c4f3c6dc89898a9b7d096a3e260d961748a",
+     "externalIds": {
+      "ArXiv": "2610.37874",
+      "CorpusId": 295319007
+     },
+     "title": "PairCLIP-SWA: Similarity-Guided Balancing and Stochastic Weight Averaging for Generalized Deepfake Image Detection with OpenCLIP",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.37874, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2364205127",
+       "name": "M. Nakib"
+      },
+      {
+       "authorId": "2524283378",
+       "name": "Sudipto Sarkar"
+      },
+      {
+       "authorId": "2524282634",
+       "name": "A. J. A. Jubayer Talukder"
+      },
+      {
+       "authorId": "2374127421",
+       "name": "M. A. Haque"
+      }
+     ],
+     "abstract": "Deepfake detectors are almost always deployed as the single checkpoint that scored best on a validation split, yet the reliability of that choice is rarely measured. We measure it with PairCLIP-SWA, a single-backbone detector that adapts an OpenCLIP ViT-L/14 visual tower by progressive block unfreezing on a class-balanced corpus built by CLIP-similarity-guided one-to-one subsampling, and averages the fine-tuning trajectory in weight space. Trained in-domain on the IEEE SP Cup 2025 (DF-Wild-Cup) benchmark under the same protocol as the strongest published three-backbone ensemble, the weight-averaged detector reaches 97.04% accuracy, 98.64% AU-ROC and a 4.07% equal error rate, against 94.46%, 97.60% and 5.00%. Its training log shows why averaging matters: over the averaged epochs the non-averaged checkpoint swings across 5.34 points of validation accuracy while its validation loss more than doubles, whereas the average is never worse and is up to 5.99 points better. On an OpenForensics-derived benchmark the same instability becomes a misranking: the checkpoint that validation accuracy selects (98.43%) scores 88.85% on a disjoint 10,905-image test partition, rejecting 21.1% of genuine photographs, while the terminal average, ranked last on validation, scores 94.76%. A study of twenty-two in-house configurations on the identical DF-Wild-Cup split, including preprocessing ablations, shows that CLIP pre-training rather than ensembling drives accuracy, that secondary face cropping costs about 34 points, and that frequency-domain inputs transfer poorly. We recommend per-class selection criteria measured off the early-stopping split."
+    }
+   },
+   {
+    "citingPaper": {
      "paperId": "7d230c514399201b6a2574ef6007d84e00de4025",
      "externalIds": {
       "DOI": "10.1145/3795866.3844494",
@@ -150,6 +318,102 @@
       }
      ],
      "abstract": "Real-time object detection is essential for mobile augmented reality (AR) applications; however, modern detectors based on Vision Transformers (ViTs) incur significant computational overhead. Although edge offloading can alleviate the limited compute resources on mobile devices, the inference latency of ViT-based detection on edge servers remains a major bottleneck, causing detection results to arrive after the camera viewpoint has changed and degrading AR experiences. To address this problem, we propose DeltaAR, an edge-assisted AR object detection system that leverages AR geometry (depth maps and 6-DoF camera poses) to reduce the cost of ViT-based detection. Different from existing AR systems, DeltaAR uses sensory data available on modern AR devices to accurately identify newly exposed regions between consecutive frames. Based on this information, we design a region-aware ViT that reduces computation by processing tokens required for detecting objects in newly exposed regions and skipping redundant tokens from old regions. To preserve detection accuracy, we further introduce a lightweight token selector that retains a small set of old-region tokens needed for cross-boundary objects and contextual information. Experiments show that DeltaAR significantly reduces edge inference cost and latency while maintaining high detection accuracy for real-time AR applications."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "0a37164403089e686b9725b90d65369d823fe5d3",
+     "externalIds": {
+      "ArXiv": "2610.35070",
+      "CorpusId": 294366357
+     },
+     "title": "Joint Dynamic Lane Reversal and Variable Speed Limit Control: A Graphormer-Based Approach",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.35070, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2520975803",
+       "name": "Hamed Araab"
+      },
+      {
+       "authorId": "2519620790",
+       "name": "Abbas Ahmadi"
+      },
+      {
+       "authorId": "39317913",
+       "name": "M. Basiri"
+      }
+     ],
+     "abstract": "Connected and automated vehicles could allow reassigning lane directions and speed limits on every road frequently, but the benefit hinges on how traffic reroutes, and one-way roads can isolate junctions. We formulate network-wide dynamic lane allocation and directional speed limit control with one-way roads, lane clearing before each reversal, and a navigable graph kept strongly connected at all times. An action-resolution algorithm grounded in graph orientation theory admits a proposal closing a direction only if the network stays strongly connected and otherwise relaxes or reverts it, keeping all junctions mutually reachable within the model, even during clearing. All road controllers share one transformer whose attention, Global Endpoint Relation-Aware Spatio-Temporal Self-Attention (GERASTSA), spans all road-time tokens, biased by the endpoint relations between roads. It is pretrained on action-conditioned traffic forecasting and fine-tuned with per-road proximal policy optimization under a mixed reward that also credits neighboring roads and the network. On a 6 x 6 grid with commuter rush hours, the learned policy makes about two thirds of roads one-way in the peak direction and cuts daily delay by 90% against the initial configuration held fixed and by 85% against a tuned two-way load balancer. Restricted to two-way roads at test time, it gains only about as much as this balancer, whereas its learned speed limits add delay. Pretraining roughly halves the updates needed to surpass the fixed configuration. Of the ablations, only removing the relational bias or the spatial embedding clearly matters, multiplying delay about fivefold."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "8611d92554deaa97a6866e7d768138a277bce2ab",
+     "externalIds": {
+      "ArXiv": "2610.36192",
+      "CorpusId": 294524120
+     },
+     "title": "Beyond the Estimate: Wiener-Informed Decoding for Easier Training of Pixel-Space Flow Models",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.36192, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "2364644096",
+       "name": "Zi-Qiao Wang"
+      },
+      {
+       "authorId": "2314810632",
+       "name": "Yang You"
+      }
+     ],
+     "abstract": "Learning velocity fields directly in pixel space is difficult and slow. We show that coarse second-order image statistics can ease this task: frozen Wiener estimates improve velocity learning, with gains extending beyond the linear predictions they explicitly provide. Moreover, we observe similar but complementary gains from frozen bases and pixel decoding. These observations motivate Wiener-informed Decoding (WiD), which uses statistical knowledge both for direct prediction and to organize decoder computation without modifying native blocks. WiD combines a trainable Wiener prediction path with coefficient interfaces that inject features into the native decoder and return its predicted coefficient corrections, with these components initialized with data statistics. All introduced parameters, including the spectrum and coordinate transforms, are trained jointly under the original pixel-space velocity objective. Across model scales and decoder architectures, WiD accelerates training and improves generation quality with modest parameter overhead. It also yields smoother gradient trajectories and remains effective with representation alignment. WiD improves class-conditional and text-to-image generation across different resolutions. On ImageNet 256 x 256, PixelDiT-XL with WiD reaches FID 1.53 after 500 epochs, achieving comparable quality to PixelDiT with 37.5% fewer training epochs. Statistical denoisers contribute beyond the estimate: their computational structure can also ease pixel-space training."
+    }
+   },
+   {
+    "citingPaper": {
+     "paperId": "a0a4e0aab8fdd64a062faf9ee2702aed1ea6801b",
+     "externalIds": {
+      "ArXiv": "2610.33420",
+      "CorpusId": 294228496
+     },
+     "title": "An Empirical Study of Reinforcement Learning Scaling Laws",
+     "year": 2026,
+     "openAccessPdf": {
+      "url": "",
+      "status": null,
+      "license": null,
+      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.33420, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
+     },
+     "authors": [
+      {
+       "authorId": "1500655637",
+       "name": "Ze-Yu Zheng"
+      },
+      {
+       "authorId": "2283846525",
+       "name": "Clare Lyle"
+      },
+      {
+       "authorId": "38562041",
+       "name": "Khimya Khetarpal"
+      },
+      {
+       "authorId": "2288258284",
+       "name": "Will Dabney"
+      }
+     ],
+     "abstract": "The discovery of scaling laws enables prediction of the performance, the optimal resource allocation strategy, and the best hyperparameter configuration of a large-scale training job based on inexpensive experiments at smaller scales. Guided by these empirical scaling laws, the deep learning community has achieved great success in training large (self-)supervised models on Internet-scale datasets. In contrast, despite its potential and wide application, reinforcement learning (RL) has yet to find a guiding principle for predictable scaling. In this work, we conduct an empirical study of RL scaling laws of an actor-critic algorithm in two procedurally generated environments, Starpilot and Craftax. We discover empirical scaling laws with strong predictive performance in both environments. The discovered scaling laws accurately predict the aforementioned three quantities for larger-scale training jobs up to two orders of magnitude in total training compute. In particular, we employ a variant of Elo scores for the single-agent RL paradigm as an alternative performance metric than the commonly used mean episode return. Our results show that the Elo score is a much more predictable metric than the mean episode return, making it a better choice for fitting scaling laws. By applying our discovered scaling laws to increase training compute, we establish a new state of the art in the challenging Craftax environment. Beneath the surface of the global scaling trend, we also observe a non-monotonic scaling pattern of the compute-optimal model size in Craftax. We connect this observation to a pathology known as Ray interference."
     }
    },
    {
@@ -618,282 +882,6 @@
       }
      ],
      "abstract": "3D point clouds generation requires capturing both part-level layout and surface detail while preserving permutation equivariance. Existing latent generative models often encode an entire shape into a single vector, which limits their ability to retain part-level structure. We propose TokenFlow, a hierarchical flow matching framework that represents each shape as a set of latent tokens and couples a rectified flow over these tokens with a conditional flow over points. A bottleneck of $M \\ll N$ learnable tokens aggregates global context through cross-attention at $O(NM)$ cost. On ShapeNet, TokenFlow achieves the best MMD and coverage across airplane, car, and chair, while obtaining 1-NNA comparable to the strongest baselines. On ModelNet, its learned latent set reaches the best reported linear-evaluation accuracy on ModelNet10. These results show that representing a shape as a set of latent tokens, aggregated at $O(NM)$ cost, provides an effective representation for 3D point cloud generation."
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "47e8d4f7f1b6fced8dc78742a6c1d5e9a9f384cd",
-     "externalIds": {
-      "ArXiv": "2610.27995",
-      "CorpusId": 293811910
-     },
-     "title": "Learning Tactile-Aware Hand Representations from Human Hand-Object Interaction Data",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "",
-      "status": null,
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.27995, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "83360169",
-       "name": "Yeonguk Yu"
-      },
-      {
-       "authorId": "2327036925",
-       "name": "Jaehong Kim"
-      },
-      {
-       "authorId": "2695251",
-       "name": "Byungok Han"
-      }
-     ],
-     "abstract": "Tactile representation learning for dexterous manipulation often requires substantial robot-side data collection, limiting its scalability across different hands and sensors. We explore whether large-scale human hand-object interaction (HOI) data can provide a useful prior for robotic tactile learning. To this end, we propose HuTact, a framework that pretrains tactile-aware hand representations from human HOI data without requiring real tactile signals during pretraining. HuTact transfers the interaction structure learned from human hand motions to robotic tactile observations and can be further adapted with a small amount of unlabeled robot interaction data. We evaluate HuTact on tactile perception and manipulation tasks, including grasp prediction, slip detection, object classification, and tactile-conditioned policy learning. Across these tasks, human HOI pretraining improves data efficiency and provides a strong initialization for downstream learning. Notably, with HOI pretraining followed by midtraining on unlabeled robot play data, HuTact achieves 88.26% Macro-F1 on grasp prediction using only 25\\% of the labeled downstream data, comparable to training from scratch on the full labeled dataset (88.23%). These results suggest that human interaction data can serve as a scalable complementary source for robotic tactile representation learning."
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "8990841a61f2e790c6850fa8f4ac90afcdad8477",
-     "externalIds": {
-      "ArXiv": "2610.28086",
-      "CorpusId": 293812213
-     },
-     "title": "MoDDiT: Simple Token Routing in Diffusion Transformers",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "",
-      "status": null,
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28086, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "2307075759",
-       "name": "Jarek Liesen"
-      },
-      {
-       "authorId": "2334760150",
-       "name": "M. Jackson"
-      },
-      {
-       "authorId": "2151859995",
-       "name": "Benjamin Ellis"
-      },
-      {
-       "authorId": "2067203314",
-       "name": "Shimon Whiteson"
-      },
-      {
-       "authorId": "2275156099",
-       "name": "J. Foerster"
-      }
-     ],
-     "abstract": "Real-time video generation, interactive world models, and on-device image synthesis are almost a reality. Diffusion Transformers (DiT) achieve excellent sample quality, shifting the bottleneck to the throughput of the models themselves. Natural images are inherently sparse, as large portions of an image are often background, contribute little to the scene content, and are easy to denoise. DiTs fail to exploit this sparsity, as they process image tokens statically and uniformly. We propose MoDDiT, a simple architecture modification that learns to route tokens through both MLP and self-attention operations. By routing tokens through both blocks independently, MoDDiT allows for dynamic compute allocation in MLPs that varies across tokens, images, and denoising timesteps. Using MoDDiT to train image generation models from scratch significantly reduces computational costs of training and inference, processing as few as 12.5% of the tokens. By increasing sparsity and model depth, MoDDiT reduces costs and improves generation performance over unrouted baselines. The learned allocation is interpretable, revealing how computation varies with visual content and noise level. We also use MoDDiT to train video generation models, where allocation correlates with motion, and to distill a dense bidirectional video model into a sparse autoregressive student."
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "81521af96c61f69b43fcb5d21e317a9e33d13334",
-     "externalIds": {
-      "ArXiv": "2610.27960",
-      "CorpusId": 293811968
-     },
-     "title": "Efficient SAM3 Adaptation for Multi-Class Semantic Segmentation via Dense Competitive Representations",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "",
-      "status": null,
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.27960, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "2184497497",
-       "name": "Wen-Bin Liao"
-      },
-      {
-       "authorId": "2313687851",
-       "name": "Hao Zhu"
-      },
-      {
-       "authorId": "3193532",
-       "name": "Yike Ma"
-      },
-      {
-       "authorId": "2266552062",
-       "name": "Hao Jiang"
-      },
-      {
-       "authorId": "2175787349",
-       "name": "Feng Dai"
-      }
-     ],
-     "abstract": "The Segment Anything Model 3 (SAM3) has achieved significant progress in Promptable Concept Segmentation (PCS) by processing short noun phrases to generate segmentation masks with unique instance identifiers. While SAM3 excels at single-concept segmentation, it falls short in complex, real-world environments where multiple concepts must be segmented simultaneously. In particular, SAM3 typically fails to simultaneously process concepts with semantic overlap, leading to semantic misclassifications and redundant mask predictions. Moreover, as the number of concepts increases, the independent inference paradigm introduces prohibitive inference latency. To address these limitations, we propose the Dense Competitive Representations SAM (DCR-SAM) framework. By decoupling cross-modal interactions, the proposed method alleviates the inference latency. To resolve semantic misclassifications, DCR-SAM dynamically aligns textual concepts with visual representations and incorporates a dense competition head to enforce explicit inter-class competition. Furthermore, a learnable background token is applied to absorb non-target objects dynamically. These mechanisms effectively suppress overlapping predictions and generate high-fidelity masks. Extensive experimental evaluations across multiple benchmarks demonstrate that the proposed framework: (1) achieves a 2.3% $\\sim$ 10.7% performance improvement over state-of-the-art methods, (2) delivers a 33$\\times$ inference speedup compared to the native SAM3, and (3) exhibits strong robustness across diverse scenarios."
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "ed55fe425237e02baa68912f5078e5a11eacb458",
-     "externalIds": {
-      "ArXiv": "2610.28223",
-      "CorpusId": 293812212
-     },
-     "title": "Local Inference of LLMs on Long Contexts: A Data Systems Perspective",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "",
-      "status": null,
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28223, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "2516050720",
-       "name": "Mattias Dürrmeier"
-      },
-      {
-       "authorId": "143649662",
-       "name": "Alberto Lerner"
-      }
-     ],
-     "abstract": "Large language models can solve complex problems across a variety of subjects, such as mathematics and coding. For such complex analytical tasks, models with a long context perform better. Serving models with long context is currently mostly done on powerful systems with multiple GPUs, which are too expensive for most users. An alternative is local inference, or serving a model on a user's own machine, which removes per-token costs and rate limits, besides keeping sensitive data private and giving users full control over the models they run. The common understanding, however, is that local LLMs need compression (e.g., quantization) to run on a single GPU. In this paper, we set out to study the limitations that prevent serving long-context models for single users, besides the capacity issue. Rather than characterizing a single model on one GPU, we analyze how different models behave across several GPU generations. This lets us uncover not just individual bottlenecks but broader trends in where inefficiencies arise. Our analysis confirms that, as expected, self-attention dominates the runtime for long-context inference. More unexpectedly, our evaluation reveals that the current structure of self-attention leaves key GPU resources significantly underutilized, and the newest GPU is often the least well served. Many of these findings are fundamentally data management problems, from paging the KV cache to improving cache utilization and synchronization in the GPU, which is why we bring this study to the Data Systems community. To engage this community, we present our findings as a series of experimental observations and formulate recommendations for future work."
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "bd8b715ef7e5e7c2ae5ae21daffb39f059579497",
-     "externalIds": {
-      "ArXiv": "2610.28191",
-      "CorpusId": 293812383
-     },
-     "title": "Unified RAW Image Exposure Correction and Restoration via Linear Illumination and Frequency-Adaptive Enhancement",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "",
-      "status": null,
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28191, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "2312008285",
-       "name": "Ying-Kai Zhang"
-      },
-      {
-       "authorId": "31218892",
-       "name": "Yun-Hao Zou"
-      },
-      {
-       "authorId": "2238148287",
-       "name": "Ying Fu"
-      }
-     ],
-     "abstract": "Incorrect exposure degrades both image brightness and recoverable scene detail. Existing sRGB-based correction methods are limited by the non-linear image signal processing pipeline, whereas RAW-based methods are usually developed for a single degradation type, such as low-light denoising or high-light recovery. In this paper, we focus on joint exposure correction and restoration directly in the RAW domain and propose a unified RAW Image Exposure Correction and Restoration (RIECR) framework for both under- and over-exposed images. RIECR decomposes the problem into two coupled sub-problems that follow the RAW imaging model: linear illumination correction and residual degradation restoration. First, a Linear Illumination Correction Network (LICN) estimates exposure-aware linear gains by using channel-specific RAW cues. It exploits the high signal-to-noise ratio of Green channels for robust brightening and the relatively unsaturated Red/Blue responses for high-light darkening. Second, a dual-branch Frequency-based Enhancement Network (FEN) restores the remaining degradation with a Frequency Dynamic Convolution (FDC) module. FDC decomposes convolutional responses into low- and high-frequency components and adaptively suppresses amplified noise or recovers clipped textures according to the exposure context. We further build a real paired RAW benchmark containing 223 scenes and 1,784 pairs covering complex multi-exposure errors. Experiments against sixteen state-of-the-art methods show that RIECR achieves state-of-the-art performance on real RAW exposure correction."
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "6fcd1a456b8e519a49e13e9c32b2901ae589afbc",
-     "externalIds": {
-      "ArXiv": "2610.28709",
-      "CorpusId": 293845047
-     },
-     "title": "STAR-XPC: Set Transformer for Estimating X-ray Transmission in Polymer Composites",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "",
-      "status": null,
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.28709, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "2434945922",
-       "name": "Can Erer"
-      },
-      {
-       "authorId": "2357899087",
-       "name": "H. Yilmaz"
-      },
-      {
-       "authorId": "101442123",
-       "name": "Nebahat Aral"
-      }
-     ],
-     "abstract": "Evaluating the energy transmission ratio of an X-ray beam through a polymer composite is a challenging task in radiation shielding studies. The reference solution with Monte Carlo transport simulation is highly accurate but computationally expensive: each of our reference simulations is capped at $4\\times10^9$ photon histories and a 20,000 s (over 5 hours) time limit, while closed-form analytical methods fail to represent such complex scenarios. We present an artificial neural network model that maps the unordered multi-set of molecular constituents, their mass fractions, and four bulk physical descriptors directly to the transmission ratio $I(t)/I_0$ in 1-3 milliseconds. The model is a Set Transformer, which makes it permutation invariant by construction and accepts mixtures of different sizes up to 11 constituents within a fixed-size padded set. Each constituent is embedded with a chemistry-pretrained transformer language model, ChemBERTa. In our proposed method, training data are produced by an automated PENELOPE/penEasy pipeline using the radiation source at 30, 80, 100, and 120 kV tube voltages over polyethylene-based shielding composite slabs of thicknesses spanning 0.15-2.5 mm. After preprocessing, the dataset contains $n = 4697$ simulated configurations on which a leakage-free, jointly stratified 10-fold cross-validation is performed, attaining mean squared error MSE = $(1.12 \\pm 0.56)\\times10^{-4}$, normalized-MSE percentage NMSE% = 0.0294% $\\pm$ 0.0147%, and $R^2 = 0.9988$. The corresponding per-sample percentage errors give an alpha-trimmed ($\\alpha = 0.10$) absolute percentage error (APE) of 1.66% and a median APE of 1.15%. Our model's inference is several orders of magnitude faster than the underlying Monte Carlo simulation (sub-millisecond per query vs. several hours for the reference run) with effective accuracy in predicting $I(t)/I_0$."
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "61d2f5d2bf00ac75a5b09de55a9ffccb990fc08f",
-     "externalIds": {
-      "DOI": "10.3389/fnins.2026.1944816",
-      "CorpusId": 293870955
-     },
-     "title": "Anti-correlation time-frequency synergy and dual-granularity fusion for sleep stage classification",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2026.1944816/pdf",
-      "status": "GOLD",
-      "license": "CCBY",
-      "disclaimer": "Notice: Paper or abstract available at https://api.unpaywall.org/v2/10.3389/fnins.2026.1944816?email=<INSERT_YOUR_EMAIL> or https://doi.org/10.3389/fnins.2026.1944816, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "123442161",
-       "name": "Jie-Nan Pan"
-      },
-      {
-       "authorId": "2516797043",
-       "name": "Xing-Xing Zhao"
-      },
-      {
-       "authorId": "2390901185",
-       "name": "Xiao-Yu Zou"
-      },
-      {
-       "authorId": "2319808378",
-       "name": "Peng-Jun Zhao"
-      },
-      {
-       "authorId": "2516785208",
-       "name": "Lei-Lei Wang"
-      },
-      {
-       "authorId": "2364585054",
-       "name": "Cheng-Cheng Li"
-      }
-     ],
-     "abstract": "\n \n Automated sleep stage classification is crucial for diagnosing sleep disorders and evaluating sleep quality. Single-channel EEG sleep staging using central electrodes has garnered significant interest due to its ability to detect a higher number of sleep spindles and its cost-effectiveness. Nevertheless, several challenges remain, such as the neglect of interdependencies among features, reduced model sensitivity to the dispersion across features, potential information leakage during the learning of transition rules, and class imbalance.\n \n \n \n To address these challenges, this study specifically designs an automatic sleep staging network based on single-channel EEG. The network incorporates a multi-branch feature extraction module, which captures negatively correlated frequency features that exhibit significant variations during sleep transitions and promotes synergistic complementarity. Furthermore, a dual-granularity residual attention mechanism is employed to perform adaptive fusion along both temporal and channel dimensions based on statistical measures such as the mean and standard deviation. The causal transition-aware network ensures temporal consistency while facilitating effective learning of transition rules. The focal loss function is utilized to counteract class imbalance.\n \n \n \n Experiments on SleepEDF-20, SleepEDF-78 and SHHS datasets show that our method achieves the best performance with overall accuracy of 87.0%, 83.4% and 84.5%, respectively. For N1 stage classification which is more challenging, it reaches an accuracy of 57.5%, 52.5% and 49.3% on three datasets, respectively.\n \n \n \n The experimental results demonstrate the effectiveness of the proposed approach and its certain advantages over existing methods.\n"
-    }
-   },
-   {
-    "citingPaper": {
-     "paperId": "1f1d9634abb2cced07eb9b5bd2337492ca2e46b8",
-     "externalIds": {
-      "ArXiv": "2610.25991",
-      "CorpusId": 293802306
-     },
-     "title": "Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding",
-     "year": 2026,
-     "openAccessPdf": {
-      "url": "",
-      "status": null,
-      "license": null,
-      "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/2610.25991, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
-     },
-     "authors": [
-      {
-       "authorId": "2515955906",
-       "name": "Fumimaro Suzuki"
-      },
-      {
-       "authorId": "2375137066",
-       "name": "Keisuke Okumura"
-      }
-     ],
-     "abstract": "Designing capable neural policies for multi-agent pathfinding (MAPF), which map local observations to action distributions, represents an important challenge in multi-agent learning, with practical relevance to scalable collective automation problems such as warehouse logistics. In contrast to prior studies focusing primarily on individual policy design, this study explores a meta-level Mixture-of-Experts (MoE) approach to learning-based MAPF. Specifically, given a collection of compact yet high-performing experts specialised for different map distributions, our architecture learns a router that selectively fuses their outputs according to each agent's local situation. We instantiate and validate this MoE approach with a commonly used graph neural network-based policy as well as a newly developed recursive action-token refinement model. Combined with supervised and reinforcement learning fine-tuning of the experts, our experiments show that MoE generally improves upon the pretrained policy and outperforms existing leading methods. At the same time, our findings reveal that appropriately trained, parameter-matched monolithic models still outperform MoE, highlighting a nuanced role for map-distribution MoE for MAPF."
     }
    }
   ]

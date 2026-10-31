@@ -133,8 +133,14 @@ def _unligature(text: str) -> str:
 
 
 def _norm_title(text: str) -> str:
-    """标题归一化，用于跨来源判重：只保留字母数字，全小写。"""
-    return re.sub(r"[^0-9a-z]+", "", _unligature(text or "").lower())
+    """标题归一化，用于跨来源判重：只保留字母数字与汉字，全小写。
+
+    **必须保留汉字**。旧实现是 ``re.sub(r"[^0-9a-z]+", "", ...)``，纯中文标题
+    归一化后得到空字符串，而 ``_dedupe`` 会把空 key 过滤掉（``if k``），于是
+    《关于拟阵基图一个猜想的证明》这类中文文献的判重键全为空 —— 同一篇论文
+    被检索两次就进池两次，最终参考文献里出现 C1/C7/C9 三条一模一样的条目。
+    """
+    return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", _unligature(text or "").lower())
 
 
 def _client() -> httpx.Client:
@@ -265,6 +271,42 @@ def search_local(query: str, limit: int = 8) -> list[Candidate]:
 # --------------------------------------------------------------------------- arXiv
 
 
+_ARXIV_STOPWORDS = frozenset(
+    """
+    a an the and or but if then than that this these those of for from with without
+    in on at to into onto by as is are was were be been being do does did
+    based via using use towards toward about over under between among
+    approach approaches method methods model models paper papers study
+    new novel towards system systems framework frameworks
+    """.split()
+)
+
+
+def _arxiv_expr(q: str) -> str:
+    """把查询词拼成 arXiv 检索表达式。
+
+    旧实现是 ``all:"{q}"``（整句当短语），实测对多词查询近乎必空——
+    ``all:"citation graph based paper recommendation"`` 返回 0 条，而
+    ``ti:"citation" AND abs:"recommendation"`` 能命中。arXiv 的 ``all:`` 只认单 token，
+    加引号即要求整句连续出现，长查询必然打空。
+
+    现在的拼法：过滤停用词后取前 5 个实词，**第一个词限定标题**（保证主题对得上），
+    其余词用 ``all:`` 放开字段（摘要/标题/作者都算），交给 ``sortBy=relevance`` 排序。
+    实测：``retrieval augmented generation for academic paper recommendation`` 命中 5 篇，
+    ``attention mechanism`` 命中 5 篇。
+    """
+    words = [
+        w
+        for w in re.split(r"[\s,;，、]+", q)
+        if len(w) >= 3 and w.lower() not in _ARXIV_STOPWORDS
+    ][:5]
+    if not words:
+        # 全是停用词/短词时退回裸词，不加引号（加了必空）
+        return " ".join(w for w in re.split(r"\s+", q) if w) or f'all:"{q}"'
+    clauses = [f'ti:"{words[0]}"'] + [f'all:"{w}"' for w in words[1:]]
+    return " AND ".join(clauses)
+
+
 def search_arxiv(query: str, limit: int = 10) -> list[Candidate]:
     """调 arXiv Atom API 检索。失败返回空列表（调用方退回本库结果）。"""
     q = (query or "").strip()
@@ -274,10 +316,8 @@ def search_arxiv(query: str, limit: int = 10) -> list[Candidate]:
     if (cached := _read_cache(cache_key)) is not None:
         return [Candidate(**row) for row in cached]
 
-    # arXiv 的检索语法里空格是 AND；用 all: 做全字段匹配最省事。
-    # 双引号包起来当作短语，能明显提高精确率。
     params = {
-        "search_query": f'all:"{q}"',
+        "search_query": _arxiv_expr(q),
         "start": 0,
         "max_results": max(1, min(limit, 20)),
         "sortBy": "relevance",
@@ -470,6 +510,19 @@ def build_candidates(
 
     返回的每篇都带 ``key``（``C1``…``Cn``），模型后续只能引用这些 key。
     这是「候选集约束生成」的入口，池子里的每一条都**真实存在**。
+
+    关于**不做标题相关度过滤**这件事：曾试过「标题必须含某个查询词才保留」，
+    实测两条路都不通——
+
+    * 整串匹配：查询词常是长词组（``retrieval augmented generation for``），
+      归一化后是 ``retrievalaugmentedgenerationfor``，而命中的标题里写的是
+      ``FAIR-RAG``、``Engineering the RAG Stack``，一个字都匹配不上，
+      正经结果被全部误杀。
+    * 单词匹配：``Super-LoRa``（无线通信协议）、``Szafran, Lora``（人名）与
+      微调技术 ``LoRA`` 字面完全重叠，无法区分，噪声照样进池。
+
+    所以这里保留数据源的原始排序，让相关度由上游检索的排名决定；
+    候选池里真有噪声时，正文生成环节会因为「没有合适文献」而不去引用它。
     """
     pool: list[Candidate] = []
     for q in queries:

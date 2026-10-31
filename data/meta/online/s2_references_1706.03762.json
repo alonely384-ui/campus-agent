@@ -1,5 +1,5 @@
 {
- "saved_at": "2026-10-28T04:53:22+00:00",
+ "saved_at": "2026-10-31T04:59:40+00:00",
  "data": {
   "offset": 0,
   "citingPaperInfo": {
@@ -199,7 +199,7 @@
       },
       {
        "authorId": "144028698",
-       "name": "Bing Xiang"
+       "name": "Xiang Bing"
       },
       {
        "authorId": "145218984",
@@ -821,9 +821,9 @@
      "title": "Deep Residual Learning for Image Recognition",
      "year": 2015,
      "openAccessPdf": {
-      "url": "https://repositorio.unal.edu.co/handle/unal/81443",
-      "status": "GREEN",
-      "license": "CCBY",
+      "url": "",
+      "status": "CLOSED",
+      "license": null,
       "disclaimer": "Notice: Paper or abstract available at https://arxiv.org/abs/1512.03385, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
      },
      "authors": [
@@ -1456,7 +1456,7 @@
      "year": 2006,
      "openAccessPdf": {
       "url": "http://dl.acm.org/ft_gateway.cfm?id=1220855&type=pdf",
-      "status": "GOLD",
+      "status": "BRONZE",
       "license": null,
       "disclaimer": "Notice: Paper or abstract available at https://aclanthology.org/N06-1020, which is subject to the license by the author or copyright owner provided with this content. Please go to the source to verify the license and copyright information for your use."
      },

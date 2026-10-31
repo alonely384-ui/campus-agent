@@ -1,0 +1,19 @@
+{
+ "saved_at": "2026-10-31T05:00:16+00:00",
+ "data": {
+  "arxiv_id": "2610.37995",
+  "title": "QMUL_AK at AISA-ArabicFC: Schema-Constrained Function Calling with ALLaM",
+  "authors": [
+   "Ali Khairallah",
+   "Arkaitz Zubiaga"
+  ],
+  "abstract": "We describe the QMUL_AK submission to AISA-ArabicFC 2026. The system adapts the Arabic-English ALLaM-7B-Instruct model to function calling with low-rank adaptation (LoRA). It combines an Arabic schema-aware prompt, dialect and no-call resampling, a token-weighted training objective, and deterministic validation of generated calls against the candidate tool schema. The same output supports Track A function calling and Track B reasoning-augmented calling. Training uses only the official task data. On the development set, the system achieves 0.9982 function accuracy and 0.8920 argument exact match, corresponding to overall A and B scores of 0.9345 and 0.9454. On the blind test set, the system reaches overall A and B scores of 0.9253 and 0.9380, ranking 3rd on both submission tracks and 1st of 21 teams on the Track C dialect-robustness diagnostic with a macro-averaged score of 0.9075 and the smallest dialect gap in the shared task (0.077). The results show that function selection is nearly saturated, while argument extraction remains the main source of error.",
+  "published": "[Submitted on 27 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.37995",
+  "fetched_at": "2026-10-31T05:00:16+00:00"
+ }
+}

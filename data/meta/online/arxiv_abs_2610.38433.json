@@ -1,0 +1,18 @@
+{
+ "saved_at": "2026-10-31T05:00:14+00:00",
+ "data": {
+  "arxiv_id": "2610.38433",
+  "title": "Does Chain-of-Thought Reliance Follow a Scaling Law?Larger Models Follow Their Steps More, Independent of Post-Training",
+  "authors": [
+   "Esther Xin"
+  ],
+  "abstract": "Monitoring a model&#39;s chain of thought (CoT) is useful for safety only if the final answer depends on the written steps. Prior measurements use natural tasks where true reasoning is unknown. We measure it against an exact ground truth on a synthetic box-swap task where every intermediate state is known. We replace one step inside a model&#39;s own chain with a wrong but valid state and check whether the answer follows the edit. We evaluate 25 open-weight models--Qwen3 (0.6B-14B, base and post-trained), Gemma 3 (1B-12B), Llama 3 (1B-8B), and 8 OLMo 2 checkpoints--on 7,200 items each. We find five results: (1) Reliance rises with size and saturates. In Qwen3, answer reliance rises from 16-18% at 0.6B to 97-100% at 14B; a logistic in log N fits well (R^2 = 0.89), and Gemma 3 and Llama 3 follow this trend. (2) Capability is the main driver. Across all models, reliance and step accuracy correlate at r = 0.99; equally capable models are equally reliant, regardless of family. (3) Size still matters at matched correctness. On problems solved correctly before the edit, reliance increases with size among capable models (rho = 0.80, p = 0.002). (4) Post-training does not change reliance. Base and post-trained Qwen3 differ by at most 0.03 from 4B upward; a large gap at 1.7B matches a large capability gap. (5) No model up to 14B solves the task internally. Without written steps, every capable model is at chance once a problem has four or more swaps. OLMo 2 checkpoints never become capable, making the training-token axis a limitation. On tasks requiring step-by-step computation, scale makes the chain of thought more load-bearing, supporting CoT monitoring in this regime.",
+  "published": "[Submitted on 28 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Computation and Language (cs.CL) ; Machine Learning (cs.LG)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.38433",
+  "fetched_at": "2026-10-31T05:00:14+00:00"
+ }
+}

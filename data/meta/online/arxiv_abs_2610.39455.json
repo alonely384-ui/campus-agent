@@ -1,0 +1,20 @@
+{
+ "saved_at": "2026-10-31T05:00:18+00:00",
+ "data": {
+  "arxiv_id": "2610.39455",
+  "title": "Sparse Fine-Tuning for Parameter-Efficient Adversarial Training",
+  "authors": [
+   "Zhaoxin Wang",
+   "Zihang Ding",
+   "Handing Wang"
+  ],
+  "abstract": "Deep neural networks achieve strong performance across many tasks but remain vulnerable to adversarial perturbations. Adversarial training (AT) is one of the most effective defenses, yet it suffers from high memory cost on large models and the persistent clean-robust accuracy trade-off. Recent work introduces parameter-efficient fine-tuning, such as LoRA, into AT, but this constraint induces a notable robustness gap relative to full-parameter AT. In this work, we revisit parameter-efficient adversarial fine-tuning from a parameter space perspective. Through gradient analysis, we find that adversarial optimization is highly concentrated on a small subset of parameters, which we call Robustness-Critical Parameters (RCPs), suggesting that robustness is encoded in a sparse subspace. Building on this observation, we propose Sparse Adversarial Fine-Tuning (SAFT), which identifies RCPs via adversarial gradient saliency and performs AT by updating only these parameters while freezing the rest. Across architectures and datasets, SAFT outperforms LoRA-based methods in both clean and robust accuracy with fewer trainable parameters, and approaches or surpasses full parameter AT in robustness while updating only about 5\\% of parameters.",
+  "published": "[Submitted on 29 Oct 2026]",
+  "year": 2026,
+  "comments": "",
+  "subjects": "Machine Learning (cs.LG) ; Artificial Intelligence (cs.AI)",
+  "github": "",
+  "url": "https://arxiv.org/abs/2610.39455",
+  "fetched_at": "2026-10-31T05:00:18+00:00"
+ }
+}
