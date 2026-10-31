@@ -430,6 +430,7 @@ _REASON_PROMPT = """你是一个学术助理。下面是若干篇候选论文，
 - 相似度 ≥0.30 时：先点明它在库里的哪一篇**基础上**做（只能用下面给的"最相近的库内论文"或"引用库内"里出现过的篇名，不许编），再说它的**区别/新意**（换了任务、数据、方法或规模）；
 - 相似度 <0.30 时：**禁止**写"在《X》的基础上"，直接讲这篇自己在做什么、属于哪个方向，以及它和库内那篇的差异在哪；
 - 如果候选摘要里明确写了在某个数据集上提升或超过某个基线，可以点出一句；没写就不要编数字。
+- **禁止出现任何内部数值**：不要写"相似度""相关度""低于 0.30""0.47"这类打分或阈值，用户看不懂也不需要看；想说关系近就说"方向接近"，想说远就说"属相邻方向"。
 只输出 JSON 数组，不要任何解释，格式：
 [{"arxiv_id": "2401.00001", "reason": "在《Layer Normalization》的基础上……，区别在于……"}]
 
@@ -439,6 +440,29 @@ __LIBRARY__
 候选论文：
 __CANDIDATES__
 """
+
+
+# 理由里不该出现的内部度量：模型偶尔会把阈值直接抄进中文句子
+_METRIC_LEAK_RE = re.compile(r"(?:主题|方向)?(?:相似度|相关度)\s*(?:低于|高于|不足)?\s*[\d.]*[,，、]?")
+
+
+def sanitize_reason(text: str) -> str:
+    """把模型写进推荐理由里的内部打分抹掉，别让用户看见阈值。
+
+    只做保守清洗：删掉「相似度 0.47」「相关度低于0.30」这类片段，再收拾留下的
+    标点与句首空洞词。清洗后一句话都读不通就返回空串，让调用方用兜底模板。
+    """
+    cleaned = _METRIC_LEAK_RE.sub("", text or "")
+    cleaned = re.sub(r"[（(]\s*[)）]", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"[，、]{2,}", "，", cleaned)
+    # 删掉数字后常留下「方向相近但」这种半截转折，改成逗号
+    cleaned = re.sub(r"(?:相近|接近|类似|相仿)\s*但\s*", "相近；", cleaned)
+    cleaned = cleaned.strip(" ，、,;；")
+    # 只剩半句的情况：清洗后长度掉太多说明这句话是围着数字写的，不值得留
+    if len(cleaned) < 12 or len(cleaned) * 2 < len(text or ""):
+        return ""
+    return cleaned
 
 
 def _library_brief(library: list[dict[str, Any]], limit: int = 12) -> str:
@@ -475,7 +499,7 @@ async def write_reasons(items: list[dict[str, Any]], library: list[dict[str, Any
         logger.warning("生成推荐理由失败：%s", exc)
         reasons = {}
     for item in items:
-        reason = reasons.get(item["arxiv_id"] or item["key"], "")
+        reason = sanitize_reason(reasons.get(item["arxiv_id"] or item["key"], ""))
         if not reason:
             anchor = item.get("topic_of") or ""
             topic = float(item.get("topic") or 0.0)
@@ -483,23 +507,22 @@ async def write_reasons(items: list[dict[str, Any]], library: list[dict[str, Any
                 # 相似度不高时不要硬凑"在《X》基础上"，那句话会误导用户
                 reason = (
                     f"arXiv 近两周新上架（{item.get('category') or '未分类'}）；"
-                    f"与库内《{anchor or '—'}》方向不同（相似度 {topic:.2f}），"
-                    f"可作为该方向的旁证参考"
+                    f"与库内《{anchor or '—'}》属相邻方向，可作为该方向的旁证参考"
                 )
             elif item.get("source") == "recent":
                 reason = (
                     f"arXiv 近两周新上架（{item.get('category') or '未分类'}），"
-                    f"主题与库内《{anchor or '—'}》最接近（相似度 {item['topic']:.2f}）"
+                    f"主题与库内《{anchor or '—'}》最接近"
                 )
             elif anchor:
                 reason = (
-                    f"在库内《{anchor}》的基础上（主题相似度 {item['topic']:.2f}）"
-                    f"又引用了库内 {len(item['cited_by'])} 篇论文，区别是它换了问题设定与实验对象"
+                    f"在库内《{anchor}》的基础上又引用了库内 "
+                    f"{len(item['cited_by'])} 篇论文，区别是它换了问题设定与实验对象"
                 )
             else:
                 reason = (
                     f"引用了库内 {len(item['cited_by'])} 篇论文（{item['cited_by'][0]} 等），"
-                    f"主题相关度 {item['topic']:.2f}"
+                    f"与库里已有工作方向相关"
                 )
             if item.get("github"):
                 reason += "，且提供了开源代码"

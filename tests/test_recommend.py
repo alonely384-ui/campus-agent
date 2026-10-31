@@ -118,7 +118,9 @@ def test_write_reasons_falls_back_to_template(monkeypatch):
     ]
     out = asyncio.run(rec.write_reasons(items, [{"title": "Layer Normalization"}]))
     assert "引用了库内 1 篇论文" in out[0]["reason"]
-    assert "0.31" in out[0]["reason"]
+    # 兜底模板也不能把内部相似度（0.31）抄给用户看
+    assert "0.31" not in out[0]["reason"]
+    assert "相似度" not in out[0]["reason"]
 
 
 def test_title_key_normalises():
@@ -200,3 +202,34 @@ def test_collect_recent_skips_library_duplicates(monkeypatch):
     assert [item["arxiv_id"] for item in out] == ["2610.00003"]
     assert out[0]["source"] == "recent"
     assert out[0]["year"] == 2026
+
+
+# ------------------------------------------------------------------ 理由里的内部度量
+
+
+@pytest.mark.parametrize(
+    "raw, must_not_contain",
+    [
+        ("与库内LoRA方向相近但相似度低于0.30，本文重新审视LoRA初始化，属参数高效微调方向。", "相似度"),
+        ("与库内《Attention Is All You Need》方向相近但相似度低于0.30，本文提出Transformer++改进。", "0.30"),
+        ("在库内《X》的基础上（主题相似度 0.47）又引用了库内 3 篇论文，区别是换了问题设定", "0.47"),
+        ("与库内《Y》方向不同（相似度 0.21），可作为该方向的旁证参考", "相似度"),
+    ],
+)
+def test_sanitize_reason_strips_internal_metric(raw, must_not_contain):
+    """模型会把「相似度低于0.30」这种内部阈值抄进给用户看的理由里，必须清掉。"""
+    out = rec.sanitize_reason(raw)
+    assert out, "清洗后不该整句丢掉"
+    assert must_not_contain not in out
+    assert "相关度" not in out
+    assert "相近但" not in out, "删数字后留下的半截转折要收拾掉"
+
+
+def test_sanitize_reason_keeps_clean_text_untouched():
+    raw = "在《Scaling Laws for Neural Language Models》的基础上，拓展到强化学习训练场景。"
+    assert rec.sanitize_reason(raw) == raw
+
+
+def test_sanitize_reason_drops_text_that_is_only_a_number():
+    """清洗后掉太多字说明整句是围着数字写的，返回空串让调用方走兜底模板。"""
+    assert rec.sanitize_reason("相似度 0.47") == ""
