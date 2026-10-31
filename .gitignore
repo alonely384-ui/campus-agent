@@ -91,7 +91,9 @@ docs/multi-agent-research.md
 docs/writing-assistant-research.md
 docs/citation-graph-frontend-research.md
 docs/补课-核心设计讲稿.md
-docs/DEMO-SCRIPT.md
+
+# docs/DEMO-SCRIPT.md（演示视频念稿）**不在忽略之列** —— 它是参赛交付物的一部分，
+# 不是本地工作资料：视频录制要按它逐段念，换台机器也要能拿到。已入库。
 
 # ---- 本地学习页面（不上传公开仓库）----
 # 三份是我自己看的笔记/导览/进度表，含大量源码摘录，写在这里而不是
