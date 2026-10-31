@@ -19,6 +19,10 @@ data/chroma/
 data/uploads/
 data/online/
 data/*.json
+# 例外：catalog.json 是随代码发布的论文元数据清单（39 篇的标题/年份/分类），
+# 不是运行产生的数据，必须跟着镜像走。不带它的话，"库里有哪些论文"这类问题
+# 会退化成数检索片段，答案直接失真。13 KB，放得进镜像。
+!data/catalog.json
 
 # ---- 版本控制与编辑器 ----
 .git/

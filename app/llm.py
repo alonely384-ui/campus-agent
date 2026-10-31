@@ -11,6 +11,7 @@
 
 from collections.abc import AsyncIterator
 
+import httpx
 from openai import AsyncOpenAI
 
 from app.config import settings
@@ -31,9 +32,15 @@ def get_client() -> AsyncOpenAI:
                 "还没有配置 API Key。请把 .env.example 复制成 .env，"
                 "并在里面填入 LLM_API_KEY。"
             )
+        # 显式给超时和重试。不传的话 SDK 默认 timeout=600s（10 分钟），
+        # 上游卡住时请求会一直挂着，用户端只看到「转圈」，而这边占着一个
+        # 工作线程和一条连接，几个并发就能把服务拖死。
+        # connect 单独收紧到 10s：连不上这种事几秒内就该知道，不该等 60s。
         _client = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
+            timeout=httpx.Timeout(60.0, connect=10.0),
+            max_retries=2,
         )
         logger.info("LLM 客户端已创建: %s (%s)", settings.llm_base_url, settings.llm_model)
     return _client
@@ -104,9 +111,21 @@ async def chat_stream(messages: list[dict], temperature: float = 0.3) -> AsyncIt
         stream=True,  # ← 关键就这一行
     )
 
-    async for chunk in stream:
-        if not chunk.choices:
-            continue
-        piece = chunk.choices[0].delta.content
-        if piece:
-            yield piece
+    # try/finally 关流：外面这个生成器被提前丢弃时（用户关掉页面、点了停止、
+    # 或者上层用 asyncio.wait_for 超时取消），async for 不会被走完，
+    # 底层那条 HTTP 连接会一直挂在连接池里直到进程退出。
+    # 几个用户反复刷新就能把连接池占满，之后所有请求都卡在建连阶段。
+    try:
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            piece = chunk.choices[0].delta.content
+            if piece:
+                yield piece
+    finally:
+        close = getattr(stream, "close", None)
+        if close is not None:
+            try:
+                await close()
+            except Exception:  # noqa: BLE001 —— 关连接失败不该影响已经吐给用户的内容
+                logger.warning("关闭 LLM 流失败（已忽略）", exc_info=True)
