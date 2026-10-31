@@ -660,6 +660,82 @@ def _evidence_pages(evidence: list[Evidence]) -> int:
     return sum(1 for ev in evidence if ev.page is not None)
 
 
+def _dup_owner_map() -> dict[str, str]:
+    """文件名 → 同一篇论文的主版本文件名。
+
+    论文库里同一篇可能存了好几份：1706.03762 就有 v7 / v1 / v1_img / 重传副本
+    四个文件，内容几乎一样。它们的向量和 BM25 分数也几乎一样，
+    纯按分数截断会让它们把证据位全占满，别的论文一条都进不来。
+    pipeline 层只认文件名，看不到这层关系，所以要在拿得到 index.json 的这一层折叠。
+
+    数据源是 data/index.json（papers.list_papers），不是 data/catalog.json——
+    后者是给「全库清单」问答用的精简清单，字段是 file/title/year，没有 duplicate_of。
+
+    返回的映射里，主版本自己不在键中（它不是任何人的副本）。
+    """
+    try:
+        from app.papers import list_papers
+    except Exception:  # noqa: BLE001 —— 拿不到就不折叠，不能因此让检索失败
+        logger.warning("读取论文索引失败，本轮不做重复副本折叠", exc_info=True)
+        return {}
+
+    by_id: dict[str, str] = {}
+    dup_of: dict[str, str] = {}
+    for paper in list_papers():
+        if paper.filename:
+            by_id.setdefault(paper.paper_id, paper.filename)
+        if paper.duplicate_of:
+            dup_of[paper.paper_id] = paper.duplicate_of
+
+    owner: dict[str, str] = {}
+    for copy_id, parent_id in dup_of.items():
+        fname = by_id.get(copy_id, "")
+        if not fname:
+            continue
+        root_id = parent_id
+        seen: set[str] = {copy_id}
+        # 顺着 duplicate_of 往上找主版本（副本可能指向另一个副本）
+        while root_id not in seen and root_id in dup_of:
+            seen.add(root_id)
+            root_id = dup_of[root_id]
+        master = by_id.get(root_id, "")
+        if not master:
+            continue
+        # 索引里的 source 有两种来源：正常入库用 filename，历史遗留用 <paper_id>.pdf。
+        # 两种写法都要映射到主版本，否则折叠对历史块不起作用。
+        for alias in {fname, f"{copy_id}.pdf"}:
+            if alias and alias != master:
+                owner[alias] = master
+    return owner
+
+
+def _collapse_duplicates(scored: list[tuple], keep: int = 1) -> list[tuple]:
+    """把同一篇论文的重复副本折叠掉，同组最多留 keep 条。
+
+    注意同名副本（1706.03762v7.pdf 有两条记录，paper_id 不同）不会出现在
+    owner map 里——它们文件名一样，检索侧按 source 限流已经处理过了。
+    这里只管「不同文件名、但内容是同篇」的情况。
+
+    不直接删：副本可能在某一路上召回更靠前，删掉会少一个候选；
+    这里只是把同组剩余的条目排到后面去，不丢数据。
+    """
+    owner = _dup_owner_map()
+    if not owner:
+        return scored
+    budget: dict[str, int] = {}
+    head: list[tuple] = []
+    tail: list[tuple] = []
+    for item in scored:
+        chunk = item[0]
+        group = owner.get(chunk.source, chunk.source) or chunk.source
+        if budget.get(group, 0) < keep:
+            budget[group] = budget.get(group, 0) + 1
+            head.append(item)
+        else:
+            tail.append(item)
+    return head + tail
+
+
 def _apply_page_fill(evidence: list[Evidence]) -> int:
     """补救一：给缺页码的证据补上整页正文，顺带把页码找回来。
 
@@ -903,7 +979,13 @@ async def _rag_context_with_evidence(
             if not source:
                 named = _named_sources(question)
                 source = named[0] if named else None
-            scored = retrieve_scored(query, top_k=RETRIEVE_TOP_K, source=source, use_dense=use_dense)
+            # 多拿一些候选再折叠：retrieve_scored 内部按 top_k 截断，
+            # 如果只取 RETRIEVE_TOP_K 条，副本可能已经占满这 4 个位置，
+            # 折叠后凑不满证据条数。先要 4 倍量，折叠完再截回 RETRIEVE_TOP_K。
+            scored = retrieve_scored(query, top_k=RETRIEVE_TOP_K * 4, source=source, use_dense=use_dense)
+            # 单篇问答不折叠：本来就只搜一篇，折叠会把证据砍光
+            if not source:
+                scored = _collapse_duplicates(scored)[:RETRIEVE_TOP_K]
     except Exception:
         logger.exception("检索失败，本次对话不带参考资料")
         if roles is not None:

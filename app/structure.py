@@ -777,27 +777,68 @@ def _formulas(lines: list[dict]) -> list[dict]:
     return out[:120]
 
 
+# 参考文献章节标题：论文惯例是 References，整本书（如 Understanding Deep Learning）用 Bibliography。
+# 这个集合必须和 :628 的章节识别保持一致，否则会出现「章节树认出来了、参考文献数却是 0」。
+_REF_TITLES = ("references", "bibliography")
+
+
+def _is_ref_title(text: str) -> bool:
+    return _norm(text).lower() in _REF_TITLES
+
+
+def _is_toc_line(lines: list[dict], i: int) -> bool:
+    """判断 lines[i] 是正文标题，还是目录里的同名条目。
+
+    目录条目的特征是「标题行 + 紧跟一行纯页码」或「标题行带引导点」。
+    注意不能看**上一行**是不是纯页码：`_lines` 按 PDF 块顺序返回，
+    页脚页码常常紧挨在正文标题上方（1607.06450v1 第 10 页就是这样），
+    拿它当判据会把每一页开头的标题都误判成目录。
+    """
+    text = lines[i]["text"]
+    if _TOC_LEADER_RE.search(text):
+        return True
+    if i + 1 < len(lines):
+        nxt = lines[i + 1]["text"].strip()
+        if re.fullmatch(r"\d{1,4}", nxt):     # 目录里页码单独成行，紧跟标题
+            return True
+    return False
+
+
 def _references(lines: list[dict]) -> dict:
-    """参考文献：从 References 标题后开始数条目。
+    """参考文献：从 References / Bibliography 标题后开始数条目。
 
     两种常见格式都支持：
     1. 编号式："[1] Jimmy Lei Ba, Jamie Ryan Kiros..."
     2. 作者-年份式（LLaMA 3、Llama 2 等）："Amro Abbas, Kushal Tirumala..."
+
+    取**最后一个**非目录命中：整本书的目录里往往也有 Bibliography 条目，
+    而正文的参考文献在最后。论文通常只有一个，取最后一个不影响。
     """
     start = None
-    for i, ln in enumerate(lines):
-        if _norm(ln["text"]).lower() == "references":
+    for i in range(len(lines) - 1, -1, -1):
+        if _is_ref_title(lines[i]["text"]) and not _is_toc_line(lines, i):
             start = i
             break
     if start is None:
         return {"page": None, "count": 0, "first": "", "last": ""}
     entries: list[str] = []
+    # 有些模板（ACL/NeurIPS 的 [ACDE12] 这类 key 式编号）把编号单独放一行，
+    # 条目正文在下一行。这时剥掉编号会得到空串，要把下一行接上。
+    pending_key = False
     for ln in lines[start + 1:]:
         t = ln["text"].strip()
         if _norm(t).lower() in ("appendix", "appendices", "a appendix"):
             break
         if _is_ref_entry(t):
-            entries.append(re.sub(r"^\s*\[[^\]]{1,12}\]\s*", "", t))
+            body = re.sub(r"^\s*\[[^\]]{1,12}\]\s*", "", t)
+            if body:
+                entries.append(body)
+                pending_key = False
+            else:
+                pending_key = True          # 编号独占一行，正文在下一行
+        elif pending_key:
+            entries.append(t)
+            pending_key = False
     page = lines[start]["page"] if start < len(lines) else None
     return {
         "page": page,
@@ -817,16 +858,28 @@ def _appendix(sections: list[dict]) -> list[dict]:
     return out
 
 
-def _find_references(doc, head: list[dict], pages: int, first_pass: int = 25, limit: int = 90) -> dict:
-    """参考文献常在 25 页之后才出现，所以先扫已读行，没有就逐页往后找。"""
+def _find_references(doc, head: list[dict], pages: int, first_pass: int = 25, limit: int | None = None) -> dict:
+    """参考文献常在正文之后才出现，所以先扫已读行，没有就逐页往后找。
+
+    limit 默认扫到最后一页：早先写死 90 页，导致 541 页的书（参考文献在第 525 页）
+    永远返回 0 条。按页扫只在前面没命中时触发，代价是每页一次 get_text。
+
+    first_pass 不能是硬下限：短论文（14 页）的参考文献在第 10 页，
+    而 `head` 只覆盖 max_pages 页，写死 `range(25, pages)` 在短文档上是空循环。
+    这里直接接在 `head` 已覆盖的页之后继续扫，`first_pass` 只作为下限兜底。
+    """
     refs = _references(head)
-    if refs["count"] > 0:
-        return refs
+    stop = pages if limit is None else min(limit, pages)
+    scanned = (max((ln["page"] for ln in head), default=-1) + 1) if head else 0
+    start = min(scanned if scanned > 0 else first_pass, stop)
     extra: list[dict] = []
-    for pno in range(first_pass, min(limit, pages)):
+    for pno in range(start, stop):
         extra += _lines(doc[pno], pno)
-        if any(_norm(ln["text"]).lower() == "references" for ln in extra):
-            return _references(extra)
+        hit = _references(extra)
+        # 只要找到标题就记下来：条目正则可能认不全某本冷门排版，
+        # 但「参考文献在第几页」这个信息仍然有价值，不该退化成 None。
+        if hit["page"] is not None:
+            refs = hit
     return refs
 
 

@@ -936,6 +936,50 @@ def _fuse_ids(
     return order, fused, channels
 
 
+_MAX_PER_SOURCE = 2
+
+
+def _diversify_by_source(
+    items: list[tuple[Chunk, float, list[str]]],
+    top_k: int,
+    source: str | None = None,
+) -> list[tuple[Chunk, float, list[str]]]:
+    """按来源限流：同一篇论文最多贡献 _MAX_PER_SOURCE 条证据。
+
+    为什么需要：论文库里同一篇存在多个版本副本（1706.03762v7 / v1 / v1_img /
+    重传副本）。它们内容几乎一样，向量和 BM25 分数也几乎一样，纯按分数截断时
+    会把这 4 条全挤进 4 个证据位——实测提问「Transformer 的注意力机制怎么算」，
+    返回的 4 条证据全部来自 1706.03762 的 4 个副本，其他论文一条都没进来。
+    这既浪费证据位，也让「覆盖论文数」这个展示指标失去意义。
+
+    规则：高分优先，但同一 source 计数到上限就跳过，把位置让给后面的论文。
+    被跳过的块不丢，留在候选池里——若后面的来源不够填满 top_k，再回补它们，
+    避免为了多样性把证据条数做少。
+    单篇问答（source 已指定）不需要限流，全部来源本来就相同，直接返回。
+    """
+    if source or len(items) <= top_k:
+        return items
+
+    picked: list[tuple[Chunk, float, list[str]]] = []
+    overflow: list[tuple[Chunk, float, list[str]]] = []
+    per_source: dict[str, int] = {}
+
+    for item in items:
+        src = item[0].source
+        if per_source.get(src, 0) < _MAX_PER_SOURCE:
+            per_source[src] = per_source.get(src, 0) + 1
+            picked.append(item)
+        else:
+            overflow.append(item)
+        if len(picked) >= top_k:
+            break
+
+    # 来源不够用时回补，保证证据条数不被多样性拖少
+    if len(picked) < top_k:
+        picked.extend(overflow[: top_k - len(picked)])
+    return picked
+
+
 def retrieve_scored(
     question: str, top_k: int = 4, source: str | None = None, use_dense: bool = True
 ) -> list[tuple[Chunk, float, list[str]]]:
@@ -1037,6 +1081,8 @@ def retrieve_scored(
             chunk_id=(meta or {}).get("chunk_id", 0),
         )
         out.append((chunk, fused[cid], channels.get(cid, [])))
+
+    out = _diversify_by_source(out, top_k, source=source)
 
     if _RERANK_ENABLED:
         try:
