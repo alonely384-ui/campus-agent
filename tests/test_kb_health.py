@@ -299,12 +299,18 @@ def test_bm25_save_success_replaces_atomically(tmp_path, monkeypatch):
     assert not (tmp_path / "bm25.json.tmp").exists()
 
 
-def test_remove_source_deletes_dense_last(monkeypatch):
-    """docs_dense 删除放最后：失败时已改动的面最小，且异常照常抛出。"""
+def test_remove_source_deletes_dense_last(monkeypatch, tmp_path):
+    """docs_dense 删除放最后：失败时已改动的面最小，且异常照常抛出。
+
+    注意 chroma_dir 必须重定向到 tmp_path：这条路径会走 _save_bm25，
+    不重定向就会把真实的 data/chroma/bm25.json 覆盖成测试用的假索引
+    （实测把 26596 块的真实 BM25 索引写成了 56 字节的空索引）。
+    """
     import chromadb
 
     from app.rag import pipeline
 
+    monkeypatch.setattr(pipeline.settings, "chroma_dir", str(tmp_path))
     order: list[str] = []
 
     class FakeCol:
@@ -338,3 +344,5 @@ def test_remove_source_deletes_dense_last(monkeypatch):
         pipeline.remove_source("ghost.pdf")
 
     assert order == ["docs", "docs_dense"], f"docs_dense 必须排在最后，实际顺序 {order}"
+    # 只写了 tmp_path，真实索引没被动过
+    assert (tmp_path / "bm25.json").exists()
