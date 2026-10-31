@@ -376,9 +376,18 @@ def env_overrides(item: Setting) -> dict[str, Any]:
     本次进程内是对的；但如果操作系统里本来就设了同名变量（比如 systemd 的
     Environment=、Docker 的 -e、shell 的 $env:），**进程重启后**又会变回系统值。
     不提示的话用户会以为"我明明改了，怎么重启又回去了"。
+
+    判定依据必须是**进程启动时**的环境变量快照，不能直接看 os.environ：
+    set_env_value() 保存时会同步写 os.environ，所以保存过一项之后，
+    这一项就永远能在 os.environ 里查到——用它做判据会导致"改什么就警告什么"，
+    把真警告淹没在假警告里。见 config.was_in_system_env()。
     """
+    if not config.was_in_system_env(item.key):
+        # 启动时没有这个变量，现在的值只可能是我们自己保存进去的
+        return {"overridden": False}
     value = os.environ.get(item.key)
     if value is None:
+        # 启动时有、现在被删了（比如恢复默认值），同样不算覆盖
         return {"overridden": False}
     return {"overridden": True, "env_value": "" if item.secret else value}
 
