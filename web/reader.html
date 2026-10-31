@@ -338,6 +338,15 @@
     font-size: 10px; color: var(--ink-4); letter-spacing: .08em; margin-bottom: 6px;
   }
   #transBody .tempty { color: var(--ink-4); font-size: 12px; line-height: 1.7; }
+  /* 译文里的插图：点开是大图，中文说明在下面一行 */
+  #transBody .tfig { margin: 10px 0 14px; }
+  #transBody .tfig img {
+    display: block; max-width: 100%; height: auto; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--gray-50); cursor: zoom-in;
+  }
+  #transBody .tfig figcaption {
+    font-size: 11px; color: var(--ink-3); line-height: 1.6; margin-top: 6px;
+  }
   #transBody .sel {
     background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: 8px;
     padding: 10px 12px; margin-bottom: 14px;
@@ -2069,12 +2078,39 @@ function mdToHtml(md) {
     .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 
+  // 图片：![alt](url)。译文里的图是模型写的「![图1：xxx]()」，url 为空时
+  // 按 alt 里的图号去 structures.json 的 number 字段上找，再指到裁图接口；
+  // 找不到就整行丢掉，绝不留一个空 src 的破图。
+  const resolveFigure = (alt, url) => {
+    if (url && !/^\s*$/.test(url)) return url;
+    const m = /图\s*(\d+)|Fig(?:ure)?\.?\s*(\d+)/i.exec(alt || '');
+    const no = m ? Number(m[1] || m[2]) : 0;
+    const list = (state.paperMeta && state.paperMeta.figures) || [];
+    if (!no || !list.length) return '';
+    // number 是论文里的图号（"1"、"2"…），index 才是图接口要的顺序号
+    let hit = list.find(f => Number(f.number) === no);
+    if (!hit && no - 1 < list.length) hit = list[no - 1];
+    if (!hit) return '';
+    return `/paper/${encodeURIComponent(state.paperName || PAPER)}/figure/${hit.index}`;
+  };
+
   const out = [];
   let list = null;
   const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
   for (const raw of text.split('\n')) {
     const line = raw.trim();
     if (!line) { closeList(); continue; }
+    // 整行是一张图：![alt](url) 或 ![alt]()
+    const img = /^!\[([^\]]*)\]\(([^)]*)\)\s*$/.exec(line);
+    if (img) {
+      closeList();
+      const src = resolveFigure(img[1], img[2]);
+      if (src) {
+        out.push(`<figure class="tfig"><img loading="lazy" src="${src}" alt="${escapeHtml(img[1])}">` +
+          `<figcaption>${escapeHtml(img[1])}</figcaption></figure>`);
+      }
+      continue;
+    }
     const h = /^(#{1,4})\s+(.*)$/.exec(line);
     if (h) { closeList(); const n = Math.min(3, h[1].length); out.push(`<h${n}>${inline(h[2])}</h${n}>`); continue; }
     const ul = /^[-*]\s+(.*)$/.exec(line);
@@ -2102,12 +2138,24 @@ function renderTrans() {
       '也可以选中正文里的一段话，点浮出的「译」只翻那一段。</div>');
   }
   transBodyEl.innerHTML = parts.join('');
+  // 译文一到位就默认开联动：面板是开着的说明用户就是要做中英对比，
+  // 再让 TA 点一次「对比」属于多余一步。按钮仍然可以手动关掉。
+  if (state.trans.open && state.trans.pages.size && !state.trans.sync) {
+    state.trans.sync = true;
+    transSyncBtnEl.classList.add('on');
+  }
 }
 
 function openTrans() {
   state.trans.open = true;
   transPaneEl.classList.add('open');
   transToggleEl.classList.add('on');
+  // 赛题 1.3.3.3 要求的中英对比就是"拉开译文栏，拖一侧另一侧跟着走"。
+  // 所以面板一打开就默认开联动（有译文时），不用再点一次「对比」。
+  if (!state.trans.sync && state.trans.pages.size) {
+    state.trans.sync = true;
+    transSyncBtnEl.classList.add('on');
+  }
   relayoutKeepingPage();
 }
 
