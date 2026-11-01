@@ -43,6 +43,7 @@ from app.llm import get_client
 from app.logging_config import get_logger
 from app.papers import find_paper_by_title, load_structures, paper_meta
 from app.rag.pipeline import _looks_like_citation, page_text, retrieve_scored
+from app.security import reserve_llm_call
 from app.tools.registry import get_tool, list_tools, tool_schemas
 
 logger = get_logger(__name__)
@@ -630,6 +631,7 @@ async def _search_query(question: str) -> str:
         return cached
 
     try:
+        reserve_llm_call()
         resp = await get_client().chat.completions.create(
             model=settings.llm_model,
             messages=[
@@ -644,6 +646,9 @@ async def _search_query(question: str) -> str:
                 {"role": "user", "content": question},
             ],
             temperature=0,
+            # 只输出一串英文关键词，64 token 绰绰有余；
+            # 不设上限时上游若抽风会一直吐到自然结束
+            max_tokens=64,
         )
         q = (resp.choices[0].message.content or "").strip().strip('"').strip()
         q = _merge_terms(q or question, question)
@@ -1576,12 +1581,14 @@ async def run_agent(
         logger.info("--- 第 %d 轮 ---", round_no)
 
         t_writer = time.perf_counter()
+        reserve_llm_call()
         resp = await get_client().chat.completions.create(
             model=settings.llm_model,
             messages=messages,
             tools=tool_schemas(),          # ← 把工具说明书交给模型
             tool_choice="auto",            # ← auto = 让模型自己决定用不用
             temperature=0.3,
+            max_tokens=settings.llm_max_tokens,
         )
         msg = resp.choices[0].message
 
@@ -1710,12 +1717,14 @@ async def run_agent_stream(
         yield {"type": "status", "text": _make_status(evidence, roles)}
 
     for round_no in range(1, MAX_ROUNDS + 1):
+        reserve_llm_call()
         stream = await get_client().chat.completions.create(
             model=settings.llm_model,
             messages=messages,
             tools=tool_schemas(),
             tool_choice="auto",
             temperature=0.3,
+            max_tokens=settings.llm_max_tokens,
             stream=True,
         )
 

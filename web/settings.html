@@ -250,6 +250,12 @@
     let body = null;
     try { body = await res.json(); } catch (_) { body = null; }
     if (!res.ok) {
+      // 401/503 说明没登录或服务端没配管理员口令——都跳到登录页，
+      // 而不是把「需要管理员认证」当成普通报错弹在配置列表里。
+      if (res.status === 401 || res.status === 503) {
+        location.href = 'admin-login.html?next=' + encodeURIComponent(location.pathname + location.search);
+        throw new Error('需要管理员登录');
+      }
       const msg = (body && (body.detail || body.message)) || ('HTTP ' + res.status);
       throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
     }

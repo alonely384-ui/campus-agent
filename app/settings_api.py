@@ -429,14 +429,20 @@ def describe(item: Setting) -> dict[str, Any]:
 
 
 def snapshot() -> dict[str, Any]:
-    """整个设置页要的数据：按 group 分好组。"""
+    """整个设置页要的数据：按 group 分好组。
+
+    不回传 `.env` 的绝对路径：`/opt/campus-agent/.env` 这类信息对排障有用，
+    对探测者更有用（暴露部署目录结构）。界面上「配置文件位置」那一行
+    改由后端在描述里说明是相对路径。
+    """
     groups: dict[str, list[dict[str, Any]]] = {}
     for item in SETTINGS.values():
         groups.setdefault(item.group, []).append(describe(item))
     overridden = [k for k, v in SETTINGS.items() if env_overrides(v)["overridden"]]
     return {
         "groups": groups,
-        "env_file": str(config._env_path()),
+        # 只给文件名，不给绝对路径
+        "env_file": config._env_path().name,
         "key_configured": has_real_key(),
         # 被系统环境变量覆盖的键名列表；前端据此在页头挂一条醒目提示
         "env_overrides": overridden,

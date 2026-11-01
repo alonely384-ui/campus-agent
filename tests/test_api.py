@@ -16,17 +16,27 @@ client = TestClient(app)
 
 
 def test_health_endpoint():
-    """/health 必须永远能返回 200 —— 部署后靠它判断服务是否存活。"""
+    """/health 必须永远能返回 200 —— 部署后靠它判断服务是否存活。
+
+    注意 model 字段：安全整改后它**只对管理员返回**。
+    探活方（Nginx / Docker）不该看到用的是哪家上游、哪个型号，
+    那属于运维细节。所以这里断言的是「匿名访问拿不到 model」。
+    """
     resp = client.get("/health")
     assert resp.status_code == 200
 
     data = resp.json()
     assert data["status"] == "ok"
-    assert "model" in data
+    assert "version" in data
+    assert "model" not in data, "匿名访问 /health 不应泄露模型名"
 
 
 def test_openapi_schema_is_valid():
-    """FastAPI 能生成接口文档，说明所有路由定义语法正确。"""
+    """FastAPI 能生成接口文档，说明所有路由定义语法正确。
+
+    dev 环境下文档开着；生产（APP_ENV=prod）会被关掉，
+    那条行为由 test_security.py::test_docs_hidden_in_prod 单独验证。
+    """
     resp = client.get("/openapi.json")
     assert resp.status_code == 200
 

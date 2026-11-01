@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>管理员登录 · 科研小助手</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="design-system.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-page); min-height: 100vh; color: var(--text-primary);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 380px; background: var(--bg-surface);
+      border: 1px solid var(--border-color); border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card); padding: 28px 26px 24px;
+    }
+    .mark {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+    }
+    .mark img { width: 30px; height: 30px; border-radius: 8px; }
+    h1 { font-size: 17px; font-weight: 600; }
+    .sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6; }
+    label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+    input[type="password"] {
+      width: 100%; padding: 10px 12px; font-size: 14px; font-family: var(--font-sans);
+      border: 1px solid var(--border-color); border-radius: var(--radius-control);
+      background: var(--bg-input); color: var(--text-primary);
+      transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+    }
+    input[type="password"]:focus {
+      outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring);
+    }
+    button {
+      width: 100%; margin-top: 16px; padding: 10px 14px; font-size: 14px; font-weight: 500;
+      font-family: var(--font-sans); color: #fff; background: var(--brand);
+      border: none; border-radius: var(--radius-control); cursor: pointer;
+      transition: background var(--dur-fast) var(--ease);
+    }
+    button:hover:not(:disabled) { background: var(--brand-hover); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .msg {
+      margin-top: 14px; font-size: 13px; line-height: 1.6; padding: 9px 11px;
+      border-radius: var(--radius-control); display: none;
+    }
+    .msg.bad { display: block; color: #b42318; background: #fef3f2; border: 1px solid #fecdca; }
+    .msg.ok { display: block; color: #067647; background: #ecfdf3; border: 1px solid #abefc6; }
+    .foot { margin-top: 18px; font-size: 12px; color: var(--text-tertiary); text-align: center; }
+    .foot a { color: var(--text-secondary); text-decoration: none; }
+    .foot a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">
+      <img src="logo.svg" alt="" width="30" height="30">
+      <h1>管理员登录</h1>
+    </div>
+    <p class="sub">
+      设置中心与论文删除属于管理操作，需要口令。普通浏览、问答、阅读、检索等演示功能无需登录。
+    </p>
+
+    <label for="token">管理员口令</label>
+    <input id="token" type="password" autocomplete="current-password" placeholder="请输入口令" />
+    <button id="submit" type="button">登录</button>
+    <div id="msg" class="msg"></div>
+
+    <div class="foot"><a href="index.html">← 返回问答页</a></div>
+  </main>
+
+<script>
+  (function () {
+    const input = document.getElementById('token');
+    const btn = document.getElementById('submit');
+    const msg = document.getElementById('msg');
+
+    // 登录成功后回到来源页；只接受同源的相对路径，避免被构造成开放重定向
+    function nextUrl() {
+      const raw = new URLSearchParams(location.search).get('next') || '';
+      if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
+      return 'settings.html';
+    }
+
+    function show(text, kind) {
+      msg.textContent = text;
+      msg.className = 'msg ' + (kind || 'bad');
+    }
+
+    async function submit() {
+      const token = input.value.trim();
+      if (!token) { show('请输入管理员口令'); input.focus(); return; }
+
+      btn.disabled = true;
+      show('正在校验…', 'ok');
+      try {
+        const res = await fetch('/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: token }),
+        });
+        const body = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          show('登录成功，正在跳转…', 'ok');
+          location.href = nextUrl();
+          return;
+        }
+        if (res.status === 429) {
+          show(body.detail || '尝试次数过多，请稍后再试');
+        } else if (res.status === 503) {
+          show('服务端尚未配置管理员口令（ADMIN_TOKEN / ADMIN_COOKIE_SECRET），请先在 .env 中设置后重启服务');
+        } else {
+          show(body.detail || '口令错误');
+        }
+      } catch (err) {
+        show('网络异常：' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    btn.addEventListener('click', submit);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submit();
+    });
+    input.focus();
+  })();
+</script>
+</body>
+</html>

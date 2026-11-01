@@ -512,7 +512,12 @@
       btn.disabled = true;
       try {
         const resp = await fetch('/papers/' + encodeURIComponent(paperId), { method: 'DELETE' });
-        const d = await resp.json();
+        const d = await resp.json().catch(() => ({}));
+        // 删除是管理员操作：没登录就跳登录页，登录完回到本页
+        if (resp.status === 401 || resp.status === 503) {
+          location.href = 'admin-login.html?next=' + encodeURIComponent(location.pathname);
+          return;
+        }
         if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
         upStatusEl.textContent = `已删除，清理索引块 ${d.removed_chunks || 0} 个。`;
         await loadLibrary();

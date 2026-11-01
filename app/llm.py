@@ -16,6 +16,7 @@ from openai import AsyncOpenAI
 
 from app.config import settings
 from app.logging_config import get_logger
+from app.security import reserve_llm_call
 
 logger = get_logger(__name__)
 
@@ -74,7 +75,7 @@ async def reset_client_async() -> None:
         logger.warning("关闭旧 LLM 客户端时出错（已忽略，不影响新配置生效）", exc_info=True)
 
 
-async def chat(messages: list[dict], temperature: float = 0.3) -> str:
+async def chat(messages: list[dict], temperature: float = 0.3, max_tokens: int | None = None) -> str:
     """一次性拿完整回答。
 
     参数 messages 的形状（这是 OpenAI 定的标准格式，记住它）：
@@ -82,20 +83,29 @@ async def chat(messages: list[dict], temperature: float = 0.3) -> str:
             {"role": "system", "content": "你是一个校园助手"},
             {"role": "user",   "content": "明天有什么课"},
         ]
+
+    ``max_tokens`` 是**上限不是目标**：正常回答不会因此变短，但它是防刷爆
+    账单的最后一道闸——原来全项目 0 处 max_tokens，一次请求要多久输出多久。
     """
     logger.info("请求模型 %s，消息数 %d", settings.llm_model, len(messages))
 
+    reserve_llm_call()
     resp = await get_client().chat.completions.create(
         model=settings.llm_model,
         messages=messages,
         temperature=temperature,
+        max_tokens=max_tokens or settings.llm_max_tokens,
     )
     answer = resp.choices[0].message.content or ""
     logger.info("模型返回 %d 个字符", len(answer))
     return answer
 
 
-async def chat_stream(messages: list[dict], temperature: float = 0.3) -> AsyncIterator[str]:
+async def chat_stream(
+    messages: list[dict],
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+) -> AsyncIterator[str]:
     """流式拿回答：一个字一个字往外吐。
 
     这是聊天框"打字机效果"的原理。用 async for 消费：
@@ -104,10 +114,12 @@ async def chat_stream(messages: list[dict], temperature: float = 0.3) -> AsyncIt
     """
     logger.info("流式请求模型 %s", settings.llm_model)
 
+    reserve_llm_call()
     stream = await get_client().chat.completions.create(
         model=settings.llm_model,
         messages=messages,
         temperature=temperature,
+        max_tokens=max_tokens or settings.llm_max_tokens,
         stream=True,  # ← 关键就这一行
     )
 

@@ -16,11 +16,13 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import fitz
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
+from starlette.routing import Mount
 
 from app import kb_health, llm, scheduler, settings_api
 from app.agent import run_agent, run_agent_stream
@@ -68,6 +70,27 @@ from app.recommend import (
     rerank_with_feedback,
     save_feedback,
 )
+from app.security import (
+    ADMIN_PATHS,
+    DOC_PATHS,
+    PUBLIC_PATHS,
+    PUBLIC_PREFIXES,
+    SESSION_TTL,
+    BudgetExceeded,
+    admin_configured,
+    body_limit_for,
+    bucket_for,
+    client_ip,
+    cookie_value,
+    daily_budget,
+    limiter,
+    login_guard,
+    normalize_path,
+    origin_allowed,
+    sign_session,
+    verify_password,
+    verify_session,
+)
 from app.translate import (
     load_translation,
     references_page_of,
@@ -102,10 +125,17 @@ def _read_version() -> str:
 
 VERSION = _read_version()
 
+# 生产环境关掉 /docs、/redoc、/openapi.json：它们把 44 个接口的参数结构
+# 完整摊开，对评委没用，对探测者很有用。本地调试想看文档时 APP_ENV=dev 即可。
+_IS_PROD = str(settings.app_env or "").strip().lower() in ("prod", "production")
+
 app = FastAPI(
     title="Campus Agent",
     description="校园智能助手：RAG 问答 + 工具调用 + 流式输出",
     version=VERSION,
+    docs_url=None if _IS_PROD else "/docs",
+    redoc_url=None if _IS_PROD else "/redoc",
+    openapi_url=None if _IS_PROD else "/openapi.json",
 )
 
 # 所有数据路径都从 BASE_DIR 拼，**绝不写 Path("data/...")**。
@@ -127,6 +157,253 @@ for _d in (UPLOAD_DIR, META_CHARTS_DIR, META_DIAGRAMS_DIR):
 WEB_DIR = BASE_DIR / "web"
 if not WEB_DIR.is_dir():
     logger.warning("找不到 web 目录（%s），/ui 会 404；请确认代码是否完整", WEB_DIR)
+
+# ---------------- 安全层：路由分类对账 ----------------
+# 见 app/security.py。这里的关键不是「拦住谁」，而是「没被登记的路由一律拒绝」。
+#
+# 为什么要在启动时对账而不是靠代码审查：44 个路由散在 1400 行里，将来加一个
+# `@app.post("/settings/reset")` 忘记登记，默认行为就成了「公开可调」。
+# 这里在 import 阶段直接抛异常，服务根本起不来——把安全缺陷变成启动失败。
+
+
+def _route_templates() -> set[str]:
+    """当前所有对外路由的路径模板（不含 /ui 静态挂载与自动生成的文档路由）。"""
+    skip_names = {"openapi", "swagger_ui_html", "swagger_ui_redirect", "redoc_html"}
+    # Mount（如 /ui 静态目录）是 ASGI 子应用挂载点，由 PUBLIC_PREFIXES 统管，
+    # 不是 API 路由，不参与逐条对账
+    mount_cls = Mount
+    out: set[str] = set()
+    for route in app.routes:
+        path = getattr(route, "path", None)
+        name = getattr(route, "name", "")
+        if not path or name in skip_names:
+            continue
+        if path in ("/openapi.json", "/docs", "/redoc"):
+            continue
+        if isinstance(route, mount_cls):
+            continue
+        out.add(path)
+    return out
+
+
+def _assert_route_coverage() -> None:
+    """任何一个路由既不在 ADMIN 也不在 PUBLIC，就拒绝启动。"""
+    templates = _route_templates()
+    uncovered = sorted(templates - ADMIN_PATHS - PUBLIC_PATHS)
+    if uncovered:
+        raise RuntimeError(
+            "安全层未登记的路由（默认公开是最危险的默认值）："
+            + "、".join(uncovered)
+            + "；请在 app/security.py 的 ADMIN_PATHS 或 PUBLIC_PATHS 中登记"
+        )
+    # 反向检查：登记了却不存在，说明清单和代码脱节了，同样拒绝启动。
+    # 要排除三类「登记了但本来就不该出现在 app.routes 里」的路径：
+    #   PUBLIC_PREFIXES —— /ui 是 Mount，不是路由
+    #   DOC_PATHS       —— 生产环境 openapi_url=None，这三条根本没注册
+    exempt = set(PUBLIC_PREFIXES) | set(DOC_PATHS)
+    stale = sorted((ADMIN_PATHS | PUBLIC_PATHS) - templates - exempt)
+    if stale:
+        raise RuntimeError(
+            "安全层登记了不存在的路由（清单已与代码脱节）：" + "、".join(stale)
+        )
+    logger.info("安全层路由对账通过：管理 %d 条，公开 %d 条", len(ADMIN_PATHS), len(PUBLIC_PATHS))
+
+
+def _matches_template(path: str, template: str) -> bool:
+    """把真实路径和路由模板对齐。逐段比较，`{xxx}` 段匹配任意非空片段。"""
+    if path == template:
+        return True
+    p_seg = path.split("/")
+    t_seg = template.split("/")
+    if len(p_seg) != len(t_seg):
+        return False
+    for real, tpl in zip(p_seg, t_seg, strict=True):
+        if tpl.startswith("{") and tpl.endswith("}"):
+            if not real:
+                return False
+            continue
+        if real != tpl:
+            return False
+    return True
+
+
+def resolve_template(path: str) -> str | None:
+    """把真实请求路径映射回路由模板；匹配不上返回 None。"""
+    path = normalize_path(path)
+    if path in ADMIN_PATHS or path in PUBLIC_PATHS:
+        return path
+    for template in ADMIN_PATHS | PUBLIC_PATHS:
+        if _matches_template(path, template):
+            return template
+    return None
+
+
+class _BodyTooLarge(Exception):
+    """请求体超过上限。在 ASGI 层抛出，由中间件转成 413。"""
+
+
+def _plain(status: int, detail: str, headers: dict[str, str] | None = None) -> JSONResponse:
+    return JSONResponse({"detail": detail}, status_code=status, headers=headers)
+
+
+@app.middleware("http")
+async def security_guard(request: Request, call_next):
+    """认证 → 限流 → 体积，三层一次过。
+
+    顺序有讲究：
+        认证放最前，未授权请求连限流的令牌都不消耗（否则攻击者能靠乱打
+        管理接口把管理员自己的额度耗光）；
+        体积检查放最后，只对已放行的请求生效。
+    """
+    raw_path = request.url.path
+    path = normalize_path(raw_path)
+
+    # ---- 静态页面：整页放行，页面里的接口各自受保护 ----
+    for prefix in PUBLIC_PREFIXES:
+        if raw_path.startswith(prefix):
+            return await call_next(request)
+
+    template = resolve_template(path)
+    if template is None:
+        # 未知路径返回 404 而不是 401：401 等于告诉对方「这里有个接口你缺权限」
+        return _plain(404, "未找到该接口")
+
+    headers = list(request.scope.get("headers") or [])
+    ip = client_ip(request.scope, headers)
+
+    # ---- 0. 接口文档：dev 下透传，生产下这些路由根本没注册 ----
+    # 不能让它走后面的模板匹配再交给 FastAPI：FastAPI 的文档路由名是
+    # openapi/swagger_ui_html，不在 ADMIN/PUBLIC 之外的对账集合里，
+    # 这里显式放行可读性最好。
+    if path in DOC_PATHS:
+        return await call_next(request)
+
+    # ---- 1. 认证 ----
+    # /admin/login 与 /admin/logout 自身是公开的（不登录怎么登录），
+    # 它们的失败锁定由 security.login_guard 单独管，不走 Cookie 校验。
+    if template in ADMIN_PATHS:
+        if not admin_configured():
+            # 没配凭证 = 管理功能不可用。绝不降级成放行。
+            logger.error(
+                "管理接口被访问，但 ADMIN_TOKEN / ADMIN_COOKIE_SECRET 未配置：%s", template
+            )
+            return _plain(503, "管理功能未配置，请联系管理员")
+        if not verify_session(cookie_value(headers, "ca_admin")):
+            return _plain(401, "需要管理员认证")
+        if request.method not in ("GET", "HEAD", "OPTIONS") and not origin_allowed(request.scope):
+            # CSRF 纵深防御：SameSite=Strict 之外再加一道同源校验
+            return _plain(403, "跨站请求被拒绝")
+
+    # ---- 2. 限流 ----
+    if int(getattr(settings, "security_limit_enabled", 1) or 0):
+        bucket = bucket_for(template)
+        ok, wait = limiter.allow(f"{ip}|{template}", bucket)
+        if not ok:
+            logger.warning("限流触发：ip=%s path=%s", ip, template)
+            return _plain(
+                429,
+                "请求过于频繁，请稍后再试",
+                {"Retry-After": str(wait), "X-RateLimit-Template": template},
+            )
+
+    # ---- 3. 请求体体积（实际字节数，不看 Content-Length） ----
+    limit = body_limit_for(path)
+    spoken = _safe_content_length(headers)
+    if spoken is not None and spoken > limit:
+        return _plain(413, f"请求体超过 {limit // (1024 * 1024)}MB")
+
+    # 包的必须是「原始的」receive 句柄。
+    # 不能写 `request.receive()`——`Request.receive` 是个属性，取它就是取
+    # `request._receive`，一旦我们把 `request._receive` 换成了自己，
+    # 这里就会无限调用自己，报 RecursionError（把 /paper/{f} 的 PDF 下载打成 500）。
+    raw_receive = request._receive  # noqa: SLF001
+
+    async def limited_receive():
+        total = 0
+        while True:
+            # 只处理 http.request 一种消息，其余的（http.disconnect 等）原样放行
+            message = await raw_receive()
+            if message.get("type") == "http.request":
+                total += len(message.get("body", b"") or b"")
+                if total > limit:
+                    # 分块传输不带 Content-Length，只能边读边算
+                    raise _BodyTooLarge
+            return message
+
+    request._receive = limited_receive  # noqa: SLF001 —— Starlette 官方推荐的包装方式
+
+    return await call_next(request)
+
+
+def _safe_content_length(headers: list[tuple[bytes, bytes]]) -> int | None:
+    for key, value in headers:
+        if key.lower() == b"content-length":
+            try:
+                return int(value.decode("latin-1"))
+            except ValueError:
+                return None
+    return None
+
+
+@app.exception_handler(_BodyTooLarge)
+async def _body_too_large_handler(request: Request, exc: _BodyTooLarge) -> JSONResponse:
+    return _plain(413, "请求体过大")
+
+
+@app.exception_handler(BudgetExceeded)
+async def _budget_handler(request: Request, exc: BudgetExceeded) -> JSONResponse:
+    """预算用完是业务状态，不是服务器故障，必须 429 而不是 500。"""
+    return _plain(
+        429,
+        "今日演示额度已用完，请明天再试",
+        {"Retry-After": "3600", "X-Budget-Status": "exhausted"},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """参数校验失败保持 422。
+
+    为什么必须显式注册：`RequestValidationError` 直接继承 `Exception`，
+    一旦注册了 `Exception` 的兜底处理器，它就会先于 FastAPI 自带的 422
+    处理器命中，把所有参数错误降级成 400——这会骗过前端所有
+    「422 就提示用户改输入」的分支。
+    """
+    # 只回字段名和原因，不回显原始输入（可能是超长文本）
+    fields = [
+        {"loc": list(err.get("loc", [])), "msg": str(err.get("msg", ""))}
+        for err in exc.errors()[:10]
+    ]
+    return JSONResponse({"detail": "参数校验失败", "errors": fields}, status_code=422)
+
+
+@app.exception_handler(Exception)
+async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
+    """兜底：任何未捕获异常都不把堆栈、路径、SQL 吐给客户端。
+
+    原来靠每个接口自己 try/except，漏一个就把 `FileNotFoundError:
+    /opt/campus-agent/data/papers/xxx.pdf` 直接送出去。
+    """
+    if isinstance(exc, HTTPException):
+        return _plain(exc.status_code, str(exc.detail))
+    logger.exception("未捕获异常：%s", request.url.path)
+    return _plain(500, "服务器内部错误")
+
+
+def require_admin(request: Request) -> None:
+    """管理接口的第二道保险（第一道是中间件）。
+
+    两层都要，因为中间件是按路径前缀/模板判定的，一旦将来有人把某个管理
+    接口挪到公开路径下，这层依赖仍会拦住它。
+    """
+    if not admin_configured():
+        raise HTTPException(status_code=503, detail="管理功能未配置，请联系管理员")
+    headers = list(request.scope.get("headers") or [])
+    if not verify_session(cookie_value(headers, "ca_admin")):
+        raise HTTPException(status_code=401, detail="需要管理员认证")
+
+
+AdminOnly = Depends(require_admin)
 
 # SSE 保活间隔（秒）。长推理、长翻译时上游可能几十秒一个字都不吐，
 # Nginx 默认 proxy_read_timeout 60s 会直接把这条连接掐掉，前端表现成「卡住不动」。
@@ -238,6 +515,10 @@ async def _save_upload_limited(file: UploadFile, dest: Path, *, limit: int) -> i
 HISTORY_MAX_TURNS = 50
 HISTORY_KEEP_TURNS = 12
 
+# 单条历史消息的字符上限。2000 字对齐 message 的上限——单条历史比当前问题还长，
+# 没有正常前端会这么发。
+HISTORY_ITEM_MAX_CHARS = 2000
+
 
 class ChatRequest(BaseModel):
     """POST /chat 的请求体。Pydantic 会自动校验字段，写错了直接返回 422。"""
@@ -261,19 +542,25 @@ class ChatRequest(BaseModel):
 
 
 def trim_history(history: list[dict] | None) -> list[dict]:
-    """只留最近 HISTORY_KEEP_TURNS 条历史，并剔掉结构不对、内容为空的消息。
+    """只留最近 HISTORY_KEEP_TURNS 条历史，并剔掉结构不对、内容为空或过长的消息。
 
     为什么两层都要限：`message` 限了 2000 字，但 history 原来是一个不限长的 list，
     客户端可以一次塞进十万条，既直接抬高每次请求的 token 成本，
     也能被拿来当放大器。字段层的 max_length 挡住异常大的请求（返回 422），
     这里再兜一次底：正常客户端传 40 条也只取最近 12 条去拼提示词。
+
+    单条 content 也要限：50 条 × 每条 2000 字 = 10 万字，是 message 上限的 50 倍，
+    光靠条数限制挡不住这条放大路径。
     """
     if not history:
         return []
     clean = [
         m
         for m in history
-        if isinstance(m, dict) and isinstance(m.get("content"), str) and m["content"].strip()
+        if isinstance(m, dict)
+        and isinstance(m.get("content"), str)
+        and m["content"].strip()
+        and len(m["content"]) <= HISTORY_ITEM_MAX_CHARS
     ]
     return clean[-HISTORY_KEEP_TURNS:]
 
@@ -322,9 +609,18 @@ async def favicon() -> RedirectResponse:
 
 
 @app.get("/health", summary="健康检查")
-async def health() -> dict:
-    """部署后用这个接口判断服务是不是活着。Nginx / Docker 都靠它做探活。"""
-    return {"status": "ok", "model": settings.llm_model, "version": VERSION}
+async def health(request: Request) -> dict:
+    """部署后用这个接口判断服务是不是活着。Nginx / Docker 都靠它做探活。
+
+    普通访问只拿到 status/version；模型名与今日额度只对管理员返回。
+    模型名会暴露用的是哪家上游与哪个型号，属于运维细节。
+    """
+    payload: dict = {"status": "ok", "version": VERSION}
+    headers = list(request.scope.get("headers") or [])
+    if verify_session(cookie_value(headers, "ca_admin")):
+        payload["model"] = settings.llm_model
+        payload["budget"] = daily_budget.status()
+    return payload
 
 
 @app.post("/chat", response_model=ChatResponse, summary="对话（一次性返回）")
@@ -338,6 +634,10 @@ async def chat(req: ChatRequest) -> ChatResponse:
             sources=req.sources,
             use_dense=req.use_dense,
         )
+    except BudgetExceeded:
+        # 额度用完不是故障，必须原样上抛给异常处理器转成 429，
+        # 不能被下面的通用 except 包成 500——前端据此显示「今日额度已用完」
+        raise
     except Exception as e:
         logger.exception("处理 /chat 失败")
         # 不要把原始异常直接抛给用户（可能泄漏内部信息），记日志 + 返回通用提示
@@ -613,7 +913,7 @@ async def papers_upload(
     return body
 
 
-@app.delete("/papers/{paper_id}", summary="删除论文")
+@app.delete("/papers/{paper_id}", summary="删除论文", dependencies=[AdminOnly])
 async def papers_delete(paper_id: str) -> dict:
     paper = get_paper(paper_id)
     if paper is None:
@@ -1299,12 +1599,12 @@ class IndexCleanupRequest(BaseModel):
     sources: list[str] = Field(default_factory=list, max_length=500)
 
 
-@app.get("/settings", summary="读取全部设置（API Key 已脱敏）")
+@app.get("/settings", summary="读取全部设置（API Key 已脱敏）", dependencies=[AdminOnly])
 async def settings_read() -> dict:
     return await run_in_threadpool(settings_api.snapshot)
 
 
-@app.get("/settings/about", summary="项目信息（技术栈与版本）")
+@app.get("/settings/about", summary="项目信息（技术栈与版本）", dependencies=[AdminOnly])
 async def settings_about() -> dict:
     return settings_api.about()
 
@@ -1322,7 +1622,7 @@ async def settings_save(req: SettingsUpdateRequest) -> dict:
     return {**result, "settings": settings_api.snapshot()}
 
 
-@app.post("/settings/restore", summary="单项恢复默认值")
+@app.post("/settings/restore", summary="单项恢复默认值", dependencies=[AdminOnly])
 async def settings_restore(req: SettingsUpdateRequest) -> dict:
     try:
         result = await run_in_threadpool(settings_api.restore_default, req.key)
@@ -1331,7 +1631,7 @@ async def settings_restore(req: SettingsUpdateRequest) -> dict:
     return {**result, "settings": settings_api.snapshot()}
 
 
-@app.post("/settings/test-connection", summary="测试模型连接")
+@app.post("/settings/test-connection", summary="测试模型连接", dependencies=[AdminOnly])
 async def settings_test_connection() -> dict:
     probe = await settings_api.test_connection()
     return {
@@ -1344,12 +1644,12 @@ async def settings_test_connection() -> dict:
     }
 
 
-@app.get("/settings/schedule", summary="定时刷新状态")
+@app.get("/settings/schedule", summary="定时刷新状态", dependencies=[AdminOnly])
 async def settings_schedule() -> dict:
     return await run_in_threadpool(scheduler.status)
 
 
-@app.post("/settings/schedule", summary="应用定时刷新设置")
+@app.post("/settings/schedule", summary="应用定时刷新设置", dependencies=[AdminOnly])
 async def settings_schedule_apply(req: SettingsUpdateRequest) -> dict:
     """先写配置、再动运行时；运行时起不来就把配置回滚。
 
@@ -1382,13 +1682,13 @@ async def settings_schedule_apply(req: SettingsUpdateRequest) -> dict:
             "next_run": info.get("next_run") or "", "settings": settings_api.snapshot()}
 
 
-@app.get("/settings/index/health", summary="索引健康检查（只读）")
+@app.get("/settings/index/health", summary="索引健康检查（只读）", dependencies=[AdminOnly])
 async def settings_index_health() -> dict:
     report = await run_in_threadpool(kb_health.health_check)
     return report.to_dict()
 
 
-@app.post("/settings/index/cleanup", summary="清理幽灵索引（三路同步）")
+@app.post("/settings/index/cleanup", summary="清理幽灵索引（三路同步）", dependencies=[AdminOnly])
 async def settings_index_cleanup(req: IndexCleanupRequest | None = None) -> dict:
     """只清理磁盘上已不存在的 source；有效论文一律跳过（在 cleanup_ghosts 里保证）。"""
     sources: list[str] | None = None
@@ -1399,12 +1699,83 @@ async def settings_index_cleanup(req: IndexCleanupRequest | None = None) -> dict
     return {"result": result.to_dict(), "verify": verify}
 
 
+# ---------------- 管理员登录（两阶段第二期） ----------------
+# 为什么是「Cookie + 登录页」而不是 HTTP Basic：
+#   1. Basic Auth 的密码框是浏览器弹的原生窗口，评委做演示时会以为点错了；
+#   2. Basic 每个请求都带凭据，无法主动登出；
+#   3. 这里只需要「管理员点开设置中心才要密码」，普通访问完全无感。
+#
+# 为什么 Cookie 值不是随机串而是签名：
+#   多 worker 时随机串存在进程内存里，A worker 发的 Cookie 到了 B worker 就是无效的。
+#   签名方案不需要任何共享存储，密钥在环境变量里，天然多进程一致。
+
+
+class AdminLoginRequest(BaseModel):
+    token: str = Field(..., min_length=1, max_length=256)
+
+
+@app.post("/admin/login", summary="管理员登录")
+async def admin_login(req: AdminLoginRequest, request: Request) -> Response:
+    if not admin_configured():
+        # 没配 ADMIN_TOKEN：登录功能不存在本身就是正确状态，不是错误
+        raise HTTPException(status_code=503, detail="管理功能未配置，请联系管理员")
+
+    headers = list(request.scope.get("headers") or [])
+    ip = client_ip(request.scope, headers)
+
+    locked_for = login_guard.locked(ip)
+    if locked_for > 0:
+        raise HTTPException(
+            status_code=429,
+            detail=f"尝试次数过多，请 {locked_for // 60 + 1} 分钟后再试",
+            headers={"Retry-After": str(locked_for)},
+        )
+
+    if not verify_password(req.token):
+        remaining = login_guard.fail(ip)
+        logger.warning("管理员登录失败：ip=%s 剩余尝试 %d", ip, remaining)
+        if remaining > 0:
+            # 刚刚跨过阈值：明确告诉客户端已锁定，并带上 Retry-After
+            raise HTTPException(
+                status_code=429,
+                detail=f"尝试次数过多，请 {remaining // 60 + 1} 分钟后再试",
+                headers={"Retry-After": str(remaining)},
+            )
+        raise HTTPException(status_code=401, detail="口令错误")
+
+    login_guard.succeed(ip)
+    value = sign_session()
+    resp = JSONResponse({"ok": True, "expires_in": SESSION_TTL})
+    resp.set_cookie(
+        key="ca_admin",
+        value=value,
+        max_age=SESSION_TTL,
+        httponly=True,          # JS 读不到，降低 XSS 窃取风险
+        samesite="strict",      # 跨站请求不带 Cookie，CSRF 第一道
+        secure=_IS_PROD,        # 生产走 HTTPS 才加 Secure；本地 http 调试不加
+        path="/",
+    )
+    logger.info("管理员登录成功：ip=%s", ip)
+    return resp
+
+
+@app.post("/admin/logout", summary="管理员登出")
+async def admin_logout() -> Response:
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(key="ca_admin", path="/")
+    return resp
+
+
 # ---------------- 前端页面 ----------------
 # 把 web/ 目录挂到 /ui，这样访问 http://127.0.0.1:8000/ui/ 就能看到聊天页面。
 # 用绝对路径 WEB_DIR：`Path("web")` 是按 CWD 找的，换个目录启动就挂不上，
 # 表现是 /ui 直接 404 而日志里什么都不说（顶部已经 warning 过一句）。
 if WEB_DIR.is_dir():
     app.mount("/ui", StaticFiles(directory=WEB_DIR, html=True), name="web")
+
+# 所有 @app.get/@app.post 都已执行完，此刻才谈得上「对账」。
+# 它必须在 import 阶段跑完：漏登记的路由让服务直接起不来，而不是悄悄公开。
+_assert_route_coverage()
 
 # ---------------- 定时刷新推荐（1.4.2） ----------------
 # 默认每天跑一次；`DISCOVER_SCHEDULE=off` 可关掉，`weekly` 改每周一。

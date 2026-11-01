@@ -117,6 +117,29 @@ class Settings(BaseSettings):
     discover_schedule: str = "daily"
     discover_hour: int = 8
 
+    # ---- 安全（见 app/security.py，只从环境变量/.env 读，代码里不留任何默认口令） ----
+    # 管理员口令。**故意默认为空**：为空时认证层一律拒绝，
+    # 而不是「没配就放行」——那样漏配一个环境变量等于把管理接口送人。
+    admin_token: str = ""
+    # 签发 Session Cookie 用的密钥，与口令分开，方便只换密钥让所有会话立刻失效
+    admin_cookie_secret: str = ""
+    # 生产环境关文档；dev 保留 /docs 便于本地调试
+    app_env: str = "dev"
+    # 信任的反向代理地址（逗号分隔）。为空时完全不看 X-Forwarded-For。
+    trusted_proxies: str = ""
+    # 限流总开关。0 时只关限流、认证仍然生效。
+    # 认环境变量 SECURITY_LIMIT_ENABLED；测试里由 tests/conftest.py 强制关掉，
+    # 因为一个 pytest 进程会在几秒内连打同一路线几十次，那是压测不是正常访问。
+    security_limit_enabled: int = 1
+    # 每日真实模型调用次数上限（不是 HTTP 请求次数）
+    llm_daily_budget: int = 800
+    # LLM 并发上限，超出排队不拒绝
+    llm_max_concurrency: int = 4
+    # 单次生成的最大 token，防刷爆账单的最后一道闸
+    llm_max_tokens: int = 2048
+    # 预算计数落盘位置（相对路径按进程工作目录解析）
+    budget_file: str = "data/meta/llm-budget.json"
+
     # 不在这里写死 env_file：读哪个文件由下面的 settings_customise_sources
     # 在每次构造时动态决定，保证和写入侧（_env_path）指向同一个文件。
     model_config = SettingsConfigDict(env_file_encoding="utf-8", extra="ignore")

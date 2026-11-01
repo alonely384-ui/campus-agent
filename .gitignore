@@ -29,6 +29,10 @@ data/meta/ref-titles-cache.json
 data/meta/*.before.json
 data/meta/*.pre-rebuild.json
 
+# 每日模型调用预算的计数文件：运行时状态，每台机器各自记账，不进仓库
+# （部署时自动创建，删了也只是当天计数归零）
+data/meta/llm-budget.json
+
 # 1.6 写作助手的生成物，全部按内容哈希命名，随时可重新生成。
 # 注意：.gitignore 不支持行尾注释，# 必须独占一行，否则整行会被当成字面路径。
 data/meta/charts/

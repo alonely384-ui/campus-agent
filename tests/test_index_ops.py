@@ -164,10 +164,19 @@ def test_upload_and_delete_endpoints_are_wired(tmp_path, monkeypatch):
 
     这里把两个函数换成记录器，验证的是"接口有没有把它们接上"，
     真正的索引行为由上面的单元测试保证。
+
+    删除接口是管理员专属（会删文件、删索引），所以先走一次真实的登录流程
+    拿到 Cookie。**不 monkeypatch 掉认证**——认证本来就是这几行要覆盖的路径之一，
+    绕过它就等于没测。
     """
     from fastapi.testclient import TestClient
 
     from app import main as main_mod
+    from app import security
+
+    # 给测试进程一套临时凭证；monkeypatch 自动还原，不会污染别的用例
+    monkeypatch.setattr(security, "_admin_token", lambda: "test-token")
+    monkeypatch.setattr(security, "_cookie_secret", lambda: "test-secret")
 
     monkeypatch.setattr(papers_mod, "PAPERS_DIR", tmp_path / "papers")
     monkeypatch.setattr(papers_mod, "INDEX_FILE", tmp_path / "papers" / "index.json")
@@ -188,6 +197,11 @@ def test_upload_and_delete_endpoints_are_wired(tmp_path, monkeypatch):
     monkeypatch.setattr(main_mod, "remove_source", fake_remove)
 
     client = TestClient(main_mod.app)
+
+    # 先登录：删除接口需要管理员会话
+    login = client.post("/admin/login", json={"token": "test-token"})
+    assert login.status_code == 200, login.text
+
     resp = client.post(
         "/papers/upload",
         files={"file": ("x.pdf", b"%PDF-1.4 fake body", "application/pdf")},
