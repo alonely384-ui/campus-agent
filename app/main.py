@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Stre
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
 from starlette.routing import Mount
 
 from app import kb_health, llm, scheduler, settings_api
@@ -346,7 +347,16 @@ def _safe_content_length(headers: list[tuple[bytes, bytes]]) -> int | None:
 
 
 @app.exception_handler(_BodyTooLarge)
-async def _body_too_large_handler(request: Request, exc: _BodyTooLarge) -> JSONResponse:
+@app.exception_handler(ClientDisconnect)
+async def _body_too_large_handler(request: Request, exc: Exception) -> JSONResponse:
+    """请求体超限 → 413。
+
+    为什么还兜 `ClientDisconnect`：体积上限是在 ASGI 层按实际字节抛出的，
+    此时 Starlette 正在读请求体，异常会从 `request.body()` 一路冒出来，
+    到异常处理器手上时已经变成了 `ClientDisconnect`（不是 `_BodyTooLarge`）。
+    不兜这个，超限请求会得到 400「There was an error parsing the body」——
+    状态码对了没人在意，但语义完全错，前端也没法区分"超限"和"格式错"。
+    """
     return _plain(413, "请求体过大")
 
 
@@ -619,7 +629,9 @@ async def health(request: Request) -> dict:
     headers = list(request.scope.get("headers") or [])
     if verify_session(cookie_value(headers, "ca_admin")):
         payload["model"] = settings.llm_model
-        payload["budget"] = daily_budget.status()
+        # status() 每次都读一次预算 JSON（磁盘），5~18 ms，够把同 tick 的其他请求顶到
+        # 下一个事件循环轮次。探活接口必须是最轻的，所以单独丢线程池。
+        payload["budget"] = await run_in_threadpool(daily_budget.status)
     return payload
 
 
@@ -750,13 +762,24 @@ async def papers_files() -> dict:
     为什么不复用 /papers：/papers 读的是上传索引，批量解压进来的 41 篇不在索引里；
     单篇问答只需要文件名，直接扫磁盘最准。
     """
-    from app.papers import PAPERS_DIR
+    # glob 走的是同步 stat 系统调用，论文多时能到几十毫秒——放线程池，别占事件循环
+    def _scan() -> list[str]:
+        from app.papers import PAPERS_DIR
 
-    return {"files": sorted(p.name for p in PAPERS_DIR.glob("*.pdf"))}
+        return sorted(p.name for p in PAPERS_DIR.glob("*.pdf"))
+
+    return {"files": await run_in_threadpool(_scan)}
 
 @app.get("/papers", summary="论文列表")
 async def papers_list() -> dict:
     """列出论文，顺带附上解析出的真实标题和主题归属（只读聚合，不调大模型）。"""
+    # 读索引 + 读 structures.json（0.8 MB，无缓存）都是同步磁盘 IO，整段丢线程池，
+    # 否则一个列表请求能把整个事件循环占住（第三阶段报告 1.9 节实测）
+    return await run_in_threadpool(_papers_payload)
+
+
+def _papers_payload() -> dict:
+    """`/papers` 的实际取数逻辑。单独成函数是为了能整体扔进线程池。"""
     items = list_papers()
     topics = {p.filename: p for p in _topic_index([p.filename for p in items])}
     papers: list[PaperOut] = []
@@ -796,11 +819,17 @@ async def papers_topics() -> dict:
     """
     from app.paper_topics import PAGE_SIZE
 
+    # 列表 + Louvain 分组都要读磁盘，整段丢线程池
+    return await run_in_threadpool(_topics_payload, PAGE_SIZE)
+
+
+def _topics_payload(page_size: int) -> dict:
+    """`/papers/topics` 的实际取数逻辑。page_size 由调用方传，避免线程里再 import 一次。"""
     filenames = [p.filename for p in list_papers()]
     groups = _topic_groups(filenames)
     return {
         "total": sum(len(g.papers) for g in groups),
-        "page_size": PAGE_SIZE,
+        "page_size": page_size,
         "topics": [
             {
                 "topic_id": g.topic_id,
@@ -915,21 +944,30 @@ async def papers_upload(
 
 @app.delete("/papers/{paper_id}", summary="删除论文", dependencies=[AdminOnly])
 async def papers_delete(paper_id: str) -> dict:
-    paper = get_paper(paper_id)
+    # 读索引 + 删文件 + 删三路索引都是同步 IO（Chroma 与磁盘），整段丢线程池。
+    # 注意：不能把 `await` 和 `raise HTTPException` 一起塞进线程池函数——
+    # 在 starlette 用 BaseExceptionGroup 之前，线程池只认 Exception，
+    # 这里 stray 的 HTTPException 会一路冒到中间件。所以校验留在协程里。
+    paper = await run_in_threadpool(get_paper, paper_id)
     if paper is None:
         raise HTTPException(status_code=404, detail="论文不存在")
-    if not delete_paper(paper_id):
+    if not await run_in_threadpool(delete_paper, paper_id):
         raise HTTPException(status_code=500, detail="删除失败")
 
     # 文件删掉后必须同步清索引，否则"删了还能被检索到"（赛题实测会翻车）
+    removed_chunks = await run_in_threadpool(_purge_index, paper.filename)
+    return {"deleted": paper_id, "removed_chunks": removed_chunks}
+
+
+def _purge_index(filename: str) -> int:
+    """删论文后清索引。返回本次清掉的块数；清理失败不阻断，只记日志（保持原行为）。"""
     removed_chunks = 0
     try:
-        removed_chunks = remove_source(paper.filename)
-        delete_structure(paper.filename)
+        removed_chunks = remove_source(filename)
+        delete_structure(filename)
     except Exception:
-        logger.exception("论文文件已删，但清理索引失败（source=%s）", paper.filename)
-
-    return {"deleted": paper_id, "removed_chunks": removed_chunks}
+        logger.exception("论文文件已删，但清理索引失败（source=%s）", filename)
+    return removed_chunks
 
 
 # ---------------- 阅读页（1.3.2）----------------
@@ -938,13 +976,16 @@ async def papers_delete(paper_id: str) -> dict:
 
 @app.get("/reader/papers", summary="阅读页可选的论文清单")
 async def reader_papers() -> dict:
-    items = list_reader_papers()
+    # list_reader_papers 要逐个读 PDF 元信息，同步 IO
+    items = await run_in_threadpool(list_reader_papers)
     return {"total": len(items), "papers": items}
 
 
 @app.get("/paper/{filename}/structure", summary="阅读页章节树（标题/作者/章节页码）")
 async def paper_structure(filename: str) -> dict:
-    meta = reader_meta(filename)
+    # reader_meta 每次重读解析 0.8 MB 的 structures.json（`app/papers.py:369` 无缓存），
+    # 是第三阶段报告里最重的一处：均值 592 ms、最差 6401 ms。必须离开事件循环。
+    meta = await run_in_threadpool(reader_meta, filename)
     if meta is None:
         raise HTTPException(status_code=404, detail="论文不存在")
     return meta
@@ -957,25 +998,25 @@ async def paper_layout(filename: str) -> dict:
     前端顶栏的版式徽章和「按栏看」视图都靠它：双栏页按一栏宽度放大，
     才能像读单栏一样顺着往下读，不用横向来回扫。
     """
-    path = safe_paper_path(filename)
+    path = await run_in_threadpool(safe_paper_path, filename)
     if path is None:
         raise HTTPException(status_code=404, detail="论文不存在")
-    return detect_layout(path)
+    # detect_layout 要逐页打开 PDF，全库冷跑 22.7 秒，是最重的一处 CPU/IO 混合负载
+    return await run_in_threadpool(detect_layout, path)
 
 
-@app.get("/paper/{filename}/figure/{index}", summary="论文里的图表（按需裁成 PNG）")
-async def paper_figure(filename: str, index: int) -> Response:
-    """把 structures.json 里第 index 张图从 PDF 里裁出来。
+_NO_FIGURE = object()
 
-    为什么按需裁：全库预裁一次要几分钟，而用户一次只看一张。裁完缓存在
-    data/meta/figures/<stem>/fig<index>.png，同一张图第二次是直接读文件。
+
+def _figure_png(path, index: int) -> object:
+    """裁第 index 张图；裁不出来退回整页预览。返回 `(bytes, crop)` 或 `_NO_FIGURE`。
+
+    单独成同步函数是因为要整体丢线程池：`load_structures()`（读 0.8 MB JSON）与
+    `figure_bytes()` / `page_png()`（PyMuPDF 渲染）全是同步的。
     """
-    path = safe_paper_path(filename)
-    if path is None:
-        raise HTTPException(status_code=404, detail="论文不存在")
-    figures = (load_structures().get(filename) or {}).get("figures") or []
+    figures = (load_structures().get(path.name) or {}).get("figures") or []
     if not (0 <= index < len(figures)):
-        raise HTTPException(status_code=404, detail="没有这张图")
+        return _NO_FIGURE
     fig = figures[index]
     page_no = int(fig.get("page") or 0)
     data = figure_bytes(path, path.stem, index, page_no, str(fig.get("caption") or ""))
@@ -985,7 +1026,24 @@ async def paper_figure(filename: str, index: int) -> Response:
         data = page_png(path, page_no)
         crop = "page"
     if data is None:
-        raise HTTPException(status_code=404, detail="这张图没能从 PDF 里裁出来")
+        return _NO_FIGURE
+    return data, crop
+
+
+@app.get("/paper/{filename}/figure/{index}", summary="论文里的图表（按需裁成 PNG）")
+async def paper_figure(filename: str, index: int) -> Response:
+    """把 structures.json 里第 index 张图从 PDF 里裁出来。
+
+    为什么按需裁：全库预裁一次要几分钟，而用户一次只看一张。裁完缓存在
+    data/meta/figures/<stem>/fig<index>.png，同一张图第二次是直接读文件。
+    """
+    path = await run_in_threadpool(safe_paper_path, filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    result = await run_in_threadpool(_figure_png, path, index)
+    if result is _NO_FIGURE:
+        raise HTTPException(status_code=404, detail="没有这张图")
+    data, crop = result
     return Response(
         content=data,
         media_type="image/png",
@@ -1003,6 +1061,9 @@ async def paper_file(filename: str) -> FileResponse:
     安全性交给 safe_paper_path：只认 data/papers 里的裸文件名，
     `../`、绝对路径、非 .pdf 一律 404（不返回 403，避免暴露目录结构）。
     FileResponse 自带 Range 支持，PDF.js 可以按需分段加载大文件。
+
+    这里**不用**线程池：`safe_paper_path` 只做字符串比较与一次目录列名，
+    而真正的文件 IO 由 FileResponse 自己在 ASGI 层异步分块发送，包线程池反而多一次调度。
     """
     path = safe_paper_path(filename)
     if path is None:
@@ -1027,8 +1088,14 @@ class TranslateSelectionRequest(BaseModel):
 @app.get("/paper/{filename}/translation", summary="已缓存的译文（按页）")
 async def paper_translation(filename: str) -> dict:
     """返回缓存里已经翻好的页；一页都没翻过时 pages 为空对象。"""
-    if safe_paper_path(filename) is None:
+    # 先确认论文在不在。safe_paper_path 要列一次 data/papers 目录，同步 IO
+    if await run_in_threadpool(safe_paper_path, filename) is None:
         raise HTTPException(status_code=404, detail="论文不存在")
+    return await run_in_threadpool(_translation_payload, filename)
+
+
+def _translation_payload(filename: str) -> dict:
+    """`/paper/{f}/translation` 的实际取数：读译文缓存 JSON + 读 structures.json 找参考文献页。"""
     data = load_translation(filename)
     pages = data.get("pages") or {}
     ordered = {str(k): v for k, v in sorted(pages.items(), key=lambda kv: int(kv[0]))}
@@ -1040,6 +1107,12 @@ async def paper_translation(filename: str) -> dict:
         "references_page": references_page_of(filename),
         "pages": ordered,
     }
+
+
+def _pdf_page_count(path) -> int:
+    """PDF 总页数。`fitz.open` 要解析交叉引用表，属于同步 IO，只在 `pages=all` 时用一次。"""
+    with fitz.open(path) as doc:
+        return len(doc)
 
 
 @app.get("/paper/{filename}/translate", summary="论文翻译（SSE 逐页流式返回）")
@@ -1056,10 +1129,10 @@ async def paper_translate(filename: str, pages: str = "all", force: bool = False
     if not settings.llm_api_key or settings.llm_api_key.startswith("sk-在这里"):
         raise HTTPException(status_code=503, detail="还没有配置 LLM_API_KEY，无法翻译")
 
-    ref_page = references_page_of(filename)
+    ref_page = await run_in_threadpool(references_page_of, filename)
     if pages.strip().lower() in ("all", "", "*"):
-        with fitz.open(path) as doc:
-            total_pages = len(doc)
+        # fitz 打开 PDF 取页数，同步且要解析交叉引用表
+        total_pages = await run_in_threadpool(_pdf_page_count, path)
         limit = ref_page - 1 if ref_page and ref_page > 1 else total_pages
         wanted: list[int] | None = list(range(1, limit + 1))
     else:
@@ -1723,7 +1796,7 @@ async def admin_login(req: AdminLoginRequest, request: Request) -> Response:
     headers = list(request.scope.get("headers") or [])
     ip = client_ip(request.scope, headers)
 
-    locked_for = login_guard.locked(ip)
+    locked_for = await run_in_threadpool(login_guard.locked, ip)
     if locked_for > 0:
         raise HTTPException(
             status_code=429,
@@ -1731,8 +1804,8 @@ async def admin_login(req: AdminLoginRequest, request: Request) -> Response:
             headers={"Retry-After": str(locked_for)},
         )
 
-    if not verify_password(req.token):
-        remaining = login_guard.fail(ip)
+    if not await run_in_threadpool(verify_password, req.token):
+        remaining = await run_in_threadpool(login_guard.fail, ip)
         logger.warning("管理员登录失败：ip=%s 剩余尝试 %d", ip, remaining)
         if remaining > 0:
             # 刚刚跨过阈值：明确告诉客户端已锁定，并带上 Retry-After
@@ -1744,7 +1817,7 @@ async def admin_login(req: AdminLoginRequest, request: Request) -> Response:
         raise HTTPException(status_code=401, detail="口令错误")
 
     login_guard.succeed(ip)
-    value = sign_session()
+    value = await run_in_threadpool(sign_session)
     resp = JSONResponse({"ok": True, "expires_in": SESSION_TTL})
     resp.set_cookie(
         key="ca_admin",
