@@ -4,7 +4,7 @@
 >
 > 第九届传智杯 · AI大模型创新应用挑战赛 · 个人赛 · B 组参赛作品
 
-**🔗 在线体验**：http://156.239.2.206:8000/ui/ （公网可访问，无需登录）
+**🔗 在线体验**：见大赛提交说明中的演示地址（公网可访问，无需登录）
 **🎬 演示视频**：（录制后填入 B 站链接）
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
@@ -122,11 +122,11 @@
 
 热更新踩到的一个真 bug 值得记：`RAG_RERANK` 按规则推导出的属性名是 `_RERANK`，但管道里真实的属性叫 `_RERANK_ENABLED`——**推错了不会报错，只会静默改成默认值**。现在 `Setting` 多了显式 `attr` 字段，并在 `_apply_runtime` 里 `hasattr` 检查，对不上就抛异常，不允许静默。
 
-### 7. 前端设计系统：162 个 CSS 变量统一六个页面
+### 7. 前端设计系统：172 个 CSS 变量统一六个页面
 
 七个页面各写各的颜色，改一次主题要改七处，改完必然有几个漏网。改成**单一事实源**：
 
-- `web/design-system.css` 定义 **162 个 CSS 变量**（品牌色/语义色/间距/圆角/阴影/字号/角色色/图表色）；
+- `web/design-system.css` 定义 **172 个 CSS 变量**（品牌色/语义色/间距/圆角/阴影/字号/角色色/图表色）；
 - `web/chart-colors.js` 让 ECharts 直接读 CSS 变量，图表配色跟着主题走，不再手写十六进制；
 - 六个页面全部迁移完成，剩余硬编码 `hex` **0 处**、`rgba` **0 处**；
 - 迁移时顺手修了两个真缺陷：`index.html` 引用了未定义的 `--line`（改为 `--border-strong`）；`--role-isolated-fg` 对比度只有 **2.31:1**（改为 `#5c6672`，**5.30:1**）；
@@ -227,9 +227,9 @@ docker run -p 8000:8000 --env-file .env research-agent
 - [x] 多智能体四角色时间线 + 状态回显
 - [x] 真实浏览器端到端验证（六个模块全走一遍，控制台除 favicon 外无报错）
 - [ ] Docker 镜像构建验证（本机未安装 Docker，Dockerfile 已提供但未实跑）
-- [x] 公网部署（雨云香港节点，systemd 托管 + 每日 04:00 UTC 自动重启，走通 HTTP；HTTPS 待配）
+- [x] 公网部署（云服务器 + systemd 托管，服务异常自动拉起 + 每日定时重启，已走通 HTTP）
 - [x] 设置中心（模型 / RAG / 定时 / 知识库健康 / 关于，五项均可在线改且立即生效，无需重启）
-- [x] 前端设计系统（`web/design-system.css`，162 个 CSS 变量，六个页面全部迁移，对比度全部 ≥ 4.5:1）
+- [x] 前端设计系统（`web/design-system.css`，172 个 CSS 变量，六个页面全部迁移，对比度全部 ≥ 4.5:1）
 
 ## 已知问题
 
@@ -275,7 +275,7 @@ campus-agent/
 │   ├── analysis.html      # 论文分析
 │   ├── writing.html       # 写作助手
 │   ├── settings.html      # 设置中心（模型/RAG/定时/知识库/关于）
-│   ├── design-system.css  # 设计系统（162 个 CSS 变量，六页共用）
+│   ├── design-system.css  # 设计系统（172 个 CSS 变量，六页共用）
 │   ├── chart-colors.js    # ECharts 读 CSS 变量，图表配色与主题联动
 │   ├── sidebar.js         # 侧栏会话历史与折叠
 │   ├── quick-translate.js # 划词/悬停浮钮组件（阅读页/分析页/写作助手复用）
