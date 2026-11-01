@@ -508,10 +508,14 @@ function loadPaperFiles() {
 loadPaperFiles();
 
 // ---------- 健康检查：确认后端活着 ----------
+// 安全整改后 /health 对匿名访客只返回 {status, version}，模型名与当日预算只在
+// 管理员登录后才给（那属于运维细节，不该暴露给公开演示的评委）。所以这里不能
+// 无条件拼 `模型 ${d.model}`，否则页脚会显示「模型 undefined」。
 fetch('/health')
   .then(r => r.json())
   .then(d => {
-    statusEl.textContent = `服务正常 · 模型 ${d.model} · v${d.version}`;
+    const model = d.model ? ` · 模型 ${d.model}` : '';
+    statusEl.textContent = `服务正常${model} · v${d.version}`;
     statusEl.className = 'status ok';
   })
   .catch(() => {
