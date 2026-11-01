@@ -140,7 +140,9 @@ def test_paper_id_filename_alias_is_not_a_ghost(monkeypatch):
     assert report.ghost_sources == [], "在用论文被误判为幽灵 —— cleanup 会删掉它的索引"
     assert report.missing_from_index == [], "别名被误报成索引缺失"
     assert report.papers_on_disk == 1
+    # 两个口径必须一致：索引记录数（新名）与弃用别名（旧名）
     assert report.papers_in_catalog == 1
+    assert report.papers_unique_files == 1
 
 
 def test_disk_sources_accepts_both_naming_schemes(monkeypatch, tmp_path):
@@ -160,6 +162,54 @@ def test_disk_sources_accepts_both_naming_schemes(monkeypatch, tmp_path):
 
     assert "1610.08613.pdf" in names, "索引里的 source（原文件名）必须在集合里"
     assert "57567c72c96f.pdf" in aliases, "物理别名要单独归类，供 missing_from_index 过滤"
+
+
+def test_papers_in_index_matches_deprecated_alias(monkeypatch):
+    """兼容迁移：papers_in_index 是正式名，papers_in_catalog 是弃用别名，两者必须恒等。
+
+    旧字段之所以保留，是因为 GET /settings/index/health 的响应体是外部契约，
+    直接删键会让还在读旧名的调用方拿到 undefined。
+    """
+    _patch_sources(monkeypatch, *HEALTHY)
+    data = kb_health.health_check().to_dict()
+
+    assert "papers_in_index" in data, "新字段必须存在"
+    assert "papers_in_catalog" in data, "旧字段在迁移期内必须继续返回"
+    assert data["papers_in_index"] == data["papers_in_catalog"]
+    assert data["papers_in_index"] == len(kb_health.papers.list_papers())
+    assert data["papers_unique_files"] == 2, "a.pdf / b.pdf 两个文件"
+
+
+def test_paper_counts_handle_same_filename_records(monkeypatch):
+    """同一 filename 占了多条索引记录时，记录数与唯一文件数必须给出不同值。
+
+    真实场景：1706.03762v7.pdf 被上传过两次，分别登记成 paper_id
+    ``1706.03762v7`` 与 ``bdfaa68d8984``，两条记录共用同一个 filename。
+    此时「索引记录数」是 2，而「唯一文件数」是 1 —— 这两个口径不能混用。
+    """
+    monkeypatch.setattr(
+        kb_health, "_chroma_sources", lambda name: {"1706.03762v7.pdf": 5}
+    )
+    monkeypatch.setattr(kb_health, "_bm25_sources", lambda: {"1706.03762v7.pdf": 5})
+    monkeypatch.setattr(
+        kb_health, "_disk_sources", lambda: ({"1706.03762v7.pdf"}, set())
+    )
+    monkeypatch.setattr(
+        kb_health.papers,
+        "list_papers",
+        lambda: [
+            _paper("1706.03762v7.pdf", paper_id="1706.03762v7"),
+            _paper("1706.03762v7.pdf", paper_id="bdfaa68d8984"),
+        ],
+    )
+    monkeypatch.setattr(kb_health.papers, "paper_path", lambda pid: object())
+
+    report = kb_health.health_check()
+
+    assert report.papers_in_catalog == 2, "两条索引记录"
+    assert report.papers_unique_files == 1, "同一个文件名只算一个文件"
+    assert report.papers_on_disk == 2, "两条记录的原件都存在"
+    assert report.consistent, "同名双记录本身不是不一致，不应触发告警"
 
 
 def test_three_path_total_mismatch_is_noted(monkeypatch):

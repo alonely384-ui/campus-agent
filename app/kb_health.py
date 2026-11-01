@@ -135,8 +135,18 @@ class SourceIssue:
 
 @dataclass
 class HealthReport:
+    # 磁盘原件真实存在的索引条目数（对 list_papers() 逐条调 paper_path 判定）。
     papers_on_disk: int = 0
+    # 索引记录数：data/papers/index.json 的条目数。
+    # 字段名是历史遗留且容易误解 —— 它数的是 index.json，**不是**
+    # data/catalog.json。对外序列化时正名为 papers_in_index，
+    # 这里保留原名是为了不改内部逻辑；新代码请一律用 to_dict() 的
+    # papers_in_index 键。
     papers_in_catalog: int = 0
+    # 唯一文件数：按 filename 去重后的条数。
+    # 与 papers_in_catalog 的差 = 同一文件名被上传了多次
+    # （例如 1706.03762v7.pdf 同时属于 paper_id 1706.03762v7 与 bdfaa68d8984）。
+    papers_unique_files: int = 0
     docs_total: int = 0
     dense_total: int = 0
     bm25_total: int = 0
@@ -151,6 +161,12 @@ class HealthReport:
     def to_dict(self) -> dict:
         return {
             "papers_on_disk": self.papers_on_disk,
+            # 正式字段名：索引记录数
+            "papers_in_index": self.papers_in_catalog,
+            # 唯一文件数：按 filename 去重
+            "papers_unique_files": self.papers_unique_files,
+            # 弃用别名，保留一个版本周期以兼容旧调用方；
+            # 与新名 papers_in_index 恒等，新代码请勿再读这个键。
             "papers_in_catalog": self.papers_in_catalog,
             "docs_total": self.docs_total,
             "dense_total": self.dense_total,
@@ -183,7 +199,9 @@ def health_check() -> HealthReport:
     report.papers_on_disk = sum(
         1 for p in catalog if papers.paper_path(p.paper_id) is not None
     )
+    # 索引记录数（条目数，不是唯一文件数）
     report.papers_in_catalog = len(catalog)
+    report.papers_unique_files = len({p.filename for p in catalog})
     report.docs_total = sum(docs.values())
     report.dense_total = sum(dense.values())
     report.bm25_total = sum(bm25.values())

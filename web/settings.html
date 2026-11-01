@@ -527,7 +527,9 @@
 
     let html = '' +
       '<div class="kv" style="margin-top:12px"><span class="kk">论文 PDF</span>' +
-        '<span class="vv">' + report.papers_on_disk + ' 篇（清单 ' + report.papers_in_catalog + ' 条）</span></div>' +
+        '<span class="vv">' + report.papers_on_disk + ' 篇（索引 ' +
+          (report.papers_in_index != null ? report.papers_in_index : report.papers_in_catalog) +
+          ' 条，唯一文件 ' + report.papers_unique_files + ' 个）</span></div>' +
       '<div class="kv"><span class="kk">Chroma docs</span><span class="vv">' + report.docs_total + ' 块</span></div>' +
       '<div class="kv"><span class="kk">Chroma dense</span><span class="vv">' + report.dense_total + ' 块</span></div>' +
       '<div class="kv"><span class="kk">BM25</span><span class="vv">' + report.bm25_total + ' 块</span></div>' +

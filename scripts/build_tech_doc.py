@@ -222,7 +222,22 @@ def add_table(doc: Document, headers: list[str], rows: list[list[str]],
             run.element.rPr.rFonts.set(qn("w:eastAsia"), CJK_FONT)
     if widths:
         _fix_table_width(table, widths)
-    doc.add_paragraph()
+    # 表格后面不再插入空段落：一个空段落约占 16pt，表格正好卡在页尾时
+    # 它会单独占掉一行余量、把后续内容整体顶到下一页，造成大片页面空白
+    # （实测因此多出 6 个半空页）。改为给表格本身设段后间距。
+    _space_after_table(table)
+
+
+def _space_after_table(table) -> None:
+    """给表格最后一行加段后间距，替代 add_table 末尾的空段落。
+
+    python-docx 没有表格级的「段后距」，得写到表格各单元格段落的
+    ``w:spacing/@w:after`` 上；这里只动最后一行，其余行间距不受影响。
+    """
+    for cell in table.rows[-1].cells:
+        for p in cell.paragraphs:
+            # 20 twips = 1pt，故 160 twips = 8pt
+            p.paragraph_format.space_after = Pt(8)
 
 
 def _fix_table_width(table, widths_cm: list[float]) -> None:
@@ -1056,6 +1071,29 @@ def build() -> Path:
         "清理前必须在页面二次确认，因为这个操作不可撤销。"
         "修复这一层时还发现 docs_dense 集合的删除失败被 except Exception: pass 静默吞掉，"
         "会留下普通集合与稠密集合不一致的状态——已改为记录 warning 并抛 RuntimeError。"
+    )
+
+    doc.add_heading("6.7.1 三个论文计数口径为什么不一样", level=3)
+    doc.add_paragraph(
+        "健康检查返回的论文数字不止一个，容易被误认为数据出问题。"
+        "实际是统计对象不同，把口径写清楚比把数字凑整齐更重要。"
+    )
+    add_table(
+        doc,
+        ["字段", "统计对象", "本机实测"],
+        [
+            ["papers_on_disk", "索引条目中原件真实存在的条数（逐条调 paper_path 判定）", "41"],
+            ["papers_in_index", "data/papers/index.json 的条目数，即索引记录数", "41"],
+            ["papers_unique_files", "按 filename 去重后的条数，即唯一文件数", "40"],
+            ["papers_in_catalog", "弃用别名，恒等于 papers_in_index，仅作兼容保留", "41"],
+        ],
+    )
+    doc.add_paragraph(
+        "记录数比唯一文件数多 1，是因为 1706.03762v7.pdf 被上传过两次，"
+        "分别登记成 paper_id 1706.03762v7 与 bdfaa68d8984，两条记录共用一个文件名。"
+        "这属真实重复上传而非统计错误，两条记录各有独立索引切块，都能单独检索。"
+        "更细的「按 duplicate_of 归并后的唯一论文数」本机实测为 38，暂不对外暴露："
+        "它依赖重复引用是单层星形、无环、无悬空，而三处写入 duplicate_of 的代码都没强制保证这一点。"
     )
 
     doc.add_heading("6.8 前端设计系统：把七个页面收敛成一份", level=2)
