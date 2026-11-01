@@ -14,11 +14,36 @@ from app import kb_health
 
 
 def _patch_sources(monkeypatch, docs, dense, bm25, disk):
-    """把 health_check 用到的四个读取器全部换成假实现。"""
+    """把 health_check 用到的四个读取器全部换成假实现。
+
+    这几个假数据里「磁盘文件名 == 索引 source」是最简单的情形，
+    所以 _disk_sources 返回 (名字集合, 空别名集合)：
+        别名集合是 `<paper_id>.pdf` 这种物理别名（见 app/kb_health.py 的说明），
+        它会从 missing_from_index 里被排除，与本用例无关。
+    """
     monkeypatch.setattr(kb_health, "_chroma_sources", lambda name: dict(docs if name == "docs" else dense))
     monkeypatch.setattr(kb_health, "_bm25_sources", lambda: dict(bm25))
-    monkeypatch.setattr(kb_health, "_disk_sources", lambda: set(disk))
-    monkeypatch.setattr(kb_health.papers, "list_papers", lambda: [{"file": n} for n in disk])
+    monkeypatch.setattr(kb_health, "_disk_sources", lambda: (set(disk), set()))
+    monkeypatch.setattr(kb_health.papers, "list_papers", lambda: [_paper(n) for n in disk])
+    monkeypatch.setattr(kb_health.papers, "paper_path", lambda pid: object())
+
+
+def _paper(filename: str, paper_id: str | None = None):
+    """构造一个最小 Paper：list_papers 的返回值是 dataclass，不是 dict。
+
+    paper_id 默认从文件名推（``a.pdf`` -> ``a``），这只对「样例/手动拷进来、
+    保留原名」那类论文成立。上传入库的论文两者无关（磁盘叫 57567c72c96f.pdf、
+    索引 source 叫 1610.08613.pdf），那种场景必须显式传 paper_id。
+    """
+    return kb_health.papers.Paper(
+        paper_id=paper_id if paper_id is not None else (
+            filename[:-4] if filename.endswith(".pdf") else filename
+        ),
+        filename=filename,
+        size=1,
+        pages=1,
+        uploaded_at="2026-01-01T00:00:00",
+    )
 
 
 HEALTHY = (
@@ -85,6 +110,56 @@ def test_missing_from_index_is_reported(monkeypatch):
     assert report.missing_from_index == ["new.pdf"]
     assert report.ghost_sources == []
     assert any("索引里没有" in n for n in report.notes)
+
+
+def test_paper_id_filename_alias_is_not_a_ghost(monkeypatch):
+    """回归：上传落盘叫 `<paper_id>.pdf`，索引 source 是原文件名，不能互判为异常。
+
+    缺陷现场（2026-10-31 上传的两篇）：
+        磁盘 data/papers/57567c72c96f.pdf ↔ 索引 source `1610.08613.pdf`
+    旧实现只拿裸文件名比对，于是
+        - `1610.08613.pdf` 在磁盘上"找不到" → 误判幽灵块，cleanup_ghosts 会删掉在用论文
+        - `57567c72c96f.pdf` 索引里没有 → 误报 missing_from_index
+    这两个名字指向同一篇论文，两个方向都是假警报。
+    """
+    # 磁盘上真实存在的是 57567c72c96f.pdf，索引 source 是 1610.08613.pdf
+    monkeypatch.setattr(kb_health, "_chroma_sources", lambda name: {"1610.08613.pdf": 145})
+    monkeypatch.setattr(kb_health, "_bm25_sources", lambda: {"1610.08613.pdf": 145})
+    monkeypatch.setattr(
+        kb_health, "_disk_sources", lambda: ({"57567c72c96f.pdf", "1610.08613.pdf"}, {"57567c72c96f.pdf"})
+    )
+    monkeypatch.setattr(
+        kb_health.papers,
+        "list_papers",
+        lambda: [_paper("1610.08613.pdf", paper_id="57567c72c96f")],
+    )
+    monkeypatch.setattr(kb_health.papers, "paper_path", lambda pid: object())
+
+    report = kb_health.health_check()
+
+    assert report.ghost_sources == [], "在用论文被误判为幽灵 —— cleanup 会删掉它的索引"
+    assert report.missing_from_index == [], "别名被误报成索引缺失"
+    assert report.papers_on_disk == 1
+    assert report.papers_in_catalog == 1
+
+
+def test_disk_sources_accepts_both_naming_schemes(monkeypatch, tmp_path):
+    """_disk_sources 必须同时认可「原文件名」和「<paper_id>.pdf」两种物理命名。"""
+    (tmp_path / "57567c72c96f.pdf").write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(kb_health, "PAPERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        kb_health.papers,
+        "list_papers",
+        lambda: [_paper("1610.08613.pdf", paper_id="57567c72c96f")],
+    )
+    monkeypatch.setattr(
+        kb_health.papers, "paper_path", lambda pid: tmp_path / f"{pid}.pdf"
+    )
+
+    names, aliases = kb_health._disk_sources()
+
+    assert "1610.08613.pdf" in names, "索引里的 source（原文件名）必须在集合里"
+    assert "57567c72c96f.pdf" in aliases, "物理别名要单独归类，供 missing_from_index 过滤"
 
 
 def test_three_path_total_mismatch_is_noted(monkeypatch):
@@ -173,8 +248,9 @@ def test_cleanup_aftermath_is_rechecked(monkeypatch):
     }
     monkeypatch.setattr(kb_health, "_chroma_sources", lambda name: dict(state["docs" if name == "docs" else "dense"]))
     monkeypatch.setattr(kb_health, "_bm25_sources", lambda: dict(state["bm25"]))
-    monkeypatch.setattr(kb_health, "_disk_sources", lambda: {"a.pdf"})
-    monkeypatch.setattr(kb_health.papers, "list_papers", lambda: [{"file": "a.pdf"}])
+    monkeypatch.setattr(kb_health, "_disk_sources", lambda: ({"a.pdf"}, set()))
+    monkeypatch.setattr(kb_health.papers, "list_papers", lambda: [_paper("a.pdf")])
+    monkeypatch.setattr(kb_health.papers, "paper_path", lambda pid: object())
 
     before = kb_health.health_check()
     assert before.consistent is False

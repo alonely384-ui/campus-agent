@@ -65,10 +65,43 @@ def _bm25_sources() -> dict[str, int]:
     return counts
 
 
-def _disk_sources() -> set[str]:
+def _disk_sources() -> tuple[set[str], set[str]]:
+    """返回 (磁盘上真实存在的论文对应的 source 名集合, `<paper_id>.pdf` 别名集合)。
+
+    为什么不能只取 ``PAPERS_DIR.glob("*.pdf")`` 的文件名：
+        ``papers.save_paper`` 落盘时用的是 ``<paper_id>.pdf``
+        （见 ``app/papers.py`` 的 ``dest = PAPERS_DIR / f"{paper_id}.pdf"``），
+        而索引里 chunk 的 ``source`` 记的是**用户上传时的原始文件名**
+        （``paper.filename``）。两者对同一篇论文是两个名字，例如磁盘上的
+        ``57567c72c96f.pdf`` 在索引里叫 ``1610.08613.pdf``。
+
+        只拿裸文件名去比对会产生一对镜像误报：
+          - ``1610.08613.pdf`` 在磁盘上"找不到" → 被判成幽灵块（会误删）
+          - ``57567c72c96f.pdf`` 索引里没有 → 被判成"磁盘有索引无"（一致的假警报）
+
+    所以这里按 ``papers.list_papers()`` 还原真实映射，并**保留裸文件名**：
+    样例/手动拷进来的论文保留原名（``app/papers.py:330`` 注释说明过两种命名都在），
+    它们的 source 就是文件名本身，不能漏。
+
+    第二个返回值给调用方过滤 ``missing_from_index``：``<paper_id>.pdf`` 是别名，
+    不代表索引缺失。
+    """
     if not PAPERS_DIR.exists():
-        return set()
-    return {p.name for p in PAPERS_DIR.glob("*.pdf")}
+        return set(), set()
+
+    names = {p.name for p in PAPERS_DIR.glob("*.pdf")}
+    aliases: set[str] = set()
+    for paper in papers.list_papers():
+        # paper_path 已经处理了「<paper_id>.pdf 与原名两种命名」的择一逻辑，
+        # 拿它来判定存在性，和删除、读取走同一套口径。
+        if papers.paper_path(paper.paper_id) is None:
+            continue
+        # 索引里的 source 是 filename；再补上 paper_id.pdf 这种历史写法
+        names.add(paper.filename)
+        alias = f"{paper.paper_id}{Path(paper.filename).suffix.lower()}"
+        names.add(alias)
+        aliases.add(alias)
+    return names, aliases
 
 
 # ---------------------------------------------------------------- 健康检查
@@ -136,13 +169,20 @@ def health_check() -> HealthReport:
     """只读扫描三路索引与磁盘的一致性。不修改任何数据。"""
     report = HealthReport()
 
-    disk = _disk_sources()
+    # alias_names: `<paper_id>.pdf` 这类物理文件名的集合。它们代表"同一篇论文"，
+    # 索引里不会以这个名字出现，用来过滤 missing_from_index 的假警报。
+    disk, alias_names = _disk_sources()
     docs = _chroma_sources("docs")
     dense = _chroma_sources("docs_dense")
     bm25 = _bm25_sources()
     catalog = papers.list_papers()
 
-    report.papers_on_disk = len(disk)
+    # disk 现在含「原文件名」与「<paper_id>.pdf」两种写法（同一篇论文占两个名字），
+    # 所以磁盘论文数改成数 list_papers 里原件真实存在的那几篇，而不是 len(disk)。
+    # 索引侧同理：source 集合里的两种写法归一后才是论文篇数。
+    report.papers_on_disk = sum(
+        1 for p in catalog if papers.paper_path(p.paper_id) is not None
+    )
     report.papers_in_catalog = len(catalog)
     report.docs_total = sum(docs.values())
     report.dense_total = sum(dense.values())
@@ -162,6 +202,11 @@ def health_check() -> HealthReport:
             report.ghost_chunks_dense += issue.dense_chunks
             report.ghost_chunks_bm25 += issue.bm25_chunks
         elif src in disk and not (issue.docs_chunks or issue.bm25_chunks):
+            # `<paper_id>.pdf` 只是同一篇论文在磁盘上的物理别名，索引里的正名是
+            # `paper.filename`（已在 disk 集合内）。它本身永远不会出现在索引里，
+            # 报出来就是假警报，所以跳过。真·孤立 PDF（磁盘有、清单里没有）不在此列。
+            if src in alias_names:
+                continue
             report.missing_from_index.append(src)
 
     if report.papers_on_disk != report.papers_in_catalog:

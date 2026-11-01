@@ -420,18 +420,6 @@
     "topic": "基础模型与预训练"
   },
   {
-    "file": "bdfaa68d8984.pdf",
-    "title": "Attention Is All You Need",
-    "authors_count": 7,
-    "pages": 15,
-    "arxiv_id": "",
-    "year": null,
-    "category": "模型架构",
-    "indexed": true,
-    "arxiv_category": "未分类",
-    "topic": "模型架构"
-  },
-  {
     "file": "language_understanding_paper.pdf",
     "title": "Improving Language Understanding by Generative Pre-Training",
     "authors_count": 4,
@@ -466,5 +454,29 @@
     "indexed": true,
     "arxiv_category": "未分类",
     "topic": "教材与理论"
+  },
+  {
+    "file": "1610.08613.pdf",
+    "title": "Can Active Memory Replace Attention?",
+    "authors_count": 2,
+    "pages": 9,
+    "arxiv_id": "1610.08613",
+    "year": 2016,
+    "category": "模型架构",
+    "indexed": true,
+    "arxiv_category": "未分类",
+    "topic": "模型架构"
+  },
+  {
+    "file": "2312.00752.pdf",
+    "title": "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
+    "authors_count": 2,
+    "pages": 36,
+    "arxiv_id": "2312.00752",
+    "year": 2023,
+    "category": "模型架构",
+    "indexed": true,
+    "arxiv_category": "未分类",
+    "topic": "模型架构"
   }
 ]
