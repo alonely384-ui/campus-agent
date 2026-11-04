@@ -107,3 +107,10 @@ docs/DEMO-SCRIPT.md
 web/guide.html
 web/project-tour.html
 web/study-plan.html
+
+# ---- 桌面版打包产物 ----
+# 数据包 470MB、exe 几百 MB，都是可由 scripts/build_desktop.py 重新生成的
+dist/
+build/
+desktop/_bundle/
+*.spec.bak

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import time
 from dataclasses import asdict, dataclass
@@ -25,7 +26,13 @@ logger = get_logger(__name__)
 
 # 项目根目录：本文件在 app/ 下，往上一级就是仓库根
 BASE_DIR = Path(__file__).resolve().parent.parent
-PAPERS_DIR = BASE_DIR / "data" / "papers"
+
+# 数据根目录。默认就在仓库的 data/ 下；打包成 exe 时 __file__ 指向 PyInstaller
+# 的临时解压目录，那里只读、而且每次启动都会重建，索引和 PDF 放不进去，所以
+# 桌面版会设 DATA_DIR 指到用户目录。不设时行为与原来完全一致。
+DATA_DIR = Path(os.getenv("DATA_DIR") or (BASE_DIR / "data")).resolve()
+
+PAPERS_DIR = DATA_DIR / "papers"
 INDEX_FILE = PAPERS_DIR / "index.json"
 TEXT_DIR = PAPERS_DIR / "text"  # 抽出来的文字缓存，供查重使用
 
@@ -349,7 +356,7 @@ def structure_path(paper_id: str) -> Path:
 # 结构化产物（标题/作者/章节树）放 data/meta/ —— 它是要入库的「数据字典」，
 # 不是能随时重下的大文件；data/papers/ 整个目录被 .gitignore 排除，放在那里
 # 换台机器就没有章节树了。旧位置保留成兜底，老环境不用手动搬。
-META_DIR = BASE_DIR / "data" / "meta"
+META_DIR = DATA_DIR / "meta"
 DEFAULT_STRUCTURES_FILE = META_DIR / "structures.json"
 LEGACY_STRUCTURES_FILE = PAPERS_DIR / "structures.json"
 STRUCTURES_FILE = DEFAULT_STRUCTURES_FILE

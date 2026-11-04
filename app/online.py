@@ -25,11 +25,11 @@ from typing import Any
 import httpx
 
 from app.logging_config import get_logger
-from app.papers import BASE_DIR
+from app.papers import DATA_DIR
 
 logger = get_logger(__name__)
 
-CACHE_DIR = BASE_DIR / "data" / "meta" / "online"
+CACHE_DIR = DATA_DIR / "meta" / "online"
 ARXIV_BASE = "https://arxiv.org"
 S2_BASE = "https://api.semanticscholar.org/graph/v1"
 USER_AGENT = "campus-agent/0.1 (research demo; contact: local)"

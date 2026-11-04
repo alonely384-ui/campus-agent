@@ -18,14 +18,14 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.papers import BASE_DIR
+from app.papers import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
 # 数据目录按代码位置算，不按进程当前目录算。
 # 原来的 Path("data/meta/...") 是从 CWD 解析的：换一个目录启动就会读到空数据，
 # 论文全部掉进「其他」分组，而日志里只有一句「文件不存在」。
-_META_DIR = BASE_DIR / "data" / "meta"
+_META_DIR = DATA_DIR / "meta"
 
 # 标题超过这个长度就截断（字符数，按 unicode 码位算）
 TITLE_MAX_CHARS = 60

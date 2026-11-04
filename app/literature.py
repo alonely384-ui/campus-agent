@@ -44,15 +44,15 @@ from typing import Any
 import httpx
 
 from app.logging_config import get_logger
-from app.papers import BASE_DIR
+from app.papers import DATA_DIR
 
 logger = get_logger(__name__)
 
-CATALOG_FILE = BASE_DIR / "data" / "catalog.json"
+CATALOG_FILE = DATA_DIR / "catalog.json"
 # catalog.json 只记了 authors_count（计数），没有名单；作者名在 structures.json 里。
 # 1.6.1 生成参考文献时要写作者，所以得从这里补。
-STRUCTURES_FILE = BASE_DIR / "data" / "meta" / "structures.json"
-CACHE_DIR = BASE_DIR / "data" / "meta" / "online"
+STRUCTURES_FILE = DATA_DIR / "meta" / "structures.json"
+CACHE_DIR = DATA_DIR / "meta" / "online"
 CACHE_TTL = 60 * 60 * 6  # 6 小时：检索结果变化慢，缓存能挡掉重复演示的等待
 
 ARXIV_API = "http://export.arxiv.org/api/query"

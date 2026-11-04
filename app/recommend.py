@@ -33,12 +33,12 @@ from app.online import (
     recent_papers,
     write_cache,
 )
-from app.papers import BASE_DIR, load_structures, sync_index
+from app.papers import DATA_DIR, load_structures, sync_index
 from app.rag.pipeline import embed
 
 logger = get_logger(__name__)
 
-META_DIR = BASE_DIR / "data" / "meta"
+META_DIR = DATA_DIR / "meta"
 FEEDBACK_FILE = META_DIR / "feedback.json"
 RECOMMEND_FILE = META_DIR / "recommendations.json"
 CACHE_KEY = "recommendations_latest"
