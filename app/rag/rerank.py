@@ -23,6 +23,7 @@
 模型文件（离线，约 23MB）：
     data/models/ms-marco-MiniLM-L-6-v2/model.onnx        交叉编码器（量化版）
     data/models/ms-marco-MiniLM-L-6-v2/tokenizer.json    分词器
+    这里的 data/ 指 DATA_DIR（桌面版是用户目录下的那份），不是代码所在目录。
     可用 RAG_RERANK_DIR 覆盖目录；文件缺失时抛 RerankUnavailable，
     调用方回退到融合排序，绝不让检索整体失败。
 """
@@ -34,15 +35,19 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from app.logging_config import get_logger
-from app.papers import BASE_DIR
+from app.papers import DATA_DIR
 
 logger = get_logger(__name__)
 
-# 默认值走 BASE_DIR 而不是相对路径：相对路径按进程 CWD 解析，
-# 换目录启动就会找不到重排模型权重，然后静默降级成不重排——
-# 检索质量悄悄变差，界面上看不出任何异常。
+# 默认值走 DATA_DIR 而不是 BASE_DIR：
+#   - 相对路径按进程 CWD 解析，换目录启动就找不到权重，静默降级成不重排；
+#   - BASE_DIR 打包成 exe 后是 PyInstaller 的临时解压目录（_MEIxxxx），
+#     那里每次启动重建、只读，而模型是解压到用户目录的（DATA_DIR 指向它）。
+# 早先这里写的是 BASE_DIR，桌面版于是永远找不到模型、一直回退融合排序，
+# 界面上看不出任何异常——所以必须跟着 DATA_DIR 走。
+# RAG_RERANK_DIR 仍然优先，留给需要换模型的自定义部署。
 _MODEL_DIR = Path(
-    os.getenv("RAG_RERANK_DIR") or (BASE_DIR / "data" / "models" / "ms-marco-MiniLM-L-6-v2")
+    os.getenv("RAG_RERANK_DIR") or (DATA_DIR / "models" / "ms-marco-MiniLM-L-6-v2")
 )
 # 文档截断长度：cross-encoder 的输入是「问题 + 文档」，512 是 BERT 类模型的上限
 _MAX_LEN = 512

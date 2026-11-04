@@ -13,6 +13,24 @@ from app.rag import rerank
 from app.rag.pipeline import Chunk
 
 
+def test_model_dir_follows_data_dir():
+    """模型目录必须落在 DATA_DIR 下，而不是写死成代码所在目录的 data/。
+
+    这是桌面版踩过的坑：打包成 exe 后 BASE_DIR 是 PyInstaller 的临时解压
+    目录（_MEIxxxx，每次启动重建且只读），模型实际解压在用户目录
+    （DATA_DIR 指向那里），于是重排永远加载失败、静默回退融合排序，
+    界面上完全看不出异常。
+
+    直接比较常量而不是改环境变量重载模块：DATA_DIR 在 app.papers 导入时
+    就定死了，只 reload 本模块不会重新读取它。未设 DATA_DIR 时
+    DATA_DIR 恰好等于 BASE_DIR/data，所以这里只断言"跟着 DATA_DIR"，
+    不断言"不等于 BASE_DIR 下的路径"——那样在没有覆盖时会误报。
+    """
+    from app.papers import DATA_DIR
+
+    assert rerank._MODEL_DIR == DATA_DIR / "models" / "ms-marco-MiniLM-L-6-v2"
+
+
 def test_rerank_orders_by_cross_encoder_score(monkeypatch):
     items = [
         (Chunk(text="无关段落", source="a.pdf"), 0.03, ["dense"]),
