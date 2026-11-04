@@ -80,14 +80,21 @@ def _loc(rel: str, suffix: str) -> int:
 
 
 def _count_routes() -> int:
-    """数 app/main.py 里真实注册的路由装饰器数（OpenAPI 里的 path 数需跑起来才准）。"""
+    """数对外暴露的 REST 接口数，口径与 README「工程规模」表一致。
+
+    数的是路由装饰器，但**排除 include_in_schema=False 的**（如 /favicon.ico）——
+    这类端点不属于 REST 接口面，算进去会让文档里的数字与 README 对不上。
+    当前值 47，对应 OpenAPI 的 45 个 path / 47 个操作
+    （/settings 一条 path 上同时挂 GET 与 POST，故操作数多于 path 数）。
+    """
     main_py = BASE / "app" / "main.py"
     if not main_py.exists():
         return 0
     import re as _re
 
     text = main_py.read_text(encoding="utf-8", errors="replace")
-    return len(_re.findall(r"^@app\.(?:get|post|put|delete)\(", text, _re.M))
+    decos = _re.findall(r"^@app\.(?:get|post|put|delete)\((.*?)\)\s*$", text, _re.M)
+    return sum(1 for args in decos if "include_in_schema=False" not in args)
 
 
 def _count_tools() -> int:
@@ -141,7 +148,28 @@ def _count_css_vars() -> int:
     return len(set(_re.findall(r"^\s*(--[a-z0-9-]+)\s*:", text, _re.M)))
 
 
+def _count_providers() -> int:
+    """数设置中心预置的厂商数（app/settings_api.py 里 PROVIDERS 元组的元素个数）。"""
+    api = BASE / "app" / "settings_api.py"
+    if not api.exists():
+        return 0
+    import ast
+
+    try:
+        tree = ast.parse(api.read_text(encoding="utf-8", errors="replace"))
+    except SyntaxError:
+        return 0
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "PROVIDERS":
+            if isinstance(node.value, ast.Tuple):
+                return len(node.value.elts)
+    return 0
+
+
 TEST_COUNT = _count_tests()
+SECURITY_TEST_COUNT = 55  # tests/test_security.py 的 pytest 收集数（52 个 def test_ 经 parametrize 展开）
+RETRY_TEST_COUNT = 36  # tests/test_llm_retry.py 的 pytest 收集数
+PROVIDER_COUNT = _count_providers()
 ROUTE_COUNT = _count_routes()
 LOC_APP = _loc("app", ".py")
 LOC_WEB = _loc("web", ".js") + _loc("web", ".css") + _loc("web", ".html")
@@ -163,8 +191,8 @@ def setup_styles(doc: Document) -> None:
     normal.font.name = CJK_FONT
     normal.font.size = Pt(10.5)
     normal.element.rPr.rFonts.set(qn("w:eastAsia"), CJK_FONT)
-    normal.paragraph_format.line_spacing = 1.4
-    normal.paragraph_format.space_after = Pt(4)
+    normal.paragraph_format.line_spacing = 1.3
+    normal.paragraph_format.space_after = Pt(3)
 
     for level, size in ((1, 16), (2, 13), (3, 11.5)):
         style = doc.styles[f"Heading {level}"]
@@ -173,8 +201,8 @@ def setup_styles(doc: Document) -> None:
         style.font.bold = True
         style.font.color.rgb = RGBColor(0x1F, 0x29, 0x37)
         style.element.rPr.rFonts.set(qn("w:eastAsia"), CJK_FONT)
-        style.paragraph_format.space_before = Pt(12 if level == 1 else 8)
-        style.paragraph_format.space_after = Pt(6)
+        style.paragraph_format.space_before = Pt(10 if level == 1 else 7)
+        style.paragraph_format.space_after = Pt(5)
 
 
 def add_code(doc: Document, text: str) -> None:
@@ -373,7 +401,7 @@ def build() -> Path:
 
     for _ in range(6):
         doc.add_paragraph()
-    for line in ("第九届传智杯大赛 · AI 大模型创新应用挑战赛", "参赛作品技术文档", "2026 年 10 月"):
+    for line in ("第九届传智杯大赛 · AI 大模型创新应用挑战赛", "参赛作品技术文档", "2026 年 11 月"):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(line)
@@ -390,6 +418,11 @@ def build() -> Path:
         "系统完成细粒度解析、混合检索问答、中英双向翻译、引用关系图谱分析，"
         "并在写作环节提供受约束的框架生成、架构图绘制、数据可视化与中译英。"
         "全部功能围绕「让研究者少花时间在找和读，多花时间在想和写」这一个目标展开。"
+    )
+    doc.add_paragraph(
+        "系统提供两种形态，同一份代码：一是 Web 服务形态，部署在云服务器上，浏览器直接访问；"
+        "二是桌面形态，打包成单个 exe，双击运行后自动打开本地界面，全部数据留在本机。"
+        "两者共用同一个 FastAPI 应用与同一套数据目录结构，差异只在启动方式与数据目录位置。"
     )
 
     doc.add_heading("1.2 与赛题要求的对应", level=2)
@@ -424,9 +457,14 @@ def build() -> Path:
             ["脚本", f"{LOC_SCRIPTS:,} 行", "scripts/ 下全部 .py"],
             ["REST 接口", f"{ROUTE_COUNT} 个", "app/main.py 路由装饰器"],
             ["测试用例", f"pytest 收集 {TEST_COUNT} 个，全部通过", "pytest --co 实测"],
-            ["自动化检查", "ruff 全绿 + 依赖自检 + CI 三步", "见 8.3"],
+            ["自动化检查", "ruff 全绿 + 依赖自检 + CI 三步", "见 9.3"],
         ],
         widths=[3.4, 6.6, 6.0],
+    )
+    doc.add_paragraph(
+        "统计口径说明：前端页面一行只数仓库里真实存在并参与部署的页面。"
+        "开发过程中另有三页静态原型（guide / project-tour / study-plan）被 .gitignore 排除、"
+        "不入仓库也不参与部署，故不计入。"
     )
 
     # ---------------- 架构 ----------------
@@ -439,20 +477,24 @@ def build() -> Path:
     )
     add_code(
         doc,
-        "浏览器（原生 HTML/JS，无构建步骤）\n"
-        "      │  fetch / SSE\n"
-        "      ▼\n"
+        "浏览器（原生 HTML/JS，无构建步骤）          桌面版 exe（PyInstaller 单文件）\n"
+        "      │  fetch / SSE                              │  启动本地服务 + 打开浏览器\n"
+        "      └──────────────────┬────────────────────────┘\n"
+        "                         ▼\n"
         f"FastAPI 应用 app/main.py  ── {ROUTE_COUNT} 个 REST 接口\n"
         "      │\n"
-        "      ├─ app/agent.py   编排：规划→检索→抽取→校验→写作\n"
-        "      ├─ app/rag/       三路召回 + RRF 融合 + 交叉编码器重排\n"
-        "      ├─ app/graph.py   引用图谱与图谱挖掘算法\n"
-        "      ├─ app/writing.py 候选集约束生成\n"
+        "      ├─ app/agent.py     编排：规划→检索→抽取→校验→写作\n"
+        "      ├─ app/rag/         三路召回 + RRF 融合 + 交叉编码器重排\n"
+        "      ├─ app/graph.py     引用图谱与图谱挖掘算法\n"
+        "      ├─ app/writing.py   候选集约束生成\n"
+        "      ├─ app/llm.py + app/llm_retry.py   客户端与五类错误分类重试\n"
+        "      ├─ app/security.py  认证 / 限流 / 请求体上限 / 每日预算\n"
         "      ├─ app/chart.py / diagram.py / zh2en.py  写作三件套\n"
         "      └─ app/structure.py / ocr.py / layout.py  解析层\n"
         "      │\n"
         "      ▼\n"
-        "data/   papers(原始PDF) · chroma(向量) · meta(解析与索引) · models(本地模型)"
+        "DATA_DIR/   papers(原始PDF) · chroma(向量) · meta(解析与索引) · models(本地模型)\n"
+        "            源码模式默认取仓库下 data/，桌面版取用户目录下的那份"
     )
 
     doc.add_heading("2.2 数据流：一次问答发生了什么", level=2)
@@ -487,6 +529,11 @@ def build() -> Path:
         "「是否入库」这一列是刻意设计的结果：索引与图谱都能由脚本从原始 PDF 重建，"
         "放进仓库只会让克隆变慢且容易产生二进制冲突。"
         "原始 PDF 不进仓库则有另一个理由——公开仓库不应分发他人版权论文。"
+    )
+    doc.add_paragraph(
+        "上表的 data/ 是逻辑根目录，它的物理位置由环境变量 DATA_DIR 决定，代码里不允许出现第二个写死的路径："
+        "未设置时取仓库根下的 data/，desktop/main.py 启动时则指到用户目录。"
+        "这一条不是设计洁癖，而是一个真实缺陷逼出来的——见 6.11。"
     )
 
     doc.add_heading("2.4 工具调用链：Function Calling 的接入方式", level=2)
@@ -986,14 +1033,81 @@ def build() -> Path:
         ".dockerignore 把构建上下文从 2.1 GB 压到 27 MB。"
     )
 
-    doc.add_heading("6.4 安全", level=2)
+    doc.add_heading("6.4 安全：公开演示与管理保护如何并存", level=2)
+    doc.add_paragraph(
+        "这个项目有一条硬约束：评委打开链接就必须能用，不能先输密码。"
+        "而同一个公网地址上还挂着设置中心、知识库删除、索引重建这类高危接口。"
+        "把两者硬拧在一起是行不通的，常见的两种省事做法都不接受——"
+        "全站 Basic Auth 会让评委在第一步就卡住；靠 IP 白名单放行评委更不可靠，评委的出口 IP 我们无从得知。"
+        "所以采用第三种：按路径分权，默认拒绝。"
+    )
+    add_table(
+        doc,
+        ["层次", "做什么", "为什么这么定"],
+        [
+            [
+                "路由对账（启动即校验）",
+                "app/main.py 导入时扫描全部装饰器，任何一条路径若没在 "
+                "ADMIN_PATHS 或 PUBLIC_PATHS 里登记，直接 RuntimeError 让服务起不来",
+                "最危险的默认值是「新加的接口默认公开」。这条检查把这次默认值反过来："
+                "忘记登记不是静默放行，而是服务启动失败，问题在部署前就暴露",
+            ],
+            [
+                "认证层",
+                "管理路径必须带有效 Cookie（HMAC 签名的 ca_admin，2 小时过期，"
+                "httponly + samesite=strict）；口令比对用常量时间比较",
+                "双层兜底：中间件统一拦一次，8 个管理路由再各挂一次 dependencies=[AdminOnly]。"
+                "任一处漏写，另一处仍然拦得住",
+            ],
+            [
+                "CSRF",
+                "非 GET/HEAD/OPTIONS 的写操作校验 Origin，跨站直接 403",
+                "Cookie 认证天生怕 CSRF；无 Origin 头的请求仍放行，是给 curl 自测留的口子",
+            ],
+            [
+                "限流",
+                "按「客户端 IP + 路由模板」分桶，每个路由有自己的档位；"
+                "登录失败 5 次锁 15 分钟",
+                "按路由模板而不是按 URL 分桶，避免攻击者用随机 path 把计数表撑爆",
+            ],
+            [
+                "请求体上限",
+                "JSON 接口 1 MB、上传接口 24 MB，按实际读取字节累计，不信任 Content-Length",
+                "只信 Content-Length 的话，分块传输能绕过；包装 receive 后无头也拦得住",
+            ],
+            [
+                "每日预算",
+                "LLM 调用按次计数，落盘持久化，跨天自动清零",
+                "这是一道次数闸不是钱闸：它防的是被人脚本刷光 API 额度，"
+                "不负责费用精算——这一点在文档里写明，不夸大能力",
+            ],
+        ],
+        widths=[2.8, 6.4, 7.0],
+    )
+    doc.add_paragraph(
+        "几个值得记录的取舍，都是实测中发现必须有、而不是设计推演出来的："
+    )
     add_bullets(
         doc,
         [
-            "API 密钥只通过环境变量读取，.env 已加入 .gitignore 并在提交前逐项人工核查。",
-            "原始 PDF 只读，任何功能都不修改用户文件。",
-            "索引与图谱均可从原始 PDF 重建，损坏不影响数据。",
+            "未知路径返回 404 而不是 401。401 等于告诉对方「这个地址存在，只是你没权限」，"
+            "等于免费提供一个接口清单接口。",
+            "管理口令与 Cookie 密钥两项任一为空，管理接口一律 503 并提示去配置，"
+            "而不是「空口令即放行」。曾经的设计是空值自动跳过认证，那实际上是个默认关闭的开关。",
+            "纯 HTTP 环境下绝不能把 APP_ENV 设成 production：Cookie 会带上 Secure 标记，"
+            "浏览器在 http:// 下直接丢弃，结果就是「登录成功 → 被踢回登录页」的死循环。"
+            "正确顺序是先上 HTTPS 验证全通，再改 prod。",
+            "架反向代理后，scope[\"client\"] 恒为本机地址。若 Nginx 不配 X-Forwarded-For，"
+            "所有人共用一个限流桶——一个人失败 5 次会把全体访客锁 15 分钟。这条已写进部署清单的必填项。",
         ],
+    )
+    doc.add_paragraph(
+        "另外三件与安全相关的基础约定：API 密钥只通过环境变量读取，.env 已加入 .gitignore "
+        "且每次提交前逐项人工核查；原始 PDF 只读，任何功能都不修改用户文件；"
+        "索引与图谱均可从原始 PDF 重建，损坏不影响数据。"
+        f"安全层本身有 {SECURITY_TEST_COUNT} 条测试锁定（tests/test_security.py），"
+        "包括路由总数、路径规范化（尾斜杠不能绕过认证）、"
+        "100 线程抢 10 个令牌不超发、以及篡改/过期 Cookie 一律拒绝。"
     )
 
     doc.add_heading("6.5 设置中心：改配置不用登服务器", level=2)
@@ -1041,6 +1155,43 @@ def build() -> Path:
                 "单项恢复默认",
                 "每项右侧一个恢复按钮，只还原该项",
                 "不需要为了改一项而重置整份配置",
+            ],
+        ],
+        widths=[3.4, 5.6, 7.2],
+    )
+    doc.add_paragraph(
+        f"设置中心里最省事的一处是厂商切换：内置 {PROVIDER_COUNT} 家常见服务商的地址与模型清单，"
+        "选中一家就把三项（LLM_BASE_URL / LLM_MODEL / LLM_API_KEY）一次性写好，并立即重建客户端，"
+        "不需要重启服务。"
+    )
+    add_table(
+        doc,
+        ["设计点", "做法", "为什么这么做"],
+        [
+            [
+                "三项原子写",
+                "地址、模型、密钥作为一个整体写入，任一失败按快照全部回滚",
+                "半新半旧的配置最难排查：地址换了模型没换，报错信息会把人引向错误方向",
+            ],
+            [
+                "留空 = 沿用现有密钥",
+                "某家厂商的密钥留空时，只改地址与模型，不覆盖已有的 LLM_API_KEY",
+                "换厂商时最常做的其实只是试试别家的模型，把密钥一起清掉等于逼用户重填",
+            ],
+            [
+                "密钥占位符显式排除",
+                "密钥框里的占位文案（如 sk-在这里填你的key）不得被当成真实值写回",
+                "占位符看起来就是一个普通字符串，不显式排除就会被当成密钥存进 .env",
+            ],
+            [
+                "识别不出时显示「自定义」",
+                "当前地址不属于任何预设时，下拉框追加只读的「自定义（当前地址不在预设里）」",
+                "否则下拉框会默默选中第一家，用户以为在跑 DeepSeek，实际跑的是别的地址",
+            ],
+            [
+                "本地模型免密钥",
+                "Ollama 一项标记为不需要密钥，切过去时写入占位值",
+                "本地模型不校验密钥，但客户端库要求这个字段非空",
             ],
         ],
         widths=[3.4, 5.6, 7.2],
@@ -1199,6 +1350,113 @@ def build() -> Path:
         "回答正文用 token 级流式推送，不是等全文生成完再一次性返回。"
         "这一点在演示时差别很明显：同样 8 秒的回答，逐字流出与空白 8 秒后整段蹦出来，"
         "用户的感受完全不同。"
+    )
+
+    doc.add_heading("6.11 桌面版：把整套系统打进一个 exe", level=2)
+    doc.add_paragraph(
+        "云端部署解决了「评委点开链接就能用」，但没有解决另一件事："
+        "很多研究场景里论文本身不能外传，整套系统必须能在一台没联网的机器上跑起来。"
+        "桌面版就是把同一份代码打成一个单文件 exe，双击即用，数据全部留在本机。"
+        "打包产物体积与冷启动耗时均为本机实测。"
+    )
+    add_table(
+        doc,
+        ["指标", "实测值", "说明"],
+        [
+            ["产物大小", "452.9 MB", "单文件 exe，内置全部 Python 运行时、依赖与预置论文库"],
+            ["内置数据", "466.5 MB", "115 个文件的数据包（论文、索引、重排模型）"],
+            ["冷启动", "8.7 秒", "从双击到 /health 返回 200，本机首次运行"],
+            ["打包耗时", "159.6 秒", "scripts/build_desktop.py 全量重打"],
+        ],
+        widths=[3.0, 3.6, 9.6],
+    )
+    doc.add_paragraph(
+        "打包不是把脚本丢给 PyInstaller 就完事。整个过程靠三个环境变量把「数据在哪」从代码里抽出来，"
+        "业务代码一行没改成桌面专用："
+    )
+    add_table(
+        doc,
+        ["环境变量", "作用", "为什么必须这样"],
+        [
+            [
+                "DATA_DIR",
+                "指定数据根目录；不设时取仓库下的 data/",
+                "PyInstaller 运行时 __file__ 指向临时解压目录（_MEIxxxx），"
+                "打包后每次启动路径都变，写死 BASE_DIR 等于每次都找不到数据。"
+                "七个模块统一走 DATA_DIR 后，源码模式行为完全不变",
+            ],
+            [
+                "CAMPUS_ENV_FILE",
+                ".env 的位置，桌面版指到 %LOCALAPPDATA%\\ResearchAssistant\\data\\.env",
+                "配置要能跟随用户，不能跟着 exe 的安装位置走；"
+                "app/config.py 本就优先读这个变量，因此无需改配置层",
+            ],
+            [
+                "LOG_FILE",
+                "同时输出到滚动日志文件（5 MB × 3 份）",
+                "exe 以无控制台方式运行，stdout 全丢。没有这一项，"
+                "任何后台异常都只能靠猜。不设该变量时行为与原来完全一致",
+            ],
+        ],
+        widths=[3.2, 5.2, 7.8],
+    )
+    doc.add_paragraph(
+        "三个真实踩过的坑，都属于「静态分析看不见、运行时才炸」那类："
+    )
+    add_bullets(
+        doc,
+        [
+            "pymupdf 在 import 时无条件激活自己的版面分析模块，要读一份 48.9 MB 的 ONNX 配置目录。"
+            "PyInstaller 不会自动收集它，结果 exe 起来但端口根本不监听。"
+            "本项目只用 fitz 的页面与矩阵接口，不用版面分析，修法是显式收集该包的数据文件。",
+            "chromadb 内部用字符串拼出模块名再 import_module，静态分析完全看不到。"
+            "缺了它，检索会在 except Exception 里被吞成「本轮不带参考资料」——"
+            "服务照常返回 200，答案看起来也像模像样，只是全部凭空生成。"
+            "这类静默降级是最危险的，修法是显式收集 chromadb 全部子模块。",
+            "打包产物里没有 .env，API Key 落到空默认值，对话接口直接 500。"
+            "修法是首次启动时生成一份模板（密钥字段留空），"
+            "密钥本身绝不进 exe——这是红线。",
+        ],
+    )
+    doc.add_paragraph(
+        "日志里的一条启动横幅也是这次加的：每次启动写入一行时间与进程号作分隔。"
+        "起因是排查上面第二个问题时，app.log 里几次启动的日志连成一片，"
+        "分不清哪一段属于哪次运行——排查成本远高于加这三行代码的成本。"
+    )
+
+    doc.add_heading("6.12 五类错误：把「重试」从盲目变成分类", level=2)
+    doc.add_paragraph(
+        "上游大模型接口的失败分好几种，而它们的正确处置方式完全不同："
+        "限流该等一会儿再来，密钥错了重试一万次也没用，参数错了更不该重试。"
+        "SDK 自带的自动重试只看状态码，把 401 和 503 一视同仁，"
+        "既会对着一个错密钥白等，也让「到底重试了几次」变得不可断言。"
+        "所以本项目关掉 SDK 自带重试（max_retries=0），换成自己的一层分类重试。"
+    )
+    add_table(
+        doc,
+        ["错误类别", "典型成因", "是否重试", "给用户的话"],
+        [
+            ["retryable", "服务端 5xx、408、409", "重试，指数退避", "服务暂时不可用，正在重试"],
+            ["rate_limit", "429 限流", "有 Retry-After 就等，超过 20 秒则放弃", "请求过于频繁，请稍后再试"],
+            ["timeout", "读超时", "重试", "响应超时，已重试 N 次"],
+            ["auth", "401 / 403，密钥错误或无权限", "不重试", "密钥无效或无权限，请到设置中心检查"],
+            ["bad_request", "400 / 422，参数或模型名不对", "不重试", "模型不存在，请确认模型名与服务商是否匹配"],
+        ],
+        widths=[2.4, 5.0, 4.2, 4.6],
+    )
+    doc.add_paragraph(
+        "实现上是 app/llm_retry.py 的一个 classify() 加一个 call_with_retry()。"
+        "几个必须做对的细节：最多 3 次尝试；退避 0.8 / 1.6 / 3.2 秒、上限 8 秒，"
+        "并叠加 ±25% 的随机抖动——同时刻失败的请求若按同一节奏重试，会一波一波地再撞上去；"
+        "超时必须先于「连接错误」判定，因为超时异常本身是连接异常的子类，"
+        "判反了会把「模型太慢」说成「网络不通」，把人引去查错方向；"
+        "未识别的异常一律不重试，宁可失败也不要放大一个没人看懂的故障。"
+    )
+    doc.add_paragraph(
+        "还有一条容易被忽略的口径：每日预算只在首次尝试前扣一次，"
+        "重试属于同一个逻辑请求的内部细节。如果每次重试都扣，"
+        "「用户问了几次」和账面数字就对不上了。"
+        f"这一层有 {RETRY_TEST_COUNT} 条测试，逐个类别断言「该重试的重试几次、不该重试的一次都不多」。"
     )
 
     # ---------------- 创新 ----------------
@@ -1438,16 +1696,26 @@ def build() -> Path:
     # ---------------- 验收 ----------------
     chapter(doc, "九、验收与复现")
     doc.add_heading("9.1 快速启动", level=2)
+    doc.add_paragraph("服务形态（推荐，也是线上部署用的方式）：")
     add_code(
         doc,
         "# 1. 安装依赖\n"
         "pip install -r requirements.txt\n\n"
-        "# 2. 配置密钥（复制模板后填入自己的 Key）\n"
+        "# 2. 配置（复制模板后填入自己的 Key，不要直接改模板文件）\n"
         "cp .env.example .env\n\n"
         "# 3. 启动服务\n"
         "uvicorn app.main:app --host 127.0.0.1 --port 8000\n\n"
         "# 4. 浏览器打开\n"
         "http://127.0.0.1:8000/ui/index.html"
+    )
+    doc.add_paragraph("桌面形态（单文件 exe，数据全部留在本机）：")
+    add_code(
+        doc,
+        "# 打包（约 160 秒，产物在 dist/ 下）\n"
+        "python scripts/build_desktop.py\n\n"
+        "# 直接双击 dist/科研小助手.exe 即可，无需命令行\n"
+        "# 首次运行会在 %LOCALAPPDATA%\\ResearchAssistant\\ 下生成 data/ 与 .env 模板\n"
+        "# 填入 API Key 后重启即可使用；日志在同目录的 app.log"
     )
 
     doc.add_heading("9.2 自检脚本", level=2)
@@ -1457,19 +1725,28 @@ def build() -> Path:
         [
             ["scripts/check_all.py", "环境、索引、模型、Git、依赖一键体检"],
             ["scripts/check_deps.py", "依赖清单与代码 import 一致性检查"],
+            ["scripts/count_lines.py", "按目录统计真实代码行数（文档与 README 的数字来源）"],
             ["scripts/build_structure.py", "重建细粒度解析结果"],
             ["scripts/build_graph.py", "重建引用图谱"],
             ["scripts/build_index.py", "重建向量索引"],
+            ["scripts/build_desktop.py", "打出桌面版单文件 exe"],
             ["scripts/verify_official5.py", "官方 1.1~1.4 条目验收脚本"],
+            ["scripts/e2e/check_sidebar.py", "浏览器回归：历史对话、侧栏拖拽、悬停拉手"],
+            ["scripts/e2e/check_provider_switch.py", "浏览器回归：厂商一键切换的完整交互"],
         ],
         widths=[6.5, 9.5],
+    )
+    doc.add_paragraph(
+        "两个 e2e 脚本用无头浏览器真实点页面，而不是只测接口。"
+        "理由很实际：厂商切换这类功能，接口返回 200 不代表页面上那个下拉框真的生效——"
+        "接口层测试与页面层测试漏掉的缺陷类型完全不同。"
     )
 
     doc.add_heading("9.3 质量门禁", level=2)
     add_code(
         doc,
         "ruff check .                 # All checks passed!\n"
-        "pytest tests -q              # 444 passed\n"
+        f"pytest tests -q              # {TEST_COUNT} passed\n"
         "python scripts/check_deps.py # ✓ 依赖清单覆盖全部 import"
     )
     doc.add_paragraph(
@@ -1507,12 +1784,31 @@ def build() -> Path:
                 "data/models/ 不入库，缺失时降级",
                 "提供下载脚本与校验和",
             ],
+            [
+                "桌面版体积偏大",
+                "单文件 452.9 MB，内含 Python 运行时与预置论文库",
+                "提供「不含预置论文库」的瘦身版，首次启动时按需下载",
+            ],
+            [
+                "重试不含流式中途失败",
+                "只在建流前重试；开始出字后的中断不重发",
+                "用户已看到前半段，从头重来会造成更差的体验，需要断点续传式设计",
+            ],
         ],
         widths=[4.5, 5.9, 5.6],
     )
     doc.add_paragraph(
         "上述局限均已记录在仓库 README 与 docs/ 下的交接文档中，"
         "没有以「已实现」的方式掩盖。其中第一条与第五条是后续最优先处理的两项。"
+    )
+    doc.add_paragraph(
+        "另外记一笔今天暴露的真实缺陷，它说明「测试全绿」和「功能正确」之间还有距离："
+        "厂商切换功能写好时，8 条单元测试全部通过，但在浏览器里第一次真实操作就报了错。"
+        "原因出在判断顺序——密钥占位符集合里包含空字符串，于是「留空以沿用现有密钥」这条分支"
+        "永远走不到，用户一提交就被判为「需要填写 API Key」。"
+        "单元测试当时调用的都是「显式传一个密钥」的路径，恰好绕过了出问题的那条。"
+        "补上的用例直接叫 test_apply_provider_blank_key_keeps_existing_secret，把这个分支钉死在回归里。"
+        "这也是为什么 9.2 里要放两个用无头浏览器点真实页面的脚本——接口测试覆盖不到页面的真实操作路径。"
     )
 
     OUT_DIR.mkdir(exist_ok=True)
