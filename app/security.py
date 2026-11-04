@@ -53,6 +53,8 @@ ADMIN_PATHS: frozenset[str] = frozenset(
         "/settings/index/health",         # 单次 4 秒，CPU 密集
         "/settings/index/cleanup",        # 删除索引块
         "/settings/about",                # 技术栈清单，对竞赛对手有价值
+        "/settings/providers",            # 厂商预设里没有密钥，但属于配置面，一并收进
+        "/settings/provider",             # 一键切厂商 = 改 base_url + 模型 + key
         "/papers/{paper_id}",             # DELETE 删论文
     }
 )
@@ -328,6 +330,10 @@ _RATE_TABLE: dict[str, Bucket] = {
     "/redoc": BUCKET_LIGHT,
     "/settings/index/health": BUCKET_CPU,
     "/settings/index/cleanup": BUCKET_CPU,
+    # 切厂商要原子写三项并重建客户端，按 LLM 档而不是管理档：
+    # 管理员反复误点也会真的把 key/地址改来改去
+    "/settings/providers": BUCKET_LIGHT,
+    "/settings/provider": BUCKET_LLM,
     "/papers/{paper_id}": BUCKET_LIGHT,
     "/admin/login": Bucket(rate=0.05, burst=5),
     "/admin/logout": BUCKET_LIGHT,

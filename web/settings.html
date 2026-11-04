@@ -123,10 +123,42 @@
     .dialog .btnrow { justify-content: flex-end; }
     .empty { font-size: 12px; color: var(--text-muted); padding: 10px 0; }
 
+    /* 厂商切换块：与下面的逐项设置用一条虚线隔开，视觉上表明
+       「这是快捷方式，下面那些才是手动细调」 */
+    .provider-box {
+      border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-card);
+      padding: 14px 16px;
+      margin: 4px 0 18px;
+      background: var(--bg-muted);
+    }
+    .provider-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .provider-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    #provSel {
+      font: inherit; font-size: 13px; padding: 6px 10px;
+      border: 1px solid var(--border-strong); border-radius: var(--radius-chip);
+      background: var(--bg-surface); color: var(--text-primary); min-width: 220px;
+    }
+    .provider-note { font-size: 12px; color: var(--text-muted); }
+    .provider-body { margin-top: 12px; }
+    .provider-row {
+      display: grid; grid-template-columns: 88px 1fr; align-items: center;
+      gap: 10px; margin-bottom: 9px;
+    }
+    .provider-row > label { font-size: 12px; color: var(--text-secondary); }
+    .provider-row input {
+      font: inherit; font-size: 13px; padding: 6px 10px;
+      border: 1px solid var(--border-strong); border-radius: var(--radius-chip);
+      background: var(--bg-surface); color: var(--text-primary);
+    }
+    .provider-preview { font-size: 12px; color: var(--text-muted); margin: 2px 0 10px; }
+    #provError:empty { display: none; }
+
     @media (max-width: 720px) {
       .row { grid-template-columns: 1fr; gap: 6px; }
       .row > .k { padding-top: 0; }
       .card-sub { padding-left: 0; }
+      .provider-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -167,6 +199,34 @@
       <div class="card-sub">
         API Key 只以掩码显示，任何接口都不会返回明文。保存后立即重建 LLM 客户端，下一次提问就用新配置。
       </div>
+
+      <!-- 厂商一键切换：比一行行改 Base URL + 模型 + Key 快得多，
+           也避免「改了地址忘了改模型名」这种半套配置 -->
+      <div class="provider-box">
+        <div class="provider-head">
+          <label class="provider-label" for="provSel">服务商</label>
+          <select id="provSel"><option value="">加载中…</option></select>
+          <span class="provider-note" id="provNote"></span>
+        </div>
+        <div class="provider-body" id="provBody" hidden>
+          <div class="provider-row">
+            <label for="provModel">模型</label>
+            <input type="text" id="provModel" list="provModelList" placeholder="选择或手填模型名" />
+            <datalist id="provModelList"></datalist>
+          </div>
+          <div class="provider-row">
+            <label for="provKey">API Key</label>
+            <input type="password" id="provKey" autocomplete="off" />
+          </div>
+          <div class="mono provider-preview" id="provPreview"></div>
+          <div class="btnrow">
+            <button class="act primary" id="btnProvSave">切换并保存</button>
+            <span class="stat pending" id="provStat"></span>
+          </div>
+          <div class="hint" id="provError" style="color:var(--danger)"></div>
+        </div>
+      </div>
+
       <div id="modelRows"></div>
       <div class="btnrow">
         <button class="act primary" id="btnProbe">测试连接</button>
@@ -232,7 +292,7 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const state = { groups: {}, health: null, pendingCleanup: null };
+  const state = { groups: {}, health: null, pendingCleanup: null, providers: [], currentProvider: '' };
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
@@ -403,6 +463,7 @@
         sched.running ? 'ok' : 'pending');
 
       renderAbout(await api('/settings/about'));
+      await loadProviders();
     } catch (err) {
       setStat($('loadState'), '读取失败：' + err.message, 'bad');
     }
@@ -483,6 +544,112 @@
     row.insertAdjacentHTML('beforebegin', renderRow(updated, prefix));
     row.remove();
     if (updated.group === 'schedule') refreshScheduleState();
+  }
+
+  // ---------------------------------------------------------- 厂商一键切换
+
+  // 厂商清单只拉一次。里面没有任何密钥，就是 base_url + 常见模型名。
+  let provLoaded = false;
+
+  async function loadProviders() {
+    if (provLoaded) return;
+    try {
+      const data = await api('/settings/providers');
+      state.providers = data.providers || [];
+      state.currentProvider = data.current || 'custom';
+      renderProviders();
+      provLoaded = true;
+    } catch (err) {
+      $('provSel').innerHTML = '<option value="">加载失败</option>';
+      $('provNote').textContent = err.message;
+    }
+  }
+
+  function renderProviders() {
+    const sel = $('provSel');
+    const list = state.providers || [];
+    let html = list.map((p) =>
+      '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'
+    ).join('');
+    // base_url 不匹配任何预设时（自己填的地址），加一个只读的「自定义」项，
+    // 否则下拉框会默默选中第一家，让人误以为现在跑的是 DeepSeek
+    if (state.currentProvider === 'custom') {
+      html += '<option value="custom">自定义（当前地址不在预设里）</option>';
+    }
+    sel.innerHTML = html;
+    sel.value = state.currentProvider || (list[0] && list[0].id) || '';
+    applyProviderView(sel.value);
+  }
+
+  function providerById(id) {
+    return (state.providers || []).find((p) => p.id === id) || null;
+  }
+
+  function applyProviderView(id) {
+    const body = $('provBody');
+    const prov = providerById(id);
+    if (!prov) {
+      // 「自定义」不提供一键切换：没有 base_url 可填，让用户去下面的
+      // Base URL / 模型名 / API Key 三行手动改，避免这里给出半套配置
+      body.hidden = true;
+      $('provNote').textContent = '当前地址不在预设列表里，请用下面的 Base URL 手动改';
+      return;
+    }
+    body.hidden = false;
+    $('provNote').textContent = prov.note || '';
+    $('provModelList').innerHTML = prov.models.map((m) =>
+      '<option value="' + esc(m) + '"></option>'
+    ).join('');
+    $('provModel').value = prov.models[0] || '';
+    $('provKey').placeholder = prov.key_required
+      ? (prov.key_hint || 'sk-...')
+      : (prov.key_hint || '本地服务不需要');
+    $('provError').textContent = '';
+    setStat($('provStat'), '', 'pending');
+    refreshProviderPreview();
+  }
+
+  function refreshProviderPreview() {
+    const prov = providerById($('provSel').value);
+    if (!prov) { $('provPreview').textContent = ''; return; }
+    const model = ($('provModel').value || prov.models[0] || '').trim();
+    $('provPreview').textContent =
+      '将写入：LLM_BASE_URL = ' + prov.base_url + ' · LLM_MODEL = ' + model;
+  }
+
+  async function saveProvider() {
+    const prov = providerById($('provSel').value);
+    if (!prov) return;
+    const btn = $('btnProvSave');
+    btn.disabled = true;
+    $('provError').textContent = '';
+    setStat($('provStat'), '保存中…', 'pending');
+    try {
+      const out = await api('/settings/provider', {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: prov.id,
+          api_key: $('provKey').value.trim(),
+          model: $('provModel').value.trim(),
+        }),
+      });
+      setStat($('provStat'), '已切换到 ' + out.name + ' · ' + out.model, 'ok');
+      $('provKey').value = '';
+      state.currentProvider = out.provider;
+      // 下面那三行是同一份配置的详细视图，必须一起刷新，
+      // 否则界面上会同时存在「刚切到 Kimi」和「Base URL 还是 deepseek」两种说法
+      if (out.settings) {
+        state.groups = out.settings.groups || state.groups;
+        renderModel(state.groups);
+      }
+      $('provPreview').textContent =
+        '当前生效：' + out.base_url + ' · ' + out.model + ' · API Key ' + (out.has_key ? '已配置' : '未配置');
+    } catch (err) {
+      $('provError').textContent = err.message;
+      setStat($('provStat'), '切换失败', 'bad');
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   // ---------------------------------------------------------- 测试连接
@@ -636,6 +803,12 @@
   });
 
   $('btnProbe').addEventListener('click', probe);
+  $('provSel').addEventListener('change', (ev) => applyProviderView(ev.target.value));
+  $('provModel').addEventListener('input', refreshProviderPreview);
+  $('btnProvSave').addEventListener('click', saveProvider);
+  $('provKey').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); saveProvider(); }
+  });
   $('btnHealth').addEventListener('click', runHealth);
   $('dlgCancel').addEventListener('click', () => { $('mask').hidden = true; state.pendingCleanup = null; });
   $('dlgOk').addEventListener('click', doCleanup);

@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import difflib
 import json
+import os
 import re
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -145,7 +146,7 @@ app = FastAPI(
 # 线上 systemd 设了 WorkingDirectory 所以一直没事；但评委或老师用 IDE
 # 从别的目录启动时，程序会安安静静地在那个目录下新建一套空 data/，
 # 论文库是空的、/ui 直接 404，而日志里一个字都不报——这种失败最难查。
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.getenv("DATA_DIR") or (BASE_DIR / "data")).resolve()
 UPLOAD_DIR = DATA_DIR / "uploads"
 META_DIR = DATA_DIR / "meta"
 META_CHARTS_DIR = META_DIR / "charts"
@@ -1666,6 +1667,14 @@ class SettingsUpdateRequest(BaseModel):
     value: str = Field(default="", max_length=400)
 
 
+class ProviderSwitchRequest(BaseModel):
+    """一键切换厂商。model 留空则用该厂商推荐的第一项。"""
+
+    provider: str = Field(..., min_length=1, max_length=32)
+    api_key: str = Field(default="", max_length=400)
+    model: str = Field(default="", max_length=120)
+
+
 class IndexCleanupRequest(BaseModel):
     """清理幽灵索引的入参。sources 为空表示由后端自己判定全部幽灵。"""
 
@@ -1680,6 +1689,27 @@ async def settings_read() -> dict:
 @app.get("/settings/about", summary="项目信息（技术栈与版本）", dependencies=[AdminOnly])
 async def settings_about() -> dict:
     return settings_api.about()
+
+
+@app.get("/settings/providers", summary="可选的大模型厂商预设", dependencies=[AdminOnly])
+async def settings_providers() -> dict:
+    return {
+        "providers": settings_api.list_providers(),
+        "current": settings_api.detect_provider(),
+    }
+
+
+@app.post("/settings/provider", summary="一键切换到某家厂商", dependencies=[AdminOnly])
+async def settings_switch_provider(req: ProviderSwitchRequest) -> dict:
+    try:
+        result = await run_in_threadpool(
+            settings_api.apply_provider, req.provider, req.api_key, req.model
+        )
+    except settings_api.SettingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # apply_provider 内部已经 reset 了同步客户端，这里关掉旧连接池
+    await llm.reset_client_async()
+    return {**result, "settings": settings_api.snapshot()}
 
 
 @app.post("/settings", summary="保存一项设置")

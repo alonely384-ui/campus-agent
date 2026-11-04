@@ -609,13 +609,228 @@ def restore_default(key: str) -> dict[str, Any]:
 
 @dataclass
 class ConnectionProbe:
-    ok: bool
     model: str
     base_url: str
+    # 这行曾经漏了：调用处（settings_api.test_connection 构造时传 ok=False、
+    # 成功后置 ok=True）和 /settings/test-connection 的返回体、以及测试都在用
+    # probe.ok，但字段没声明，构造处直接 TypeError。默认给 False 是刻意的——
+    # 探活没跑完之前不能算成功，失败路径本来就不改它。
+    ok: bool = False
     latency_ms: int = 0
     detail: str = ""
     error: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------- 厂商预设
+
+# 每家只记「OpenAI 兼容端点 + 常见模型名」。模型名是给人选的快捷项，
+# 不是白名单——用户照样可以手填任何模型名（新模型比程序更新得快）。
+# ollama 的 key 是占位串，官方本地服务不校验，但 openai SDK 要求非空。
+PROVIDERS: tuple[dict[str, Any], ...] = (
+    {
+        "id": "deepseek",
+        "name": "DeepSeek（深度求索）",
+        "base_url": "https://api.deepseek.com",
+        "models": ("deepseek-chat", "deepseek-reasoner"),
+        "key_hint": "sk-...",
+        "key_required": True,
+        "note": "性价比较高，推理类任务用 deepseek-reasoner",
+    },
+    {
+        "id": "openai",
+        "name": "OpenAI",
+        "base_url": "https://api.openai.com/v1",
+        "models": ("gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"),
+        "key_hint": "sk-...",
+        "key_required": True,
+        "note": "国内访问需要自备网络出口",
+    },
+    {
+        "id": "dashscope",
+        "name": "通义千问（阿里云百炼）",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "models": ("qwen-plus", "qwen-turbo", "qwen-max", "qwen-long"),
+        "key_hint": "sk-...",
+        "key_required": True,
+        "note": "中文与长文档表现稳定",
+    },
+    {
+        "id": "moonshot",
+        "name": "Kimi（月之暗面）",
+        "base_url": "https://api.moonshot.cn/v1",
+        "models": ("moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"),
+        "key_hint": "sk-...",
+        "key_required": True,
+        "note": "超长上下文，适合整篇论文",
+    },
+    {
+        "id": "zhipu",
+        "name": "智谱 GLM",
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "models": ("glm-4-plus", "glm-4-flash", "glm-4-air"),
+        "key_hint": "形如 xxxx.xxxx",
+        "key_required": True,
+        "note": "glm-4-flash 有免费额度",
+    },
+    {
+        "id": "siliconflow",
+        "name": "硅基流动",
+        "base_url": "https://api.siliconflow.cn/v1",
+        "models": ("deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"),
+        "key_hint": "sk-...",
+        "key_required": True,
+        "note": "聚合多家开源模型，常常有免费额度",
+    },
+    {
+        "id": "ollama",
+        "name": "本地 Ollama",
+        "base_url": "http://127.0.0.1:11434/v1",
+        "models": ("qwen2.5:7b", "llama3.1:8b", "deepseek-r1:7b"),
+        "key_hint": "本地服务不需要，随便填 ollama",
+        "key_required": False,
+        "note": "完全离线，先在本机 `ollama pull 模型名` 拉好模型",
+    },
+)
+
+PROVIDER_BY_ID: dict[str, dict[str, Any]] = {p["id"]: p for p in PROVIDERS}
+
+# 本地 Ollama 不校验 key，但 openai SDK 传空串会直接报错，给个固定占位
+_OLLAMA_KEY = "ollama"
+
+
+def list_providers() -> list[dict[str, Any]]:
+    """设置页下拉用的厂商清单。API Key 相关字段只给提示，不透出任何真实值。"""
+    return [
+        {
+            "id": p["id"],
+            "name": p["name"],
+            "base_url": p["base_url"],
+            "models": list(p["models"]),
+            "key_hint": p["key_hint"],
+            "key_required": p["key_required"],
+            "note": p["note"],
+        }
+        for p in PROVIDERS
+    ]
+
+
+def apply_provider(provider_id: str, api_key: str = "", model: str = "") -> dict[str, Any]:
+    """一键切换到某家厂商：原子地写 LLM_BASE_URL + LLM_MODEL + LLM_API_KEY。
+
+    为什么不能简单地连调三次 save()：三次写盘各自独立，第二、三次如果失败，
+    前一次已经落盘并生效了 —— 用户会拿到「base_url 换了、模型还是旧的」
+    这种半套配置，然后对着一个不存在的模型名报 404。
+
+    这里一次记下三项的旧值，任一失败全部回滚。
+    """
+    provider = PROVIDER_BY_ID.get(provider_id)
+    if provider is None:
+        raise SettingError(f"未知的厂商: {provider_id}")
+
+    base_url = provider["base_url"]
+    # 模型留空就用该厂商推荐的第一项；用户手填的模型名照样接受
+    model = (model or "").strip() or provider["models"][0]
+
+    # Key 的语义分三种，顺序不能乱：
+    #   ① 本地服务（ollama 等）压根不要 key → 塞占位字符串让 SDK 满意
+    #   ② 用户填了掩码占位符（形如 sk-****abcd）→ 当成占位，不是真 key
+    #   ③ 用户留空 → **沿用现有 key**，绝不清空。换 base_url 但复用同一把 key
+    #      是最常见的场景（同一家云的多模型路径），留空就报错会把人逼回去手动改
+    #   ④ 用户填了真 key → 用新的
+    # 早先的写法把「留空」直接判成错误（`key_required and api_key in SECRET_PLACEHOLDERS`
+    # 里空串恰好命中占位集合），结果第 3 步的「沿用」分支永远走不到。
+    raw_key = (api_key or "").strip()
+    if not provider["key_required"]:
+        api_key = _OLLAMA_KEY if (not raw_key or raw_key in SECRET_PLACEHOLDERS) else raw_key
+    elif raw_key and raw_key in SECRET_PLACEHOLDERS:
+        raise SettingError(f"{provider['name']} 需要填写 API Key")
+    elif raw_key:
+        api_key = raw_key
+    else:
+        # 留空：沿用现有 key，没有可用 key 才报错
+        if not has_real_key():
+            raise SettingError(f"{provider['name']} 需要填写 API Key")
+        api_key = ""
+
+    # 先把三项都校验一遍，别写到一半才发现模型名带空格
+    pairs: list[tuple[str, str]] = [
+        ("LLM_BASE_URL", canonical("LLM_BASE_URL", base_url)),
+        ("LLM_MODEL", canonical("LLM_MODEL", model)),
+    ]
+    if api_key:
+        pairs.append(("LLM_API_KEY", api_key))
+    else:
+        # 没填 key 时保留原有 key（换厂商但想沿用同一把 key 的场景）
+        if not has_real_key():
+            raise SettingError(f"{provider['name']} 需要填写 API Key")
+
+    # 记快照：每项原本在 .env 里存不存在、原值是什么
+    snapshot: list[tuple[str, bool, str]] = [
+        (key, *_snapshot_env_line(key)) for key, _ in pairs
+    ]
+
+    written: list[str] = []
+    try:
+        for key, value in pairs:
+            config.set_env_value(key, value)
+            written.append(key)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("切换到厂商 %s 时写 .env 失败，开始回滚", provider_id)
+        for key, existed, old in snapshot:
+            if key in written:
+                try:
+                    _rollback_env(key, existed, old)
+                except Exception:  # noqa: BLE001
+                    logger.exception("回滚 %s 失败，磁盘可能残留新值", key)
+        raise SettingError(f"写入配置失败，已回滚：{exc}") from exc
+
+    # 刷新运行态：三项走同一套 config._reload_setting
+    try:
+        for key, value in pairs:
+            item = SETTINGS[key]
+            _apply_runtime(item, value)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("切换到厂商 %s 后生效失败，开始回滚", provider_id)
+        for key, existed, old in snapshot:
+            try:
+                _rollback_env(key, existed, old)
+            except Exception:  # noqa: BLE001
+                logger.exception("回滚 %s 的 .env 失败", key)
+            try:
+                _apply_runtime_failed(SETTINGS[key], old)
+            except Exception:  # noqa: BLE001
+                logger.exception("回滚 %s 的运行态失败", key)
+        raise SettingError(f"切换厂商失败，已回滚：{exc}") from exc
+
+    # base_url / key 变了必须重建客户端，否则请求还打向旧地址
+    llm.reset_client()
+    logger.info("已切换到厂商 %s (%s / %s)", provider_id, base_url, model)
+
+    return {
+        "provider": provider_id,
+        "name": provider["name"],
+        "base_url": base_url,
+        "model": model,
+        "has_key": has_real_key(),
+    }
+
+
+def detect_provider_for(base_url: str) -> str:
+    """按给定的 base_url 反查厂商 id，查不到返回 "custom"。
+
+    单独拆出来是为了能在测试里直接验映射关系，不必去改全局 settings。
+    """
+    current = (base_url or "").rstrip("/").lower()
+    for p in PROVIDERS:
+        if p["base_url"].rstrip("/").lower() == current:
+            return p["id"]
+    return "custom"
+
+
+def detect_provider() -> str:
+    """按当前 base_url 反查是哪家厂商，供设置页下拉框预选中。"""
+    return detect_provider_for(config.settings.llm_base_url)
 
 
 async def test_connection(*, timeout: float = 20.0) -> ConnectionProbe:

@@ -538,3 +538,103 @@ def test_status_reports_stopped_right_after_off(monkeypatch):
     # 模式不是 off 时仍如实反映线程存活
     monkeypatch.setitem(scheduler._state, "mode", "daily")
     assert scheduler.status()["running"] is True
+
+
+# ---------------------------------------------------------------- F 厂商一键切换
+
+
+def test_providers_list_has_no_secret_material():
+    """厂商预设里绝不能带任何 key，哪怕是示例 key。"""
+    provs = settings_api.list_providers()
+    assert len(provs) >= 6
+    text = json.dumps(provs, ensure_ascii=False).lower()
+    assert "sk-" not in text.replace("sk-...", ""), "厂商预设里出现了形似密钥的字符串"
+    for p in provs:
+        assert p["base_url"].startswith(("http://", "https://"))
+        assert p["models"], f"{p['id']} 没有候选模型"
+
+
+def test_detect_provider_matches_base_url():
+    """按 base_url 反查厂商，含尾斜杠也要认出来。"""
+    for p in settings_api.list_providers():
+        assert settings_api.detect_provider_for(p["base_url"]) == p["id"]
+        assert settings_api.detect_provider_for(p["base_url"] + "/") == p["id"]
+    assert settings_api.detect_provider_for("https://example.invalid/v1") == "custom"
+
+
+def test_apply_provider_writes_all_three_atomically(env_file):
+    """一次切换必须同时落下 base_url、模型、key 三项。"""
+    out = settings_api.apply_provider("moonshot", api_key="sk-newkey-abcdefghijklmnop", model="")
+    assert out["provider"] == "moonshot"
+    assert out["base_url"] == "https://api.moonshot.cn/v1"
+    assert out["model"] == "moonshot-v1-8k"  # 留空取该厂商第一个模型
+    assert out["has_key"] is True
+
+    text = env_file.read_text(encoding="utf-8")
+    assert "LLM_BASE_URL=https://api.moonshot.cn/v1" in text
+    assert "LLM_MODEL=moonshot-v1-8k" in text
+    assert "LLM_API_KEY=sk-newkey-abcdefghijklmnop" in text
+    # 原本的注释必须保留
+    assert "# 头部注释" in text
+
+
+def test_apply_provider_blank_key_keeps_existing_secret(env_file):
+    """留空 = 沿用现有 key，绝不能因为没填就把它清空。
+
+    这是 2026-11-04 实测抓到的真 bug：SECRET_PLACEHOLDERS 里含空字符串 '',
+    于是「留空」被判成「填了占位符」直接报错，「沿用现有 key」的分支永远走不到。
+    """
+    settings_api.apply_provider("moonshot", api_key="sk-keepme-1234567890abc", model="")
+    out = settings_api.apply_provider("zhipu", api_key="", model="")
+    assert out["has_key"] is True
+    assert out["base_url"] == "https://open.bigmodel.cn/api/paas/v4"
+    text = env_file.read_text(encoding="utf-8")
+    assert "LLM_API_KEY=sk-keepme-1234567890abc" in text
+
+
+def test_apply_provider_blank_key_without_any_key_is_rejected(env_file, monkeypatch):
+    """既没填 key、库里也没有可用 key 时，必须明确报错而不是写一个空 key。"""
+    env_file.write_text("LLM_MODEL=deepseek-chat\nLLM_API_KEY=\n", encoding="utf-8")
+    monkeypatch.setattr(config.settings, "llm_api_key", "")
+    with pytest.raises(settings_api.SettingError, match="需要填写 API Key"):
+        settings_api.apply_provider("openai", api_key="", model="")
+
+
+def test_apply_provider_local_provider_does_not_need_key(env_file, monkeypatch):
+    """本地 Ollama 不需要真 key，但 SDK 要求非空，所以要塞占位。"""
+    env_file.write_text("LLM_MODEL=deepseek-chat\nLLM_API_KEY=\n", encoding="utf-8")
+    monkeypatch.setattr(config.settings, "llm_api_key", "")
+    out = settings_api.apply_provider("ollama", api_key="", model="")
+    assert out["base_url"] == "http://127.0.0.1:11434/v1"
+    assert out["has_key"] is True  # 占位 key 让 has_real_key 视为「可用」
+
+
+def test_apply_provider_unknown_id_is_rejected():
+    with pytest.raises(settings_api.SettingError, match="未知的厂商"):
+        settings_api.apply_provider("not-a-vendor", api_key="sk-x", model="")
+
+
+def test_apply_provider_rebuilds_client(env_file, monkeypatch):
+    """切完必须丢掉缓存的客户端，否则请求还打向旧地址。"""
+    called = {"n": 0}
+    monkeypatch.setattr(llm, "reset_client", lambda: called.__setitem__("n", called["n"] + 1))
+    settings_api.apply_provider("moonshot", api_key="sk-abcdefghijklmnopqrst", model="")
+    assert called["n"] == 1
+
+
+def test_apply_provider_rolls_back_when_runtime_patch_fails(env_file, monkeypatch):
+    """运行态生效失败时，磁盘与内存都要回到切换前。"""
+    env_file.write_text(
+        "LLM_BASE_URL=https://api.deepseek.com\nLLM_MODEL=deepseek-chat\n"
+        "LLM_API_KEY=sk-original-key-123456\n",
+        encoding="utf-8",
+    )
+    before = env_file.read_text(encoding="utf-8")
+
+    def boom(item, value):
+        raise RuntimeError("模拟运行态失败")
+
+    monkeypatch.setattr(settings_api, "_apply_runtime", boom)
+    with pytest.raises(settings_api.SettingError, match="已回滚"):
+        settings_api.apply_provider("moonshot", api_key="sk-new-abcdefghijklmnop", model="")
+    assert env_file.read_text(encoding="utf-8") == before

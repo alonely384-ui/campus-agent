@@ -185,20 +185,22 @@ def test_verify_password_rejects_empty_and_none(admin_env):
 
 
 def test_all_routes_are_classified():
-    """44 个路由必须一条不漏地归入 ADMIN 或 PUBLIC。"""
+    """46 个路由必须一条不漏地归入 ADMIN 或 PUBLIC。"""
     templates = main_mod._route_templates()
     uncovered = templates - ADMIN_PATHS - PUBLIC_PATHS
     assert not uncovered, f"未登记路由：{sorted(uncovered)}"
 
 
 def test_route_count_matches_design():
-    """路由总数锁定在 44（含 /admin/login、/admin/logout）。
+    """路由总数锁定在 46（含 /admin/login、/admin/logout）。
 
     这条测试的意义：将来加接口时数量会变，强制开发者停下来想一次
     「这个新接口该归哪一类」，而不是默默多一个公开接口。
+    2026-11-04：44 → 46，新增 /settings/providers 与 /settings/provider
+    （厂商一键切换），两条都归管理员。
     """
     templates = main_mod._route_templates()
-    assert len(templates) == 44, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
+    assert len(templates) == 46, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
 
 
 def test_admin_paths_have_no_public_overlap():
