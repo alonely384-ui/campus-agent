@@ -15,6 +15,7 @@ import httpx
 from openai import AsyncOpenAI
 
 from app.config import settings
+from app.llm_retry import call_with_retry
 from app.logging_config import get_logger
 from app.security import reserve_llm_call
 
@@ -37,11 +38,14 @@ def get_client() -> AsyncOpenAI:
         # 上游卡住时请求会一直挂着，用户端只看到「转圈」，而这边占着一个
         # 工作线程和一条连接，几个并发就能把服务拖死。
         # connect 单独收紧到 10s：连不上这种事几秒内就该知道，不该等 60s。
+        #
+        # max_retries=0 是有意的：重试改由 app.llm_retry 接管（见那里的说明），
+        # SDK 再叠一层就会出现 3×3=9 次尝试、退避序列也没法断言。
         _client = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
             timeout=httpx.Timeout(60.0, connect=10.0),
-            max_retries=2,
+            max_retries=0,
         )
         logger.info("LLM 客户端已创建: %s (%s)", settings.llm_base_url, settings.llm_model)
     return _client
@@ -89,13 +93,19 @@ async def chat(messages: list[dict], temperature: float = 0.3, max_tokens: int |
     """
     logger.info("请求模型 %s，消息数 %d", settings.llm_model, len(messages))
 
+    # 预算只在首次尝试前扣一次：重试属于同一个逻辑请求的内部细节，
+    # 每重试一次都扣会让「用户问了几次」和账面次数对不上。
     reserve_llm_call()
-    resp = await get_client().chat.completions.create(
-        model=settings.llm_model,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens or settings.llm_max_tokens,
-    )
+
+    async def _once() -> str:
+        return await get_client().chat.completions.create(
+            model=settings.llm_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens or settings.llm_max_tokens,
+        )
+
+    resp = await call_with_retry(_once, what="非流式对话")
     answer = resp.choices[0].message.content or ""
     logger.info("模型返回 %d 个字符", len(answer))
     return answer
@@ -115,13 +125,20 @@ async def chat_stream(
     logger.info("流式请求模型 %s", settings.llm_model)
 
     reserve_llm_call()
-    stream = await get_client().chat.completions.create(
-        model=settings.llm_model,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens or settings.llm_max_tokens,
-        stream=True,  # ← 关键就这一行
-    )
+
+    async def _open() -> object:
+        return await get_client().chat.completions.create(
+            model=settings.llm_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens or settings.llm_max_tokens,
+            stream=True,  # ← 关键就这一行
+        )
+
+    # 重试只覆盖「建立流」这一步。流已经开始往外吐字之后再失败就不重试了 ——
+    # 用户已经在屏幕上看到前半段回答，重发会让它从头再来一遍，
+    # 而收尾的异常由上层的 SSE 错误事件转成人话。
+    stream = await call_with_retry(_open, what="流式对话建流")
 
     # try/finally 关流：外面这个生成器被提前丢弃时（用户关掉页面、点了停止、
     # 或者上层用 asyncio.wait_for 超时取消），async for 不会被走完，
