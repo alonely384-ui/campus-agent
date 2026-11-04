@@ -10,6 +10,7 @@
 
 from fastapi.testclient import TestClient
 
+from app import main as main_mod
 from app.main import app
 
 client = TestClient(app)
@@ -29,6 +30,25 @@ def test_health_endpoint():
     assert data["status"] == "ok"
     assert "version" in data
     assert "model" not in data, "匿名访问 /health 不应泄露模型名"
+
+
+def test_version_comes_from_pyproject():
+    """版本号只能有一个真源：pyproject.toml。
+
+    app/main.py 的 _read_version() 先问 importlib.metadata（装过就返回包装版本），
+    装不上才回落到直接读 pyproject.toml。两条路的结果必须一致——
+    以前这里是硬编码 0.1.0，pyproject 里也写一份，改一处忘一处就会对不上。
+    所以这里不写死期望值，而是**比对两个来源**。
+    """
+    import tomllib
+
+    with (main_mod.BASE_DIR / "pyproject.toml").open("rb") as fh:
+        declared = tomllib.load(fh)["project"]["version"]
+
+    assert main_mod.VERSION == declared, (
+        f"/health 报的版本 {main_mod.VERSION} 与 pyproject.toml 的 {declared} 不一致"
+    )
+    assert main_mod.VERSION != "unknown", "版本号回落到了兜底值，说明两条读取路径都不通"
 
 
 def test_openapi_schema_is_valid():

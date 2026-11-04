@@ -108,21 +108,27 @@ logger = get_logger(__name__)
 # 版本号只从 pyproject.toml 读，不在代码里第二次硬编码。
 # 原来这里写死 VERSION = "0.1.0"，pyproject 里也写一份，两处迟早对不上
 # （改了一处忘了另一处，/health 报的版本和包里装的对不上）。
-# 包没安装时（比如直接 `python -m app.main` 跑源码）退回读一次 pyproject，
+#
+# 顺序刻意是「先 pyproject、后 importlib.metadata」，不是反过来。
+# 反过来踩过坑：pip install -e . 装出来的 dist-info 记的是**安装那一刻**的版本，
+# 之后改 pyproject 不会跟着变（实测 dist 里还是 0.1.0，pyproject 已改成新版本），
+# 于是 /health 报旧版本、仓库里写着新版本，正是上面注释想避免的那种对不上。
+# 源码目录里 pyproject 永远在，它才是真源；只有把包装到别处、目录里没有 pyproject 时
+# （比如从 site-packages 导入），才回落到 metadata。
 # 两条路都不通才给 "unknown"，不抛异常——版本号不该拦住服务启动。
 def _read_version() -> str:
-    from importlib.metadata import PackageNotFoundError, version
-
-    try:
-        return version("campus-agent")
-    except PackageNotFoundError:
-        pass
     with contextlib.suppress(Exception):
         import tomllib
 
         with (BASE_DIR / "pyproject.toml").open("rb") as fh:
             return str(tomllib.load(fh)["project"]["version"])
-    return "unknown"
+
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("campus-agent")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 VERSION = _read_version()
