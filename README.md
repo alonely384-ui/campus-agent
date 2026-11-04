@@ -168,7 +168,7 @@ docker run -p 8000:8000 --env-file .env research-agent
 用户浏览器 (web/*.html)
    │  SSE / REST
    ▼
- FastAPI (app/main.py, 41 个接口)
+ FastAPI (app/main.py, 45 个接口)
    │
    ├─► Agent 主循环 (app/agent.py)        四角色：规划 → 检索 → 抽取 → 校验 → 写作
    │     └─► LLM (app/llm.py)             DeepSeek / 任意 OpenAI 兼容接口
@@ -185,9 +185,9 @@ docker run -p 8000:8000 --env-file .env research-agent
 
 | 项 | 数据 | 复现命令 |
 |---|---|---|
-| 接口数 | **41 个 path** | `GET /openapi.json` |
-| 代码规模 | `app/` 11438 · `web/` 22276 · `tests/` 4497 · `scripts/` 4188 行 | `scripts/check_deps.py` 同源统计 |
-| 自动化测试 | **444 passed** | `pytest tests -q` |
+| 接口数 | **45 个 path / 47 个操作** | `GET /openapi.json` |
+| 代码规模 | `app/` 16880 · `web/` 9355 · `tests/` 8819 · `scripts/` 4804 行，合计 **39858 行** | `scripts/count_lines.py` |
+| 自动化测试 | **613 passed** | `pytest tests -q` |
 | 静态检查 | 全绿 | `ruff check .` |
 | 论文库 | 39 篇 / 1971 页（含 541 页专著）/ 961 章节 / 282 表 / 287 图 | `data/meta/structures.json` |
 | 引用图谱 | 36 逻辑节点 / 189 边 / 3 社区 / 4234 条参考文献条目 | `data/meta/citation-graph.json` |
@@ -244,7 +244,7 @@ docker run -p 8000:8000 --env-file .env research-agent
 ```
 campus-agent/
 ├── app/
-│   ├── main.py            # FastAPI 入口 + 41 个接口
+│   ├── main.py            # FastAPI 入口 + 45 个接口
 │   ├── agent.py           # ⭐ 手写 Agent 循环 + 四角色时间线
 │   ├── llm.py             # LLM 客户端封装
 │   ├── config.py          # 配置中心（读 .env + 行级原子写回）
