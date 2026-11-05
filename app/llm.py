@@ -84,8 +84,8 @@ async def chat(messages: list[dict], temperature: float = 0.3, max_tokens: int |
 
     参数 messages 的形状（这是 OpenAI 定的标准格式，记住它）：
         [
-            {"role": "system", "content": "你是一个校园助手"},
-            {"role": "user",   "content": "明天有什么课"},
+            {"role": "system", "content": "你是一个科研文献助手"},
+            {"role": "user",   "content": "这篇论文的方法有什么局限"},
         ]
 
     ``max_tokens`` 是**上限不是目标**：正常回答不会因此变短，但它是防刷爆

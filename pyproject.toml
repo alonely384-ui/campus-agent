@@ -22,7 +22,7 @@ name = "campus-agent"
 #   2.0.1  2026-11-04 重排模型路径修复（桌面版静默降级）
 #   2.1.0  2026-11-04 七家厂商一键切换
 version = "2.1.0"
-description = "校园智能助手 Agent：RAG 问答 + 工具调用 + 流式输出"
+description = "科研小助手：基于 RAG 与引用图谱的论文阅读与写作 Agent"
 requires-python = ">=3.11"
 # 依赖只有 requirements.txt 一处真源，这里刻意不重复写。
 #

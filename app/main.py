@@ -138,8 +138,8 @@ VERSION = _read_version()
 _IS_PROD = str(settings.app_env or "").strip().lower() in ("prod", "production")
 
 app = FastAPI(
-    title="Campus Agent",
-    description="校园智能助手：RAG 问答 + 工具调用 + 流式输出",
+    title="科研小助手",
+    description="基于 RAG 与引用图谱的论文阅读与写作 Agent：检索问答 + 工具调用 + 流式输出",
     version=VERSION,
     docs_url=None if _IS_PROD else "/docs",
     redoc_url=None if _IS_PROD else "/redoc",
