@@ -137,6 +137,10 @@ class Settings(BaseSettings):
     llm_max_concurrency: int = 4
     # 单次生成的最大 token，防刷爆账单的最后一道闸
     llm_max_tokens: int = 2048
+    # 单次模型调用的读超时（秒）。云端通常 10~30 秒返回，60 秒够用；
+    # 接本地推理（Ollama / vLLM 等）时 12B 级模型跑一次多角色推理要 70 秒以上，
+    # 必须调大，否则每轮都必然 ReadTimeout。**默认值保持 60，不改变云端行为。**
+    llm_timeout: float = 60.0
     # 预算计数落盘位置（相对路径按进程工作目录解析）
     budget_file: str = "data/meta/llm-budget.json"
 

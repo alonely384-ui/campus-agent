@@ -40,6 +40,7 @@ from typing import Any
 from app.cards import get_card, render_card
 from app.config import settings
 from app.llm import get_client
+from app.llm_retry import call_with_retry
 from app.logging_config import get_logger
 from app.papers import find_paper_by_title, load_structures, paper_meta
 from app.rag.pipeline import _looks_like_citation, page_text, retrieve_scored
@@ -1582,14 +1583,23 @@ async def run_agent(
 
         t_writer = time.perf_counter()
         reserve_llm_call()
-        resp = await get_client().chat.completions.create(
-            model=settings.llm_model,
-            messages=messages,
-            tools=tool_schemas(),          # ← 把工具说明书交给模型
-            tool_choice="auto",            # ← auto = 让模型自己决定用不用
-            temperature=0.3,
-            max_tokens=settings.llm_max_tokens,
-        )
+
+        # 走 call_with_retry 而不是直接 await：与 app.llm.chat() 保持同一套
+        # 五类错误处置（503 重试、401 不重试、超时重试）。预算在进入重试前
+        # 已经扣过，重试不会重复计费，见 app/llm_retry.py 顶部说明。
+        # 注意重试只覆盖「拿到完整响应」这一步——工具执行不重试，
+        # 因为工具可能有副作用（下载文件、写索引）。
+        async def _once() -> object:
+            return await get_client().chat.completions.create(
+                model=settings.llm_model,
+                messages=messages,
+                tools=tool_schemas(),          # ← 把工具说明书交给模型
+                tool_choice="auto",            # ← auto = 让模型自己决定用不用
+                temperature=0.3,
+                max_tokens=settings.llm_max_tokens,
+            )
+
+        resp = await call_with_retry(_once, what="Agent 主循环")
         msg = resp.choices[0].message
 
         # ---- 情况 A：模型不再调工具，直接给答案 → 结束 ----
@@ -1718,15 +1728,22 @@ async def run_agent_stream(
 
     for round_no in range(1, MAX_ROUNDS + 1):
         reserve_llm_call()
-        stream = await get_client().chat.completions.create(
-            model=settings.llm_model,
-            messages=messages,
-            tools=tool_schemas(),
-            tool_choice="auto",
-            temperature=0.3,
-            max_tokens=settings.llm_max_tokens,
-            stream=True,
-        )
+
+        # 只重试「建立流」这一步。流开始往外吐字之后再失败就不重试了——
+        # 用户已经在屏幕上看到前半段回答，重发会让它从头再来一遍。
+        # 这条边界和 app.llm.chat_stream 一致。
+        async def _open() -> object:
+            return await get_client().chat.completions.create(
+                model=settings.llm_model,
+                messages=messages,
+                tools=tool_schemas(),
+                tool_choice="auto",
+                temperature=0.3,
+                max_tokens=settings.llm_max_tokens,
+                stream=True,
+            )
+
+        stream = await call_with_retry(_open, what="Agent 流式建流")
 
         # 流式返回时，工具调用的参数是一小片一小片拼出来的，要自己累积
         content_buf = ""

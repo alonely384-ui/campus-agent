@@ -401,3 +401,33 @@ def test_chat_stream_yields_pieces():
 async def _aint(s: str) -> AsyncIterator[str]:
     for ch in s:
         yield ch
+
+
+# ---------------------------------------------------------------- 可配置读超时
+
+
+def test_client_read_timeout_comes_from_settings(monkeypatch):
+    """读超时必须是配置项，不能写死。
+
+    写死 60 秒时，本地 12B 模型跑一次多角色推理（实测 70 秒以上）必然
+    ReadTimeout，而云端模型从没碰到过这个上限——所以这个坑只在接本地推理
+    时才暴露。默认值保持 60，不改变云端行为。
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "llm_timeout", 300.0)
+    monkeypatch.setattr(llm, "_client", None)
+    client = llm.get_client()
+    try:
+        assert client.timeout.read == 300.0
+        # connect 仍然收紧在 10 秒：连不上这种事不该等 300 秒
+        assert client.timeout.connect == 10.0
+    finally:
+        llm.reset_client()
+
+
+def test_client_read_timeout_default_is_60():
+    """默认值 60 秒：与改造前硬编码的值一致，云端部署行为不变。"""
+    from app.config import Settings
+
+    assert Settings.model_fields["llm_timeout"].default == 60.0

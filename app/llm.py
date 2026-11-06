@@ -44,10 +44,15 @@ def get_client() -> AsyncOpenAI:
         _client = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
-            timeout=httpx.Timeout(60.0, connect=10.0),
+            timeout=httpx.Timeout(settings.llm_timeout, connect=10.0),
             max_retries=0,
         )
-        logger.info("LLM 客户端已创建: %s (%s)", settings.llm_base_url, settings.llm_model)
+        logger.info(
+            "LLM 客户端已创建: %s (%s)，读超时 %.0fs",
+            settings.llm_base_url,
+            settings.llm_model,
+            settings.llm_timeout,
+        )
     return _client
 
 
