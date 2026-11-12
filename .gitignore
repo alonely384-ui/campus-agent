@@ -42,6 +42,10 @@ data/meta/_preview/
 data/meta/figures/
 data/meta/translations/
 
+# 在线检索缓存（arXiv / Crossref / OpenAlex / GitHub）。每按一次「生成框架」
+# 就会按查询词各存一份，实测单个会话就能堆出几百个文件，且随时可重新拉取。
+data/meta/online/
+
 # ---- 工具缓存 ----
 .pytest_cache/
 .ruff_cache/

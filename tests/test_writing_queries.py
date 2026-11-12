@@ -47,7 +47,16 @@ def test_english_queries_translates_chinese(monkeypatch: pytest.MonkeyPatch) -> 
         "citation graph, paper recommendation system, reference chain",
         ["引用关系图谱", "论文推荐系统"],
     )
-    assert out == ["citation graph", "paper recommendation system", "reference chain"]
+    # 概念两两组合排在前面（3 个概念 → C(3,2)=3 条 AND 表达式），
+    # 后面才是逐概念单体查询，一起交给 RRF 融合。
+    assert out == [
+        'all:"citation graph" AND all:"paper recommendation system"',
+        'all:"citation graph" AND all:"reference chain"',
+        'all:"paper recommendation system" AND all:"reference chain"',
+        "citation graph",
+        "paper recommendation system",
+        "reference chain",
+    ][: w._MAX_QUERIES]
 
 
 def test_english_queries_skips_when_all_english(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,7 +81,11 @@ def test_english_queries_drops_non_english_output(monkeypatch: pytest.MonkeyPatc
         "1. citation graph\n2. 论文推荐\n3. recommendation system",
         ["引用关系图谱"],
     )
-    assert out == ["citation graph", "recommendation system"]
+    assert out == [
+        'all:"citation graph" AND all:"recommendation system"',
+        "citation graph",
+        "recommendation system",
+    ]
 
 
 def test_english_queries_dedupes_and_caps(monkeypatch: pytest.MonkeyPatch) -> None:

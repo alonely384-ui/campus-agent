@@ -57,13 +57,17 @@ CACHE_TTL = 60 * 60 * 6  # 6 小时：检索结果变化慢，缓存能挡掉重
 
 ARXIV_API = "http://export.arxiv.org/api/query"
 CROSSREF_API = "https://api.crossref.org/works"
+OPENALEX_API = "https://api.openalex.org/works"
+# OpenAlex 礼貌池标识。带 mailto 的请求限速宽很多，用域名占位避免写进个人信息。
+OPENALEX_MAILTO = "campus-agent@research-agent.top"
 USER_AGENT = "campus-agent/0.1 (research demo; contact: local)"
 TIMEOUT = 20.0
 
-# 检索结果来源标记。前端直接显示这两个词，别改。
+# 检索结果来源标记。前端直接显示这些词，别改。
 SOURCE_LOCAL = "local"
 SOURCE_ARXIV = "arxiv"
 SOURCE_CROSSREF = "crossref"
+SOURCE_OPENALEX = "openalex"
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
@@ -94,6 +98,12 @@ class Candidate:
     local_file: str = ""
     #: 相关度分数，仅用于排序，不对外承诺语义
     score: float = 0.0
+    #: 本库论文的正文证据块（见 app/writing_evidence.py）。原文完整保留，
+    #: 只在渲染 prompt 时截断。外面检索的论文这里是空列表。
+    evidence: list[dict] = field(default_factory=list)
+    #: 这篇是怎么进池的。正常检索为 ``{"kind": "retrieval"}``；
+    #: 由正文证据补进来的带命中 query 与门统计，供审计。
+    entry_reason: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -282,6 +292,14 @@ _ARXIV_STOPWORDS = frozenset(
 )
 
 
+_API_EXPR_RE = re.compile(r'[a-z]+:[^\s]|"')
+"""判断查询是不是已经拼好的 arXiv 检索表达式（含字段前缀或引号）。
+
+``_arxiv_expr`` 见到它就原样透传，不再按空格切词——切词会把
+``all:"citation graph"`` 拆成 ``all:"citation`` 和 ``graph"``，表达式必空。
+"""
+
+
 def _arxiv_expr(q: str) -> str:
     """把查询词拼成 arXiv 检索表达式。
 
@@ -294,7 +312,14 @@ def _arxiv_expr(q: str) -> str:
     其余词用 ``all:`` 放开字段（摘要/标题/作者都算），交给 ``sortBy=relevance`` 排序。
     实测：``retrieval augmented generation for academic paper recommendation`` 命中 5 篇，
     ``attention mechanism`` 命中 5 篇。
+
+    如果拿来的是**已经拼好的布尔表达式**（调用方 ``_english_expr`` 产出的
+    ``all:"RAG" AND all:"citation graph"``），原样透传：按空格切词会把
+    ``all:"citation`` 和 ``graph"`` 切成两半，拼出来的表达式在 arXiv 上必空。
     """
+    if _API_EXPR_RE.search(q):
+        return q
+
     words = [
         w
         for w in re.split(r"[\s,;，、]+", q)
@@ -316,8 +341,27 @@ def search_arxiv(query: str, limit: int = 10) -> list[Candidate]:
     if (cached := _read_cache(cache_key)) is not None:
         return [Candidate(**row) for row in cached]
 
+    rows = _arxiv_get(_arxiv_expr(q), limit)
+    if not rows:
+        # 概念 AND 里只要有一个词在论文里不出现就全灭（实测加 all:"hallucination"
+        # 直接从 5 条变 0 条），所以打空时逐级放宽：3 个概念 → 2 个 → 1 个。
+        # 只放宽我们自己拼的布尔表达式，普通关键词查询原样返回（上面已经查过了）。
+        for relaxed in _relax_api_expr(_arxiv_expr(q)):
+            rows = _arxiv_get(relaxed, limit)
+            if rows:
+                logger.info("arXiv 查询打空，已放宽为 %s", relaxed)
+                break
+    if not rows:
+        return []
+
+    _write_cache(cache_key, [c.to_dict() for c in rows])
+    return rows
+
+
+def _arxiv_get(expr: str, limit: int) -> list[Candidate]:
+    """单次 arXiv 请求。失败/非 200 一律返回空列表，由调用方决定怎么降级。"""
     params = {
-        "search_query": _arxiv_expr(q),
+        "search_query": expr,
         "start": 0,
         "max_results": max(1, min(limit, 20)),
         "sortBy": "relevance",
@@ -328,13 +372,23 @@ def search_arxiv(query: str, limit: int = 10) -> list[Candidate]:
         if resp.status_code != 200:
             logger.warning("arXiv 检索返回 %s", resp.status_code)
             return []
-        rows = _parse_arxiv(resp.text)
+        return _parse_arxiv(resp.text)
     except (httpx.HTTPError, OSError) as exc:
         logger.warning("arXiv 检索失败: %s", exc)
         return []
 
-    _write_cache(cache_key, [c.to_dict() for c in rows])
-    return rows
+
+def _relax_api_expr(expr: str) -> list[str]:
+    """把 ``A AND B AND C`` 逐级放宽成 ``A AND B``、``A``。
+
+    只处理调用方拼好的整段 ``all:"..."`` 表达式；普通关键词（``ti:"x" AND all:"y"``）
+    也照样子句切开重拼，但**至少保留 2 个概念**时才降级——1 个宽泛的
+    ``all:"retrieval"`` 会把整个候选池冲成泛 RAG 论文，比空池更糟。
+    """
+    parts = [p.strip() for p in expr.split(" AND ") if p.strip()]
+    if len(parts) < 2:
+        return []
+    return [" AND ".join(parts[:n]) for n in range(len(parts) - 1, 1, -1)]
 
 
 def _parse_arxiv(xml: str) -> list[Candidate]:
@@ -472,20 +526,133 @@ def _parse_crossref(payload: dict) -> list[Candidate]:
     return out
 
 
+# --------------------------------------------------------------------------- OpenAlex
+
+
+def search_openalex(query: str, limit: int = 8) -> list[Candidate]:
+    """调 OpenAlex ``/works`` 做自然语言检索（第四个来源）。
+
+    为什么加它：arXiv 的检索语法是「字段 + 布尔」，一个概念里有一个词对不上就全灭；
+    实测加个 ``hallucination`` 直接从 5 条变 0 条。OpenAlex 的 ``search`` 参数是
+    **全文自然语言检索**，由它自己做相关度排序，不会因为多一个词就打空。
+    （Semantic Scholar 的 ``paper/search`` 本来是首选，但匿名调用实测持续 429，
+    见 2026-11-11 记录，所以不用它。）
+
+    ``abstract_inverted_index`` 是「词 → 出现位置列表」的倒排结构，
+    要还原成正常语序才能当摘要用，见 ``_openalex_abstract``。
+
+    失败一律返回空列表：这是补漏来源，挂了不能影响 arXiv/Crossref 的结果。
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+    cache_key = f"openalex_{q}_{limit}"
+    if (cached := _read_cache(cache_key)) is not None:
+        return [Candidate(**row) for row in cached]
+
+    params = {
+        "search": q,
+        "per-page": max(1, min(limit, 20)),
+        "select": (
+            "id,doi,title,publication_year,authorships,primary_location,"
+            "cited_by_count,abstract_inverted_index"
+        ),
+        # OpenAlex 的礼貌池：带邮箱的请求进「polite pool」，限速更宽。
+        # 这里不写死成真实邮箱，用项目域名占位，避免把个人信息写进源码。
+        "mailto": OPENALEX_MAILTO,
+    }
+    try:
+        with _client() as client:
+            resp = client.get(OPENALEX_API, params=params)
+        if resp.status_code != 200:
+            logger.warning("OpenAlex 检索返回 %s", resp.status_code)
+            return []
+        rows = _parse_openalex(resp.json())
+    except (httpx.HTTPError, OSError, json.JSONDecodeError, KeyError) as exc:
+        logger.warning("OpenAlex 检索失败: %s", exc)
+        return []
+
+    _write_cache(cache_key, [c.to_dict() for c in rows])
+    return rows
+
+
+def _openalex_abstract(inverted: dict | None) -> str:
+    """把 OpenAlex 的倒排摘要还原成正常语序。
+
+    结构长这样：``{"Naive": [0], "Retrieval-Augmented": [1], "Generation": [2], ...}``
+    ——词是键，值是该词出现的位置列表（同一个词出现多次就有多个位置）。
+    按位置排序再把词拼回去就是原文。
+    """
+    if not inverted:
+        return ""
+    slots: dict[int, str] = {}
+    for word, positions in inverted.items():
+        for pos in positions or []:
+            slots[pos] = word
+    return " ".join(slots[i] for i in sorted(slots))
+
+
+def _parse_openalex(payload: dict) -> list[Candidate]:
+    out: list[Candidate] = []
+    for item in payload.get("results") or []:
+        title = _clean(item.get("title") or item.get("display_name") or "")
+        if not title:
+            continue
+        authors: list[str] = []
+        for a in item.get("authorships") or []:
+            name = ((a.get("author") or {}).get("display_name") or "").strip()
+            if name:
+                authors.append(name)
+        year = item.get("publication_year")
+        if not isinstance(year, int):
+            year = None
+        # DOI 在 OpenAlex 里是完整链接形式（https://doi.org/10.xxxx），
+        # 而 Candidate.doi 的约定是裸 DOI，两条路都要能认
+        doi = str(item.get("doi") or "")
+        if doi.lower().startswith("https://doi.org/"):
+            doi = doi[len("https://doi.org/") :]
+        venue = ""
+        loc = item.get("primary_location") or {}
+        if isinstance(loc, dict):
+            src = loc.get("source") or {}
+            if isinstance(src, dict):
+                venue = _clean(src.get("display_name") or "")
+        out.append(
+            Candidate(
+                key="",
+                title=title,
+                authors=authors[:8],
+                year=year,
+                source=SOURCE_OPENALEX,
+                doi=doi,
+                venue=venue,
+                abstract=_clean(_openalex_abstract(item.get("abstract_inverted_index"))),
+                url=f"https://doi.org/{doi}" if doi else (item.get("id") or ""),
+            )
+        )
+    return out
+
+
 # --------------------------------------------------------------------------- 汇总
 
 
 def _dedupe(rows: list[Candidate]) -> list[Candidate]:
     """跨来源判重：同一篇只留一个。
 
-    优先级：本库 > arXiv > Crossref。理由是本库条目能跳转到阅读页看原文，
-    信息最完整；Crossref 的标题偶尔带期刊后缀，最不可靠。
+    优先级：本库 > arXiv > Crossref > OpenAlex。理由是本库条目能跳转到阅读页看原文，
+    信息最完整；Crossref 的标题偶尔带期刊后缀，最不可靠；OpenAlex 只做补漏，
+    和 arXiv 重叠最多（arXiv 里的论文 OpenAlex 大多也收了），所以排最后。
 
     注意本库内部**也有重复文件**：``Attention Is All You Need`` 在库里存了
     ``1706.03762v1.pdf`` 和 ``1706.03762v7.pdf`` 两份（版本不同）。
     判重时按归一化标题 + arXiv 基础号双键，命中就只保留第一个。
     """
-    rank = {SOURCE_LOCAL: 0, SOURCE_ARXIV: 1, SOURCE_CROSSREF: 2}
+    rank = {
+        SOURCE_LOCAL: 0,
+        SOURCE_ARXIV: 1,
+        SOURCE_CROSSREF: 2,
+        SOURCE_OPENALEX: 3,
+    }
     seen: dict[str, Candidate] = {}
     out: list[Candidate] = []
 
@@ -499,17 +666,142 @@ def _dedupe(rows: list[Candidate]) -> list[Candidate]:
     return out
 
 
+_RRF_K = 60
+
+
+def _rrf_fuse(per_query: list[list[Candidate]]) -> list[Candidate]:
+    """把「每个查询各召回一列」按 RRF（倒数排名融合）合成一列。
+
+    为什么不能直接拼接后再截断（旧做法）：拼接会把第一个查询整列放在前面，
+    ``merged[:total_limit]`` 于是被第一个查询的「大路货」占满，后面几个查询
+    即使命中了更贴题的小众论文也进不了池子。实测一个「引用图谱约束 + 多智能体校验」
+    的 idea，英语翻译出的三个词里第一个 ``retrieval-augmented generation`` 就吃掉了
+    arXiv 的 8 个名额（全是 Ragas、FAIR-RAG 这类泛 RAG 论文），而真正相关
+    「引用图谱」的 CG-RAG 一条都进不来。
+
+    RRF 只看「在各自列表里排第几」，不看来源和绝对分数，所以每个查询都有机会
+    靠前——排第一的论文哪怕只被一个查询召回，也能压过被所有查询排第八的泛论文。
+    这里和 RAG 检索链路用的是同一套思路（``app/rag/pipeline.py`` 的 _RRF_K），
+    但两侧数据源不同，不共用常量。
+
+    同一篇在多个查询里出现时分数累加——这是 RRF 的性质：多路一致召回说明更相关。
+    """
+    scores: dict[str, float] = {}
+    first: dict[str, Candidate] = {}
+    for column in per_query:
+        for idx, c in enumerate(column, start=1):
+            ident = (c.arxiv_id or "").strip() or _norm_title(c.title) or c.title
+            if not ident:
+                continue
+            scores[ident] = scores.get(ident, 0.0) + 1.0 / (_RRF_K + idx)
+            first.setdefault(ident, c)
+    ordered = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+    return [first[ident] for ident, _ in ordered]
+
+
+def _concept_terms(text: str) -> list[str]:
+    """从 idea 原文里挑出「必须是复合概念」的词，供 ``_covered`` 判断覆盖。
+
+    带连字符的缩写（ ``RAG``、``LoRA`` ）和两个词的英文组合（ ``citation graph`` ）
+    都是强信号：论文标题里出现它们，基本可以确定同一主题。中文的「引用图谱」
+    「检索增强」这类四字词同理——单独一个字太泛，连起来才有区分度。
+    """
+    terms: list[str] = []
+    for m in re.findall(r"[A-Za-z]{2,}(?:[\s\-]+[A-Za-z]{2,})+|[A-Z][A-Za-z]{3,}", text or ""):
+        t = m.strip()
+        if len(t) >= 3 and t.lower() not in _GENERIC_EN:
+            terms.append(t)
+    for m in re.findall(r"[\u4e00-\u9fff]{4,}", text or ""):
+        if m not in terms:
+            terms.append(m)
+    return terms
+
+
+_ZH_CONCEPT_MAP = {
+    "引用": ("citation", "cite", "reference"),
+    "图谱": ("graph", "network"),
+    "检索增强": ("retrieval", "rag"),
+    "增强生成": ("generation", "rag"),
+    "多智能体": ("multi-agent", "agent"),
+    "智能体": ("agent",),
+    "校验": ("verif", "check", "validat"),
+    "幻觉": ("hallucinat",),
+    "学术": ("academic", "scholar"),
+    "问答": ("question answering", "qa", "answer"),
+    "长文档": ("long document", "long-document"),
+    "摘要": ("summar",),
+    "推荐": ("recommend",),
+    "知识图谱": ("knowledge graph",),
+}
+
+_GENERIC_EN = frozenset(
+    {"retrieval", "generation", "augmented", "system", "model", "large", "language"}
+)
+
+
+def _covered(term: str, title_blobs: list[str]) -> bool:
+    """一个 idea 里的概念词，在候选池里有没有**单独一篇**论文落到。
+
+    P1 改动：旧实现把所有候选的标题+摘要+作者拼成一个大字符串再查，
+    于是「池子里任意一篇标题含 retrieval」就等于「检索增强方向已覆盖」——
+    16 篇里几乎每篇都含 retrieval，导致这个函数恒返回 True，
+    ``pool_coverage_gaps`` 从来没报出过缺口（实测返回值一直是 ``[]``）。
+
+    现在逐个候选单独判断，命中任意一篇才算覆盖。
+    """
+    if re.search(r"[\u4e00-\u9fff]", term):
+        # 中文概念词在英文标题里不可能出现，翻成对应的英文片段再查
+        frags: list[str] = []
+        for zh_frag, en_frags in _ZH_CONCEPT_MAP.items():
+            if zh_frag in term:
+                frags.extend(en_frags)
+        frags.append(term.lower())
+        return any(any(f in title for f in frags) for title in title_blobs)
+
+    words = [w for w in re.split(r"[\s\-]+", term.lower()) if len(w) >= 3]
+    if not words:
+        return False
+    # 复合概念（citation graph）要求所有词落在**同一篇**标题里，
+    # 而不是「citation 在 A 篇、graph 在 B 篇」就算覆盖
+    return any(all(w in title for w in words) for title in title_blobs)
+
+
+def pool_coverage_gaps(idea: str, pool: list[Candidate]) -> list[str]:
+    """找出 idea 里哪些概念在候选池中**没有**对应文献。
+
+    用途：把这个缺口如实告诉模型，它才不会为了凑引用去硬挂编号
+    （实测正是这样：池子里没有引用图谱方向的论文，模型就把《RAG 检索失败分析》
+    挂到「混合专家式稀疏化」这种完全无关的论断上）。
+
+    判据只认**标题**，且必须**同一篇**标题里同时命中概念的所有词：
+    摘要太泛（几乎每篇 RAG 论文摘要里都有 retrieval / graph），拿它判覆盖等于不判。
+    代价是可能误报——把模型本可以引的方向也标成「无文献」。
+    但误报的后果是模型改写措辞（安全），漏报的后果是模型硬挂编号（有害），
+    所以这里宁严不宽，与旧注释里「宁可漏报」的取舍相反，理由如上。
+    """
+    if not pool:
+        return []
+    titles = [(c.title or "").lower() for c in pool if c.title]
+    if not titles:
+        return []
+    return [t for t in _concept_terms(idea) if not _covered(t, titles)]
+
+
 def build_candidates(
     queries: list[str],
     local_limit: int = 6,
     arxiv_limit: int = 8,
     crossref_limit: int = 6,
+    openalex_limit: int = 8,
     total_limit: int = 16,
 ) -> list[Candidate]:
-    """把多个查询词扫一遍三个来源，合并去重后返回候选池。
+    """把多个查询词扫一遍四个来源，合并去重后返回候选池。
 
     返回的每篇都带 ``key``（``C1``…``Cn``），模型后续只能引用这些 key。
     这是「候选集约束生成」的入口，池子里的每一条都**真实存在**。
+
+    每个查询各自召回一列，再按 RRF 融合（见 ``_rrf_fuse``），而不是先拼接后截断——
+    拼接会让第一个查询的名额挤掉后面查询里更贴题的小众论文。
 
     关于**不做标题相关度过滤**这件事：曾试过「标题必须含某个查询词才保留」，
     实测两条路都不通——
@@ -524,16 +816,37 @@ def build_candidates(
     所以这里保留数据源的原始排序，让相关度由上游检索的排名决定；
     候选池里真有噪声时，正文生成环节会因为「没有合适文献」而不去引用它。
     """
-    pool: list[Candidate] = []
+    per_query: list[list[Candidate]] = []
     for q in queries:
-        pool.extend(search_local(q, limit=local_limit))
-        pool.extend(search_arxiv(q, limit=arxiv_limit))
-        pool.extend(search_crossref(q, limit=crossref_limit))
+        column: list[Candidate] = []
+        column.extend(search_local(q, limit=local_limit))
+        column.extend(search_arxiv(q, limit=arxiv_limit))
+        column.extend(search_crossref(q, limit=crossref_limit))
+        column.extend(search_openalex(q, limit=openalex_limit))
+        if column:
+            # 列内先去重：同一篇在 arXiv 和 Crossref 都出现时，
+            # 不能算成两个名次，否则它的 RRF 分数会凭空翻倍
+            per_query.append(_dedupe(column))
 
-    merged = _dedupe(pool)
-    # 本库优先，其余按来源顺序；同来源内保持检索顺序（arXiv/Crossref 已按相关度排）
-    rank = {SOURCE_LOCAL: 0, SOURCE_ARXIV: 1, SOURCE_CROSSREF: 2}
-    merged.sort(key=lambda c: (rank.get(c.source, 9), -c.score))
+    fused = _rrf_fuse(per_query)
+    # 排序只看 RRF 分数——这是改过的地方。旧做法是「本库优先，其余按来源排」，
+    # 结果是本库 5 篇 + arXiv 前 8 篇就把 16 个名额吃满，而 arXiv 那 8 篇是按
+    # 单个查询自己的相关性排的，泛 RAG 论文（Ragas、FAIR-RAG）挤掉了排在
+    # 第 9 位的 CG-RAG 这类真正贴题的。RRF 分数已经综合了多路召回的排名，
+    # 比「来源 + 单路名次」更可靠，所以让它主导，来源只在分数相同时兜底。
+    #
+    # fused 已按 RRF 分数降序，用下标当分数即可（下标越小分越高）。
+    rank = {
+        SOURCE_LOCAL: 0,
+        SOURCE_ARXIV: 1,
+        SOURCE_CROSSREF: 2,
+        SOURCE_OPENALEX: 3,
+    }
+    order = {id(c): i for i, c in enumerate(fused)}
+    # 两趟排序：先按来源（稳定排序会把来源优先级保留为同 RRF 名次时的次序），
+    # 再按 RRF 名次
+    merged = sorted(fused, key=lambda c: rank.get(c.source, 9))
+    merged = sorted(merged, key=lambda c: order[id(c)])
     merged = merged[:total_limit]
 
     for i, c in enumerate(merged, start=1):

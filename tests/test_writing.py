@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 
@@ -729,3 +730,195 @@ def test_glossary_text_empty_when_no_terms():
 def test_glossary_text_lists_every_term():
     t = z._glossary_text({"残差连接": "residual connection"})
     assert "残差连接" in t and "residual connection" in t
+
+
+# --------------------------------------------------------------------------- 1.6.1 正文标题与引用标注
+
+
+def test_normalize_headings_adds_hashes_to_bare_section_names():
+    # 实测模型经常只写裸标题，前端只认 `^## `，不补井号整篇就没有章节结构
+    text = (
+        "Abstract\n正文一段。\n\nIntroduction\n正文二段。\n\n"
+        "Related Work\n### 子节\n正文。\n\nReferences\n[C1]\n[C2]"
+    )
+    out = w.normalize_headings(text)
+    assert "## Abstract" in out
+    assert "## Introduction" in out
+    assert "## Related Work" in out
+    assert "## References" in out
+    # 子节本来就是 ### ，不能被改成 ##
+    assert "### 子节" in out
+
+
+def test_normalize_headings_leaves_inline_mentions_alone():
+    # 正文里提到 Abstract 不算标题：只有独占一行才补
+    text = "本文的 Abstract 部分写了问题陈述。\nIntroduction 通常从背景讲起。"
+    assert w.normalize_headings(text) == text
+
+
+def test_normalize_headings_does_not_double_prefix():
+    text = "## Abstract\n正文。\n## Introduction\n正文。"
+    assert w.normalize_headings(text) == text
+
+
+def test_normalize_headings_empty_text():
+    assert w.normalize_headings("") == ""
+
+
+def test_annotate_appends_title_to_every_marker():
+    pool = [_cand("C1", "HierDoc: Hierarchical Page-to-Region Evidence Routing")]
+    out = w.annotate_citations("该方法使用层级路由 [C1]。", pool)
+    assert "[C1·HierDoc]" in out
+
+
+def test_annotate_keeps_group_markers_together():
+    pool = [_cand("C1", "RWKV: Reinventing RNNs"), _cand("C2", "R-Transformer: Recurrent")]
+    out = w.annotate_citations("线性注意力 [C1, C2] 都改了主干。", pool)
+    assert "[C1·RWKV, C2·R-Transformer]" in out
+
+
+def test_annotate_uses_filename_for_library_papers():
+    # 本库论文带 local_file，文件名是唯一能落到本地 PDF 的标识，要一并摊出来
+    pool = [_cand("C1", "Attention Is All You Need", local_file="1706.03762v1.pdf")]
+    out = w.annotate_citations("自注意力 [C1]。", pool)
+    assert "[C1·Attention Is·1706.03762v1]" in out
+
+
+def test_annotate_picks_short_word_for_short_english_title():
+    pool = [_cand("C1", "GPT-4")]
+    assert "[C1·GPT-4]" in w.annotate_citations("大模型 [C1]。", pool)
+
+
+def test_annotate_truncates_chinese_title_without_a_colon():
+    # 中文标题没有空格，按词数截等于不截，必须按字数截
+    pool = [_cand("C1", "基于知识图谱约束与检索增强生成协同的大模型工程造价智能生成方法研究")]
+    out = w.annotate_citations("相关研究 [C1]。", pool)
+    assert "…" in out
+    assert len(out) < 60
+
+
+def test_annotate_unknown_key_is_left_as_bare_number():
+    # 池外编号不能编名字出来，保持纯编号，前端会染色划掉
+    out = w.annotate_citations("幻觉引用 [C9]。", [_cand("C1", "A")])
+    assert "[C9]" in out
+
+
+def test_annotate_leaves_reference_section_untouched():
+    # References 节紧跟着代码生成的真实条目，再摊一遍名字是纯噪音
+    pool = [_cand("C1", "HierDoc: Routing")]
+    text = "正文 [C1]。\n\n## References\n[C1]"
+    out = w.annotate_citations(text, pool)
+    head, _, tail = out.partition("## References")
+    assert "[C1·HierDoc]" in head
+    assert tail.strip() == "[C1]"
+
+
+def test_annotate_is_idempotent():
+    pool = [_cand("C1", "HierDoc: Routing")]
+    once = w.annotate_citations("正文 [C1]。", pool)
+    assert w.annotate_citations(once, pool) == once
+
+
+def test_annotate_empty_text():
+    assert w.annotate_citations("", [_cand("C1", "A")]) == ""
+
+
+def test_prompt_requires_refs_to_support_the_claim():
+    # 编号合法但论断对不上的错配，只能靠 prompt 约束，这条把要求钉住
+    assert "编号必须与论断对得上" in w.FRAMEWORK_SYSTEM
+    assert "典型错配" in w.FRAMEWORK_SYSTEM
+
+
+def test_prompt_mandates_output_language_follows_idea():
+    assert "正文语言跟随【研究 idea】的语言" in w.FRAMEWORK_SYSTEM
+
+
+async def _fake_chat(messages, temperature=0.3, max_tokens=None):
+    return (
+        "Abstract\n本文研究长文档问答。\n\nIntroduction\n自注意力带来开销 [C1]。\n\n"
+        "Related Work\n### 效率优化\n分块计算降低显存 [C1]。\n\nReferences\n[C1]"
+    )
+
+
+def test_generate_framework_outputs_headings_and_annotated_citations(monkeypatch):
+    # 端到端：模型给的是裸标题 + 纯编号，返回给前端的必须是 ## 标题 + 带名引用
+    pool = [_cand("C1", "HierDoc: Hierarchical Routing", local_file="1706.03762v1.pdf")]
+    monkeypatch.setattr(w.lit, "build_candidates", lambda *_a, **_k: pool)
+
+    async def _no_english(_q):
+        return None
+
+    monkeypatch.setattr(w, "_english_queries", _no_english)
+    monkeypatch.setattr(w, "chat", _fake_chat)
+
+    async def run():
+        return await w.generate_framework("长文档问答中的稀疏注意力")
+
+    out = asyncio.run(run())
+    md = out["markdown"]
+    assert "## Abstract" in md and "## Introduction" in md and "### 效率优化" in md
+    assert "[C1·HierDoc·1706.03762v1]" in md
+    # References 节保持纯编号
+    assert md.rstrip().endswith("[C1]")
+    # 校验结果按改写前的原文算，不能因为正文多了名字就漏判
+    assert out["check"]["cited_keys"] == ["C1"]
+    assert out["check"]["unknown_keys"] == []
+
+
+# ---------------- 引用句回译（「读原文」定位用） ----------------
+
+def test_strip_claim_markers_removes_numbers_and_markdown():
+    """回译前要把 [C1] 和行首的 ## / - / 1. 剥掉，否则模型会把编号当正文译出去。"""
+    assert w._strip_claim_markers("自注意力开销大 [C1]。") == "自注意力开销大 。"
+    assert w._strip_claim_markers("## 效率优化") == "效率优化"
+    assert w._strip_claim_markers("- 分块计算降低显存[C12·Flash]") == "分块计算降低显存"
+
+
+def test_claim_to_english_rejects_fragment(monkeypatch):
+    """太短的残句不值得花一次模型调用，直接返回空串走标题兜底。"""
+
+    async def _boom(*_a, **_k):
+        raise AssertionError("残句不该调用模型")
+
+    monkeypatch.setattr(w, "chat", _boom)
+    assert asyncio.run(w.claim_to_english("[C1]")) == ""
+    assert asyncio.run(w.claim_to_english("")) == ""
+
+
+def test_claim_to_english_takes_first_line(monkeypatch):
+    """模型多回了开场白时只取第一行，别把整段塞进 PDF 搜索词。"""
+
+    async def _chat(messages, temperature=0.3, max_tokens=None):
+        assert temperature == 0.0, "回译要确定性，温度不能顺着默认值走"
+        return '"Self-attention allows direct dependencies between positions."\n说明：以上是译文'
+
+    monkeypatch.setattr(w, "chat", _chat)
+    got = asyncio.run(w.claim_to_english("自注意力允许位置之间建立直接依赖 [C1]"))
+    assert got == "Self-attention allows direct dependencies between positions."
+
+
+def test_claim_to_english_returns_empty_when_model_echoes_chinese(monkeypatch):
+    """模型没翻译、原样回了中文时，必须返回空串而不是把中文当英语去搜。"""
+
+    async def _chat(messages, temperature=0.3, max_tokens=None):
+        return "自注意力允许位置之间建立直接依赖"
+
+    monkeypatch.setattr(w, "chat", _chat)
+    assert asyncio.run(w.claim_to_english("自注意力允许位置之间建立直接依赖 [C1]")) == ""
+
+
+def test_claim_to_english_never_raises(monkeypatch):
+    """翻译失败不能断掉「读原文」整条链路，只能降级成标题定位。"""
+
+    async def _boom(*_a, **_k):
+        raise RuntimeError("模型挂了")
+
+    monkeypatch.setattr(w, "chat", _boom)
+    assert asyncio.run(w.claim_to_english("自注意力允许位置之间建立直接依赖 [C1]")) == ""
+
+
+def test_claim_to_english_prompt_demands_original_wordings():
+    """提示词必须要求贴近原论文措辞，否则回译出来的英文跟原文对不上。"""
+    sys_prompt = (w._CLAIM_TO_EN_SYSTEM or "").lower()
+    assert "措辞" in w._CLAIM_TO_EN_SYSTEM or "wording" in sys_prompt
+    assert "英文" in w._CLAIM_TO_EN_SYSTEM

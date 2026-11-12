@@ -16,7 +16,10 @@ import re
 from pathlib import Path
 
 from app.layout import layout_summary
+from app.logging_config import get_logger
 from app.papers import PAPERS_DIR, load_structures
+
+logger = get_logger(__name__)
 
 # 摘要只返回前 1200 字：阅读页侧栏只当"这篇讲什么"的提示，不承担全文展示
 ABSTRACT_MAX_CHARS = 1200
@@ -206,3 +209,132 @@ def _section_page_of(sections: list[dict], title: str) -> int | None:
         if str(sec.get("title") or "").strip().lower().rstrip(":.") == title:
             return int(sec.get("page") or 0) or None
     return None
+
+
+# --------------------------------------------------------------------- 引用句定位
+#
+# 背景：写作助手生成的正文是中文，本库论文的 PDF 是英文。
+# 点「读原文」要跳到「这篇论文的哪一部分支撑了那句话」，直接拿中文句去搜命中率是 0；
+# 退化成用标题词定位，高亮落在标题上，等于没回答问题。
+#
+# 实测出来的两条硬事实（决定了下面对算法的选择）：
+#   1. 整句字面匹配几乎必然失败——PDF 文本层里句子被换行切断
+#      （"The fundamental\nconstraint of sequential computation"），
+#      还有连字符断行（"transduc-\ntion"）和连字（"eﬃcient" 里的 ﬃ）。
+#   2. 就算把换行归一化，整句也常常搜不到——回译出来的英文是我们自己的说法，
+#      不是论文原话。例：正文「计算与内存开销随序列长度呈二次增长」，
+#      Attention 原文根本没有 quadratically 这个词，写的是
+#      "a self-attention layer connects all positions with a constant number of
+#       sequentially executed operations"。所以不能指望整句命中。
+#
+# 因此改用「关键词密度 + 滑窗」：
+#   把英文句子拆成实词，逐页统计命中数选页，再在该页找一个包含最多实词、
+#   跨度最紧的词窗口，那个窗口的矩形就是高亮区。
+#   实测 Attention 第 2 页命中 9/14 词，滑窗定位到的正是讲位置依赖的那段。
+
+# 英文虚词表：这些词在任何学术论文里都出现，拿来当检索词只会让每页都"命中"
+_STOP_WORDS: frozenset[str] = frozenset(
+    {
+        "this", "that", "these", "those", "there", "their", "them", "they", "than",
+        "then", "with", "without", "from", "into", "onto", "over", "under", "upon",
+        "about", "above", "after", "before", "between", "during", "through",
+        "which", "while", "where", "when", "what", "whose", "whom", "have", "has",
+        "had", "been", "being", "were", "was", "are", "is", "am", "will", "would",
+        "shall", "should", "could", "can", "may", "might", "must", "also", "such",
+        "more", "most", "much", "many", "some", "any", "all", "both", "each",
+        "other", "another", "only", "same", "very", "just", "even", "still",
+        "however", "therefore", "thus", "hence", "moreover", "furthermore",
+        "does", "did", "doing", "done", "not", "nor", "but", "and", "for", "the",
+        "via", "per", "although", "though", "because", "since",
+        "allow", "allows", "allowed", "make", "makes", "made", "use", "uses",
+        "used", "using", "based", "given", "show", "shows", "shown", "propose",
+        "proposes", "proposed", "achieve", "achieves", "require", "requires",
+        "provide", "provides", "large", "small", "high", "low",
+    }
+)
+
+# 句子拆词时丢掉这些尾巴，否则 "positions." 和 "positions" 匹配不上
+_WORD_TRIM = ".,;:!?()[]{}\"'“”‘’·…"
+
+# 一个窗口最多取多少个词（约 3-4 行正文）。太长会把整页包进去，太短装不下一个论断。
+_WINDOW_WORDS = 45
+# 窗口里至少要有这么多个实词命中，否则不算定位成功，宁可退回标题页
+_MIN_WINDOW_HITS = 3
+# 实词总数少于这个数，说明这句话本身没信息量，别硬定位
+_MIN_KEYS = 3
+
+
+def _content_words(sentence: str) -> list[str]:
+    """把英文句子拆成可检索的实词（小写、去虚词、去标点、长度 ≥4）。"""
+    keys: list[str] = []
+    for raw in (sentence or "").split():
+        w = raw.strip(_WORD_TRIM).lower()
+        if len(w) >= 4 and w not in _STOP_WORDS and w.isascii():
+            keys.append(w)
+    return keys
+
+
+def locate_claim_in_pdf(filename: str, english: str) -> dict | None:
+    """在一篇本库 PDF 里找到最能支撑 ``english`` 这句话的位置。
+
+    返回 ``{"page": 1 基页码, "rect": [x0,y0,x1,y1], "snippet": 命中窗口原文,
+    "hits": 命中实词数, "keys": 实词总数}``；定不到就返回 None，调用方退回标题页。
+
+    为什么返回矩形而不是整页：前端要把这一块涂黄，只给页码等于让用户自己找。
+    矩形用的是 PDF 页面坐标系（左上原点），前端按 canvas 的实际缩放换算。
+    """
+    path = safe_paper_path(filename)
+    if path is None or not english:
+        return None
+    keys = _content_words(english)
+    if len(keys) < _MIN_KEYS:
+        return None
+    key_set = set(keys)
+
+    import pymupdf  # 延迟导入：只有这条路径需要，别让阅读页元数据也背上启动开销
+
+    best: tuple[int, int, int, list, str] | None = None  # (hits, -span, page, rect, snippet)
+    try:
+        with pymupdf.open(path) as doc:
+            for pno in range(doc.page_count):
+                words = doc[pno].get_text("words")
+                if len(words) < 10:
+                    continue
+                low = [w[4].strip(_WORD_TRIM).lower() for w in words]
+                hit_flags = [w in key_set for w in low]
+                # 页级命中数先过滤：一页都不沾几下的，没必要滑窗
+                if sum(hit_flags) < _MIN_WINDOW_HITS:
+                    continue
+                win = min(_WINDOW_WORDS, len(words))
+                for start in range(0, max(1, len(words) - win + 1)):
+                    end = min(start + win, len(words))
+                    hits = sum(1 for f in hit_flags[start:end] if f)
+                    if hits < _MIN_WINDOW_HITS:
+                        continue
+                    # 命中多的优先；命中一样多时取跨度更紧的（更可能是一段而非一整页）。
+                    # 用元组整体比较：拆成 `score > (best[0], -best[1])` 时，
+                    # 命中数与跨度都相等的情况会一直判为"不更大"，
+                    # 结果取决于遍历顺序——实测同一篇论文两次调用落在第 7 页和第 10 页。
+                    score = (hits, -(end - start), -pno)
+                    if best is None or score > best[0]:
+                        x0 = min(w[0] for w in words[start:end])
+                        y0 = min(w[1] for w in words[start:end])
+                        x1 = max(w[2] for w in words[start:end])
+                        y1 = max(w[3] for w in words[start:end])
+                        snippet = " ".join(words[i][4] for i in range(start, end))
+                        best = (score, hits, pno + 1, [x0, y0, x1, y1], snippet)
+    except Exception as exc:  # 坏 PDF 不该让「读原文」整条链路失败
+        logger.warning("定位引用句失败 %s: %s", filename, exc)
+        return None
+
+    if best is None:
+        return None
+    score, hits, page, rect, snippet = best
+    return {
+        "page": page,
+        "rect": [round(v, 2) for v in rect],
+        "snippet": " ".join(snippet.split())[:300],
+        "hits": hits,
+        "keys": len(keys),
+        "span": -score[1],
+    }

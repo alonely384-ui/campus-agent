@@ -60,7 +60,7 @@ from app.papers import (
     version_of,
 )
 from app.rag.pipeline import index_paper, remove_source
-from app.reader import list_reader_papers, reader_meta, safe_paper_path
+from app.reader import list_reader_papers, locate_claim_in_pdf, reader_meta, safe_paper_path
 from app.recommend import (
     CACHE_KEY,
     DEFAULT_USER,
@@ -99,7 +99,7 @@ from app.translate import (
     translate_pages,
     translate_text,
 )
-from app.writing import generate_framework
+from app.writing import claim_to_english, generate_framework
 from app.zh2en import parse_glossary, translate_zh2en
 
 setup_logging()
@@ -596,7 +596,7 @@ class FrameworkRequest(BaseModel):
     """POST /writing/framework 的请求体。"""
 
     idea: str = Field(..., min_length=5, max_length=2000, description="研究想法")
-    candidates: int = Field(default=16, ge=4, le=40, description="候选文献池大小")
+    candidates: int = Field(default=32, ge=4, le=40, description="候选文献池大小")
 
 
 class DiagramRequest(BaseModel):
@@ -604,6 +604,16 @@ class DiagramRequest(BaseModel):
 
     description: str = Field(..., min_length=5, max_length=2000, description="要画的系统描述")
     kind: str = Field(default="mermaid", description="渲染器：mermaid / graphviz")
+
+
+class ClaimEnglishRequest(BaseModel):
+    """POST /writing/claim-english 的请求体。"""
+
+    text: str = Field(
+        ...,
+        max_length=1000,
+        description="正文里引用某篇论文的那句中文陈述（可带 [C3] 标记，服务端会去掉）",
+    )
 
 
 class Zh2EnRequest(BaseModel):
@@ -996,6 +1006,30 @@ async def paper_structure(filename: str) -> dict:
     if meta is None:
         raise HTTPException(status_code=404, detail="论文不存在")
     return meta
+
+
+@app.get("/paper/{filename}/claim-locate", summary="引用句在原文里的定位（供「读原文」高亮）")
+async def paper_claim_locate(filename: str, q: str) -> dict:
+    """给定一句（英文）陈述，返回它在这篇 PDF 里最可能的出处位置。
+
+    写作助手点「读原文」时调用：先把中文引用句回译成英文（/writing/claim-english），
+    再拿英文来这里定位，最后打开 reader.html?paper=..&page=..&rect=..&q=.. 并高亮。
+
+    整句字面匹配做不到——PDF 文本层有换行、连字符断行和连字，而且回译出来的
+    英文是我们自己的说法、不是论文原话。所以这里用实词密度 + 滑窗定位段落，
+    详情见 `app/reader.py:locate_claim_in_pdf`。
+
+    定位不到返回 found=false，前端退回用标题词定位第 1 页。
+    """
+    # 先校验路径：定位函数把「文件不存在」和「定不到位置」都折成 None，
+    # 接口层必须自己分开——路径非法是 404，定不到才是 found=false。
+    if safe_paper_path(filename) is None:
+        raise HTTPException(404, "没有这篇论文")
+    # 要打开并逐页扫 PDF，是重 CPU/IO，必须离开事件循环
+    located = await run_in_threadpool(locate_claim_in_pdf, filename, q)
+    if located is None:
+        return {"found": False, "filename": filename}
+    return {"found": True, "filename": filename, **located}
 
 
 @app.get("/paper/{filename}/layout", summary="原文版式判定（单栏/双栏，赛题 1.3.1）")
@@ -1601,6 +1635,21 @@ async def writing_diagram(req: DiagramRequest) -> dict:
         return await generate_diagram(req.description, req.kind)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/writing/claim-english", summary="引用句回译（供「读原文」定位原文）")
+async def writing_claim_english(req: ClaimEnglishRequest) -> dict:
+    """把正文里引用某篇论文的那句中文，回译成英文，用来在英文 PDF 里逐字搜索。
+
+    写作助手生成的正文是中文，本库论文的 PDF 是英文。点「读原文」时拿中文句去搜
+    命中率是 0，只能退化成用标题词定位——高亮落在标题上，等于没回答
+    「这篇论文的哪一部分支撑了那句话」。所以这里先回译再搜。
+
+    **失败不抛错**：返回空字符串，前端据此退回标题定位。
+    翻译是锦上添花，不能让它把整条跳转链路弄断。
+    """
+    english = await claim_to_english(req.text)
+    return {"text": req.text, "english": english}
 
 
 @app.get("/writing/paper-figures", summary="从库内 PDF 找已有架构图（1.6.2 参考）")

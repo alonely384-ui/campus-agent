@@ -71,6 +71,7 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/reader/papers",
         "/paper/{filename}/structure",
         "/paper/{filename}/layout",
+        "/paper/{filename}/claim-locate",
         "/paper/{filename}/translation",
         "/paper/{filename}",
         "/recommendations",
@@ -98,6 +99,8 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/writing/paper-figures",
         "/writing/chart",
         "/writing/zh2en",
+        # 引用句回译：写作页点「读原文」时按需调用，属于写作页的只读辅助接口
+        "/writing/claim-english",
         # ---- 登录端点自身必须公开，否则永远登不进来 ----
         "/admin/login",
         "/admin/logout",
@@ -275,6 +278,11 @@ BUCKET_LLM = Bucket(rate=0.2, burst=3)
 BUCKET_HEAVY = Bucket(rate=0.02, burst=2)
 # 档位 E CPU 密集：并发完全不扩展
 BUCKET_CPU = Bucket(rate=0.05, burst=2)
+# 档位 F 轻量 CPU：扫一遍 PDF 的实词、单次实测 64–100 ms，
+# 比 /paper/{f}/layout（逐页判版式）轻一到两个数量级。
+# 写作页的候选池有 20-32 篇，用户可能连着点好几篇的「读原文」，
+# 沿用 BUCKET_CPU（20 秒才回 1 个、突发 2）点第 3 篇就被 429 拦住。
+BUCKET_SCAN = Bucket(rate=1.0, burst=8)
 
 # 路径 → 档位。路径模板带 {xxx} 的形式与 main.py 的路由模板完全一致，
 # 匹配时先精确查，查不到再按前缀（用于 /paper/{filename}/xxx 这类）。
@@ -299,6 +307,7 @@ _RATE_TABLE: dict[str, Bucket] = {
     "/writing/zh2en": BUCKET_LLM,
     "/writing/chart": BUCKET_LLM,
     "/writing/paper-figures": BUCKET_LLM,
+    "/writing/claim-english": BUCKET_LLM,
     "/paper/{filename}/translate": BUCKET_LLM,
     # ---- D 重量级（外网 + 入库） ----
     "/upload": BUCKET_HEAVY,
@@ -312,6 +321,7 @@ _RATE_TABLE: dict[str, Bucket] = {
     "/graph/survey": BUCKET_CPU,
     "/graph/frontier": BUCKET_CPU,
     "/paper/{filename}/layout": BUCKET_CPU,
+    "/paper/{filename}/claim-locate": BUCKET_SCAN,
     "/paper/{filename}/figure/{index}": BUCKET_LIGHT,
     "/paper/{filename}/structure": BUCKET_LIGHT,
     "/paper/{filename}/translation": BUCKET_LIGHT,
@@ -699,6 +709,7 @@ __all__ = [
     "BUCKET_HEAVY",
     "BUCKET_LIGHT",
     "BUCKET_LLM",
+    "BUCKET_SCAN",
     "COOKIE_NAME",
     "BudgetExceeded",
     "ClientDisconnected",

@@ -15,7 +15,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.reader import PAPERS_DIR, list_reader_papers, reader_meta, safe_paper_path
+from app.reader import (
+    PAPERS_DIR,
+    list_reader_papers,
+    locate_claim_in_pdf,
+    reader_meta,
+    safe_paper_path,
+)
 
 client = TestClient(app)
 
@@ -185,3 +191,88 @@ def test_safe_paper_path_guards():
 
     for bad in ["", "..", "../app/main.py", "a/b.pdf", "/etc/passwd.pdf", "x.docx"]:
         assert safe_paper_path(bad) is None, f"{bad!r} 竟然通过了校验"
+
+
+# ---------------- 引用出处定位（写作页「读原文」） ----------------
+
+def test_locate_claim_returns_page_and_rect_for_known_paper():
+    """给一句英文陈述，要能在这篇 PDF 里定到具体页码和矩形。
+
+    这是「读原文」的核心：不能只回到标题页，得落到支撑那句话的那一段。
+    """
+    papers = _papers()
+    target = next((p for p in papers if p["filename"] == "1706.03762v1.pdf"), None)
+    if target is None:
+        pytest.skip("本地库里没有 Attention Is All You Need，跳过")
+
+    got = locate_claim_in_pdf(
+        "1706.03762v1.pdf",
+        "Self-attention allows direct dependencies between any two positions in a sequence, "
+        "but its computation and memory costs grow quadratically with sequence length.",
+    )
+    assert got is not None, "这句在原文里明明有对应段落，不该定位不到"
+    # 该段落在第 2 页（第 1 页是标题+摘要）
+    assert got["page"] == 2, f"定位到第 {got['page']} 页，应该在正文第 2 页"
+    x0, y0, x1, y1 = got["rect"]
+    assert x1 > x0 and y1 > y0, "矩形宽高必须为正，否则前端画不出高亮"
+    assert got["hits"] >= 2
+    assert "attention" in got["snippet"].lower()
+
+
+def test_locate_claim_is_deterministic():
+    """同一句话连测 5 次必须落在完全相同的位置。
+
+    回归用：早先的打分写成 `score > (best[0], -best[1])`，
+    命中数与跨度都相等时不判"更大"，结果取决于遍历顺序——
+    同一篇论文两次调用分别落在第 7 页和第 10 页。
+    """
+    papers = _papers()
+    name = "2205.14135v2.pdf"
+    if not any(p["filename"] == name for p in papers):
+        pytest.skip("本地库里没有 FlashAttention，跳过")
+    sentence = (
+        "FlashAttention adopts tiling and recomputation to reduce the memory footprint "
+        "of attention without approximation."
+    )
+    seen = set()
+    for _ in range(5):
+        got = locate_claim_in_pdf(name, sentence)
+        assert got is not None
+        seen.add((got["page"], tuple(got["rect"])))
+    assert len(seen) == 1, f"同一输入定位出了 {len(seen)} 种位置：{seen}"
+
+
+def test_locate_claim_returns_none_for_unknown_file():
+    """文件名不存在时返回 None，不能抛异常——前端要能退回标题页。"""
+    assert locate_claim_in_pdf("no-such-paper.pdf", "any sentence here") is None
+
+
+def test_locate_claim_endpoint_404_for_unknown_paper():
+    """接口层：未知论文走安全路径校验，404 而不是 500。"""
+    _papers()
+    resp = client.get("/paper/not-a-real-paper.pdf/claim-locate", params={"q": "attention"})
+    assert resp.status_code == 404
+
+
+def test_reader_html_supports_rect_highlight():
+    """阅读页要支持 rect 参数并画独立图层。
+
+    这几个字符串是「读原文」链路的关键拼图，缺一个高亮就画不出来：
+      START_RECT     解析 URL 里的矩形
+      claimLayer     独立图层（不能混进 searchLayer，两者坐标系不同）
+      pdfToCss       pymupdf 左上原点 → pdf.js 左下原点的翻转
+    """
+    html = (WEB_DIR / "reader.html").read_text(encoding="utf-8")
+    assert "START_RECT" in html
+    assert "claimLayer" in html
+    assert "function pdfToCss" in html
+    # 翻转 y 的关键一行：pdf.js 与 pymupdf 的 y 轴方向相反
+    assert "pageHeightPt - y" in html, "少了 y 轴翻转，高亮会上下镜像"
+
+
+def test_writing_html_requests_claim_english_before_jump():
+    """写作页点「读原文」要先请求中文句回译，再拿英文去定位。"""
+    html = (WEB_DIR / "writing.html").read_text(encoding="utf-8")
+    assert "/writing/claim-english" in html, "没接回译接口，中文句拿去英文 PDF 里搜必然 0 命中"
+    assert "/claim-locate" in html
+    assert "openLocalPaper" in html

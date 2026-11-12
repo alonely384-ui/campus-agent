@@ -100,6 +100,23 @@
   .badge.arxiv { background: var(--warnbg); color: var(--warn); }
   .badge.crossref { background: var(--purplebg); color: var(--purple); }
   .badge.unknown { background: var(--badbg); color: var(--bad); }
+  /* 正文里的 [C3] 引用：做成可点的小胶囊，点了跳原文摘要页 */
+  .markdown .badge {
+    margin: 0 1px; padding: 1px 6px; border-radius: 8px; font-size: 11.5px;
+    font-family: inherit; text-decoration: none;
+    background: var(--brand-soft); color: var(--brand-text);
+    border: 1px solid transparent; vertical-align: 1px; white-space: nowrap;
+    transition: background .12s, border-color .12s;
+  }
+  .markdown a.badge:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
+  /* 胶囊里「·论文名」那截：字号压到 11px，跟编号拉开层级，扫读时先看到 C5 再看名字 */
+  .markdown .badge__t { font-size: 11px; opacity: .88; }
+  .markdown span.badge { cursor: default; opacity: .75; }
+  .markdown .badge.local { background: var(--brand-soft); color: var(--brand-text); }
+  .markdown .badge.unknown {
+    background: var(--badbg); color: var(--bad);
+    border-color: var(--bad); text-decoration: line-through;
+  }
   .status { font-size: 12.5px; margin-top: 10px; color: var(--dim); }
   .status.err { color: var(--bad); }
   .status.ok { color: var(--ok); }
@@ -107,16 +124,40 @@
   #chartBox { width: 100%; height: 420px; background: var(--bg-surface); border-radius: 8px; margin-top: 10px; border: 1px solid var(--line); }
   .ref { font-size: 12px; color: var(--dim); margin-bottom: 6px; word-break: break-word; line-height: 1.7; }
   .ref b { color: var(--text2); }
+  .ref-link {
+    margin-left: 8px; font-size: 11.5px; color: var(--brand-text);
+    text-decoration: none; border-bottom: 1px solid transparent; white-space: nowrap;
+  }
+  .ref-link:hover { border-bottom-color: var(--brand-text); }
   .markdown {
     background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px;
-    padding: 16px 18px; color: var(--text2);
+    padding: 18px 22px; color: var(--text2); font-size: 14px; line-height: 1.85;
   }
+  /* 一级节标题：左侧色条 + 更重的字重，扫一眼能分清四节 */
   .markdown h2 {
-    font-size: 15px; color: var(--gray-900); margin: 20px 0 8px;
-    border-bottom: 1px solid var(--line2); padding-bottom: 5px;
+    font-size: 17px; font-weight: 650; color: var(--gray-900);
+    margin: 26px 0 12px; padding: 0 0 8px 12px;
+    border-left: 3px solid var(--brand); border-bottom: 1px solid var(--line2);
+    letter-spacing: .01em;
   }
   .markdown h2:first-child { margin-top: 0; }
-  .markdown p { margin: 8px 0; }
+  /* 二级小标题（Related Work 里的技术路线分组）：小一号，不带色条 */
+  .markdown h3 {
+    font-size: 14.5px; font-weight: 600; color: var(--gray-900);
+    margin: 18px 0 8px; padding-left: 10px;
+    border-left: 2px solid var(--brand-2);
+  }
+  .markdown p { margin: 10px 0; }
+  /* 段落里的关键术语高亮：给模型标出的 **加粗** 一点底色，扫读时跳出来 */
+  .markdown b, .markdown strong {
+    color: var(--gray-900); font-weight: 600;
+    background: linear-gradient(transparent 62%, var(--brand-soft) 62%);
+    padding: 0 1px;
+  }
+  /* 分点列表：真实渲染成列表，不是把 • 当文字 */
+  .markdown ul, .markdown ol { margin: 10px 0 12px; padding-left: 22px; }
+  .markdown li { margin: 6px 0; }
+  .markdown li::marker { color: var(--brand); font-weight: 600; }
   .hint { font-size: 12px; color: var(--dim); margin-top: 6px; }
   .imgwrap { background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 10px; text-align: center; }
   .imgwrap img { max-width: 100%; }
@@ -258,8 +299,8 @@
     <div class="row">
       <div class="col">
         <label>候选文献池大小</label>
-        <input type="text" id="candN" value="16">
-        <div class="hint">池越大可选的真文献越多，但 prompt 也越长。</div>
+        <input type="text" id="candN" value="32">
+        <div class="hint">池越大可选的真文献越多，但 prompt 也越长（4-40）。</div>
       </div>
       <div class="col">
         <button id="btnFramework">生成论文框架</button>
@@ -383,24 +424,282 @@ function setStatus(el, text, cls) {
 }
 
 // 极简 Markdown 渲染：只处理标题、加粗、引用标记。够本页用，不引第三方库。
-function renderMarkdown(md) {
+/**
+ * 把模型输出的 Markdown 渲染成 HTML。
+ *
+ * 这里只认模型实际会写的几种语法（标题 / 加粗 / 列表 / 引用标记），
+ * 不引第三方解析器：正文来自 LLM，任何「通用 Markdown 渲染器」都要防 XSS，
+ * 而我们要的输出形态是固定的四节，自己写几十行反而更可控。
+ *
+ * `linkFor` 把候选编号映射成跳转地址；`labelFor` 把编号映射成论文简称。
+ * 两者都没传就退化成不可点的纯文本，保证这个函数单独拎出来也能用。
+ */
+function renderMarkdown(md, linkFor, labelFor) {
+  const pickLink = k => (typeof linkFor === 'function' ? (linkFor(k) || '') : '');
+  const pickLabel = k => (typeof labelFor === 'function' ? (labelFor(k) || '') : '');
   const esc = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return esc
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h2>$1</h2>')
     .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-    // 池外的编号染红，让人一眼看到模型有没有编引用
-    .replace(/\[(C\d{1,3})\]/g, '<span class="badge" data-k="$1">[$1]</span>')
-    .split(/\n{2,}/).map(p => p.startsWith('<h2>') ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+    /**
+     * 引用标记。
+     *
+     * 后端已经把正文里的 `[C5]` 改写成 `[C5·HierDoc]`（见 app/writing.py 的
+     * annotate_citations），所以这里两种形态都要认：
+     *   - 带名（后端改写过）：编号后紧跟的 `·名字` 保留，标题单独套一层 span 方便压字号
+     *   - 纯编号（后端没改，例如改了 reference 节）：按候选池现算一个简称
+     *
+     * 为什么要把简称摊在正文里，而不是只做一个可点的编号：
+     * 编号是模型自己挑的，它完全可能把《RAG 检索失败分析》挂到「RWKV 用循环结构」上，
+     * 编号合法、References 也是真的，但引用关系是假的。只显示编号时这种错没人看得出来；
+     * 把标题摊出来，读者一眼就能发现「HierDoc 讲的是层级路由，跟循环结构没关系」。
+     */
+    .replace(/\[(C\d{1,3})(?:·([^\]\n]*))?\]/g, (_, k, baked) => {
+      const href = pickLink(k);
+      const name = baked != null ? baked : pickLabel(k);
+      const inner = name
+        ? `${k}<span class="badge__t">·${escapeHtml(name)}</span>`
+        : k;
+      const title = href ? escapeHtml(href) : '这条引用没有可跳转的原文地址';
+      return href
+        ? `<a class="badge" data-k="${k}" href="${escapeHtml(href)}" title="${escapeHtml(title)}" target="_blank" rel="noopener">${inner}</a>`
+        : `<span class="badge plain" data-k="${k}" title="${escapeHtml(title)}">${inner}</span>`;
+    })
+    .split(/\n{2,}/)
+    .map(block => {
+      const b = block.trim();
+      if (!b) return '';
+      // 标题块原样输出，不要再包一层 <p>
+      if (/^<h[23]>/.test(b)) return b;
+      // 列表块：整块以 - / * / 1. 开头，逐行拆成 <li>
+      const lines = b.split('\n');
+      if (lines.every(l => /^\s*([-*]|\d+\.)\s+/.test(l))) {
+        const ordered = /^\s*\d+\.\s+/.test(lines[0]);
+        const items = lines
+          .map(l => `<li>${l.replace(/^\s*([-*]|\d+\.)\s+/, '')}</li>`)
+          .join('');
+        return ordered ? `<ol>${items}</ol>` : `<ul>${items}</ul>`;
+      }
+      return `<p>${b.replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('');
+}
+
+/**
+ * 从论文标题里取一个能塞进正文的简称。
+ *
+ * 规则按「学术论文标题的常见写法」往下退：
+ *   1. 有冒号就取冒号前那半（``FlashAttention: Fast and Memory-Efficient…`` → FlashAttention）
+ *   2. 没冒号就取前两个词（``Attention Is All You Need`` → Attention Is）
+ *   3. 太长再按字符硬截，末尾补省略号
+ *
+ * 不做词形还原、不认缩写表——简称只要「让人一眼认出是哪篇」，
+ * 精确与否交给悬停提示里的完整标题。
+ */
+function shortTitle(title) {
+  let t = String(title || '').trim();
+  if (!t) return '';
+  const colon = t.search(/[:：]/);
+  if (colon > 0) {
+    t = t.slice(0, colon).trim();
+  } else {
+    const words = t.split(/\s+/);
+    t = words.slice(0, 2).join(' ');
+  }
+  if (t.length > 22) t = t.slice(0, 21) + '…';
+  return t;
 }
 
 const SRC_LABEL = { local: '本库', arxiv: 'arXiv', crossref: 'Crossref' };
+
+/**
+ * 把一篇候选文献映射成「能打开的原文地址」，拿不到就返回空串。
+ *
+ * 本库论文和外部论文的可用字段是互补的，实测：
+ *   - 本库（source=local）：local_file 有值、url 为空  → 走阅读器看本地 PDF
+ *   - arXiv / Crossref：url 有值、local_file 为空      → 走 arXiv 摘要页或 DOI 页
+ *
+ * 两者都没有时返回空串，调用方据此把它渲染成不可点的灰色标记，
+ * 而不是给一个点开 404 的假链接。
+ *
+ * @param {object} c   候选文献
+ * @param {string} [quote] 正文里引用这篇的那句话。本库论文会带上它，
+ *   阅读器据此跳到命中页并高亮——用户点「读原文」看到的正是它被引用的那句，
+ *   而不是从第 1 页开始翻。外部论文拿不到页码（arXiv 接口只给元数据），
+ *   所以不传 quote，只给摘要页链接。
+ */
+/**
+ * 从论文标题里挑一个「在 PDF 文本层里一定搜得到」的词。
+ *
+ * 为什么不直接拿整条标题去搜：实测 5 篇本地 PDF，整标题只有 1 篇能命中。
+ * 原因有三——PDF 文本层里标题常常跨行（换行处会插空格）、
+ * 有连字符（Memory-Eﬃcient 里的 ﬃ 是连字）、全大写标题的字母间距被拆开。
+ * 而只取一个足够长的实词，命中率高得多：
+ *   Attention Is All You Need → "Attention" 1 处
+ *   FlashAttention: Fast…    → "FlashAttention" 179 处
+ *   Switch Transformers: …   → "Switch Transformers" 45 处
+ * 取前两个词（若第一个词太短）兼顾区分度，又不至于被换行打断。
+ */
+function titleProbe(title) {
+  const raw = String(title || '').replace(/[\u2010-\u2015]/g, '-').trim();
+  if (!raw) return '';
+  // 尽量只取「冒号前的主标题」——副标题在 PDF 里常被排版拆到下一行
+  const head = (raw.split(':')[0] || raw).trim();
+  const words = head
+    .split(/\s+/)
+    .map(w => w.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, ''))
+    .filter(w => /[A-Za-z]{4,}/.test(w));
+  if (!words.length) return '';
+  const clean = w => w.replace(/[(),;.!?'"]/g, '');
+  const first = clean(words[0]);
+  if (first.length >= 8 || words.length === 1) return first;
+  const second = words.length > 1 ? clean(words[1]) : '';
+  if (!second) return first;
+  // 多词拼接的前提是原文里这两词确实相邻。全大写标题（如 AN IMAGE IS WORTH 16X16 WORDS）
+  // 常在首个词后换行、或中间被别的词隔开，拼起来反而搜不到——这时退回单个词更稳。
+  const allCaps = head === head.toUpperCase();
+  if (allCaps) return first;
+  return first + ' ' + second;
+}
+
+function sourceLink(c, quote) {
+  if (!c) return '';
+  if (c.local_file) {
+    // 本库论文的跳转需要先算「这句话在原文的哪一页」，是异步的，
+    // 具体在 openLocalPaper() 里做。这里只吐基础 URL，让 <a> 在 JS 失效时也能点开。
+    return 'reader.html?paper=' + encodeURIComponent(c.local_file);
+  }
+  if (c.url) return c.url;
+  if (c.arxiv_id) return 'https://arxiv.org/abs/' + encodeURIComponent(c.arxiv_id);
+  if (c.doi) return 'https://doi.org/' + encodeURIComponent(c.doi);
+  return '';
+}
+
+/**
+ * 点本库论文的「读原文」时，算出该跳到原文哪一页、哪一块，再打开阅读器。
+ *
+ * 为什么必须异步、不能直接写成 href：
+ *   正文是中文，PDF 原文是英文。要把「引用这句话」落到原文的位置，得先把中文句
+ *   回译成英文（/writing/claim-english），再拿英文去 PDF 里定位段落
+ *   （/paper/{f}/claim-locate）。这两步都是服务端计算，链接事先算不出来。
+ *
+ * 三级降级，保证点了总能打开：
+ *   ① 回译 + 段落定位成功 → 跳到命中页，并把那段涂黄（&rect=）
+ *   ② 回译成功但定位不到 → 跳到第 1 页，用英文句当搜索词（&q=）
+ *   ③ 回译失败 → 跳到第 1 页，用标题词当搜索词（&q=），也就是最老的兜底
+ * 整个过程 <a> 上显示「定位中…」，避免用户以为没反应连点。
+ *
+ * 同一句话只算一次：结果按「文件名 + 中文句」缓存在 paperLocCache（页面内存），
+ * 生成一次正文可能点好几次同一篇，不重复烧翻译额度。按需求明确不做磁盘缓存。
+ */
+const paperLocCache = new Map();
+
+async function openLocalPaper(ev, c, quote) {
+  if (!c || !c.local_file) return;
+  ev.preventDefault();
+  const anchor = ev.currentTarget;
+  const cacheKey = c.local_file + '\u0000' + (quote || '');
+  const base = 'reader.html?paper=' + encodeURIComponent(c.local_file);
+
+  if (paperLocCache.has(cacheKey)) {
+    location.href = paperLocCache.get(cacheKey);
+    return;
+  }
+  const oldText = anchor.textContent;
+  anchor.textContent = '定位中…';
+  anchor.style.opacity = '.65';
+  let url = base;
+  try {
+    // ① 中文引用句 → 英文
+    let english = '';
+    if (quote) {
+      const r1 = await fetch('/writing/claim-english', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: quote }),
+      });
+      if (r1.ok) english = (await r1.json()).english || '';
+    }
+    // ② 英文句 → 原文位置
+    if (english) {
+      const r2 = await fetch(
+        '/paper/' + encodeURIComponent(c.local_file)
+        + '/claim-locate?q=' + encodeURIComponent(english)
+      );
+      if (r2.ok) {
+        const loc = await r2.json();
+        if (loc.found) {
+          url = base + '&page=' + loc.page
+            + '&rect=' + loc.rect.map(v => Math.round(v)).join(',')
+            + '&q=' + encodeURIComponent(english);
+        } else {
+          url = base + '&q=' + encodeURIComponent(english);
+        }
+      } else {
+        url = base + '&q=' + encodeURIComponent(english);
+      }
+    } else {
+      // ③ 回译失败，退回标题词
+      const probe = titleProbe(c.title);
+      if (probe) url = base + '&q=' + encodeURIComponent(probe);
+    }
+  } catch (err) {
+    // 网络断了也要能打开，不能让用户点了没反应
+    console.warn('原文定位失败，直接打开第 1 页', err);
+  }
+  paperLocCache.set(cacheKey, url);
+  location.href = url;
+  // 导航通常已发生，这里只在被拦截（如弹窗拦截）时恢复文案
+  anchor.textContent = oldText;
+  anchor.style.opacity = '';
+}
+
+/**
+ * 给一块渲染好的 HTML 里的「读原文」链接挂上异步定位。
+ *
+ * 三处需要挂：候选池列表、（渲染后的）正文引用徽章、参考文献列表。
+ * 统一用一个函数，避免三处各写一遍事件委托。
+ */
+function bindClaimLinks(root, byKey, quoteGetter) {
+  if (!root) return;
+  root.querySelectorAll('a.claim-link').forEach(a => {
+    const key = a.dataset.key;
+    const c = byKey[key];
+    if (!c) return;
+    a.onclick = ev => openLocalPaper(ev, c, quoteGetter ? quoteGetter(key) : '');
+  });
+}
+
+/**
+ * 从正文里找出「引用了 Ck 的那句话」。
+ *
+ * 只在本库论文的标题搜不到时才用（标题比句子可靠得多）。留这个函数是因为
+ * 少数本地 PDF 的标题页可能是扫描件/排版特殊，标题搜不到时还能靠句子兜底。
+ *
+ * 匹配不到（模型没引用这篇）时返回空串。
+ */
+function quoteFor(md, key) {
+  if (!md) return '';
+  const re = new RegExp('\\[' + key + '(?:·[^\\]\\n]*)?\\]');
+  for (const sent of String(md).split(/(?<=[。！？；\n])/)) {
+    if (!re.test(sent)) continue;
+    // 去掉引用标记和 markdown 标题符号，只留纯文字
+    const clean = sent
+      .replace(new RegExp('\\[' + key + '(?:·[^\\]\\n]*)?\\]', 'g'), '')
+      .replace(/^#+\s*/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (clean.length >= 8) return clean;
+  }
+  return '';
+}
 
 // ---------------- 1.6.1
 $('btnFramework').onclick = async () => {
   const idea = $('idea').value.trim();
   if (!idea) return;
-  const n = parseInt($('candN').value, 10) || 16;
+  const n = parseInt($('candN').value, 10) || 32;
   const btn = $('btnFramework');
   btn.disabled = true;
   setStatus($('st1'), '检索真实文献并生成中，约 20-60 秒…', 'work');
@@ -427,28 +726,63 @@ $('btnFramework').onclick = async () => {
       `</div>`;
 
     const byKey = Object.fromEntries(d.candidates.map(c => [c.key, c]));
-    $('pool1').innerHTML = d.candidates.map(c =>
-      `<div class="cand"><b>${c.key}</b> ${escapeHtml(c.title)}
+    $('pool1').innerHTML = d.candidates.map(c => {
+      // 本库论文带上「正文引用它的那句话」，点进去直接定位并高亮；
+      // 外部论文没有页码可定位，只给摘要页链接
+      const quote = quoteFor(d.markdown, c.key);
+      const href = sourceLink(c, quote);
+      let link = '';
+      if (href) {
+        link = c.local_file
+          ? ` · <a href="${escapeHtml(href)}" class="claim-link" data-key="${c.key}" style="color:var(--accent)">读原文</a>`
+          : ` · <a href="${escapeHtml(href)}" target="_blank" rel="noopener" style="color:var(--accent)">摘要页</a>`;
+      }
+      return `<div class="cand"><b>${c.key}</b> ${escapeHtml(c.title)}
        <span class="badge ${c.source}">${SRC_LABEL[c.source] || c.source}</span>
        <div class="meta">${escapeHtml((c.authors || []).slice(0, 3).join(', '))}`
        + `${(c.authors || []).length > 3 ? ' et al.' : ''} · ${c.year || '年份不详'}`
-       + `${c.local_file ? ' · <a href="/ui/reader.html?paper=' + encodeURIComponent(c.local_file) + '" style="color:var(--accent)">读原文</a>' : ''}</div></div>`
-    ).join('');
+       + `${link}</div></div>`;
+    }).join('');
+    bindClaimLinks($('pool1'), byKey, key => quoteFor(d.markdown, key));
 
-    $('md1').innerHTML = renderMarkdown(d.markdown);
-    // 池外编号染色
-    document.querySelectorAll('#md1 .badge').forEach(b => {
+    $('md1').innerHTML = renderMarkdown(
+      d.markdown,
+      k => (byKey[k] ? '#' : ''),
+      k => (byKey[k] ? shortTitle(byKey[k].title) : '')
+    );
+    // 正文里的引用徽章也挂定位：用户读到某个论断，想直接看原文依据
+    $('md1').querySelectorAll('.badge').forEach(b => {
       const k = b.dataset.k;
-      b.classList.add(byKey[k] ? 'local' : 'unknown');
-      if (!byKey[k]) b.title = '这条引用不在候选文献池中';
+      const c = byKey[k];
+      // 池外编号染色：池里的保持主题色，池外的划掉标红
+      if (c) {
+        b.classList.add('local');
+        if (c.local_file) {
+          b.onclick = ev => openLocalPaper(ev, c, quoteFor(d.markdown, k));
+          b.style.cursor = 'pointer';
+          b.title = '点击跳到原文中支撑这句话的位置';
+        }
+      } else {
+        b.classList.add('unknown');
+        b.title = '这条引用不在候选文献池中';
+      }
     });
 
     $('refs1').innerHTML = d.references.length
-      ? d.references.map(ref =>
-          `<div class="ref"><b>[${ref.key}]</b> ${escapeHtml(ref.text)}
-           <span class="badge ${ref.source}">${SRC_LABEL[ref.source] || ref.source}</span></div>`
-        ).join('')
+      ? d.references.map(ref => {
+          const isLocal = !!ref.local_file;
+          const href = sourceLink(ref, quoteFor(d.markdown, ref.key));
+          const link = href
+            ? (isLocal
+                ? `<a href="${escapeHtml(href)}" class="ref-link claim-link" data-key="${ref.key}">读原文 ↗</a>`
+                : `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" class="ref-link">摘要页 ↗</a>`)
+            : '';
+          return `<div class="ref"><b>[${ref.key}]</b> ${escapeHtml(ref.text)}`
+            + `<span class="badge ${ref.source}">${SRC_LABEL[ref.source] || ref.source}</span>`
+            + `${link}</div>`;
+        }).join('')
       : '<div class="ref">正文没有引用任何候选文献。</div>';
+    bindClaimLinks($('refs1'), byKey, key => quoteFor(d.markdown, key));
 
     $('out1').style.display = 'block';
     setStatus($('st1'), '完成', 'ok');
