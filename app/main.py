@@ -89,6 +89,7 @@ from app.security import (
     login_guard,
     normalize_path,
     origin_allowed,
+    revoke_session,
     sign_session,
     verify_password,
     verify_session,
@@ -1918,7 +1919,15 @@ async def admin_login(req: AdminLoginRequest, request: Request) -> Response:
 
 
 @app.post("/admin/logout", summary="管理员登出")
-async def admin_logout() -> Response:
+async def admin_logout(request: Request) -> Response:
+    """登出：删 Cookie + **服务端作废这张票据**。
+
+    只删 Cookie 是不够的——签名式票据一旦被复制走，浏览器删掉本地副本对它
+    毫无影响，直到 2 小时自然过期。线上验收实测过这一点：登出后手工带旧
+    Cookie 仍能 200 进管理接口。所以这里先把当前票据登记进吊销名单。
+    """
+    headers = list(request.scope.get("headers") or [])
+    await run_in_threadpool(revoke_session, cookie_value(headers, "ca_admin"))
     resp = JSONResponse({"ok": True})
     resp.delete_cookie(key="ca_admin", path="/")
     return resp

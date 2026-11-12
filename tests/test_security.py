@@ -567,6 +567,74 @@ def test_session_signature_rejects_wrong_secret(monkeypatch):
     assert verify_session(value) is False, "换密钥后旧会话必须立刻失效"
 
 
+# ============================================================ 11b. 会话吊销
+
+
+def test_logout_revokes_copied_cookie(client):
+    """**回归测试**：登出后把旧 Cookie 抄回去也必须 401。
+
+    线上验收实测过的真缺陷（2026-11-12）：登出只删浏览器 Cookie，服务端
+    什么都没记，事先复制走的值能继续用满 2 小时。这里刻意绕开 cookie jar，
+    直接拿原始值手工发请求，等价于「有人偷走了 Cookie」。
+    """
+    assert login(client).status_code == 200
+    stolen = client.cookies.get("ca_admin")
+    assert stolen, "登录后应拿到 Cookie"
+
+    assert client.get("/settings").status_code == 200
+    assert client.post("/admin/logout").status_code == 200
+
+    # 手工带上被复制走的旧票据，服务端必须已经作废它
+    resp = client.get("/settings", headers={"Cookie": f"ca_admin={stolen}"})
+    assert resp.status_code == 401
+
+
+def test_other_sessions_survive_one_logout(client):
+    """吊销是**按票据**的：作废一张不能连坐另一个已登录的会话。"""
+    first = login(client).headers["set-cookie"].split(";")[0].split("=", 1)[1]
+    second = login(client).headers["set-cookie"].split(";")[0].split("=", 1)[1]
+    assert first and second
+
+    # 作废第一张
+    client.post("/admin/logout", headers={"Cookie": f"ca_admin={first}"})
+
+    assert client.get("/settings", headers={"Cookie": f"ca_admin={first}"}).status_code == 401
+    assert client.get("/settings", headers={"Cookie": f"ca_admin={second}"}).status_code == 200
+
+
+def test_revocation_list_is_bounded():
+    """吊销名单必须有界：容量到顶清最老的，不会随登录次数无限增长。"""
+    store = security.SessionRevocations(max_keys=10)
+    now = time.time()
+    for i in range(50):
+        store.revoke(f"ticket-{i}.sig", now + 3600)
+    assert store.size() <= 10
+
+
+def test_revocation_entry_expires_with_the_ticket():
+    """票据自身过期后，名单里的记录应被清掉，而不是永久占位。"""
+    store = security.SessionRevocations()
+    past = time.time() - 1
+    store.revoke("old-ticket.sig", past)
+    assert store.contains("old-ticket.sig") is False
+    assert store.size() == 0
+
+
+def test_revoke_session_reads_expiry_from_ticket(monkeypatch):
+    """过期时间取自票据第一段；读不出来就按 TTL 兜底，绝不抛异常。"""
+    store = security.SessionRevocations()
+    monkeypatch.setattr(security, "revoked_sessions", store)
+    stamp = int(time.time()) + 600
+    security.revoke_session(f"{stamp}.deadbeef")
+    assert store.contains(f"{stamp}.deadbeef") is True
+
+    # 脏数据不炸
+    security.revoke_session("garbage")
+    security.revoke_session("")
+    security.revoke_session(None)
+    assert store.contains("garbage") is True
+
+
 # ============================================================ 12. 上传与入库边界
 
 

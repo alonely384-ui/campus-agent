@@ -25,6 +25,7 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import threading
 import time
 from collections.abc import Callable
@@ -185,30 +186,57 @@ def verify_password(token: str) -> bool:
 
 
 def sign_session(now: float | None = None) -> str:
-    """签发 Session Cookie 值：`<过期时间戳>.<HMAC-SHA256(secret, 时间戳)>`。
+    """签发 Session Cookie 值：`<过期时间戳>-<随机数>.<HMAC-SHA256(secret, 前缀)>`。
 
-    服务端不存 session 表，所以进程重启不会把管理员踢下线；
-    代价是没有「立即吊销单个会话」的能力——要全部吊销就换
-    ADMIN_COOKIE_SECRET（所有旧 Cookie 立刻失效）。
+    服务端不存 session 表，所以进程重启不会把管理员踢下线。
+    「立即吊销单个会话」由 ``SessionRevocations`` 承担——登出时把票据值
+    记进吊销名单，校验时一并检查，见 ``verify_session``。
+
+    **第二段随机数是必须的**（2026-11-12 补）：早期实现只签「过期时间戳」，
+    同一秒内登录两次会得到**逐字节相同**的票据。那样吊销无从谈起——作废
+    一张等于作废这一秒内签发的全部，反之亦然；而且票据可预测、同一张
+    票据会在多次登录间无限复用。加随机数后每张票据唯一。
+    校验用的「过期时间戳」仍是第一段里的 `-` 前面那部分，衔接方式不变。
     """
     expires = int((now if now is not None else time.time()) + SESSION_TTL)
-    stamp = str(expires)
+    stamp = f"{expires}-{secrets.token_hex(8)}"
     mac = hmac.new(_cookie_secret().encode("utf-8"), stamp.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{stamp}.{mac}"
 
 
+def session_expiry(value: str | None) -> float | None:
+    """从票据里读过期时间戳；读不出来返回 None（不抛异常）。"""
+    if not value:
+        return None
+    stamp = value.partition(".")[0].partition("-")[0]
+    try:
+        return float(stamp)
+    except ValueError:
+        return None
+
+
 def verify_session(value: str | None) -> bool:
-    """校验 Cookie 值：签名对 + 未过期。任一不满足都返回 False。"""
+    """校验 Cookie 值：未过期 + 签名对 + 未登出。任一不满足都返回 False。
+
+    **「未登出」这一条以前没有**（2026-11-12 线上验收发现）：登出处理器只
+    让浏览器删 Cookie，服务端什么都没记住，于是事先复制走的 Cookie 在登出后
+    仍能用满 2 小时。现在登出会把票据登记进吊销名单，这里一并检查。
+    """
     secret = _cookie_secret()
     if not value or not secret or "." not in value:
         return False
     stamp, _, mac = value.partition(".")
-    if not stamp.isdigit() or not mac:
+    if not stamp or not mac:
+        return False
+    expires = session_expiry(value)
+    if expires is None:
         return False
     expected = hmac.new(secret.encode("utf-8"), stamp.encode("utf-8"), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(mac, expected):
         return False
-    return int(stamp) > time.time()
+    if revoked_sessions.contains(value):
+        return False
+    return expires > time.time()
 
 
 # ============================================================ 客户端 IP
@@ -423,6 +451,86 @@ class RateLimiter:
 
 
 limiter = RateLimiter()
+
+
+# ============================================================ 会话吊销名单
+
+
+class SessionRevocations:
+    """登出票据名单。**有界**：条目按票据自身过期时间自动清，容量到顶就清最老的。
+
+    为什么需要它（2026-11-12 线上验收实测）：签名式 Cookie 只证明「这个值是我
+    签发的」，不证明「这个值还没被本人作废」。登出如果只是让浏览器删 Cookie，
+    任何提前复制走的值都还能用满 2 小时——在共用电脑的演示现场，这就是留门。
+
+    为什么不用黑名单表 + 数据库：票据上限是「2 小时内登录过几次」，
+    现场量级是几次到几十次，进程内字典足够；引入外部存储换来的只是
+    「重启后仍记得」这一点，而重启本身已经让所有客户端重新登录了
+    （Cookie 由进程内 secret 签名，secret 不变则 Cookie 仍有效，
+    所以严格说重启并不等于全部下线——但重启窗口短、现场可控，
+    且这个边界与 RateLimiter 的边界同源，一并写进风险清单）。
+
+    条目 TTL 取票据自身的过期时间：过了那天它本来就会被 `verify_session`
+    判为过期，留在名单里毫无意义。
+    """
+
+    def __init__(self, max_keys: int = 4096) -> None:
+        self._entries: dict[str, float] = {}   # 票据值 -> 自身过期时间戳
+        self._lock = threading.Lock()
+        self._max_keys = max_keys
+
+    def revoke(self, value: str, expires_at: float) -> None:
+        """登记一条作废票据。**值本身作 key 不存明文哈希外泄风险**：
+        票据值只在服务端内存里，不写日志、不落盘。"""
+        if not value:
+            return
+        now = time.time()
+        with self._lock:
+            self._sweep(now)
+            if len(self._entries) >= self._max_keys:
+                # 内存自保：容量顶了就清最早过期的，绝不无限增长
+                ordered = sorted(self._entries.items(), key=lambda kv: kv[1])
+                for k, _ in ordered[: max(1, len(ordered) // 2)]:
+                    self._entries.pop(k, None)
+            self._entries[value] = expires_at
+
+    def contains(self, value: str) -> bool:
+        if not value:
+            return False
+        now = time.time()
+        with self._lock:
+            exp = self._entries.get(value)
+            if exp is None:
+                return False
+            if exp <= now:
+                # 票据自己都过期了，名单里的记录没有意义
+                self._entries.pop(value, None)
+                return False
+            return True
+
+    def _sweep(self, now: float) -> None:
+        dead = [k for k, exp in self._entries.items() if exp <= now]
+        for k in dead:
+            self._entries.pop(k, None)
+
+    def size(self) -> int:
+        with self._lock:
+            return len(self._entries)
+
+    def reset(self) -> None:
+        with self._lock:
+            self._entries.clear()
+
+
+revoked_sessions = SessionRevocations()
+
+
+def revoke_session(value: str | None) -> None:
+    """把一张票据登记为作废。过期时间从票据自身读，读不出来按 TTL 上限算。"""
+    if not value:
+        return
+    expires_at = session_expiry(value)
+    revoked_sessions.revoke(value, expires_at if expires_at is not None else time.time() + SESSION_TTL)
 
 
 # ============================================================ 登录失败计数
@@ -717,6 +825,7 @@ __all__ = [
     "LoginGuard",
     "RateLimiter",
     "SESSION_TTL",
+    "SessionRevocations",
     "admin_configured",
     "body_limit_for",
     "bucket_for",
@@ -730,6 +839,9 @@ __all__ = [
     "origin_allowed",
     "redact",
     "reserve_llm_call",
+    "revoke_session",
+    "revoked_sessions",
+    "session_expiry",
     "sign_session",
     "verify_password",
     "verify_session",
