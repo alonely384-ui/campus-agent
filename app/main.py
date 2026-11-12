@@ -237,11 +237,27 @@ def _matches_template(path: str, template: str) -> bool:
 
 
 def resolve_template(path: str) -> str | None:
-    """把真实请求路径映射回路由模板；匹配不上返回 None。"""
+    """把真实请求路径映射回路由模板；匹配不上返回 None。
+
+    为什么不能只遍历 (ADMIN_PATHS | PUBLIC_PATHS)：那是个 frozenset，迭代顺序
+    取决于字符串哈希，同一台机器不同进程、不同机器都可能不同。当两个模板都能
+    匹配同一个路径时，先撞上谁就决定了这条请求归管理还是归公开——
+    `/papers/classify` 与 `/papers/{paper_id}` 就是这种情况：前者本该公开，
+    却因为先遍历到后者而被当成「删论文」，在没配 ADMIN_TOKEN 的机器上直接 503。
+
+    所以这里改成**按模板具体程度排序后再匹配**：通配段越少越具体，先匹配；
+    通配段数量相同时，路径前缀更长的优先。这样结果与哈希顺序无关，可复现。
+    """
     path = normalize_path(path)
     if path in ADMIN_PATHS or path in PUBLIC_PATHS:
         return path
-    for template in ADMIN_PATHS | PUBLIC_PATHS:
+
+    def _specificity(template: str) -> tuple[int, int]:
+        # 具体度越大越先试：通配段少 = 具体；通配段一样多时路径更长 = 更具体
+        wildcards = template.count("{")
+        return (-wildcards, len(template))
+
+    for template in sorted(ADMIN_PATHS | PUBLIC_PATHS, key=_specificity, reverse=True):
         if _matches_template(path, template):
             return template
     return None
@@ -771,6 +787,14 @@ class PaperOut(BaseModel):
     title_truncated: bool = False
     topic_id: int = -1
     topic_name: str = ""
+    # 两级主旨分类（app/topics.py）。与上面的 topic_* 是两回事：
+    # topic_* 是引用图谱社区号，这里是按标题/摘要关键词判出来的研究领域与方向。
+    primary_topic: str = ""
+    subtopic: str = ""
+    classification_status: str = ""
+    confidence: str = ""
+    classification_reason: str = ""
+    secondary_topics: list[str] = Field(default_factory=list)
 
 
 @app.get("/papers/files", summary="论文库里的文件名（供单篇选择）")
@@ -800,6 +824,7 @@ def _papers_payload() -> dict:
     """`/papers` 的实际取数逻辑。单独成函数是为了能整体扔进线程池。"""
     items = list_papers()
     topics = {p.filename: p for p in _topic_index([p.filename for p in items])}
+    classes = _classification_index()
     papers: list[PaperOut] = []
     for item in items:
         row = PaperOut(**vars(item))
@@ -810,8 +835,116 @@ def _papers_payload() -> dict:
             row.title_truncated = topic.truncated
             row.topic_id = topic.topic_id
             row.topic_name = topic.topic_name
+        cls = classes.get(item.filename)
+        if cls:
+            row.primary_topic = cls.get("primary_topic") or ""
+            row.subtopic = cls.get("subtopic") or ""
+            row.classification_status = cls.get("classification_status") or ""
+            row.confidence = cls.get("confidence") or ""
+            row.classification_reason = cls.get("classification_reason") or ""
+            row.secondary_topics = list(cls.get("secondary_topics") or [])
         papers.append(row)
     return {"total": len(papers), "papers": papers}
+
+
+def _classification_index() -> dict[str, dict]:
+    """按文件名回查分类结果。分类失败时返回空字典，不影响论文列表本身。
+
+    数据源：`data/catalog.json`（40 条，含 title/arxiv_id）+ `data/meta/structures.json`
+      （39 条，含 abstract）。有些论文没进 structures（如 Mamba、Active Memory），
+      它们就只有标题证据——这正是 `classification_status=pending` 的来源之一。
+
+    每次请求都重算一遍而不是缓存：40 条分类是纯字符串匹配，实测毫秒级；
+    缓存反而会因为 catalog 被别处改写而读到旧值。
+    """
+    import json
+
+    from app.topics import assign_all
+
+    try:
+        catalog = json.loads((BASE_DIR / "data" / "catalog.json").read_text(encoding="utf-8"))
+        structures = json.loads(
+            (BASE_DIR / "data" / "meta" / "structures.json").read_text(encoding="utf-8")
+        )
+    except Exception as exc:  # noqa: BLE001 - 分类是锦上添花，不能拖垮论文库
+        logger.warning("分类数据读取失败，本次不展示分类：%s", exc, exc_info=True)
+        return {}
+    rows = [
+        {**item, "abstract": (structures.get(item.get("file") or "") or {}).get("abstract", "")}
+        for item in catalog
+    ]
+    try:
+        tagged = assign_all(rows)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("论文分类失败，本次不展示分类：%s", exc, exc_info=True)
+        return {}
+    return {r.get("file") or "": r for r in tagged if r.get("file")}
+
+
+@app.get("/papers/classify", summary="论文按研究领域/方向分组")
+async def papers_classify() -> dict:
+    """两级分类的分组视图，给论文库的「领域 / 方向」筛选用。
+
+    与 `/papers/topics` 的区别：
+      - `/papers/topics` 按**引用图谱社区**分组（谁引用谁聚类）；
+      - 这里按**论文主旨分类**分组（标题+摘要关键词规则判定）。
+    两个口径在本库实测差异很大（社区 vs 分类 NMI 仅 0.25），不要混用。
+
+    只读聚合，不调大模型。返回结构：
+        {total, fields: [{name, count, subtopics: [{name, count}], papers: [...]}]}
+    """
+    return await run_in_threadpool(_classify_payload)
+
+
+def _classify_payload() -> dict:
+    """`/papers/classify` 的实际取数逻辑。"""
+    from app.paper_topics import build_topics
+    from app.topics import TOPICS
+
+    classes = _classification_index()
+    titles: dict[str, str] = {}
+    try:
+        for group in build_topics([p.filename for p in list_papers()]):
+            for paper in group.papers:
+                titles[paper.filename] = paper.display_title or paper.title
+    except Exception as exc:  # noqa: BLE001 - 拿不到标题就用文件名兜底
+        logger.warning("分类分组取标题失败，用文件名代替：%s", exc)
+
+    order = {name: i for i, name in enumerate(TOPICS)}
+    buckets: dict[str, dict] = {}
+    for row in classes.values():
+        field = row.get("primary_topic") or "待归类"
+        sub = row.get("subtopic") or "待归类"
+        bucket = buckets.setdefault(
+            field, {"name": field, "count": 0, "subtopics": {}, "papers": []}
+        )
+        bucket["count"] += 1
+        bucket["subtopics"][sub] = bucket["subtopics"].get(sub, 0) + 1
+        bucket["papers"].append(
+            {
+                "filename": row.get("file") or "",
+                "title": titles.get(row.get("file") or "") or row.get("file") or "",
+                "subtopic": sub,
+                "status": row.get("classification_status") or "",
+                "confidence": row.get("confidence") or "",
+            }
+        )
+    fields = []
+    for name in sorted(buckets, key=lambda k: (order.get(k, 999), -buckets[k]["count"])):
+        b = buckets[name]
+        b["papers"].sort(key=lambda p: (p["subtopic"], p["filename"]))
+        fields.append(
+            {
+                "name": name,
+                "count": b["count"],
+                "subtopics": [
+                    {"name": s, "count": c}
+                    for s, c in sorted(b["subtopics"].items(), key=lambda kv: (-kv[1], kv[0]))
+                ],
+                "papers": b["papers"],
+            }
+        )
+    return {"total": sum(f["count"] for f in fields), "fields": fields}
 
 
 def _topic_index(filenames: list[str]):

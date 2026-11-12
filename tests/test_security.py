@@ -191,8 +191,23 @@ def test_all_routes_are_classified():
     assert not uncovered, f"未登记路由：{sorted(uncovered)}"
 
 
+def test_static_route_wins_over_wildcard_of_the_other_class():
+    """字面量路由不能被另一类的通配模板抢走归属。
+
+    回归的真实 bug：resolve_template 原来直接遍历 frozenset(ADMIN|PUBLIC)，
+    顺序由字符串哈希决定。/papers/classify（公开）与 /papers/{paper_id}
+    （管理员，删论文）两段数相同，先撞上谁就归谁——在没配 ADMIN_TOKEN 的
+    机器上表现为 GET /papers/classify 返回 503「管理功能未配置」。
+    """
+    assert main_mod.resolve_template("/papers/classify") == "/papers/classify"
+    assert main_mod.resolve_template("/papers/topics") == "/papers/topics"
+    assert main_mod.resolve_template("/papers/files") == "/papers/files"
+    # 真删除接口仍然归管理，没被上面的规则误伤
+    assert main_mod.resolve_template("/papers/abc123") == "/papers/{paper_id}"
+
+
 def test_route_count_matches_design():
-    """路由总数锁定在 48（含 /admin/login、/admin/logout）。
+    """路由总数锁定在 49（含 /admin/login、/admin/logout）。
 
     这条测试的意义：将来加接口时数量会变，强制开发者停下来想一次
     「这个新接口该归哪一类」，而不是默默多一个公开接口。
@@ -201,9 +216,11 @@ def test_route_count_matches_design():
     2026-11-12：46 → 48，新增 /writing/claim-english 与
     /paper/{filename}/claim-locate（写作页「读原文」定位引用出处），
     两条都归公开：阅读器是匿名可用的，把写作正文的引用句送去定位不该要口令。
+    2026-11-12：48 → 49，新增 /papers/classify（论文库按研究领域/方向筛选），
+    归公开：与 /papers、/papers/topics 同属论文库的只读聚合接口。
     """
     templates = main_mod._route_templates()
-    assert len(templates) == 48, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
+    assert len(templates) == 49, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
 
 
 def test_admin_paths_have_no_public_overlap():

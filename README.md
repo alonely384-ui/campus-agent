@@ -22,7 +22,7 @@
 | 1.2 | 单篇 / 多篇 RAG 问答，**逐句带原文出处与页码**，检索不到就拒答 | 对话 |
 | 1.3 | PDF 阅读器：章节树、引用双向跳转、版式识别、划词翻译、**悬停翻译**、整篇翻译、中英对比 | 阅读页 |
 | 1.4 | 基于 arXiv/GitHub 的文献发现与推荐，支持反馈调优与定时刷新 | 发现 |
-| 1.5 | 引用关系图谱（PageRank / 中介中心性 / 社区发现）、基石节点识别、自动综述、前沿探索 | 论文分析 |
+| 1.5 | 引用关系图谱（PageRank / 中介中心性 / 引用关系簇划分）、基石节点识别、自动综述、前沿探索 | 论文分析 |
 | 1.6 | 写作助手：框架生成（**候选集约束，结构性杜绝编造引用**）、架构图（Mermaid / Graphviz / TikZ，**也能直接从库内 PDF 里取已有架构图**，图从哪来能指回原文页码）、CSV 数据可视化（ECharts 配置 + 导出的 PNG + 自动英文 caption）、中译英 | 写作助手 |
 
 ## 创新点
@@ -213,12 +213,13 @@ docker run -p 8000:8000 --env-file .env research-agent
 
 | 项 | 数据 | 复现命令 |
 |---|---|---|
-| 接口数 | **45 个 path / 47 个操作** | `GET /openapi.json` |
-| 代码规模 | `app/` 16912 · `web/` 9355 · `tests/` 9031 · `scripts/` 5100 行，合计 **40398 行** | `scripts/count_lines.py` |
-| 自动化测试 | **621 passed** | `pytest tests -q` |
+| 接口数 | **48 个 path / 50 个操作** | `GET /openapi.json` |
+| 代码规模 | `app/` 20396 · `web/` 9969 · `tests/` 11666 · `scripts/` 5100 行，合计 **47131 行** | `scripts/count_lines.py` |
+| 自动化测试 | **801 passed** | `pytest tests -q` |
 | 静态检查 | 全绿 | `ruff check .` |
 | 论文库 | 39 篇 / 1971 页（含 541 页专著）/ 961 章节 / 282 表 / 287 图 | `data/meta/structures.json` |
-| 引用图谱 | 36 逻辑节点 / 189 边 / 3 社区 / 4234 条参考文献条目 | `data/meta/citation-graph.json` |
+| 引用图谱 | 38 逻辑节点 / 210 边 / 4 引用关系簇 / 3681 条参考文献条目 / 41 条索引记录（唯一文件 40，逻辑论文 38） | `data/meta/citation-graph.json` |
+| 论文分类 | 40 条目录记录：classified 38 / manual 1 / pending 1 | `GET /papers/classify` |
 
 ## 技术决策记录
 
@@ -249,8 +250,8 @@ docker run -p 8000:8000 --env-file .env research-agent
 - [x] 细粒度解析：章节树、表格、图、公式、参考文献（39 篇实测 961 个章节）
 - [x] PDF 阅读器：章节树、引用双向跳转、版式识别、划词/悬停/整篇翻译、中英对比
 - [x] 文献发现：arXiv + GitHub 检索、推荐反馈、定时刷新
-- [x] 引用图谱：副本合并、三层匹配、PageRank、中介中心性、社区发现、基石节点
-- [x] 论文分析：自动综述、前沿探索（新近且被引 / 跨社区桥接 / 未被接入）
+- [x] 引用图谱：副本合并、三层匹配、PageRank、中介中心性、引用关系簇划分、基石节点
+- [x] 论文分析：自动综述、前沿探索（新近且被引 / 跨簇桥接 / 未被接入）
 - [x] 写作助手：框架生成（候选集约束）、三种架构图渲染、CSV 可视化、中译英
 - [x] 多智能体四角色时间线 + 状态回显
 - [x] 真实浏览器端到端验证（六个模块全走一遍，控制台除 favicon 外无报错）
@@ -352,7 +353,7 @@ campus-agent/
 │   ├── structure.py       # 细粒度解析：章节/表格/图/公式/参考文献
 │   ├── ocr.py             # 扫描件 OCR（RapidOCR）
 │   ├── layout.py          # 版式识别（单栏/双栏）
-│   ├── graph.py           # ⭐ 引用图谱：去重/三层匹配/PageRank/社区/综述/前沿
+│   ├── graph.py           # ⭐ 引用图谱：去重/三层匹配/PageRank/引用关系簇/综述/前沿
 │   ├── writing.py         # ⭐ 写作助手：候选集约束的框架生成
 │   ├── diagram.py         # 架构图：Mermaid / Graphviz / TikZ
 │   ├── chart.py           # CSV → ECharts + matplotlib
@@ -403,7 +404,7 @@ campus-agent/
 | pdf.js | 前端 PDF 渲染 | Apache-2.0 |
 | ECharts | 图表可视化 | Apache-2.0 |
 | numpy / pandas / matplotlib | 数据处理与图表导出 | BSD-3-Clause |
-| networkx | ~~图算法（PageRank / 社区发现）~~ **已于 2026-10 移除** | BSD-3-Clause |
+| networkx | ~~图算法（PageRank / 引用关系簇划分）~~ **已于 2026-10 移除** | BSD-3-Clause |
 | sse-starlette | SSE 流式输出 | MIT |
 | pytest / ruff | 测试与静态检查 | MIT |
 

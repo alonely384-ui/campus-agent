@@ -101,6 +101,8 @@
     }
     .topic-chip__n { font-size: 11.5px; opacity: .75; }
     .topic-chip.on .topic-chip__n { opacity: .9; }
+    /* 待归类：虚线边框，提示这是"证据不足"的兜底桶，不是分类结论 */
+    .topic-chip--pending { border-style: dashed; color: var(--text-muted); }
 
     /* ---- 标题行：真实标题 + 文件名副信息 ---- */
     .lib-row .titlewrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -197,9 +199,17 @@
           <div class="dup-box" id="dupBox" hidden></div>
         </div>
 
-        <!-- 按引用图谱社区分的主题筛选；「全部」始终在最前 -->
+        <!-- 按引用关系簇分的筛选；「全部」始终在最前。簇只反映「被谁引用」，不是研究领域 -->
         <div class="topic-bar" id="topicBar">
-          <span class="topic-bar__label">主题</span>
+          <span class="topic-bar__label">引用关系簇</span>
+        </div>
+
+        <!-- 按论文主旨分类的研究领域 / 方向筛选（app/topics.py，与上面的引用关系簇是两回事） -->
+        <div class="topic-bar" id="fieldBar">
+          <span class="topic-bar__label">领域</span>
+        </div>
+        <div class="topic-bar" id="subBar" hidden>
+          <span class="topic-bar__label">方向</span>
         </div>
 
         <div class="lib-list" id="libList"></div>
@@ -217,6 +227,8 @@
     const upStatusEl = document.getElementById('upStatus');
     const dupBoxEl = document.getElementById('dupBox');
     const topicBarEl = document.getElementById('topicBar');
+    const fieldBarEl = document.getElementById('fieldBar');
+    const subBarEl = document.getElementById('subBar');
     const pagerEl = document.getElementById('pager');
 
     // 分页与主题筛选状态。page 从 1 开始；topicId 用 'all' 表示不筛。
@@ -226,6 +238,12 @@
     let curPage = 1;
     let curTopic = ALL_TOPIC;
     let topicCounts = [];      // [{id, name, count}]，来自 /papers/topics
+
+    // 主旨分类筛选（与主题是两个口径）：curField 是领域名，curSub 是方向名
+    const ALL_FIELD = '';
+    let curField = ALL_FIELD;
+    let curSub = '';
+    let fieldData = null;      // /papers/classify 的结果
 
     let pendingDups = [];
 
@@ -241,10 +259,151 @@
       return Math.round(n / 1024) + ' KB';
     }
 
+    /** 去重后的论文数：同名文件（同一篇的不同副本）只算一篇。
+     *
+     * 列表行数是「记录数」，含副本；筛选条上的 chip 数字是「论文数」，去重。
+     * 两个口径都真实存在，混在一根筛选条上会让人以为数字对不上 ——
+     * 所以筛选条统一用去重口径，并在列表上方保留「共 N 篇」的记录数。
+     */
+    function countPapers(list) {
+      return new Set(list.map(p => p.filename)).size;
+    }
+
     /** 当前主题下的论文。'all' 就是全部。 */
     function papersOfTopic() {
-      if (curTopic === ALL_TOPIC) return allPapers;
-      return allPapers.filter(p => String(p.topic_id) === String(curTopic));
+      let list = allPapers;
+      if (curTopic !== ALL_TOPIC) list = list.filter(p => String(p.topic_id) === String(curTopic));
+      // 领域 / 方向是叠加在主题之上的第二个筛子
+      if (curField) list = list.filter(p => p.primary_topic === curField);
+      if (curSub) list = list.filter(p => p.subtopic === curSub);
+      return list;
+    }
+
+    /** 当前领域下还有哪些方向（从 /papers/classify 的 subtopics 取，带篇数）。
+     *
+     * 「待归类」这类兜底桶只有一个"待归类"方向，再挂一条方向栏毫无信息量，
+     * 而且会让用户以为它也是一个正经研究方向 —— 所以这里过滤掉只有 1 条
+     * 且与领域同名的方向。
+     */
+    function subtopicsOfField() {
+      if (!curField || !fieldData) return [];
+      const f = (fieldData.fields || []).find(x => x.name === curField);
+      if (!f) return [];
+      const subs = f.subtopics || [];
+      const real = subs.filter(x => !(x.name === f.name && subs.length === 1));
+      return real;
+    }
+
+    /** 领域筛选条：全部 / 各研究领域（带篇数）。 */
+    function renderFieldBar() {
+      if (!fieldBarEl) return;
+      const fields = (fieldData && fieldData.fields) || [];
+      const parts = ['<span class="topic-bar__label">领域</span>'];
+      parts.push(
+        `<button class="topic-chip${curField === ALL_FIELD ? ' on' : ''}" data-field="">全部` +
+        `<span class="topic-chip__n">${(fieldData && fieldData.total) || allPapers.length}</span></button>`
+      );
+      fields.forEach(f => {
+        const on = curField === f.name ? ' on' : '';
+        // 待归类的 chip 用虚线边框提示"这是兜底不是分类结论"
+        const extra = f.name === '待归类' ? ' topic-chip--pending' : '';
+        parts.push(
+          `<button class="topic-chip${on}${extra}" data-field="${escapeHtml(f.name)}" ` +
+          `title="${escapeHtml(f.name)}">${escapeHtml(f.name)}` +
+          `<span class="topic-chip__n">${f.count}</span></button>`
+        );
+      });
+      fieldBarEl.innerHTML = parts.join('');
+      fieldBarEl.querySelectorAll('[data-field]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = btn.dataset.field;
+          if (next === curField) return;
+          curField = next;
+          curSub = '';            // 换领域就清空方向，否则会筛出空列表
+          curPage = 1;
+          renderFieldBar();
+          renderSubBar();
+          renderTopicBar();
+          renderList();
+          renderPager();
+          scrollToListTop();
+        });
+      });
+    }
+
+    /** 方向筛选条：选了领域才出现。 */
+    function renderSubBar() {
+      if (!subBarEl) return;
+      const subs = subtopicsOfField();
+      if (!subs.length) {
+        subBarEl.hidden = true;
+        subBarEl.innerHTML = '';
+        return;
+      }
+      subBarEl.hidden = false;
+      const parts = ['<span class="topic-bar__label">方向</span>'];
+      parts.push(
+        `<button class="topic-chip${curSub === '' ? ' on' : ''}" data-sub="">全部` +
+        `<span class="topic-chip__n">${subs.reduce((s, x) => s + x.count, 0)}</span></button>`
+      );
+      subs.forEach(s => {
+        const on = curSub === s.name ? ' on' : '';
+        parts.push(
+          `<button class="topic-chip${on}" data-sub="${escapeHtml(s.name)}" ` +
+          `title="${escapeHtml(s.name)}">${escapeHtml(s.name)}` +
+          `<span class="topic-chip__n">${s.count}</span></button>`
+        );
+      });
+      subBarEl.innerHTML = parts.join('');
+      subBarEl.querySelectorAll('[data-sub]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = btn.dataset.sub;
+          if (next === curSub) return;
+          curSub = next;
+          curPage = 1;
+          renderSubBar();
+          renderTopicBar();
+          renderList();
+          renderPager();
+          scrollToListTop();
+        });
+      });
+    }
+
+    function renderTopicBar() {
+      const total = countPapers(allPapers);
+      const list = papersOfTopic();
+      const parts = ['<span class="topic-bar__label">主题</span>'];
+      const allOn = curTopic === ALL_TOPIC ? ' on' : '';
+      parts.push(
+        `<button class="topic-chip${allOn}" data-topic="${ALL_TOPIC}">全部` +
+        `<span class="topic-chip__n">${total}</span></button>`
+      );
+      topicCounts.forEach(t => {
+        const on = String(curTopic) === String(t.id) ? ' on' : '';
+        // 计数按去重口径现算，不用后端下发的记录数（含副本，会和领域条对不上）
+        const n = countPapers(allPapers.filter(p => String(p.topic_id) === String(t.id)));
+        parts.push(
+          `<button class="topic-chip${on}" data-topic="${escapeHtml(t.id)}" ` +
+          `title="${escapeHtml(t.name)}">${escapeHtml(t.name)}` +
+          `<span class="topic-chip__n">${n}</span></button>`
+        );
+      });
+      // 把当前筛选后的篇数也摆出来，避免"筛完只剩几篇"被误以为论文丢了
+      parts.push(`<span class="topic-chip__n" style="margin-left:4px">当前 ${countPapers(list)} 篇</span>`);
+      topicBarEl.innerHTML = parts.join('');
+      topicBarEl.querySelectorAll('[data-topic]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = btn.dataset.topic;
+          if (next === curTopic) return;
+          curTopic = next;
+          curPage = 1;              // 换主题回到第一页
+          renderTopicBar();
+          renderList();
+          renderPager();
+          scrollToListTop();
+        });
+      });
     }
 
     /**
@@ -293,40 +452,6 @@
       if (curPage < 1) curPage = 1;
       const start = (curPage - 1) * pageSize;
       return list.slice(start, start + pageSize);
-    }
-
-    function renderTopicBar() {
-      const total = allPapers.length;
-      const list = papersOfTopic();
-      const parts = ['<span class="topic-bar__label">主题</span>'];
-      const allOn = curTopic === ALL_TOPIC ? ' on' : '';
-      parts.push(
-        `<button class="topic-chip${allOn}" data-topic="${ALL_TOPIC}">全部` +
-        `<span class="topic-chip__n">${total}</span></button>`
-      );
-      topicCounts.forEach(t => {
-        const on = String(curTopic) === String(t.id) ? ' on' : '';
-        parts.push(
-          `<button class="topic-chip${on}" data-topic="${escapeHtml(t.id)}" ` +
-          `title="${escapeHtml(t.name)}">${escapeHtml(t.name)}` +
-          `<span class="topic-chip__n">${t.count}</span></button>`
-        );
-      });
-      // 把当前筛选后的篇数也摆出来，避免"筛完只剩几篇"被误以为论文丢了
-      parts.push(`<span class="topic-chip__n" style="margin-left:4px">当前 ${list.length} 篇</span>`);
-      topicBarEl.innerHTML = parts.join('');
-      topicBarEl.querySelectorAll('[data-topic]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const next = btn.dataset.topic;
-          if (next === curTopic) return;
-          curTopic = next;
-          curPage = 1;              // 换主题回到第一页
-          renderTopicBar();
-          renderList();
-          renderPager();
-          scrollToListTop();
-        });
-      });
     }
 
     /** 页码序列：1 … 4 5 [6] 7 8 … 10。页数少时全列。 */
@@ -419,7 +544,11 @@
         return;
       }
       if (!list.length) {
-        libListEl.innerHTML = '<div class="empty">这个主题下没有论文，换一个主题看看。</div>';
+        // 三个筛子（主题 / 领域 / 方向）都可能筛空，提示要跟着当前口径说
+        const scope = curField
+          ? (curSub ? `「${curField} · ${curSub}」方向` : `「${curField}」领域`)
+          : '这个主题';
+        libListEl.innerHTML = `<div class="empty">${escapeHtml(scope)}下没有论文，换一个看看。</div>`;
         pagerEl.innerHTML = '';
         return;
       }
@@ -478,13 +607,17 @@
       libListEl.innerHTML = '<div class="empty">加载中…</div>';
       pagerEl.innerHTML = '';
       try {
-        // 两个接口并行：/papers 给每篇的完整信息，/papers/topics 给主题名与每页条数
-        const [d, t] = await Promise.all([
+        // 三个接口并行：/papers 给每篇的完整信息，/papers/topics 给引用关系簇名与每页条数，
+        // /papers/classify 给研究领域/方向两级分组
+        const [d, t, c] = await Promise.all([
           fetch('/papers').then(r => r.json()),
           fetch('/papers/topics').then(r => r.json()).catch(() => null),
+          fetch('/papers/classify').then(r => r.json()).catch(() => null),
         ]);
         allPapers = d.papers || [];
-        libCountEl.textContent = `共 ${allPapers.length} 篇`;
+        libCountEl.textContent = `共 ${countPapers(allPapers)} 篇` +
+          (allPapers.length !== countPapers(allPapers)
+            ? `（${allPapers.length} 条记录，含重复副本）` : '');
 
         if (t && Array.isArray(t.topics)) {
           if (t.page_size) pageSize = t.page_size;
@@ -494,11 +627,23 @@
           topicCounts = [];
           upStatusEl.textContent = '主题分组暂不可用，已按全部论文展示。';
         }
+        // 分类接口挂了同样只影响筛选条，不影响列表
+        fieldData = (c && Array.isArray(c.fields)) ? c : null;
+        if (!fieldData) {
+          curField = ALL_FIELD;
+          curSub = '';
+        } else if (curField && !fieldData.fields.some(f => f.name === curField)) {
+          curField = ALL_FIELD;
+          curSub = '';
+          curPage = 1;
+        }
         // 上次选的主题可能因为删论文没了，回落到「全部」
         if (curTopic !== ALL_TOPIC && !topicCounts.some(x => String(x.id) === String(curTopic))) {
           curTopic = ALL_TOPIC;
           curPage = 1;
         }
+        renderFieldBar();
+        renderSubBar();
         renderTopicBar();
         renderList();
         renderPager();

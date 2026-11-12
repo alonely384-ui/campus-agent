@@ -29,6 +29,13 @@
     .spacer { flex: 1; }
 
     #hint { font-size: 12px; color: var(--text-muted); max-width: 640px; line-height: 1.5; }
+    /* 社区口径的限定说明：这条必须显眼，否则读者会把"颜色"当成研究领域分类 */
+    #commNote {
+      margin-top: 6px; padding: 6px 10px; border-radius: 8px;
+      background: var(--bg-surface-alt, #f5f6f8);
+      border-left: 3px solid var(--warning, #d97706);
+      font-size: 11.5px; color: var(--text-muted); max-width: 680px; line-height: 1.55;
+    }
 
     main { flex: 1; display: flex; min-height: 0; }
     #chart { flex: 1; min-width: 0; }
@@ -163,15 +170,22 @@
     <h1>🕸 论文引用关系图谱</h1>
     <span class="pill" id="pillNodes">节点 <b>–</b></span>
     <span class="pill" id="pillEdges">引用边 <b>–</b></span>
-    <span class="pill" id="pillComm">社区 <b>–</b></span>
+    <span class="pill" id="pillComm">引用关系簇 <b>–</b></span>
     <span class="spacer"></span>
     <div id="legend"></div>
   </header>
 
   <div id="hint">
     点节点看详情，右侧可跳阅读页 ·
-    <b>节点大小</b>=被库内论文引用次数 · <b>颜色</b>=社区（引文紧密相连的一簇）·
+    <b>节点大小</b>=被库内论文引用次数 ·
+    <b>颜色</b>=引用关系簇（只反映"被谁引用"，不是研究领域分类）·
     <b>金边</b>=PageRank 前 3（被"有影响力的论文"引用，不等于被引最多）
+  </div>
+
+  <div id="commNote">
+    引用关系簇=按引用关系聚出来的分组，<b>不是研究子领域</b>：实测模块度 Q=0.1508 与随机图无显著差异
+    （200 次随机基线，实际 Q 只超过 76/200 次），且去掉 18 条模糊边后成员几乎完全洗牌（ARI=0.0009）。
+    要看研究主题请去论文库按"领域/方向"筛选。
   </div>
 
   <div id="csBar">
@@ -249,7 +263,7 @@ function render(data) {
 
   $('pillNodes').innerHTML = `节点 <b>${allNodes.length}</b>`;
   $('pillEdges').innerHTML = `引用边 <b>${allEdges.length}</b>`;
-  $('pillComm').innerHTML = `社区 <b>${sum.community_count || 0}</b>`;
+  $('pillComm').innerHTML = `引用关系簇 <b>${sum.community_count || 0}</b>`;
 
   renderLegend(sum);
   renderCornerstones(data);
@@ -487,7 +501,7 @@ function render(data) {
 
   if (iso.length) {
     // 孤立论文不再删：放进右下角独立小框，与主图区隔。
-    // 之前这里只写一行"已从图中省略"，而顶部社区统计照旧把社区 3 算作 1 篇，
+    // 之前这里只写一行"已从图中省略"，而顶部引用关系簇统计照旧把簇 3 算作 1 篇，
     // 于是画面和数字对不上——现在点进去一样能看详情。
     $('isoBox').innerHTML =
       `<div class="iso-hd">孤立论文（与库内其它论文无引用往来）</div>` +
@@ -520,7 +534,7 @@ function renderLegend(sum) {
   $('legend').innerHTML = comms.map(c => `
     <span class="legend-item">
       <span class="legend-dot" style="background:${COMMS[c.id % COMMS.length]}"></span>
-      社区 ${c.id + 1}（${c.size}）
+      引用关系簇 ${c.id + 1}（${c.size}）
     </span>`).join('');
 }
 
@@ -535,7 +549,7 @@ const ROLE_LABEL = {
 };
 const ROLE_TIP = {
   cornerstone: '入度和桥接度都很高：既是这个方向的地基，又是不同方向之间的连接点',
-  hub: '被库内大量论文引用，但主要局限在自己所属的社区内部',
+  hub: '被库内大量论文引用，但主要局限在自己所属的引用关系簇内部',
   bridge: '中介中心性高：不同研究方向的论文靠它连在一起',
   foundation: 'PageRank 极高但直接引用不多：典型是通用方法论文，被"被别人引用的论文"反复引用',
   fringe: '在库内很少被引用：属于新工作或尚未被本库覆盖的方向',
@@ -644,7 +658,7 @@ function showDetail(n) {
     <div class="d-row"><span>引用了库内</span><span>${num(n.cites, 0)} 篇</span></div>
     <div class="d-row"><span>PageRank</span><span>${fixed(n.pagerank, 0, 4)}</span></div>
     <div class="d-row"><span>中介中心性</span><span>${fixed(n.betweenness, 0, 3)}</span></div>
-    <div class="d-row"><span>所属社区</span><span>社区 ${num(n.community, 0) + 1}</span></div>
+    <div class="d-row"><span>所属引用关系簇</span><span>簇 ${num(n.community, 0) + 1}</span></div>
     <div class="d-row"><span>PDF 副本</span><span>${num(n.copy_count, 0)} 份</span></div>
 
     <a class="d-open ${n.reader_url ? '' : 'disabled'}" target="_blank"

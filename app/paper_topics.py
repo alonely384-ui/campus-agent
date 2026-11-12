@@ -1,8 +1,11 @@
 """论文库的主题分组与标题聚合（只读）。
 
 设计要点：
-1. 主题来自引用图谱已有的社区划分（`app/graph.py` 算好写进图的 JSON），
+1. 分组来自引用图谱已有的引用关系簇划分（`app/graph.py` 算好写进图的 JSON），
    这里只做「文件名 → 图节点 → community」的映射，不重新聚类。
+   ⚠ 它只反映引用网络结构，**不是研究领域分类**；研究领域请用 `app/topics.py`。
+   实测本库的簇划分不通过随机基线检验（Q=0.1508，200 次随机图里只超过 76 次），
+   所以界面上叫「引用关系簇」，不叫研究子领域。
 2. 标题优先取论文解析结果 `data/meta/structures.json` 里的 title 字段，
    不调大模型、不花额度；解析失败的论文退回文件名。
 3. 「短标题」策略：标题本身不超过 `TITLE_MAX_CHARS` 就直接用；
@@ -40,13 +43,13 @@ PAGE_SIZE = 12
 OTHER_TOPIC_ID = -1
 OTHER_TOPIC_NAME = "其他"
 
-# 社区编号 → 可读主题名。图谱只给出数字社区号，名字是按各社区代表论文人工归纳的：
+# 引用关系簇编号 → 可读名。图谱只给出数字簇号，名字是按各簇被引最多的论文人工归纳的：
 #   0 号：Attention / BERT / GPT / LLaMA / Scaling Law 一路，偏基础模型与架构
 #   1 号：Codex / InstructGPT / Llama2 / PPO / DPO / DeepSeek-R1，偏对齐与落地
 #   2 号：Understanding Deep Learning，单独一本教材
-# 切分标准（reference 里写了，方便答辩时解释）：看每篇论文的「任务目标」——
-#   目标是把模型/架构本身做得更好 → 0 号；目标是让已有模型听话、好用、省钱 → 1 号。
-# 名字取不出来就退回「主题 N」，不会因为名字而丢数据。
+# ⚠ 这两个名字是**人工归纳的展示标签**，不是算法输出，也不代表簇就是研究领域。
+#   簇划分本身不通过随机基线检验，界面上已标注为「引用关系簇」。
+# 名字取不出来就退回「簇 N」，不会因为名字而丢数据。
 COMMUNITY_NAMES: dict[int, str] = {
     0: "基础模型与架构",
     1: "对齐与推理落地",
@@ -91,6 +94,11 @@ def _graph_path() -> Path:
     return _META_DIR / "citation-graph.json"
 
 
+def _catalog_path() -> Path:
+    """上传索引。它比 structures.json 多两篇：PDF 解析失败、没进解析结果的那些。"""
+    return DATA_DIR / "catalog.json"
+
+
 def _load_json(path: Path) -> dict:
     if not path.exists():
         logger.warning("主题分组：%s 不存在，相关论文会归入「%s」", path, OTHER_TOPIC_NAME)
@@ -104,17 +112,46 @@ def _load_json(path: Path) -> dict:
 
 
 def load_titles() -> dict[str, str]:
-    """文件名 → 解析出的真实标题。title 为空的不收，让调用方退回文件名。"""
-    raw = _load_json(_structures_path())
-    if not isinstance(raw, dict):
-        return {}
+    """文件名 → 真实标题。解析结果优先，解析失败的用上传索引里的标题补。
+
+    为什么要补这一层：`structures.json` 只收「PDF 解析成功」的论文，实测 40 条
+    catalog 里有 2 条（`2312.00752.pdf` Mamba、`1610.08613.pdf` Active Memory）
+    因为 PDF 文本层为空而没有解析结果。只读 structures.json 时它们的标题会退化成
+    「未解析出标题（文件名）」，可 catalog.json 里明明存着完整标题——
+    论文是用户上传时带进来的元数据，不该因为解析失败就丢掉。
+
+    优先级：structures.json（解析出的、最权威）> catalog.json（上传时的元数据）。
+    两边都没有才让调用方退回文件名。
+    """
     titles: dict[str, str] = {}
-    for filename, item in raw.items():
-        if not isinstance(item, dict):
-            continue
-        title = str(item.get("title") or "").strip()
-        if title:
-            titles[filename] = title
+
+    # 第一层：解析结果
+    raw = _load_json(_structures_path())
+    if isinstance(raw, dict):
+        for filename, item in raw.items():
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            if title:
+                titles[filename] = title
+
+    # 第二层：上传索引兜底（只补第一层没拿到的，不覆盖）
+    catalog = _load_json(_catalog_path())
+    if isinstance(catalog, list):
+        filled = []
+        for item in catalog:
+            if not isinstance(item, dict):
+                continue
+            filename = str(item.get("file") or "").strip()
+            if not filename or filename in titles:
+                continue
+            title = str(item.get("title") or "").strip()
+            if title:
+                titles[filename] = title
+                filled.append(filename)
+        if filled:
+            logger.info("标题：%d 篇从上传索引补齐（%s）", len(filled), ", ".join(sorted(filled)))
+
     return titles
 
 

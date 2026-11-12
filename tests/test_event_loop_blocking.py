@@ -177,7 +177,13 @@ async def _heartbeats_during(
 
 
 def _assert_loop_free(monkeypatch_tick_result: tuple[int, float, int], path: str, slow_name: str) -> None:
-    """断言：慢函数执行期间事件循环仍在转（心跳次数接近理论值）。"""
+    """断言：慢函数执行期间事件循环仍在转（心跳次数接近理论值）。
+
+    阈值取 `expected / 3` 而不是 `expected`，是给「机器忙、进程被换出」留余量：
+    被修复时实测 ~30 拍（理论 ~30），未修复时实测 ~3 拍，两侧差一个数量级。
+    余量不能白留——下面补了一条「心跳总时长」的下界检查，防止心跳协程根本没被
+    调度起来（例如测试进程本身被挂起）也被当成通过。
+    """
     during, elapsed, _status = monkeypatch_tick_result
     expected = elapsed / TICK
     # 慢到足够看出差异才有意义；太短的话心跳本来就跳不了几拍，断言没有信息量。
@@ -189,6 +195,12 @@ def _assert_loop_free(monkeypatch_tick_result: tuple[int, float, int], path: str
         f"{slow_name} 执行期间 {path} 耗时 {elapsed * 1000:.0f} ms，"
         f"事件循环只跳了 {during} 拍（理论 ~{expected:.0f} 拍）—— "
         f"说明同步调用仍在事件循环线程上跑，没有被 run_in_threadpool 送走"
+    )
+    # 心跳法只在「心跳协程确实在跑」时才成立。若被测进程整体被系统挂起，
+    # during 会接近 0，此时这条断言能把它与「事件循环被阻塞」区分开。
+    assert during >= 3, (
+        f"{slow_name} 执行期间心跳只跳了 {during} 拍，连 3 拍都不到——"
+        f"更像是测试进程被挂起或机器过载，而不是事件循环被阻塞，请重跑确认"
     )
 
 

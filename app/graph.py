@@ -22,6 +22,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import logging
 import os
 import re
 import unicodedata
@@ -29,6 +30,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -36,7 +38,9 @@ from typing import Any
 import fitz
 
 from app.papers import PAPERS_DIR, arxiv_id_of, load_structures, sync_index
-from app.structure import _is_ref_entry, _lines, _norm
+from app.structure import _body_size, _is_ref_entry, _lines, _norm
+
+logger = logging.getLogger(__name__)
 
 # ---------------- 可配置阈值 ----------------
 # 标题近似匹配的接受门槛：≥ 这个分数才自动连边
@@ -58,13 +62,37 @@ _TAIL_NOISE_RE = re.compile(
     re.IGNORECASE,
 )
 # 标题末尾的出处尾巴："Attention is all you need. In NIPS" / "Layer normalization. arXiv preprint"
+#
+# ⚠ 2026-11-12 修边界：原来的 `[.\s,]+(?:In|At|...)` 会让 `In` 匹配到正文里的普通单词。
+# 实测 `Least-to-most prompting enables complex reasoning in large language models`
+# 被剥成 `Least-to-most prompting enables complex reasoning`——相似度从 0.7552 掉到 0.4915。
+# 现在 In/At 必须紧跟句点/分号或位于串首，会议缩写仍允许任意分隔符。
 _TAIL_VENUE_RE = re.compile(
-    r"(?:[.\s,]+(?:In|At|Proc\.|Proceedings|arXiv|CoRR|ICLR|ICML|NIPS|NeurIPS|ACL|EMNLP"
+    r"(?:(?:^|[,.;]\s+)(?:In|At)\b|[.\s,]+(?:Proc\.|Proceedings|arXiv|CoRR|ICLR|ICML|NIPS|NeurIPS|ACL|EMNLP"
     r"|CVPR|IEEE|ACM|LREC|NAACL|TACL|IJCAI|AAAI|PMLR|JMLR|ECCV|ICCV|WSDM|SIGDIAL|CoNLL|Coling"
-    r"|Interspeech|KDD|WWW|USENIX|OSDI|SOSP|MLSys|TMLR)"
-    r"(?:\s+[\w&.,\-/:]+){0,8}\s*)$",
+    r"|Interspeech|KDD|WWW|USENIX|OSDI|SOSP|MLSys|TMLR))"
+    r"(?:\s+[\w&.,\-/:]+){0,8}\s*$",
     re.IGNORECASE,
 )
+# 期刊卷页尾缀：". J. Mach. Learn. Res., 21(140):1–67" / "Journal of Machine Learning Research, 21:1-67"
+# 只认已知期刊全称与缩写，不做通用模式——通用模式会把正文里的数字碰掉。
+_TAIL_JOURNAL_RE = re.compile(
+    r"\.\s*(?:J\.\s*Mach\.\s*Learn\.\s*Res\.|Journal of Machine Learning Research|JMLR)"
+    r",?\s*\d+(?:\s*\(\s*\d+\s*\))?\s*:\s*[\d\-–]+\.?\s*$",
+    re.IGNORECASE,
+)
+# 标题后多出来的出版形态词：". Advances" / ". Preprint" / ". Technical Report"
+# ⚠ 必须认可带全称的写法：实测 DPO 那条是
+#   ". Advances in Neural Information Processing Systems, 36"
+# 只写 Advances 剥不掉它，相似度卡在 0.75，真引用反而被挡在门外。
+_TAIL_FORM_RE = re.compile(
+    r"\.\s*(?:(?:Advances|Proceedings)\s+in\s+[A-Za-z ]+?|Advances|Proceedings|Preprint|Technical Report)"
+    r"(?:,\s*\d+)?\s*$",
+    re.IGNORECASE,
+)
+# PDF 断行留下的连字符：「tril- lion」→「trillion」。要求两侧都是字母，
+# 且连字符后只隔一个空格——正常复合词（Least-to-most）中间没有空格，不会被碰到。
+_HYPHEN_BREAK_RE = re.compile(r"([A-Za-z])-\s+(?=[a-z])")
 
 GRAPH_DIR = PAPERS_DIR.parent / "meta"
 CACHE_FILE = GRAPH_DIR / "citation-graph.json"
@@ -89,6 +117,12 @@ class LogicalNode:
     arxiv_id: str
     copies: list[str] = field(default_factory=list)
     abstract_head: str = ""
+    # 去重用的内部键，不参与序列化：[(文件名, 规范化标题), ...]
+    _copy_keys: list[tuple[str, str]] = field(default_factory=list, repr=False, compare=False)
+    # 每个副本对应的上传索引 paper_id（与 copies 一一对应，仅内部用）。
+    # 磁盘上的 PDF 可能存成 `<paper_id>.pdf`（上传走 save_paper 时就是这个名字），
+    # 而 index.json 里记的是上传时的原名——两者对不上就得靠 paper_id 回退定位。
+    _copy_paper_ids: list[str] = field(default_factory=list, repr=False, compare=False)
 
     @property
     def copy_count(self) -> int:
@@ -119,6 +153,32 @@ def norm_arxiv(text: str) -> str:
     if match:
         return match.group(1)
     return ""
+
+
+def strip_title_noise(text: str) -> str:
+    """保守剥离标题里的已知噪声，只做能证明安全的四件事。
+
+    2026-11-12 引入。动机：review 队列里有一批条目其实和库内某篇是同一篇论文，
+    只因尾部带期刊卷页、出版形态词，或 PDF 断行留了连字符，相似度卡在 0.75~0.92。
+    离线测试集（26 条真重复 + 18 条已匹配 + 3 条已知错配 + 22 条降阈值错配）实测：
+    恢复 8 组真重复，误相似 0 提升。
+
+    只处理这些，**不做**通用后缀裁剪、不做停用词删除：
+    1. 期刊卷页尾缀（只认 JMLR 全称与缩写，不做通用模式）；
+    2. 尾部出版形态词（Advances / Preprint / Technical Report 等）；
+    3. 出处尾巴（In NIPS / arXiv preprint，边界已收紧到句点后）；
+    4. PDF 断行连字符（"tril- lion" → "trillion"）。
+
+    其余类型一律不动，继续留在人工核验队列——「不能安全判定就不强求匹配」。
+    """
+    if not text:
+        return ""
+    out = _TAIL_JOURNAL_RE.sub("", text)
+    out = _TAIL_FORM_RE.sub("", out)
+    out = _TAIL_VENUE_RE.sub("", out)
+    out = _TAIL_NOISE_RE.sub("", out)
+    out = _HYPHEN_BREAK_RE.sub(r"\1", out)
+    return out.strip(" .,-")
 
 
 def _fuzzy_key(text: str) -> str:
@@ -644,9 +704,13 @@ def _locale_text(left: dict, right: dict, page_cols: dict) -> bool:
     return right["y"] <= left["y"] + LINE_TOL
 
 
-def _merge_column_splits(lines: list[dict], start: int) -> list[str]:
-    """按版面坐标把被分栏切断的条目重新接回去，返回"行文本"序列。"""
-    body = lines[start + 1:]
+def _merge_column_splits(lines: list[dict], start: int, stop: int | None = None) -> list[str]:
+    """按版面坐标把被分栏切断的条目重新接回去，返回"行文本"序列。
+
+    `stop` 是参考文献区的结束行（附录/致谢标题），它及其之后的内容一律不参与，
+    避免把附录正文当文献条目（Mamba 实测会多出 57 条正文残片）。
+    """
+    body = lines[start + 1:] if stop is None else lines[start + 1:stop]
     page_cols: dict[int, float] = {}
     for ln in body:
         # 每页第一行通常顶格（双栏里就是左栏起点），这里只记录"本页出现过的最小横坐标"
@@ -667,6 +731,125 @@ def _end_of_reference_section(text: str) -> bool:
     if re.match(r"^(?:[a-z]\.?|\d+\.?)\s*appendi", low):
         return True
     return low in ("acknowledgments", "acknowledgements", "acknowledgements.")
+
+
+# ---------------- 参考文献区结束行识别 ----------------
+# 为什么需要这一层：
+#     原来的 `_end_of_reference_section` 只认三种写法：整行等于 "appendix"、
+#     以章节号开头且紧跟 "appendi"、整行是致谢。而大量论文的附录标题是
+#     "A / Discussion: Selection Mechanism"（Mamba，编号与标题分两行）或
+#     "A. Experimental Settings"（编号与标题同行），既不含 appendix 也不是致谢，
+#     于是参考文献区一路读进附录正文。实测 Mamba 因此多抽 57 条正文残片。
+#
+# 判据只用 PDF 结构证据（字号 / 加粗 / 编号形态 / 行间关系），不看内容猜测：
+#     1. 字号门槛取"References 之前正文的众数字号"，即 _body_size 的口径。
+#        不能取全文众数 —— CLIP 的正文 10.1pt、全局众数却可能落在别处。
+#     2. 页眉要被排除：CLIP / Whisper / Codex 每页顶部都有加粗 9pt 的论文标题，
+#        它比正文小，所以判据是"不小于正文字号"，不是"加粗就算标题"。
+#     3. 附录标题有两种排法，都要认：
+#        - 编号独占一行，标题在下一行（Mamba：'A' + 'Discussion: Selection Mechanism'）；
+#        - 编号与标题同行（'A. Experimental Settings'）。
+#     4. 仍需保留原有三种显式写法（整行 appendix / 致谢），它们的字号不一定更大。
+_APPENDIX_HEADING_RE = re.compile(
+    r"^(?:appendix\b|appendices\b|supplementary material\b|supplementary\b)",
+    re.IGNORECASE,
+)
+_NUMBERED_HEADING_RE = re.compile(
+    r"^(?:[A-Z]\.?|\d{1,2}\.|\d{1,2}(?:\.\d{1,2}){1,2}|[A-Z]\.\d{1,2}(?:\.\d{1,2})?)$"
+)
+_HEADING_WITH_TITLE_RE = re.compile(
+    r"^((?:[A-Z]|\d{1,2})(?:\.\d{1,2}){0,2}\.?)\s+\S"
+)
+# `P. Minervini. Are we done with mmlu?` / `H. Face. Open r1: ...` 这类是作者缩写开头的
+# 参考文献条目，形态上和 `A. Experimental Settings` 一样，必须单独排掉：
+# 章节编号后面跟的是"标题"（大写词开头、不含句读），作者缩写后面跟的是人名（含小写）。
+_HEADING_FONT_RATIO = 1.10   # 标题字号至少比正文大 10%（实测 14.3 / 12.0 / 10.9 对 10.0~10.1）
+
+
+def _reference_stop_index(lines: list[dict], start: int) -> int | None:
+    """返回参考文献区的结束行号（该行属于附录/致谢，不再是文献条目）。
+
+    `lines` 是全篇的版面行，`start` 是 "References" 标题所在行。
+    找不到明确的结束行时返回 None，表示"一直读到文档末尾"。
+    """
+    if not lines or start is None or start >= len(lines):
+        return None
+    body_size = _body_size(lines[:start]) or 0.0
+    if not body_size:
+        return None
+    floor = body_size * _HEADING_FONT_RATIO
+    for i in range(start + 1, len(lines)):
+        ln = lines[i]
+        text = _norm(ln["text"])
+        if not text:
+            continue
+        if _end_of_reference_section(text):
+            return i
+        # 页眉/正文行的字号达不到标题门槛，直接跳过
+        if ln.get("size", 0.0) < floor:
+            continue
+        low = text.lower()
+        if _APPENDIX_HEADING_RE.match(low) and len(text) <= 90:
+            return i
+        if _NUMBERED_HEADING_RE.match(text):
+            # 编号独占一行：下一行必须是同页、非编号、像标题的短行
+            for j in range(i + 1, min(i + 3, len(lines))):
+                nxt = lines[j]
+                nt = _norm(nxt["text"])
+                if not nt:
+                    continue
+                if nxt["page"] != ln["page"] or _NUMBERED_HEADING_RE.match(nt):
+                    break
+                if _looks_like_heading(nt):
+                    return i
+                break
+            continue
+        if _HEADING_WITH_TITLE_RE.match(text) and _looks_like_heading(text):
+            return i
+    return None
+
+
+_AUTHOR_INITIALS_RE = re.compile(
+    r"^(?:[A-Z]\.\s*)+[A-Z][A-Za-z\-]{1,}(?:\s*,\s*(?:[A-Z]\.\s*)*[A-Z][A-Za-z\-]{1,})*\s*[,.]"
+)
+# 人名列举的另一种断法："Minervini. Are we done with mmlu?" / "Face. Open r1: ..."：
+# 也就是"首词加句点后紧跟一个非虚词"，而标题里极少这么写。
+_STOPWORD_AFTER_PERIOD = frozenset(
+    "a an the in on of for with and or to at as by from its our their we this that these those".split()
+)
+
+
+def _looks_like_heading(text: str) -> bool:
+    """短行、首字符是字母、不带参考文献编号 —— 只有这样的行才可能是标题。"""
+    if not (2 <= len(text) <= 90):
+        return False
+    if not text[0].isalpha():
+        return False
+    if re.match(r"^\[\s*\d", text) or re.match(r"^\d+\.\s", text):
+        return False
+    # "et al., 2020." / "arXiv preprint arXiv:..." 这类是文献条目而不是标题
+    if "arXiv:" in text or re.search(r"\bet al\.", text):
+        return False
+    # 剥掉章节编号，剩下的部分才是"标题正文"或"作者串"
+    m = _HEADING_WITH_TITLE_RE.match(text)
+    bare = text[m.end(1):].strip() if m else text
+    # "P. Minervini. Are we done ..." → 缩写点 + 姓氏 + 标点 → 作者行
+    if _AUTHOR_INITIALS_RE.match(bare):
+        return False
+    # "Minervini. Are ..." / "Face. Open r1: ..." → 首词加句点后紧跟非虚词 → 作者行
+    word = re.match(r"([A-Z][A-Za-z\-]{1,})\.\s+([A-Za-z]+)", bare)
+    if word and word.group(2).lower() not in _STOPWORD_AFTER_PERIOD:
+        return False
+    # 多作者串："Z. Gou, Z. Shao, Y. Gong, ..." / "A. Harlap, D. Narayanan, ..." /
+    # "J. Wang, and M. Gupta. CUTLASS, ..."：逗号多、且至少两处出现"缩写点 + 大写开头的姓"。
+    # 注意用**原始整行**判断：剥掉编号会丢掉第一个缩写（"J. Wang" 变成 "Wang"），
+    # 导致"作者串"漏判、把文献条目当成附录起点。
+    if text.count(",") >= 2:
+        spaced = len(re.findall(r"[A-Z]{1,2}\.\s+[A-Z][A-Za-z\-]{2,}", text))     # "A. Harlap"
+        joined = len(re.findall(r"[A-Z][A-Za-z\-]{2,},\s+(?:[A-Z]\.\s*){1,2}", text))  # "Hendrycks, D."
+        if spaced >= 2 or joined >= 2:
+            return False
+    return True
 
 
 # ---------------- 权威库查询层（arXiv / Crossref） ----------------
@@ -862,7 +1045,8 @@ def extract_references(pdf_path: Path, max_pages: int = 90) -> list[ReferenceEnt
                         break
         if start is None:
             return entries
-        raw_lines = _merge_column_splits(lines, start)
+        stop = _reference_stop_index(lines, start)
+        raw_lines = _merge_column_splits(lines, start, stop)
         texts: list[str] = []
         # 条目被拆成两行时，前半截照样以 "A. " 结尾，会被 _is_ref_entry 当成新条目开头。
         # 这里记住"上一条是不是断的"，断了就把这一行并回去（中文文献很少断行，语法也兼容）。
@@ -966,7 +1150,7 @@ def _strip_compact_reference(title: str, body: str) -> str:
 def build_nodes(rows: list[dict[str, Any]]) -> tuple[list[LogicalNode], list[dict]]:
     """把库里的文件归并成逻辑节点。
 
-    rows: [{filename, title, arxiv_id, abstract}]
+    rows: [{filename, title, arxiv_id, abstract, paper_id?}]
     返回 (节点列表, 合并决定记录)。合并决定里带"依据"，方便答辩时解释为什么是 3 合 1。
     """
     nodes: list[LogicalNode] = []
@@ -978,6 +1162,7 @@ def build_nodes(rows: list[dict[str, Any]]) -> tuple[list[LogicalNode], list[dic
     ordered = sorted(rows, key=lambda r: (not r.get("title"), not r.get("arxiv_id")))
     for row in ordered:
         filename = row["filename"]
+        paper_id = str(row.get("paper_id") or "")
         title = str(row.get("title") or "")
         aid = norm_arxiv(row.get("arxiv_id") or "") or norm_arxiv(filename)
         key = norm_title(title)
@@ -1003,7 +1188,15 @@ def build_nodes(rows: list[dict[str, Any]]) -> tuple[list[LogicalNode], list[dic
             if not target.title and title:
                 target.title = title
 
-        target.copies.append(filename)
+        # ⚠ 文件名相同不等于同一个文件。实测 index.json 里 1706.03762v7.pdf 有两条记录
+        # （paper_id 一条是内容哈希 bdfaa68d8984、一条是文件名式 1706.03762v7，同一份文件被
+        # 索引了两次）。旧代码无脑 append，导致 copies 出现同名两项、copy_count 虚高。
+        # 这里按"文件名 + 标题"去重：真正的不同版本标题不同，仍然各算一份。
+        copy_key = (filename, key)
+        if not any((c, norm_title(t)) == copy_key for c, t in target._copy_keys):
+            target.copies.append(filename)
+            target._copy_keys.append(copy_key)
+            target._copy_paper_ids.append(paper_id)
         if aid:
             by_arxiv.setdefault(aid, target)
         if key:
@@ -1024,6 +1217,70 @@ class Edge:
     reference_arxiv_id: str
 
 
+def _title_exact_target(
+    title: str,
+    by_title: dict[str, list[LogicalNode]],
+    node_bags: dict[str, frozenset[str]],
+    declared_arxiv_id: str = "",
+) -> tuple[LogicalNode | None, str]:
+    """标题层"精确命中"的唯一判据：去空白键相等 **且** 词袋相等。
+
+    返回 (节点, 失败原因)。失败原因取值：
+        ""            命中唯一目标
+        "empty"       没有可用标题
+        "no_candidate" 去空白键上没有候选
+        "bag_mismatch" 键相等但词袋不等（`A Survey of X` vs `Survey of X`）
+        "ambiguous"   同键上有多个词袋相等的候选，无法确定唯一目标
+        "id_conflict" 候选自身有另一个明确的 arXiv ID，禁止豁免
+
+    抽成函数是因为它现在有两个调用点：第 2 层正常匹配，
+    以及"arXiv ID 不在库内"时的豁免判断。两处必须同口径，
+    否则豁免口子会开得比正常匹配还宽。
+
+    第三轮新增三条约束（**只收窄、不放宽**）：
+    1. `declared_arxiv_id` 非空时，命中节点若自己也录了 arXiv 号且与它不同 → 拒绝豁免。
+       第二轮终审实测：19 次豁免恰好全部落在「候选没有编号」的节点上，这是运气不是设计；
+       一旦给 BERT/GPT/LLaMA 补上编号，Qwen 式的错边会立刻复活。
+    2. 同标题键上出现多个词袋相等的候选 → 判歧义，不连边。
+       旧实现用 `dict[key] = node`，同键多个候选时静默保留最后一个。
+    3. 返回值带上原因，调用方据此区分「本地未收录」与「ID 明确冲突」。
+    """
+    if not title:
+        return None, "empty"
+    key = _fuzzy_key(title)
+    cands = by_title.get(key) or []
+    if not cands:
+        return None, "no_candidate"
+    bag = _title_bag(title)
+    matched = [c for c in cands if node_bags.get(c.canonical_id) == bag]
+    if not matched:
+        return None, "bag_mismatch"
+    if len(matched) > 1:
+        return None, "ambiguous"
+    cand = matched[0]
+    if declared_arxiv_id and cand.arxiv_id and cand.arxiv_id != declared_arxiv_id:
+        return None, "id_conflict"
+    return cand, ""
+
+
+def conflict_exempt_hint(title: str, by_title: dict[str, list[LogicalNode]]) -> str:
+    """给待核验队列写一句"库里那篇是谁"，方便人工判断到底是冲突还是没收录。"""
+    cands = by_title.get(_fuzzy_key(title)) or []
+    if not cands:
+        return "(无)"
+    return "、".join(f"{c.canonical_id}({c.arxiv_id})" for c in cands[:2])
+
+
+# 豁免失败原因 → 给人工看的中文解释
+_EXEMPT_REASON_TEXT = {
+    "empty": "条目标题为空",
+    "no_candidate": "库里没有同标题论文",
+    "bag_mismatch": "标题键相似但词袋不同，不是同一篇",
+    "ambiguous": "库内有多篇同标题论文，无法确定唯一目标",
+    "id_conflict": "库内有同标题论文但编号不同",
+}
+
+
 def match_references(
     nodes: list[LogicalNode],
     refs_by_node: dict[str, list[ReferenceEntry]],
@@ -1038,17 +1295,48 @@ def match_references(
 
     第 2 层口径已经收紧：单靠"去空白标题相等"不算，还要求**带词袋校验**
     （词多重集完全相等）。否则 `A Survey of X` 和 `Survey of X` 会被去空白后认成同一篇。
+
+    **arXiv ID 明确冲突时不进标题层**：条目里有 arXiv 号、但库里没有这篇，
+    说明作者指的就是另一篇论文，身份已经确定，标题再像也不能自动连边
+    （历史上的 Qwen 2309.16609 → Qwen2.5 2412.15115 就是这么连错的）。
+    这类条目只进待人工核验队列，计 `stats["arxiv_conflict"]`。
     """
     by_arxiv = {n.arxiv_id: n for n in nodes if n.arxiv_id}
-    by_title = {_fuzzy_key(n.title): n for n in nodes if _fuzzy_key(n.title)}
+    by_title: dict[str, list[LogicalNode]] = defaultdict(list)
+    for n in nodes:
+        key = _fuzzy_key(n.title)
+        if key:
+            by_title[key].append(n)
     node_bags = {n.canonical_id: _title_bag(n.title) for n in nodes}
     node_titles = [(n, _fuzzy_key(n.title)) for n in nodes]
 
     edges: dict[tuple[str, str], Edge] = {}
     edge_suspicious: dict[tuple[str, str], bool] = {}
     reviews: list[dict] = []
-    stats = {"entries_total": 0, "matched_arxiv": 0, "matched_exact": 0,
-             "matched_fuzzy": 0, "unmatched": 0, "review": 0, "self_reference": 0}
+    # ---- 统计字段口径（第三轮明确，务必保持互斥）----
+    # 下面的 `matched_* / unmatched / arxiv_conflict / arxiv_absent / self_reference`
+    # 是**互斥桶**：每条参考文献条目恰好落进其中一个，和 == entries_total。
+    # `review` 不是桶，它是"进了人工核验队列的条目数"这个跨桶视图，
+    # 由 review_arxiv_conflict + review_title_fuzzy 组成，**不参与上面的守恒**。
+    # 第二轮终审就是因为 review 与 arxiv_conflict 重复计入，导致各类之和
+    # 比 entries_total 多出整整 1242，看上去像丢了一千多条文献。
+    stats = {
+        "entries_total": 0,          # 处理过的参考文献条目总数
+        "matched_arxiv": 0,          # 桶：引用声明 ID 命中库内节点
+        "matched_exact": 0,          # 桶：标题精确命中（含下面的豁免）
+        "matched_fuzzy": 0,          # 桶：标题近似且 ≥ fuzzy_accept
+        "unmatched": 0,              # 桶：没有任何候选达到 fuzzy_review
+        "arxiv_conflict": 0,         # 桶：本地有同标题候选，但候选自身是另一个明确 ID
+        "arxiv_absent": 0,           # 桶：引用 ID 不在库内，且没有可确认的同标题候选
+        "self_reference": 0,         # 桶：引用的是本论文自己
+        "review": 0,                 # 视图：待人工核验队列条数（= 下列两项之和）
+        "review_arxiv_conflict": 0,  # 视图：队列中 ID 冲突/缺失类
+        "review_title_fuzzy": 0,     # 视图：队列中标题近似类
+        "arxiv_conflict_exempt": 0,  # 计数：豁免连边的次数（同时已计入 matched_exact）
+        "title_noise_stripped": 0,   # 计数：做过标题规范化的条目数（与桶无关）
+    }
+    # arxiv_conflict 的判定理由计数，便于解释"本地未收录"与"真冲突"的比例
+    conflict_reasons: dict[str, int] = defaultdict(int)
 
     for src_id, entries in refs_by_node.items():
         for ref in entries:
@@ -1056,23 +1344,40 @@ def match_references(
             dst: LogicalNode | None = None
             method, score = "", 0.0
             suspicious = False
+            # 比较用标题：剥掉已知尾噪后再配对。原 ref.title 保持不变，
+            # 因为 edges 里要留"原文长什么样"以便人工复核。
+            cmp_title = strip_title_noise(ref.title)
+            if cmp_title != ref.title:
+                stats["title_noise_stripped"] += 1
 
             # 自引陷阱：参考文献里是"这篇论文自己"（综述、勘误常见）时，
             # 第 2 层会精确命中源节点本身，随后在 502 行被静默丢弃。
             # 不在这里拦住的话，它会掉进第 3 层模糊匹配，撞上库内另一篇标题相近的论文——
             # 那就是凭空造边了。所以：精确命中源节点自身 → 视为自引，直接记账跳过。
             self_hit = False
-            if ref.title:
-                _k = _fuzzy_key(ref.title)
-                _hit = by_title.get(_k)
+            if cmp_title:
+                _k = _fuzzy_key(cmp_title)
+                _bag = _title_bag(cmp_title)
                 # 只有"标题键相同 + 词袋相同"才算命中自身；否则 A/B 只差一个冠词的两篇论文
                 # 会在去空白键上误相等，把真正该碰撞的模糊匹配提前吞掉。
-                self_hit = _hit is not None and _hit.canonical_id == src_id and (
-                    node_bags[src_id] == _title_bag(ref.title)
+                self_hit = any(
+                    c.canonical_id == src_id and node_bags[src_id] == _bag
+                    for c in by_title.get(_k, ())
                 )
             if self_hit:
                 stats["self_reference"] += 1
                 continue
+
+            # arXiv ID 明确冲突 = 条目写了编号、但库里没有这篇。这时身份已由编号确定，
+            # 不能再靠标题去猜（Qwen 2309.16609 → Qwen2.5 2412.15115 就是这么连错的）。
+            # 唯一例外：库内节点自己压根没有编号，只是没录入 —— 见 _title_exact_target()：
+            # 候选自身有另一个明确 ID 时**不再豁免**（第三轮 P2）。
+            conflict_exempt = None
+            exempt_reason = ""
+            if ref.arxiv_id and ref.arxiv_id not in by_arxiv:
+                conflict_exempt, exempt_reason = _title_exact_target(
+                    cmp_title, by_title, node_bags, ref.arxiv_id
+                )
 
             if ref.arxiv_id and ref.arxiv_id in by_arxiv:
                 dst = by_arxiv[ref.arxiv_id]
@@ -1083,23 +1388,75 @@ def match_references(
                 suspicious = (not ref.title and len(ref.raw) > 160) or (
                     bool(ref.title) and "OpenAI" in ref.title and "Scaling human" in ref.title
                 )
-            elif ref.title:
+            elif ref.arxiv_id and ref.arxiv_id not in by_arxiv and conflict_exempt is None:
+                # 条目声明了 arXiv 号而库里没有，且标题也无法与库内节点精确对上。
+                # 只进待人工核验队列，**不进模糊层**。
+                #
+                # 第三轮把它们拆成两个互斥桶（第二轮终审指出旧代码把两者混成
+                # 一个 arxiv_conflict，于是"本地没收录"被误读成"ID 明确冲突"）：
+                #   arxiv_conflict —— 库里确实有同标题候选，但候选自己录的是另一个 ID。
+                #                     这才是真的身份冲突。
+                #   arxiv_absent   —— 库里根本没有这篇（标题对不上 / 候选没编号但对不齐）。
+                #                     绝大多数是"引了库外论文"，不是冲突。
+                if exempt_reason == "id_conflict":
+                    stats["arxiv_conflict"] += 1
+                    bucket = "arxiv_conflict"
+                    reason = (
+                        f"条目声明的 arXiv {ref.arxiv_id} 不在库内；"
+                        f"库内有同标题候选 {conflict_exempt_hint(cmp_title, by_title)}，"
+                        "但候选自身是另一个 arXiv 编号，身份冲突，禁止连边"
+                    )
+                else:
+                    stats["arxiv_absent"] += 1
+                    bucket = "arxiv_absent"
+                    reason = (
+                        f"条目声明的 arXiv {ref.arxiv_id} 不在库内，"
+                        f"且没有可确认的同标题候选（{_EXEMPT_REASON_TEXT.get(exempt_reason, exempt_reason)}）"
+                    )
+                conflict_reasons[exempt_reason or "no_candidate"] += 1
+                stats["review_arxiv_conflict"] += 1
+                reviews.append(
+                    {
+                        "source": src_id,
+                        "candidate": "",
+                        "candidate_title": "",
+                        "match_method": bucket,
+                        "match_score": 0.0,
+                        "reference_title": ref.title or ref.raw[:120],
+                        "reference_arxiv_id": ref.arxiv_id,
+                        "reason": reason,
+                    }
+                )
+                continue
+            elif conflict_exempt is not None and conflict_exempt.canonical_id != src_id:
+                # 豁免：库内节点自身没有 arXiv 号（扫描件 / ACL 版 PDF），
+                # 条目里的编号"库里没有"只是没录入，不是冲突。标题已被 _title_exact_target
+                # 以最严口径（去空白相等 + 词袋相等）确认，才放行成 title_exact。
+                dst = conflict_exempt
+                method, score = "title_exact", 1.0
+                stats["matched_exact"] += 1
+                stats["arxiv_conflict_exempt"] += 1
+            elif cmp_title:
                 # ⚠ 第 2 层"精确匹配"必须先比词袋。原因：norm_title 把空格一起删了，
                 # `A Survey of Large Language Models` → `asurveyof…`，和 `Survey of…` 的 `surveyof…`
                 # 只差首字母，直接当 key 相等会误连两篇不同论文。
                 # 所以：去空白相等 **且** 词袋相等，才判 title_exact。
-                cand = by_title.get(_fuzzy_key(ref.title))
-                if cand is not None and node_bags[cand.canonical_id] == _title_bag(ref.title):
-                    dst = cand
+                cands = by_title.get(_fuzzy_key(cmp_title)) or []
+                hit = next(
+                    (c for c in cands if node_bags[c.canonical_id] == _title_bag(cmp_title)),
+                    None,
+                )
+                if hit is not None:
+                    dst = hit
                     method, score = "title_exact", 1.0
                     stats["matched_exact"] += 1
-                elif cand is not None and cand.canonical_id == src_id:
+                elif cands and all(c.canonical_id == src_id for c in cands):
                     # 命中源论文自己（自引），到此为止，不许掉进模糊层
                     stats["self_reference"] += 1
                     continue
                 else:
                     best_node, best_score = None, 0.0
-                    ref_key = _fuzzy_key(ref.title)
+                    ref_key = _fuzzy_key(cmp_title)
                     for node, key in node_titles:
                         if not key or node.canonical_id == src_id:
                             continue
@@ -1123,6 +1480,11 @@ def match_references(
                             }
                         )
                         stats["review"] += 1
+                        stats["review_title_fuzzy"] += 1
+                        # 待核验条目的**最终处理结果**是"未自动连边"，所以落在 unmatched 桶。
+                        # 旧代码这里直接 continue，既不进 matched_* 也不进 unmatched，
+                        # 于是各类之和比 entries_total 少的正好是队列条数（实测 24 条）。
+                        stats["unmatched"] += 1
                         continue
                     else:
                         stats["unmatched"] += 1
@@ -1148,6 +1510,19 @@ def match_references(
                 )
                 edge_suspicious[key] = suspicious
     stats["review"] = len(reviews)
+    # 守恒自检：互斥桶之和必须等于 entries_total。多了说明某条被计了两次，
+    # 少了说明有分支忘了记账——两种都是真 bug，直接炸出来，别让错误数字流到报告里。
+    buckets = (
+        "matched_arxiv", "matched_exact", "matched_fuzzy",
+        "unmatched", "arxiv_conflict", "arxiv_absent", "self_reference",
+    )
+    accounted = sum(stats[b] for b in buckets)
+    if accounted != stats["entries_total"]:
+        raise RuntimeError(
+            f"引用匹配统计不守恒：桶之和 {accounted} != entries_total {stats['entries_total']}；"
+            f"明细 {({b: stats[b] for b in buckets})}"
+        )
+    stats["conflict_reasons"] = dict(conflict_reasons)
     return list(edges.values()), reviews, stats
 
 
@@ -1173,6 +1548,98 @@ def pagerank(edges: list[Edge], node_ids: list[str], damping: float = 0.85, roun
     return {k: round(v / total, 6) for k, v in rank.items()}
 
 
+def _sha12_of(path: Path) -> str:
+    """文件内容 sha256 的前 12 位。与 app/papers.py 生成 paper_id 的规则一致。"""
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()[:12]
+
+
+def _resolve_copy_path(filename: str, paper_id: str = "") -> Path | None:
+    """把一个副本（index.json 里的一条记录）定位到磁盘上真实存在的 PDF。
+
+    为什么需要这一层：`save_paper()` 落盘用的是 `<paper_id>.pdf`，而 index.json 里
+    存的是上传时的原始文件名。对「样例库直接拷进来的」那批文件两者相同，看不出问题；
+    但只要走过一次上传（paper_id 是内容哈希），两者就分叉了——实测 3 个文件是这种：
+
+        1610.08613.pdf       -> 磁盘上只有 57567c72c96f.pdf
+        2312.00752.pdf       -> 磁盘上只有 adf70ed1803c.pdf
+        1706.03762v7.pdf     -> 还多一份 bdfaa68d8984.pdf
+
+    旧代码直接拼 `PAPERS_DIR / filename`，文件不存在时 `extract_references()` 静默
+    返回空列表，于是这两篇的参考文献从来没有进过图谱（Mamba 丢 165 条、Active Memory
+    丢 30 条），而日志里一个字都没有。
+
+    回退顺序与 `app/papers.py` 的 `paper_path()` / `_text_for()` / `sync_index()`
+    完全一致（先 `<paper_id>.pdf`，再原名），不引入新的匹配规则。
+
+    **回退必须校验内容身份**：只有 `sha256(文件内容)[:12] == paper_id` 才认。
+    这不是"文件名像就算"，而是"内容哈希对得上才算"——标题或文件名相似一律不作数。
+
+    返回 None 表示定位失败，调用方必须记 `missing_copy_files` 并告警，
+    不能把"文件找不到"当成"这篇论文没有参考文献"。
+    """
+    primary = PAPERS_DIR / filename
+    if primary.exists():
+        return primary
+    if not paper_id:
+        return None
+    for suffix in (".pdf", Path(filename).suffix.lower() or ".pdf"):
+        candidate = PAPERS_DIR / f"{paper_id}{suffix}"
+        if not candidate.exists():
+            continue
+        try:
+            if _sha12_of(candidate) == paper_id:
+                return candidate
+            logger.warning(
+                "副本回退候选 %s 的内容哈希与 paper_id %s 不符，拒绝使用", candidate.name, paper_id
+            )
+        except OSError as exc:
+            logger.warning("副本回退候选 %s 读取失败: %s", candidate.name, exc)
+    return None
+
+
+def _ref_dedup_key(entry: ReferenceEntry) -> tuple[str, str] | None:
+    """一条参考文献的去重键；返回 None 表示"不该参与去重"。
+
+    键只由 (标题, arXiv 编号) 组成，所以：
+      - 同一篇论文换不同写法被抽两次 → 键相同 → 合并，这是要去掉的重复；
+      - 标题碰巧相同但 arXiv 编号不同 → 键不同 → 两条都留，不合并不同论文。
+
+    标题为空的条目一律返回 None，不参与去重。空标题不代表"同一篇"，它更多是
+    抽取器没切干净留下的正文残片（实测 Mamba 的 35 条空标题就是附录正文），
+    把它们按 ("", "") 互相合并等于丢掉 34 段互不相同的内容。
+    """
+    title = (entry.title or "").strip()
+    if not title:
+        return None
+    return (title, entry.arxiv_id or "")
+
+
+def _merge_node_references(
+    copies: list[str], loader: Callable[[str], list[ReferenceEntry]]
+) -> list[ReferenceEntry]:
+    """把一个逻辑节点所有副本的参考文献合并成一份，去掉真重复。
+
+    原文的写法是每个副本开头用已有 merged 重建 seen，但 append 之后从不更新它，
+    于是同一个副本内部压根不去重（seen 始终等于副本开始时的快照）。这里改成
+    追加成功就记进 seen，跨副本与副本内都能挡重复。
+    """
+    merged: list[ReferenceEntry] = []
+    seen: set[tuple[str, str]] = set()
+    for copy in copies:
+        for entry in loader(copy):
+            key = _ref_dedup_key(entry)
+            if key is not None:
+                if key in seen:
+                    continue
+                seen.add(key)
+            merged.append(entry)
+    return merged
+
+
 def build_graph(
     rows: list[dict[str, Any]] | None = None,
     refs_loader=None,
@@ -1192,6 +1659,7 @@ def build_graph(
             rows.append(
                 {
                     "filename": paper.filename,
+                    "paper_id": paper.paper_id,
                     "title": str(meta.get("title") or ""),
                     "arxiv_id": arxiv_id_of(paper.filename, str(meta.get("title") or "")),
                     "abstract": str(meta.get("abstract") or ""),
@@ -1199,18 +1667,45 @@ def build_graph(
             )
     nodes, decisions = build_nodes(rows)
 
-    loader = refs_loader or (lambda name: extract_references(PAPERS_DIR / name))
+    # ---- 参考文献读取：先把每个副本定位到真实文件，再抽条目 ----
+    # 旧实现直接 `extract_references(PAPERS_DIR / name)`，文件不存在时
+    # `extract_references` 静默返回空列表，于是"文件丢了"和"这篇没参考文献"
+    # 在数据上完全无法区分（第二轮终审发现 Mamba / Active Memory 就这么被吞掉）。
+    # 现在：定位失败 -> 记 missing_copy_files + 告警，绝不静默当零条。
+    missing_copy_files: list[dict[str, str]] = []
+    resolved: dict[str, Path | None] = {}
+    for node in nodes:
+        paper_ids = list(node._copy_paper_ids) + [""] * (
+            len(node.copies) - len(node._copy_paper_ids)
+        )
+        for copy, pid in zip(node.copies, paper_ids, strict=False):
+            path = _resolve_copy_path(copy, pid)
+            resolved[copy] = path
+            if path is None:
+                missing_copy_files.append(
+                    {"filename": copy, "paper_id": pid, "node": node.canonical_id, "title": node.title}
+                )
+                logger.warning(
+                    "副本文件定位失败：node=%s filename=%s paper_id=%s，该副本的参考文献不会进图谱",
+                    node.canonical_id,
+                    copy,
+                    pid or "(空)",
+                )
+
+    if refs_loader is not None:
+        def loader(name: str) -> list[ReferenceEntry]:
+            return refs_loader(name)
+    else:
+        def loader(name: str) -> list[ReferenceEntry]:
+            path = resolved.get(name) or _resolve_copy_path(name)
+            if path is None:  # 已在上面记入 missing_copy_files，这里不重复告警
+                return []
+            return extract_references(path)
+
     refs_by_node: dict[str, list[ReferenceEntry]] = {}
     ref_files: dict[str, str] = {}
     for node in nodes:
-        merged: list[ReferenceEntry] = []
-        for copy in node.copies:  # 副本的参考文献合并，条目按 (标题,编号) 去重
-            seen = {(e.title, e.arxiv_id) for e in merged}
-            for entry in loader(copy):
-                if (entry.title, entry.arxiv_id) in seen:
-                    continue
-                merged.append(entry)
-        refs_by_node[node.canonical_id] = merged
+        refs_by_node[node.canonical_id] = _merge_node_references(node.copies, loader)
         ref_files[node.canonical_id] = node.copies[0]
 
     edges, reviews, stats = match_references(nodes, refs_by_node, fuzzy_accept, fuzzy_review)
@@ -1245,15 +1740,29 @@ def build_graph(
     node_payload.sort(key=lambda x: (-x["cited_by_count"], -x["pagerank"]))
 
     isolated = [n for n in node_payload if n["isolated"]]
+    # 四个口径必须分开算，不能互相顶替：
+    #   文件记录数 = rows 条数（index.json 里的记录，同一文件可能被索引两次）
+    #   唯一文件数 = 不同文件名个数
+    #   逻辑论文数 = 合并后的节点数
+    #   合并副本数 = 记录数 - 逻辑论文数（含"同名重复记录"这种并不到新节点的部分）
+    record_count = len(rows)
+    unique_files = len({str(r["filename"]) for r in rows})
     summary = {
-        "file_count": len(rows),                                    # 合并前：PDF 文件数
-        "node_count": len(node_payload),                            # 合并后：逻辑节点数
+        "file_count": record_count,                                 # 文件记录数（index.json 记录条数）
+        "unique_file_count": unique_files,                          # 唯一文件数（按文件名去重）
+        "node_count": len(node_payload),                            # 逻辑论文数（合并后）
         "edge_count": len(edges),                                   # 引用边数
         "cited_paper_count": len({e.target for e in edges}),        # 被引用论文数（去重）
         "citing_paper_count": len({e.source for e in edges}),       # 不同引用论文数（去重）
         "isolated_count": len(isolated),
-        "merged_away": len(rows) - len(node_payload),               # 被并掉的文件数
+        "merged_away": record_count - len(node_payload),            # 被并掉的记录数
+        "duplicate_records": record_count - unique_files,           # 同名重复记录数（本来就不该算两篇）
+        "merged_copies": unique_files - len(node_payload),          # 真正被并掉的不同文件数
         "multi_copy_nodes": [n["canonical_id"] for n in node_payload if n["copy_count"] > 1],
+        # 文件定位失败的副本：这些副本的参考文献没能进图谱。以前它们是静默的零引用，
+        # 现在必须显式暴露，否则"某篇论文一个边都没有"永远查不出是数据问题还是真的有。
+        "missing_copy_files": missing_copy_files,
+        "missing_copy_count": len(missing_copy_files),
         "refs": stats,
         "thresholds": {"fuzzy_accept": fuzzy_accept, "fuzzy_review": fuzzy_review},
     }
@@ -1359,7 +1868,9 @@ def cornerstone_scores(nodes: list[dict], edges: list[dict]) -> dict[str, dict[s
 
 
 def betweenness(nodes: list[dict], edges: list[dict]) -> dict[str, float]:
-    """中介中心性：连接两个社区的"桥论文"分数高。无向图口径（引文方向对"桥"不重要）。
+    """中介中心性：连接两个引用关系簇的"桥论文"分数高。无向图口径（引文方向对"桥"不重要）。
+
+    注意：它衡量的是**网络结构里的桥接作用**，不是研究价值，也不是论文质量。
 
     自己用 BFS 数最短路，不依赖 networkx / scipy——库里 scipy 没装，
     `nx.pagerank` 会直接 ModuleNotFoundError，所以整条链路只用标准库。
@@ -1406,8 +1917,40 @@ def betweenness(nodes: list[dict], edges: list[dict]) -> dict[str, float]:
     return {k: round(v / top, 6) if top else 0.0 for k, v in cb.items()}
 
 
-def communities(nodes: list[dict], edges: list[dict], rounds: int = 50) -> dict[str, int]:
+def edge_weight_by_match(edge: dict) -> float:
+    """按引用匹配方式给边定权（负责人专项改造 P0-2 口径 B）。
+
+    arXiv ID 精确匹配 1.0，标题精确匹配 0.8，标题近似匹配 0.5。
+    证据强度递减的理由：arXiv 号是论文的唯一标识，撞号几乎不可能；
+    标题逐字相同是强证据（同标题的少量论文罕见）；近似匹配靠相似度阈值，
+    有误连风险，所以只给半权重，让它参与划分但不能主导。
+
+    未知 match_method 一并按 0.5 处理——宁可低估，不凭空拔高。
+    """
+    method = (edge.get("match_method") or "").strip()
+    if method == "arxiv":
+        return 1.0
+    if method == "title_exact":
+        return 0.8
+    return 0.5
+
+
+def communities(
+    nodes: list[dict],
+    edges: list[dict],
+    rounds: int = 50,
+    weight_of: Callable[[dict], float] | None = None,
+) -> dict[str, int]:
     """划分子领域社区：Louvain 两阶段（局部移动 + 社区聚合），纯标准库实现。
+
+    ⚠ 定位提醒：算法把图切成若干簇，但**实测本库的划分不通过随机基线检验**
+    （Q=0.1508，200 次随机图里只超过 76 次）。因此对用户一律称「引用关系簇」，
+    不称研究子领域；它只反映引用网络结构，不等于学科分类。
+
+    `weight_of(edge) -> float` 决定边的权重；传 None 等价于所有边权重为 1（旧行为）。
+    **权重真的进了算法**：它同时参与节点度 `deg`、社区连接强度 `to_comm`
+    和模块度增益 `gain = w - deg[i] * comm_deg[c] / (2m)`。改 `weight_of`
+    会改变划分结果，而不是只改一个显示字段。
 
     为什么不用现成的：
       - 标签传播 LPA：实测在本库 36 点 189 边上**收敛成 1 个社区**，等于没划分；
@@ -1423,6 +1966,7 @@ def communities(nodes: list[dict], edges: list[dict], rounds: int = 50) -> dict[
     if n == 0:
         return {}
     rank = {nid: i for i, nid in enumerate(ids)}
+    weight = weight_of or (lambda _e: 1.0)
 
     # 用"按节点索引"的邻接权重表做 Louvain；聚合阶段把它映射到社区上
     w_edges: list[tuple[int, int, float]] = []
@@ -1430,7 +1974,7 @@ def communities(nodes: list[dict], edges: list[dict], rounds: int = 50) -> dict[
         s, t = e.get("source"), e.get("target")
         if s == t or s not in rank or t not in rank:
             continue
-        w_edges.append((rank[s], rank[t], 1.0))
+        w_edges.append((rank[s], rank[t], float(weight(e))))
 
     # membership[i] = 原始节点 i 当前所属的"当前层节点编号"
     membership = list(range(n))
@@ -1530,6 +2074,9 @@ def graph_view(data: dict[str, Any], limit_reviews: int = 60) -> dict[str, Any]:
     reviews = list(data.get("reviews") or [])
 
     bc = betweenness(nodes, edges)
+    # 默认口径仍是「所有边权重 1」（口径 A）。三口径实验结论见
+    # docs/GRAPH-COMMUNITY-STUDY.md：加权与去模糊边都没有改善模块度，
+    # 所以线上保持 A，切到 B/C 需要显式传参。
     comm = communities(nodes, edges)
     corner = cornerstone_scores(nodes, edges)
 
@@ -1769,7 +2316,7 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
 
     overview = (
         f"本综述覆盖 {total} 篇论文，时间跨度 {span}，"
-        f"节点间存在 {len(pool_edges)} 条引用边，划分为 {len(clusters)} 个引用社区。"
+        f"节点间存在 {len(pool_edges)} 条引用边，划分为 {len(clusters)} 个引用关系簇。"
     )
     if no_year:
         overview += (
@@ -1779,7 +2326,7 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
         )
     if top_cluster:
         overview += (
-            f"规模最大的社区含 {top_cluster['size']} 篇（占比 "
+            f"规模最大的簇含 {top_cluster['size']} 篇（占比 "
             f"{top_cluster['size'] * 100 // max(total, 1)}%），以《{top_cluster['lead']}》为中心。"
         )
     if top_hub:
@@ -1791,13 +2338,17 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
     sections: list[dict[str, Any]] = [{"heading": "领域概览", "body": overview}]
 
     if clusters:
-        body = "按引用关系自动划分出的主题簇如下（社区编号由算法生成，不代表重要性排序）：\n" + "\n".join(
-            f"- 社区 {c['community']}：{c['size']} 篇"
-            + (f"，主题集中在「{c['category']}」" if c["category"] else "")
-            + f"，代表工作《{c['lead']}》"
-            for c in clusters[:6]
+        body = (
+            "按引用关系自动划分出的簇如下（簇编号由算法生成，不代表重要性排序；"
+            "它只反映引用网络结构，不等于学科分类或研究主题）：\n"
+            + "\n".join(
+                f"- 引用关系簇 {c['community']}：{c['size']} 篇"
+                + (f"，成员论文的主旨多为「{c['category']}」" if c["category"] else "")
+                + f"，被引最多的是《{c['lead']}》"
+                for c in clusters[:6]
+            )
         )
-        sections.append({"heading": "主题聚类", "body": body})
+        sections.append({"heading": "引用关系簇", "body": body})
 
     if years:
         body = "按发表年份排列，各年度入选论文及其被库内引用次数：\n" + "\n".join(
@@ -1862,7 +2413,7 @@ def frontier(view: dict[str, Any], limit: int = 8) -> dict[str, Any]:
 
     三条互不重叠的线索——为什么是这三条而不是随便排序：
         1. 新近且被引：最近两年的论文里被库内引用最多的。代表"已经被同行接住的新方向"。
-        2. 桥接：中介中心性高的论文，串起了原本不相连的社区。代表"把两个方向缝起来的工作"。
+        2. 桥接：中介中心性高的论文，串起了原本不相连的簇。代表"把两个方向缝起来的工作"。
         3. 孤岛：没有任何引用往来的论文。代表"还没接进这张网、可能有独立价值"的，
            也可能是样本没覆盖到——所以必须标明依据，让人自己判断。
 
@@ -1906,7 +2457,7 @@ def frontier(view: dict[str, Any], limit: int = 8) -> dict[str, Any]:
     #
     # 为什么不能只取 betweenness > 0：这张图里 35/36 个点都大于 0，
     # 而 BERT / Attention / GPT-3 这类被引 16~18 次的大节点中介性同样很高——
-    # 它们是"人人都要经过的路"（因为大家都在引它们），不是因为它们在缝两个社区。
+    # 它们是"人人都要经过的路"（因为大家都在引它们），不是因为它们在缝两个簇。
     # 那类工作已经在「基石节点」榜里了，这里要的是穿针引线的中间件，所以：
     #   1) 中介性取前 25% 分位线以上；
     #   2) 排除 cornerstone / hub 角色（它们的地位已被基石榜覆盖）。
@@ -1925,14 +2476,14 @@ def frontier(view: dict[str, Any], limit: int = 8) -> dict[str, Any]:
         items.append(
             {
                 "kind": "bridge",
-                "kind_label": "跨社区桥接",
+                "kind_label": "跨簇桥接",
                 "id": n["id"],
                 "title": n["title"],
                 "year": n.get("year"),
                 "score": float(n["betweenness"]),
                 "basis": (
                     f"中介中心性 {n['betweenness']:.3f}（全库前 25% 分位线 {bc_cut:.3f}），"
-                    f"位于社区 {n['community']}，出 {n['cites']} / 入 {n['cited_by']} 条引用关系，"
+                    f"位于引用关系簇 {n['community']}，出 {n['cites']} / 入 {n['cited_by']} 条引用关系，"
                     f"角色为 {n['role']}"
                 ),
                 "metric": {"betweenness": round(n["betweenness"], 4), "cited_by": n["cited_by"]},
@@ -1973,7 +2524,7 @@ def frontier(view: dict[str, Any], limit: int = 8) -> dict[str, Any]:
         "items": items,
         "legend": [
             {"kind": "recent_cited", "label": "新近且被引", "desc": f"{recent_cut} 年以后发表且已被库内引用，代表已被同行接住的新方向"},
-            {"kind": "bridge", "label": "跨社区桥接", "desc": f"中介中心性在全库前 25%（≥{bc_cut:.3f}），且不属于基石/枢纽节点——它在缝两个社区，而不是人人都引的那几篇"},
+            {"kind": "bridge", "label": "跨簇桥接", "desc": f"中介中心性在全库前 25%（≥{bc_cut:.3f}），且不属于基石/枢纽节点——它在缝两个簇，而不是人人都引的那几篇"},
             {"kind": "island", "label": "未被接入引用网", "desc": "库内无任何引用往来，可能方向独立，也可能是样本覆盖不足"},
         ],
     }

@@ -11,10 +11,12 @@ from app import paper_topics
 
 @pytest.fixture()
 def fake_meta(tmp_path, monkeypatch):
-    """把 structures / 图谱两个路径都指到 tmp，避免测试依赖真实数据。"""
+    """把 structures / catalog / 图谱三个路径都指到 tmp，避免测试依赖真实数据。"""
     structures = tmp_path / "structures.json"
+    catalog = tmp_path / "catalog.json"
     graph = tmp_path / "citation-graph.json"
     monkeypatch.setattr(paper_topics, "_structures_path", lambda: structures)
+    monkeypatch.setattr(paper_topics, "_catalog_path", lambda: catalog)
     monkeypatch.setattr(paper_topics, "_graph_path", lambda: graph)
 
     def write(structures_data, graph_data):
@@ -81,6 +83,44 @@ class TestLoadTitles:
         bad.write_text("{ 这不是 json", encoding="utf-8")
         (tmp_path / "citation-graph.json").write_text("{}", encoding="utf-8")
         assert paper_topics.load_titles() == {}
+
+    def test_catalog_fills_in_papers_without_parsed_title(self, fake_meta, tmp_path):
+        """解析失败的论文（不在 structures.json）要有 catalog.json 的标题兜底。
+
+        真实数据里 Mamba（2312.00752.pdf）与 Active Memory（1610.08613.pdf）
+        就是这类：PDF 文本层为空，没进 structures.json，但上传索引里存着完整标题。
+        只读 structures.json 时它们会退化成「未解析出标题（文件名）」。
+        """
+        fake_meta({"parsed.pdf": {"title": "Parsed Title"}}, _graph([]))
+        catalog = tmp_path / "catalog.json"
+        catalog.write_text(
+            json.dumps(
+                [
+                    {"file": "2312.00752.pdf", "title": "Mamba: Linear-Time Sequence Modeling"},
+                    {"file": "parsed.pdf", "title": "应该被解析结果覆盖，不该生效"},
+                    {"file": "untitled.pdf", "title": ""},
+                ],
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        titles = paper_topics.load_titles()
+        assert titles["parsed.pdf"] == "Parsed Title", "解析结果优先，catalog 不得覆盖"
+        assert titles["2312.00752.pdf"] == "Mamba: Linear-Time Sequence Modeling"
+        assert "untitled.pdf" not in titles, "两边都没有标题的不收"
+
+    def test_catalog_body_without_frontmatter_still_works(self, fake_meta, tmp_path):
+        """catalog.json 损坏时只退回 structures.json，不能整个列表打不开。"""
+        fake_meta({"a.pdf": {"title": "A"}}, _graph([]))
+        (tmp_path / "catalog.json").write_text("{ 坏的", encoding="utf-8")
+        assert paper_topics.load_titles() == {"a.pdf": "A"}
+
+    def test_mamba_gets_a_real_title_from_the_real_catalog(self):
+        """端到端回归：真实数据里 Mamba 不能再显示「未解析出标题」。"""
+        titles = paper_topics.load_titles()
+        assert titles.get("2312.00752.pdf", "").startswith("Mamba")
+        papers = paper_topics.build_topics(["2312.00752.pdf"])[0].papers
+        assert not papers[0].display_title.startswith("未解析出标题")
 
 
 class TestBuildTopics:

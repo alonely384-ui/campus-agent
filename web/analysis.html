@@ -223,7 +223,7 @@
       const st = d.stats || {};
       $('surveyStats').innerHTML = [
         ['论文数', st.papers], ['引用边', st.edges],
-        ['引用社区', st.clusters], ['时间跨度', st.years]
+        ['引用关系簇', st.clusters], ['时间跨度', st.years]
       ].map(([k, v]) => `<div class="stat">${esc(k)}<b>${esc(v)}</b></div>`).join('');
 
       $('surveyOverview').textContent = d.overview || '';
@@ -268,9 +268,9 @@
 
       // 主题聚类
       const cl = d.clusters || [];
-      $('secClusters').innerHTML = '<h3>主题聚类</h3><div class="body">'
-        + cl.map(c => `社区 ${c.community}：${c.size} 篇`
-          + (c.category ? `，主题集中在「${esc(c.category)}」` : '')
+      $('secClusters').innerHTML = '<h3>引用关系簇</h3><div class="body">'
+        + cl.map(c => `引用关系簇 ${c.community}：${c.size} 篇`
+          + (c.category ? `，主要集中在「${esc(c.category)}」` : '')
           + `，代表工作《${esc(c.lead)}》`).join('\n') + '</div>';
 
       // 代表性工作
@@ -299,7 +299,7 @@
       const d = frontierData;
       const st = d.stats || {};
       $('frontierStats').innerHTML = [
-        ['新近且被引', st.recent_cited], ['跨社区桥接', st.bridges],
+        ['新近且被引', st.recent_cited], ['跨簇桥接', st.bridges],
         ['未被接入', st.islands], ['分析论文', st.papers]
       ].map(([k, v]) => `<div class="stat">${esc(k)}<b>${esc(v)}</b></div>`).join('');
 
