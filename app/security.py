@@ -325,8 +325,9 @@ class Bucket:
 
 # 档位 A 轻量只读：c=8 时 310ms，2 req/s 远低于饱和点
 BUCKET_LIGHT = Bucket(rate=2.0, burst=10)
-# 档位 B LLM 对话：单次 2.3–7.6s，6 次/分钟已经打满
-BUCKET_CHAT = Bucket(rate=0.1, burst=3)
+# 档位 B LLM 对话：单次 2.3–7.6s；演示时评委连续追问，3 次就会撞 429，
+# 按「12 次/分钟、突发 5 次」标定，再靠 daily_budget 兜总量
+BUCKET_CHAT = Bucket(rate=0.2, burst=5)
 # 档位 C LLM 其他：单次 1.2–5.1s
 BUCKET_LLM = Bucket(rate=0.2, burst=3)
 # 档位 D 重量级：单次 8–180s，还会外网下载 + 入库
