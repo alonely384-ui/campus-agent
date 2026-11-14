@@ -91,7 +91,7 @@
     .topic-bar__label { font-size: 12.5px; color: var(--text-muted); margin-right: 2px; }
     .topic-chip {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 6px 12px; border-radius: var(--radius-pill); font-size: 13px; cursor: pointer;
+      padding: 6px 10px; border-radius: var(--radius-pill); font-size: 13px; cursor: pointer;
       border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);
       transition: background .15s, border-color .15s, color .15s;
     }
@@ -101,8 +101,58 @@
     }
     .topic-chip__n { font-size: 11.5px; opacity: .75; }
     .topic-chip.on .topic-chip__n { opacity: .9; }
-    /* 待归类：虚线边框，提示这是"证据不足"的兜底桶，不是分类结论 */
+    /* 待分类：虚线边框，提示这是"证据不足"的兜底桶，不是分类结论 */
     .topic-chip--pending { border-style: dashed; color: var(--text-muted); }
+
+    /* ---- 分类管理弹窗 ---- */
+    .bucket-hint {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin: -4px 0 14px; font-size: 12.5px; color: var(--text-muted);
+    }
+    .bucket-hint__text { flex: 1 1 240px; min-width: 0; }
+    .bkmask {
+      position: fixed; inset: 0; z-index: 300; display: flex; align-items: center;
+      justify-content: center; background: rgba(15, 23, 32, .38); padding: 20px;
+    }
+    /* display:flex 会盖掉浏览器给 [hidden] 的 display:none，不补这条遮罩层
+       即使"看不见"也会拦截全页点击（实测点了筛选条没反应）。 */
+    .bkmask[hidden] { display: none; }
+    .bkpanel {
+      width: min(560px, 100%); max-height: min(78vh, 720px); overflow: auto;
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--radius-card); box-shadow: 0 18px 48px rgba(15, 23, 32, .18);
+    }
+    .bkpanel__head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 14px 16px; border-bottom: 1px solid var(--border-color);
+      position: sticky; top: 0; background: var(--bg-surface);
+    }
+    .bkpanel__body { padding: 14px 16px 18px; }
+    .bkhint { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; margin-bottom: 12px; }
+    .bkmsg {
+      font-size: 12.5px; border-radius: var(--radius-control); padding: 8px 10px; margin-bottom: 10px;
+      background: var(--bg-subtle); color: var(--text-secondary); border: 1px solid var(--border-color);
+    }
+    .bkmsg.err { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border); }
+    .bktable { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .bktable th {
+      text-align: left; font-weight: 500; font-size: 12px; color: var(--text-muted);
+      padding: 6px 8px; border-bottom: 1px solid var(--border-color);
+    }
+    .bktable td { padding: 7px 8px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+    .bktable td.n { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .bktable td.ops { white-space: nowrap; text-align: right; }
+    .bktag {
+      font-size: 11px; padding: 1px 7px; border-radius: 999px;
+      border: 1px solid var(--border-color); color: var(--text-muted);
+    }
+    .bkadd { display: flex; gap: 8px; margin-top: 14px; }
+    .bkadd input {
+      flex: 1; padding: 7px 10px; font-size: 13px; border-radius: var(--radius-control);
+      border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary);
+      font-family: inherit;
+    }
+    .bkadd input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
 
     /* ---- 标题行：真实标题 + 文件名副信息 ---- */
     .lib-row .titlewrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -199,21 +249,43 @@
           <div class="dup-box" id="dupBox" hidden></div>
         </div>
 
-        <!-- 按引用关系簇分的筛选；「全部」始终在最前。簇只反映「被谁引用」，不是研究领域 -->
-        <div class="topic-bar" id="topicBar">
-          <span class="topic-bar__label">引用关系簇</span>
+        <!-- 大类筛选：一条。原来「主题 / 领域 / 方向」三条并列，口径不同又互相叠加，
+             用户看不懂也在筛选时踩空；现在只保留单层大类（app/buckets.py）。 -->
+        <div class="topic-bar" id="bucketBar">
+          <span class="topic-bar__label">分类</span>
         </div>
-
-        <!-- 按论文主旨分类的研究领域 / 方向筛选（app/topics.py，与上面的引用关系簇是两回事） -->
-        <div class="topic-bar" id="fieldBar">
-          <span class="topic-bar__label">领域</span>
-        </div>
-        <div class="topic-bar" id="subBar" hidden>
-          <span class="topic-bar__label">方向</span>
+        <div class="bucket-hint">
+          <span class="bucket-hint__text">分类由标题与摘要的关键词自动判定，判不中的进「待分类」。</span>
+          <button class="btn-sm" id="bucketManageBtn" title="新建 / 改名 / 删除大类，并给单篇论文指定分类">管理分类</button>
         </div>
 
         <div class="lib-list" id="libList"></div>
         <div class="pager" id="pager"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分类管理弹窗：只在需要时创建，避免给正常浏览多塞一层 DOM -->
+  <div class="bkmask" id="bucketMask" hidden>
+    <div class="bkpanel" role="dialog" aria-modal="true" aria-labelledby="bkTitle">
+      <div class="bkpanel__head">
+        <strong id="bkTitle">管理分类</strong>
+        <button class="btn-sm" id="bkClose" title="关闭">关闭</button>
+      </div>
+      <div class="bkpanel__body">
+        <div class="bkhint">
+          内置 7 类可以改名、不能删除；自建的类可以删除，删掉后里面的论文自动回到「待分类」，不会丢。
+          所有改动会写进服务端，刷新页面仍然生效。
+        </div>
+        <div id="bkMsg" class="bkmsg" hidden></div>
+        <table class="bktable">
+          <thead><tr><th>分类</th><th>篇数</th><th>类型</th><th>操作</th></tr></thead>
+          <tbody id="bkRows"></tbody>
+        </table>
+        <div class="bkadd">
+          <input id="bkNewName" type="text" maxlength="20" placeholder="新分类名（最多 20 字）" />
+          <button class="btn-sm btn-primary" id="bkAddBtn">新建分类</button>
+        </div>
       </div>
     </div>
   </div>
@@ -226,24 +298,18 @@
     const fileInputEl = document.getElementById('fileInput');
     const upStatusEl = document.getElementById('upStatus');
     const dupBoxEl = document.getElementById('dupBox');
-    const topicBarEl = document.getElementById('topicBar');
-    const fieldBarEl = document.getElementById('fieldBar');
-    const subBarEl = document.getElementById('subBar');
+    const bucketBarEl = document.getElementById('bucketBar');
     const pagerEl = document.getElementById('pager');
 
-    // 分页与主题筛选状态。page 从 1 开始；topicId 用 'all' 表示不筛。
-    const ALL_TOPIC = 'all';
-    let allPapers = [];        // /papers 的原始结果（含 title / topic_id）
-    let pageSize = 12;         // 由后端 /papers/topics 下发的 page_size 覆盖
+    // 分页与大类筛选状态。page 从 1 开始；curBucket 用 '' 表示不筛（全部）。
+    const ALL_BUCKET = '';
+    let allPapers = [];        // /papers 的原始结果（含 bucket 字段）
+    let pageSize = 12;
     let curPage = 1;
-    let curTopic = ALL_TOPIC;
-    let topicCounts = [];      // [{id, name, count}]，来自 /papers/topics
-
-    // 主旨分类筛选（与主题是两个口径）：curField 是领域名，curSub 是方向名
-    const ALL_FIELD = '';
-    let curField = ALL_FIELD;
-    let curSub = '';
-    let fieldData = null;      // /papers/classify 的结果
+    let curBucket = ALL_BUCKET;
+    let bucketData = null;     // /papers/classify 的结果
+    let bucketNames = [];      // /buckets 返回的大类名单（含用户自建类）
+    let bucketInfo = [];       // /buckets 的完整条目：[{name, count, builtin}]
 
     let pendingDups = [];
 
@@ -269,136 +335,72 @@
       return new Set(list.map(p => p.filename)).size;
     }
 
-    /** 当前主题下的论文。'all' 就是全部。 */
-    function papersOfTopic() {
+    /** 当前大类下的论文。'' 就是全部。
+     *
+     * 大类来自 /papers 的每条记录的 bucket 字段（后端 app/buckets.py 现算的），
+     * 不再有「主题 / 领域 / 方向」三个互相叠加的筛子。
+     */
+    function papersOfBucket() {
       let list = allPapers;
-      if (curTopic !== ALL_TOPIC) list = list.filter(p => String(p.topic_id) === String(curTopic));
-      // 领域 / 方向是叠加在主题之上的第二个筛子
-      if (curField) list = list.filter(p => p.primary_topic === curField);
-      if (curSub) list = list.filter(p => p.subtopic === curSub);
+      if (curBucket !== ALL_BUCKET) list = list.filter(p => (p.bucket || '') === curBucket);
       return list;
     }
 
-    /** 当前领域下还有哪些方向（从 /papers/classify 的 subtopics 取，带篇数）。
+    /** 每个大类的篇数（去重口径）。
      *
-     * 「待归类」这类兜底桶只有一个"待归类"方向，再挂一条方向栏毫无信息量，
-     * 而且会让用户以为它也是一个正经研究方向 —— 所以这里过滤掉只有 1 条
-     * 且与领域同名的方向。
+     * 为什么现算而不用 /papers/classify 下发的 count：那里面是**记录数**（含副本），
+     * 而列表行数也是记录数、chip 上要的是篇数——两套口径混在一根条上会让人以为对不上。
+     * 这里统一按 filename 去重。
      */
-    function subtopicsOfField() {
-      if (!curField || !fieldData) return [];
-      const f = (fieldData.fields || []).find(x => x.name === curField);
-      if (!f) return [];
-      const subs = f.subtopics || [];
-      const real = subs.filter(x => !(x.name === f.name && subs.length === 1));
-      return real;
+    function bucketCounts() {
+      const pending = (bucketData && bucketData.pending) || '待分类';
+      const keyOf = p => p.bucket || pending;
+      const out = new Map();
+      bucketNames.forEach(n => out.set(n, 0));
+      const seen = new Set();
+      allPapers.forEach(p => {
+        if (seen.has(p.filename)) return;
+        seen.add(p.filename);
+        const k = keyOf(p);
+        out.set(k, (out.get(k) || 0) + 1);
+      });
+      return out;
     }
 
-    /** 领域筛选条：全部 / 各研究领域（带篇数）。 */
-    function renderFieldBar() {
-      if (!fieldBarEl) return;
-      const fields = (fieldData && fieldData.fields) || [];
-      const parts = ['<span class="topic-bar__label">领域</span>'];
-      parts.push(
-        `<button class="topic-chip${curField === ALL_FIELD ? ' on' : ''}" data-field="">全部` +
-        `<span class="topic-chip__n">${(fieldData && fieldData.total) || allPapers.length}</span></button>`
-      );
-      fields.forEach(f => {
-        const on = curField === f.name ? ' on' : '';
-        // 待归类的 chip 用虚线边框提示"这是兜底不是分类结论"
-        const extra = f.name === '待归类' ? ' topic-chip--pending' : '';
-        parts.push(
-          `<button class="topic-chip${on}${extra}" data-field="${escapeHtml(f.name)}" ` +
-          `title="${escapeHtml(f.name)}">${escapeHtml(f.name)}` +
-          `<span class="topic-chip__n">${f.count}</span></button>`
-        );
-      });
-      fieldBarEl.innerHTML = parts.join('');
-      fieldBarEl.querySelectorAll('[data-field]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const next = btn.dataset.field;
-          if (next === curField) return;
-          curField = next;
-          curSub = '';            // 换领域就清空方向，否则会筛出空列表
-          curPage = 1;
-          renderFieldBar();
-          renderSubBar();
-          renderTopicBar();
-          renderList();
-          renderPager();
-          scrollToListTop();
-        });
-      });
-    }
-
-    /** 方向筛选条：选了领域才出现。 */
-    function renderSubBar() {
-      if (!subBarEl) return;
-      const subs = subtopicsOfField();
-      if (!subs.length) {
-        subBarEl.hidden = true;
-        subBarEl.innerHTML = '';
-        return;
-      }
-      subBarEl.hidden = false;
-      const parts = ['<span class="topic-bar__label">方向</span>'];
-      parts.push(
-        `<button class="topic-chip${curSub === '' ? ' on' : ''}" data-sub="">全部` +
-        `<span class="topic-chip__n">${subs.reduce((s, x) => s + x.count, 0)}</span></button>`
-      );
-      subs.forEach(s => {
-        const on = curSub === s.name ? ' on' : '';
-        parts.push(
-          `<button class="topic-chip${on}" data-sub="${escapeHtml(s.name)}" ` +
-          `title="${escapeHtml(s.name)}">${escapeHtml(s.name)}` +
-          `<span class="topic-chip__n">${s.count}</span></button>`
-        );
-      });
-      subBarEl.innerHTML = parts.join('');
-      subBarEl.querySelectorAll('[data-sub]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const next = btn.dataset.sub;
-          if (next === curSub) return;
-          curSub = next;
-          curPage = 1;
-          renderSubBar();
-          renderTopicBar();
-          renderList();
-          renderPager();
-          scrollToListTop();
-        });
-      });
-    }
-
-    function renderTopicBar() {
+    /** 唯一一条分类筛选条：全部 / 各大类（带篇数）。
+     *
+     * 「待分类」用虚线边框：它是"证据不足"的兜底桶，不是分类结论。
+     */
+    function renderBucketBar() {
+      if (!bucketBarEl) return;
+      const counts = bucketCounts();
+      const pending = (bucketData && bucketData.pending) || '待分类';
+      const parts = [`<span class="topic-bar__label">分类</span>`];
       const total = countPapers(allPapers);
-      const list = papersOfTopic();
-      const parts = ['<span class="topic-bar__label">主题</span>'];
-      const allOn = curTopic === ALL_TOPIC ? ' on' : '';
       parts.push(
-        `<button class="topic-chip${allOn}" data-topic="${ALL_TOPIC}">全部` +
+        `<button class="topic-chip${curBucket === ALL_BUCKET ? ' on' : ''}" data-bucket="">全部` +
         `<span class="topic-chip__n">${total}</span></button>`
       );
-      topicCounts.forEach(t => {
-        const on = String(curTopic) === String(t.id) ? ' on' : '';
-        // 计数按去重口径现算，不用后端下发的记录数（含副本，会和领域条对不上）
-        const n = countPapers(allPapers.filter(p => String(p.topic_id) === String(t.id)));
+      bucketNames.forEach(name => {
+        const on = curBucket === name ? ' on' : '';
+        const extra = name === pending ? ' topic-chip--pending' : '';
         parts.push(
-          `<button class="topic-chip${on}" data-topic="${escapeHtml(t.id)}" ` +
-          `title="${escapeHtml(t.name)}">${escapeHtml(t.name)}` +
-          `<span class="topic-chip__n">${n}</span></button>`
+          `<button class="topic-chip${on}${extra}" data-bucket="${escapeHtml(name)}" ` +
+          `title="${escapeHtml(name)}">${escapeHtml(name)}` +
+          `<span class="topic-chip__n">${counts.get(name) || 0}</span></button>`
         );
       });
-      // 把当前筛选后的篇数也摆出来，避免"筛完只剩几篇"被误以为论文丢了
-      parts.push(`<span class="topic-chip__n" style="margin-left:4px">当前 ${countPapers(list)} 篇</span>`);
-      topicBarEl.innerHTML = parts.join('');
-      topicBarEl.querySelectorAll('[data-topic]').forEach(btn => {
+      parts.push(
+        `<span class="topic-chip__n" style="margin-left:4px">当前 ${countPapers(papersOfBucket())} 篇</span>`
+      );
+      bucketBarEl.innerHTML = parts.join('');
+      bucketBarEl.querySelectorAll('[data-bucket]').forEach(btn => {
         btn.addEventListener('click', () => {
-          const next = btn.dataset.topic;
-          if (next === curTopic) return;
-          curTopic = next;
-          curPage = 1;              // 换主题回到第一页
-          renderTopicBar();
+          const next = btn.dataset.bucket;
+          if (next === curBucket) return;
+          curBucket = next;
+          curPage = 1;              // 换大类回到第一页
+          renderBucketBar();
           renderList();
           renderPager();
           scrollToListTop();
@@ -417,17 +419,47 @@
      * 返回 [{keeper, dups: [...]}],keeper 是主版本，dups 是它的所有副本。
      */
     function groupsOfTopic() {
-      const list = papersOfTopic();
-      const byId = new Map(list.map(p => [p.paper_id, p]));
+      const list = papersOfBucket();
+
+      // 同一份物理文件可能被索引登记了两次（历史遗留：早期条目用「文件名 stem」
+      // 当 paper_id，后来改成「内容哈希」，两套 id 体系共存）。实测
+      // 1706.03762v7.pdf 在 index.json 里有 bdfaa68d8984 与 1706.03762v7 两条，
+      // 直接渲染就会出现两行同名的 1706.03762v7.pdf。这里按 filename 折一次：
+      // 保留被别的记录指认成主版本的那条，其次是「文件名 stem == paper_id」那类
+      // 老条目，最后才是其余；副本信息在合并时并到一起，不丢任何一行。
+      const claimed = new Set(list.map(p => p.duplicate_of).filter(Boolean));
+      const rank = p => {
+        const stem = p.filename.replace(/\.pdf$/i, '');
+        if (!p.duplicate_of && claimed.has(p.paper_id)) return 0;   // 真主版本
+        if (p.paper_id === stem) return 1;                           // 老式条目
+        return 2;
+      };
+      const byName = new Map();      // filename -> 排序后留下的那条
+      list.forEach(p => {
+        const cur = byName.get(p.filename);
+        if (!cur || rank(p) < rank(cur)) byName.set(p.filename, p);
+      });
+      const kept = Array.from(byName.values());
+
+      const byId = new Map(kept.map(p => [p.paper_id, p]));
+      const isKeeper = new Map();
+      kept.forEach(p => {
+        isKeeper.set(
+          p.paper_id,
+          !p.duplicate_of && p.paper_id !== '' && claimed.has(p.paper_id),
+        );
+      });
+
       const dupsOf = new Map();     // keeperId -> [副本...]
       const keepers = [];
-      list.forEach(p => {
-        if (p.duplicate_of && byId.has(p.duplicate_of)) {
-          // 主版本也在当前主题里，才挂到它名下
-          if (!dupsOf.has(p.duplicate_of)) dupsOf.set(p.duplicate_of, []);
-          dupsOf.get(p.duplicate_of).push(p);
+      kept.forEach(p => {
+        const target = p.duplicate_of;
+        // 副本挂到主版本名下，必须满足两条：目标在本次列表里、且目标确实是主版本
+        if (target && byId.has(target) && isKeeper.get(target)) {
+          if (!dupsOf.has(target)) dupsOf.set(target, []);
+          dupsOf.get(target).push(p);
         } else {
-          // 没有重复标记，或主版本不在当前主题里（这时副本自己当一行，不能凭空消失）
+          // 没有重复标记，或主版本不在当前筛选范围内（这时副本自己当一行，不能凭空消失）
           keepers.push(p);
         }
       });
@@ -446,7 +478,7 @@
 
     /** 当前页要显示的那一条切。页码越界时自动夹回来。 */
     function papersOfPage() {
-      const list = papersOfTopic();
+      const list = papersOfBucket();
       const pages = Math.max(1, Math.ceil(list.length / pageSize));
       if (curPage > pages) curPage = pages;
       if (curPage < 1) curPage = 1;
@@ -499,11 +531,11 @@
 
     /** 翻页只把列表区滚回可见位置，不整页跳。 */
     function scrollToListTop() {
-      if (!topicBarEl) return;
-      const rect = topicBarEl.getBoundingClientRect();
+      if (!bucketBarEl) return;
+      const rect = bucketBarEl.getBoundingClientRect();
       // 已经可见就不动，避免每次翻页屏幕抖一下
       if (rect.top < 0 || rect.top > 120) {
-        topicBarEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        bucketBarEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
       }
     }
 
@@ -530,6 +562,8 @@
             ${o.badge || ''}
             <div class="act">
               <a href="reader.html?paper=${encodeURIComponent(p.filename)}&page=1" target="_blank" rel="noopener">阅读</a>
+              <button class="btn-sm" data-assign="${escapeHtml(p.filename)}"
+                      title="给这篇人工指定分类；选「待分类」= 恢复自动判定">分类</button>
               <button class="btn-sm btn-danger" data-del="${escapeHtml(p.paper_id)}">删除</button>
             </div>
           </div>`;
@@ -537,17 +571,15 @@
 
     /** 只重绘列表区：主题栏和分页器各自管自己，避免互相触发。 */
     function renderList() {
-      const list = papersOfTopic();
+      const list = papersOfBucket();
       if (!allPapers.length) {
         libListEl.innerHTML = '<div class="empty">论文库还是空的，先在上面拖一份 PDF 进来。</div>';
         pagerEl.innerHTML = '';
         return;
       }
       if (!list.length) {
-        // 三个筛子（主题 / 领域 / 方向）都可能筛空，提示要跟着当前口径说
-        const scope = curField
-          ? (curSub ? `「${curField} · ${curSub}」方向` : `「${curField}」领域`)
-          : '这个主题';
+        // 分类筛空时要跟着当前大类说，否则用户以为论文丢了
+        const scope = curBucket ? `「${curBucket}」分类` : '当前范围';
         libListEl.innerHTML = `<div class="empty">${escapeHtml(scope)}下没有论文，换一个看看。</div>`;
         pagerEl.innerHTML = '';
         return;
@@ -592,6 +624,9 @@
       libListEl.querySelectorAll('[data-del]').forEach(btn => {
         btn.addEventListener('click', () => deletePaper(btn.dataset.del, btn));
       });
+      libListEl.querySelectorAll('[data-assign]').forEach(btn => {
+        btn.addEventListener('click', () => pickBucketFor(btn.dataset.assign, btn));
+      });
       libListEl.querySelectorAll('.dup-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
           const box = btn.nextElementSibling;
@@ -607,11 +642,12 @@
       libListEl.innerHTML = '<div class="empty">加载中…</div>';
       pagerEl.innerHTML = '';
       try {
-        // 三个接口并行：/papers 给每篇的完整信息，/papers/topics 给引用关系簇名与每页条数，
-        // /papers/classify 给研究领域/方向两级分组
-        const [d, t, c] = await Promise.all([
+        // 三个接口并行：/papers 给每篇的完整信息（含 bucket 大类），
+        // /buckets 给大类名单与每类篇数（含用户自建类），
+        // /papers/classify 给分类兜底口径（「待分类」的名字与总数）
+        const [d, bk, c] = await Promise.all([
           fetch('/papers').then(r => r.json()),
-          fetch('/papers/topics').then(r => r.json()).catch(() => null),
+          fetch('/buckets').then(r => r.json()).catch(() => null),
           fetch('/papers/classify').then(r => r.json()).catch(() => null),
         ]);
         allPapers = d.papers || [];
@@ -619,32 +655,18 @@
           (allPapers.length !== countPapers(allPapers)
             ? `（${allPapers.length} 条记录，含重复副本）` : '');
 
-        if (t && Array.isArray(t.topics)) {
-          if (t.page_size) pageSize = t.page_size;
-          topicCounts = t.topics.map(g => ({ id: g.topic_id, name: g.name, count: g.count }));
-        } else {
-          // 主题接口挂了也不能让论文列表跟着挂：退化成只有一个「全部」
-          topicCounts = [];
-          upStatusEl.textContent = '主题分组暂不可用，已按全部论文展示。';
+        // 大类名单接口挂了也不能让论文列表跟着挂：退化成「全部」一条
+        bucketNames = (bk && Array.isArray(bk.buckets)) ? bk.buckets.map(b => b.name) : [];
+        if (!bucketNames.length) {
+          upStatusEl.textContent = '分类暂不可用，已按全部论文展示。';
         }
-        // 分类接口挂了同样只影响筛选条，不影响列表
-        fieldData = (c && Array.isArray(c.fields)) ? c : null;
-        if (!fieldData) {
-          curField = ALL_FIELD;
-          curSub = '';
-        } else if (curField && !fieldData.fields.some(f => f.name === curField)) {
-          curField = ALL_FIELD;
-          curSub = '';
+        bucketData = (c && Array.isArray(c.buckets)) ? c : null;
+        // 上次选的大类可能因为改名/删类没了，回落到「全部」
+        if (curBucket !== ALL_BUCKET && !bucketNames.includes(curBucket)) {
+          curBucket = ALL_BUCKET;
           curPage = 1;
         }
-        // 上次选的主题可能因为删论文没了，回落到「全部」
-        if (curTopic !== ALL_TOPIC && !topicCounts.some(x => String(x.id) === String(curTopic))) {
-          curTopic = ALL_TOPIC;
-          curPage = 1;
-        }
-        renderFieldBar();
-        renderSubBar();
-        renderTopicBar();
+        renderBucketBar();
         renderList();
         renderPager();
       } catch (e) {
@@ -766,6 +788,172 @@
       dropZoneEl.classList.remove('hot');
     }));
     dropZoneEl.addEventListener('drop', e => uploadFiles(e.dataTransfer.files));
+
+    // ---------------------------------------------------------------- 分类管理
+    //
+    // 五个操作都走同一个 request()，统一处理 401/503 跳登录、400 显示服务端原因。
+    // 服务端 app/buckets.py 用 ValueError 表达「重名 / 不许删内置类」，
+    // 这些原因要原样给用户看 —— 只说「失败」等于没说。
+
+    const bucketMaskEl = document.getElementById('bucketMask');
+    const bkRowsEl = document.getElementById('bkRows');
+    const bkMsgEl = document.getElementById('bkMsg');
+    const bkNewNameEl = document.getElementById('bkNewName');
+
+    function bkShow(text, isErr) {
+      if (!text) { bkMsgEl.hidden = true; bkMsgEl.textContent = ''; return; }
+      bkMsgEl.hidden = false;
+      bkMsgEl.textContent = text;
+      bkMsgEl.classList.toggle('err', !!isErr);
+    }
+
+    async function bucketRequest(url, body) {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (resp.status === 401 || resp.status === 503) {
+        location.href = 'admin-login.html?next=' + encodeURIComponent(location.pathname);
+        return null;
+      }
+      let data = {};
+      try { data = await resp.json(); } catch (e) { /* 非 JSON 就按 HTTP 码报 */ }
+      if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
+      return data;
+    }
+
+    /** 重新拉 /buckets 与 /papers，把弹窗表格和筛选条一起刷新。 */
+    async function refreshBuckets() {
+      const [bk, d] = await Promise.all([
+        fetch('/buckets').then(r => r.json()).catch(() => null),
+        fetch('/papers').then(r => r.json()).catch(() => null),
+      ]);
+      bucketNames = (bk && Array.isArray(bk.buckets)) ? bk.buckets.map(b => b.name) : [];
+      bucketInfo = (bk && Array.isArray(bk.buckets)) ? bk.buckets : [];
+      if (d) allPapers = d.papers || [];
+      if (curBucket !== ALL_BUCKET && !bucketNames.includes(curBucket)) curBucket = ALL_BUCKET;
+      renderBucketBar();
+      renderList();
+      renderPager();
+      renderBucketRows();
+    }
+
+    function renderBucketRows() {
+      const pending = (bucketData && bucketData.pending) || '待分类';
+      const counts = bucketCounts();
+      bkRowsEl.innerHTML = bucketInfo.map(b => {
+        const isPending = b.name === pending;
+        const canDelete = !b.builtin && !isPending;
+        return `<tr data-name="${escapeHtml(b.name)}">
+          <td>${escapeHtml(b.name)}</td>
+          <td class="n">${counts.get(b.name) || 0}</td>
+          <td><span class="bktag">${b.builtin ? '内置' : (isPending ? '兜底' : '自建')}</span></td>
+          <td class="ops">${isPending ? '<span class="bktag">不可改</span>' : `
+            <button class="btn-sm" data-act="rename">改名</button>
+            ${canDelete ? '<button class="btn-sm" data-act="delete">删除</button>' : ''}`}
+          </td>
+        </tr>`;
+      }).join('');
+      bkRowsEl.querySelectorAll('tr[data-name]').forEach(tr => {
+        const name = tr.dataset.name;
+        tr.querySelectorAll('[data-act]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            if (btn.dataset.act === 'rename') renameBucket(name);
+            else deleteBucket(name);
+          });
+        });
+      });
+    }
+
+    async function renameBucket(name) {
+      const next = prompt(`把「${name}」改成：`, name);
+      if (next === null) return;
+      if (!next.trim() || next.trim() === name) return;
+      try {
+        await bucketRequest('/buckets/rename', { old: name, new: next.trim() });
+        await refreshBuckets();
+        bkShow(`已改名为「${next.trim()}」。`);
+      } catch (e) { bkShow(e.message, true); }
+    }
+
+    async function deleteBucket(name) {
+      const counts = bucketCounts();
+      const n = counts.get(name) || 0;
+      const ok = confirm(
+        `确定删除分类「${name}」？\n\n` +
+        `里面的 ${n} 篇论文不会丢，会回到「待分类」，你可以再手动指一个分类。`
+      );
+      if (!ok) return;
+      try {
+        await bucketRequest('/buckets/delete', { name });
+        await refreshBuckets();
+        bkShow(`已删除「${name}」，其中论文已回到「待分类」。`);
+      } catch (e) { bkShow(e.message, true); }
+    }
+
+    async function addBucket() {
+      const name = (bkNewNameEl.value || '').trim();
+      if (!name) { bkShow('分类名不能为空。', true); return; }
+      try {
+        await bucketRequest('/buckets', { name });
+        bkNewNameEl.value = '';
+        await refreshBuckets();
+        bkShow(`已新建「${name}」。要放论文进去，在列表里点那篇的「指定分类」。`);
+      } catch (e) { bkShow(e.message, true); }
+    }
+
+    document.getElementById('bucketManageBtn').addEventListener('click', async () => {
+      bucketMaskEl.hidden = false;
+      bkShow('');
+      try {
+        await refreshBuckets();
+      } catch (e) { bkShow('加载分类失败：' + e.message, true); }
+    });
+    document.getElementById('bkClose').addEventListener('click', () => { bucketMaskEl.hidden = true; });
+    bucketMaskEl.addEventListener('click', e => {
+      if (e.target === bucketMaskEl) bucketMaskEl.hidden = true;
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !bucketMaskEl.hidden) bucketMaskEl.hidden = true;
+    });
+    document.getElementById('bkAddBtn').addEventListener('click', addBucket);
+    bkNewNameEl.addEventListener('keydown', e => { if (e.key === 'Enter') addBucket(); });
+
+    /** 给单篇论文指定分类。传「待分类」等于撤销人工指定，回到自动判定。 */
+    async function assignBucket(filename, target) {
+      try {
+        await bucketRequest('/buckets/assign', { filename, bucket: target });
+        await refreshBuckets();
+        return true;
+      } catch (e) {
+        upStatusEl.textContent = '指定分类失败：' + e.message;
+        return false;
+      }
+    }
+
+    /** 点列表行上的「分类」按钮：在弹出的选项里挑一个大类。
+     *
+     * 用 prompt 而不是自建下拉，是因为这里只需要「选一个已知项」，
+     * 自建下拉要做键盘导航、点外关闭、滚动定位，成本远高于收益；
+     * 真按错了再点一次就行，不会造成数据丢失。
+     */
+    async function pickBucketFor(filename, btn) {
+      const names = bucketNames.filter(Boolean);
+      if (!names.length) { upStatusEl.textContent = '分类名单还没加载出来，刷新页面再试。'; return; }
+      const hint = names.map((n, i) => `${i + 1}. ${n}`).join('\n');
+      const ans = prompt(`把 ${filename} 归到哪一类？输入序号：\n\n${hint}`, '');
+      if (ans === null) return;
+      const idx = parseInt(ans, 10);
+      if (!Number.isInteger(idx) || idx < 1 || idx > names.length) {
+        upStatusEl.textContent = '序号不对，没做改动。';
+        return;
+      }
+      btn.disabled = true;
+      const ok = await assignBucket(filename, names[idx - 1]);
+      btn.disabled = false;
+      if (ok) upStatusEl.textContent = `已把 ${filename} 归到「${names[idx - 1]}」。`;
+    }
 
     loadLibrary();
   </script>

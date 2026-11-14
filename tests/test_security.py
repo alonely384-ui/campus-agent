@@ -24,6 +24,7 @@ from app import security
 from app.security import (
     ADMIN_PATHS,
     BUCKET_LIGHT,
+    METHOD_ADMIN_PATHS,
     PUBLIC_PATHS,
     DailyBudget,
     RateLimiter,
@@ -185,9 +186,9 @@ def test_verify_password_rejects_empty_and_none(admin_env):
 
 
 def test_all_routes_are_classified():
-    """46 个路由必须一条不漏地归入 ADMIN 或 PUBLIC。"""
+    """每个路由必须一条不漏地归入 ADMIN / PUBLIC / 按方法区分三类之一。"""
     templates = main_mod._route_templates()
-    uncovered = templates - ADMIN_PATHS - PUBLIC_PATHS
+    uncovered = templates - ADMIN_PATHS - PUBLIC_PATHS - set(METHOD_ADMIN_PATHS)
     assert not uncovered, f"未登记路由：{sorted(uncovered)}"
 
 
@@ -218,9 +219,13 @@ def test_route_count_matches_design():
     两条都归公开：阅读器是匿名可用的，把写作正文的引用句送去定位不该要口令。
     2026-11-12：48 → 49，新增 /papers/classify（论文库按研究领域/方向筛选），
     归公开：与 /papers、/papers/topics 同属论文库的只读聚合接口。
+    2026-11-13：49 → 54，论文库筛选从「主题/领域/方向」三条收成单层大类，
+    新增 /buckets（读写同路径，GET 公开 / 写要管理员，登记在 METHOD_ADMIN_PATHS）
+    与 /buckets/rename、/buckets/delete、/buckets/assign、/buckets/unassign 四条，
+    后四条都归管理员。
     """
     templates = main_mod._route_templates()
-    assert len(templates) == 49, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
+    assert len(templates) == 54, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
 
 
 def test_admin_paths_have_no_public_overlap():
@@ -386,9 +391,25 @@ def test_rate_limiter_is_thread_safe():
 
 
 def test_bucket_for_covers_every_registered_route():
-    """每个路由都要有明确档位，不能掉进默认档还不知道。"""
-    for template in ADMIN_PATHS | PUBLIC_PATHS:
+    """每个路由都要有明确档位，不能掉进默认档还不知道。
+
+    只查 ADMIN_PATHS | PUBLIC_PATHS 不够：只登记在 METHOD_ADMIN_PATHS 里的
+    模板（如 /buckets，GET 公开、POST 要管理员）会漏过，然后静默掉进
+    DEFAULT_BUCKET（BUCKET_CPU，rate=0.05）——实测论文库点几篇就 429。
+    """
+    for template in ADMIN_PATHS | PUBLIC_PATHS | set(METHOD_ADMIN_PATHS):
         assert template in security._RATE_TABLE, f"{template} 没有指定限流档位"
+
+
+def test_library_bucket_endpoints_are_not_throttled_to_cpu_tier():
+    """论文库的分类接口必须走轻量档。
+
+    回归的真实 bug：/buckets 当初漏登记，走 DEFAULT_BUCKET（BUCKET_CPU，
+    rate=0.05 → 20 秒才回 1 个令牌）。页面进一次要 /buckets + /papers/classify，
+    每指定一次分类还要再拉一次 /buckets，实测点几篇就被 429 挡住。
+    """
+    assert bucket_for("/buckets").rate >= bucket_for("/health").rate
+    assert bucket_for("/papers/classify").rate >= bucket_for("/health").rate
 
 
 def test_heavy_endpoints_get_stricter_limits_than_light_ones():

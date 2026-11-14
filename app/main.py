@@ -75,6 +75,7 @@ from app.recommend import (
 from app.security import (
     ADMIN_PATHS,
     DOC_PATHS,
+    METHOD_ADMIN_PATHS,
     PUBLIC_PATHS,
     PUBLIC_PREFIXES,
     SESSION_TTL,
@@ -89,6 +90,7 @@ from app.security import (
     login_guard,
     normalize_path,
     origin_allowed,
+    path_methods_admin,
     revoke_session,
     sign_session,
     verify_password,
@@ -198,7 +200,9 @@ def _route_templates() -> set[str]:
 def _assert_route_coverage() -> None:
     """任何一个路由既不在 ADMIN 也不在 PUBLIC，就拒绝启动。"""
     templates = _route_templates()
-    uncovered = sorted(templates - ADMIN_PATHS - PUBLIC_PATHS)
+    # 只登记 METHOD_ADMIN_PATHS 的路径（如 `/buckets`：GET 公开、POST 要管理员）
+    methods_only = set(METHOD_ADMIN_PATHS)
+    uncovered = sorted(templates - ADMIN_PATHS - PUBLIC_PATHS - methods_only)
     if uncovered:
         raise RuntimeError(
             "安全层未登记的路由（默认公开是最危险的默认值）："
@@ -210,12 +214,17 @@ def _assert_route_coverage() -> None:
     #   PUBLIC_PREFIXES —— /ui 是 Mount，不是路由
     #   DOC_PATHS       —— 生产环境 openapi_url=None，这三条根本没注册
     exempt = set(PUBLIC_PREFIXES) | set(DOC_PATHS)
-    stale = sorted((ADMIN_PATHS | PUBLIC_PATHS) - templates - exempt)
+    stale = sorted((ADMIN_PATHS | PUBLIC_PATHS | methods_only) - templates - exempt)
     if stale:
         raise RuntimeError(
             "安全层登记了不存在的路由（清单已与代码脱节）：" + "、".join(stale)
         )
-    logger.info("安全层路由对账通过：管理 %d 条，公开 %d 条", len(ADMIN_PATHS), len(PUBLIC_PATHS))
+    logger.info(
+        "安全层路由对账通过：管理 %d 条，公开 %d 条，按方法区分 %d 条",
+        len(ADMIN_PATHS),
+        len(PUBLIC_PATHS),
+        len(methods_only),
+    )
 
 
 def _matches_template(path: str, template: str) -> bool:
@@ -249,7 +258,7 @@ def resolve_template(path: str) -> str | None:
     通配段数量相同时，路径前缀更长的优先。这样结果与哈希顺序无关，可复现。
     """
     path = normalize_path(path)
-    if path in ADMIN_PATHS or path in PUBLIC_PATHS:
+    if path in ADMIN_PATHS or path in PUBLIC_PATHS or path in METHOD_ADMIN_PATHS:
         return path
 
     def _specificity(template: str) -> tuple[int, int]:
@@ -257,7 +266,9 @@ def resolve_template(path: str) -> str | None:
         wildcards = template.count("{")
         return (-wildcards, len(template))
 
-    for template in sorted(ADMIN_PATHS | PUBLIC_PATHS, key=_specificity, reverse=True):
+    for template in sorted(
+        ADMIN_PATHS | PUBLIC_PATHS | set(METHOD_ADMIN_PATHS), key=_specificity, reverse=True
+    ):
         if _matches_template(path, template):
             return template
     return None
@@ -306,7 +317,7 @@ async def security_guard(request: Request, call_next):
     # ---- 1. 认证 ----
     # /admin/login 与 /admin/logout 自身是公开的（不登录怎么登录），
     # 它们的失败锁定由 security.login_guard 单独管，不走 Cookie 校验。
-    if template in ADMIN_PATHS:
+    if template in ADMIN_PATHS or path_methods_admin(template, request.method):
         if not admin_configured():
             # 没配凭证 = 管理功能不可用。绝不降级成放行。
             logger.error(
@@ -787,14 +798,12 @@ class PaperOut(BaseModel):
     title_truncated: bool = False
     topic_id: int = -1
     topic_name: str = ""
-    # 两级主旨分类（app/topics.py）。与上面的 topic_* 是两回事：
-    # topic_* 是引用图谱社区号，这里是按标题/摘要关键词判出来的研究领域与方向。
-    primary_topic: str = ""
-    subtopic: str = ""
-    classification_status: str = ""
-    confidence: str = ""
-    classification_reason: str = ""
-    secondary_topics: list[str] = Field(default_factory=list)
+    # 大类归属（app/buckets.py）。与上面的 topic_* 是两回事：
+    # topic_* 是引用图谱社区号，这里是按标题/摘要关键词判出来的单层大类。
+    bucket: str = ""
+    bucket_status: str = ""
+    bucket_confidence: str = ""
+    bucket_reason: str = ""
 
 
 @app.get("/papers/files", summary="论文库里的文件名（供单篇选择）")
@@ -837,29 +846,28 @@ def _papers_payload() -> dict:
             row.topic_name = topic.topic_name
         cls = classes.get(item.filename)
         if cls:
-            row.primary_topic = cls.get("primary_topic") or ""
-            row.subtopic = cls.get("subtopic") or ""
-            row.classification_status = cls.get("classification_status") or ""
-            row.confidence = cls.get("confidence") or ""
-            row.classification_reason = cls.get("classification_reason") or ""
-            row.secondary_topics = list(cls.get("secondary_topics") or [])
+            row.bucket = cls.get("bucket") or ""
+            row.bucket_status = cls.get("bucket_status") or ""
+            row.bucket_confidence = cls.get("bucket_confidence") or ""
+            row.bucket_reason = cls.get("bucket_reason") or ""
         papers.append(row)
     return {"total": len(papers), "papers": papers}
 
 
 def _classification_index() -> dict[str, dict]:
-    """按文件名回查分类结果。分类失败时返回空字典，不影响论文列表本身。
+    """按文件名回查大类归属。分类失败时返回空字典，不影响论文列表本身。
 
-    数据源：`data/catalog.json`（40 条，含 title/arxiv_id）+ `data/meta/structures.json`
-      （39 条，含 abstract）。有些论文没进 structures（如 Mamba、Active Memory），
-      它们就只有标题证据——这正是 `classification_status=pending` 的来源之一。
+    数据源：`data/catalog.json`（40 条，含 title）+ `data/meta/structures.json`
+      （39 条，含 abstract）+ `data/meta/review_buckets.json`（人工指定表）。
+      没进 structures 的论文只有标题证据；纯图片 PDF 标题也是空的，
+      只能靠人工指定，这类会进「待分类」。
 
     每次请求都重算一遍而不是缓存：40 条分类是纯字符串匹配，实测毫秒级；
-    缓存反而会因为 catalog 被别处改写而读到旧值。
+    缓存反而会因为 catalog 或人工指定表被改写而读到旧值。
     """
     import json
 
-    from app.topics import assign_all
+    from app.buckets import assign_all
 
     try:
         catalog = json.loads((BASE_DIR / "data" / "catalog.json").read_text(encoding="utf-8"))
@@ -881,25 +889,25 @@ def _classification_index() -> dict[str, dict]:
     return {r.get("file") or "": r for r in tagged if r.get("file")}
 
 
-@app.get("/papers/classify", summary="论文按研究领域/方向分组")
+@app.get("/papers/classify", summary="论文按大类分组")
 async def papers_classify() -> dict:
-    """两级分类的分组视图，给论文库的「领域 / 方向」筛选用。
+    """单层大类的分组视图，给论文库的大类筛选用。
 
     与 `/papers/topics` 的区别：
       - `/papers/topics` 按**引用图谱社区**分组（谁引用谁聚类）；
-      - 这里按**论文主旨分类**分组（标题+摘要关键词规则判定）。
+      - 这里按**论文主旨大类**分组（标题+摘要关键词规则判定）。
     两个口径在本库实测差异很大（社区 vs 分类 NMI 仅 0.25），不要混用。
 
     只读聚合，不调大模型。返回结构：
-        {total, fields: [{name, count, subtopics: [{name, count}], papers: [...]}]}
+        {total, buckets: [{name, count, papers: [...]}], pending}
     """
     return await run_in_threadpool(_classify_payload)
 
 
 def _classify_payload() -> dict:
     """`/papers/classify` 的实际取数逻辑。"""
+    from app.buckets import PENDING_BUCKET, list_buckets
     from app.paper_topics import build_topics
-    from app.topics import TOPICS
 
     classes = _classification_index()
     titles: dict[str, str] = {}
@@ -910,41 +918,32 @@ def _classify_payload() -> dict:
     except Exception as exc:  # noqa: BLE001 - 拿不到标题就用文件名兜底
         logger.warning("分类分组取标题失败，用文件名代替：%s", exc)
 
-    order = {name: i for i, name in enumerate(TOPICS)}
-    buckets: dict[str, dict] = {}
+    names = list_buckets()
+    order = {name: i for i, name in enumerate(names)}
+    buckets: dict[str, list[dict]] = {name: [] for name in names}
     for row in classes.values():
-        field = row.get("primary_topic") or "待归类"
-        sub = row.get("subtopic") or "待归类"
-        bucket = buckets.setdefault(
-            field, {"name": field, "count": 0, "subtopics": {}, "papers": []}
-        )
-        bucket["count"] += 1
-        bucket["subtopics"][sub] = bucket["subtopics"].get(sub, 0) + 1
-        bucket["papers"].append(
+        name = row.get("bucket") or PENDING_BUCKET
+        buckets.setdefault(name, []).append(
             {
                 "filename": row.get("file") or "",
                 "title": titles.get(row.get("file") or "") or row.get("file") or "",
-                "subtopic": sub,
-                "status": row.get("classification_status") or "",
-                "confidence": row.get("confidence") or "",
+                "status": row.get("bucket_status") or "",
+                "confidence": row.get("bucket_confidence") or "",
+                "reason": row.get("bucket_reason") or "",
             }
         )
-    fields = []
-    for name in sorted(buckets, key=lambda k: (order.get(k, 999), -buckets[k]["count"])):
-        b = buckets[name]
-        b["papers"].sort(key=lambda p: (p["subtopic"], p["filename"]))
-        fields.append(
-            {
-                "name": name,
-                "count": b["count"],
-                "subtopics": [
-                    {"name": s, "count": c}
-                    for s, c in sorted(b["subtopics"].items(), key=lambda kv: (-kv[1], kv[0]))
-                ],
-                "papers": b["papers"],
-            }
-        )
-    return {"total": sum(f["count"] for f in fields), "fields": fields}
+
+    out = []
+    for name in sorted(buckets, key=lambda k: (order.get(k, 999), k)):
+        items = buckets[name]
+        items.sort(key=lambda p: p["filename"])
+        out.append({"name": name, "count": len(items), "papers": items})
+    return {
+        "total": sum(b["count"] for b in out),
+        "buckets": out,
+        "bucket_names": names,
+        "pending": PENDING_BUCKET,
+    }
 
 
 def _topic_index(filenames: list[str]):
@@ -1011,6 +1010,121 @@ def _topic_groups(filenames: list[str]):
     except Exception as exc:  # noqa: BLE001 - 分组失败退化成单组，别让页面打不开
         logger.warning("论文主题分组失败，退化成「全部」单组：%s", exc, exc_info=True)
         return []
+
+
+# ---------------------------------------------------------------- 大类管理
+#
+# 单层大类：内置 7 类（只许改名、不许删）+ 用户自建类（可删）。
+# 论文归属 = 关键词规则自动判定，判不中的进「待分类」；用户可人工指定覆盖。
+# 全部持久化在 data/meta/review_buckets.json，改完刷新页面仍在。
+
+
+class BucketCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=20)
+
+
+class BucketRenameRequest(BaseModel):
+    old: str = Field(..., min_length=1, max_length=20)
+    new: str = Field(..., min_length=1, max_length=20)
+
+
+class BucketDeleteRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=20)
+
+
+class BucketAssignRequest(BaseModel):
+    filename: str = Field(..., min_length=1, max_length=260)
+    bucket: str = Field(..., min_length=1, max_length=20)
+
+
+async def _bucket_op(fn, *args) -> dict:
+    """跑一个大类写操作，把业务错误翻成 400。
+
+    `app/buckets.py` 用 `ValueError` 表达「重名 / 不许删内置类」这类业务错误。
+    不翻的话它会一路冒到全局异常处理器变成 500，前端只能看到「服务器错误」，
+    而这类错误恰恰是要原样告诉用户「为什么不行」的。
+    """
+    try:
+        names = await run_in_threadpool(fn, *args)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "buckets": names}
+
+
+@app.get("/buckets", summary="大类名单与人工指定表")
+async def buckets_list() -> dict:
+    """列出当前大类（含内置/自建标记与每个大类的论文数）。
+
+    只读，公开可访问：前端筛选条启动时要拿这份名单。
+    """
+    from app.buckets import PENDING_BUCKET
+
+    return await run_in_threadpool(_buckets_payload, PENDING_BUCKET)
+
+
+def _buckets_payload(pending: str) -> dict:
+    from app.buckets import builtin_names, list_buckets, load_state
+
+    names = list_buckets()
+    state = load_state()
+    assignments = state.get("assignments") or {}
+    classes = _classification_index()
+    counts: dict[str, int] = {name: 0 for name in names}
+    for row in classes.values():
+        key = row.get("bucket") or pending
+        counts[key] = counts.get(key, 0) + 1
+    builtin = builtin_names()
+    return {
+        "total": len(classes),
+        "buckets": [{"name": n, "count": counts.get(n, 0), "builtin": n in builtin} for n in names],
+        "pending": pending,
+        "pending_count": counts.get(pending, 0),
+        "assignments": assignments,
+    }
+
+
+@app.post("/buckets", summary="新建大类")
+async def buckets_create(req: BucketCreateRequest) -> dict:
+    """新建一个用户大类。名字不能空、不能与现有（含「待分类」）重名。"""
+    from app.buckets import add_bucket
+
+    return await _bucket_op(add_bucket, req.name)
+
+
+@app.post("/buckets/rename", summary="给大类改名（内置类也可改）")
+async def buckets_rename(req: BucketRenameRequest) -> dict:
+    """改名。内置类一起改：人工指定表里记的旧名会被同步搬到新名下。"""
+    from app.buckets import rename_bucket
+
+    return await _bucket_op(rename_bucket, req.old, req.new)
+
+
+@app.post("/buckets/delete", summary="删除自建大类")
+async def buckets_delete(req: BucketDeleteRequest) -> dict:
+    """删除自建大类。内置 7 类与「待分类」不许删。
+
+    删除后原本归到该类的论文**自动落到「待分类」，不会丢**——
+    因为归属是每次请求现算的，删掉规则即回到无规则状态。
+    """
+    from app.buckets import delete_bucket
+
+    return await _bucket_op(delete_bucket, req.name)
+
+
+@app.post("/buckets/assign", summary="人工指定某篇论文的大类")
+async def buckets_assign(req: BucketAssignRequest) -> dict:
+    """人工覆盖自动判定。指定后该篇一律按人工的结果走（status=manual）。"""
+    from app.buckets import set_assignment
+
+    return await _bucket_op(set_assignment, req.filename, req.bucket)
+
+
+@app.post("/buckets/unassign", summary="撤销人工指定，回到自动判定")
+async def buckets_unassign(req: BucketAssignRequest) -> dict:
+    """等价于把这篇人工指定成「待分类」——`set_assignment` 里就是 pop 掉记录。"""
+    from app.buckets import PENDING_BUCKET, set_assignment
+
+    return await _bucket_op(set_assignment, req.filename, PENDING_BUCKET)
 
 
 @app.post("/papers/upload", summary="上传论文（支持批量，自动查重）")

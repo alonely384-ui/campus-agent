@@ -1917,6 +1917,109 @@ def betweenness(nodes: list[dict], edges: list[dict]) -> dict[str, float]:
     return {k: round(v / top, 6) if top else 0.0 for k, v in cb.items()}
 
 
+def modularity(
+    nodes: list[dict],
+    edges: list[dict],
+    comm: dict[str, int],
+    weight_of: Callable[[dict], float] | None = None,
+) -> float:
+    """模块度 Q：`Q = Σ_c [ L_c / m − (d_c / 2m)² ]`。
+
+    其中 m 是边权总和，L_c 是社区 c 内部边权之和，d_c 是社区 c 的节点度之和。
+    **自环必须乘 2**（UndirectedMultigraph 口径）——这一步算错会让 Q 系统性偏低，
+    并且和随机基线的口径对不上，所以公式里显式写出来，不做隐式处理。
+
+    权重全为 1 时就是教科书对比分块的无权公式；传 `weight_of` 即加权版本。
+    """
+    weight = weight_of or (lambda _e: 1.0)
+    deg: dict[str, float] = defaultdict(float)
+    m2 = 0.0                      # 2m：所有边权之和的两倍
+    inside: dict[int, float] = defaultdict(float)
+    for e in edges:
+        s, t = e.get("source"), e.get("target")
+        if not s or not t or s == t:      # 自环不计入（建图阶段已保证 source != target）
+            continue
+        w = float(weight(e))
+        deg[s] += w
+        deg[t] += w
+        m2 += 2.0 * w
+        cs, ct = comm.get(s), comm.get(t)
+        if cs is not None and cs == ct:
+            inside[cs] += 2.0 * w         # 社区内部边在 ΣL_c 里按两端各记一次
+    if m2 == 0:
+        return 0.0
+    tot: dict[int, float] = defaultdict(float)
+    for nid, d in deg.items():
+        tot[comm[nid]] += d
+    q = sum(inside[c] / m2 - (tot[c] / m2) ** 2 for c in tot)
+    return round(q, 6)
+
+
+def random_q_baseline(
+    nodes: list[dict],
+    edges: list[dict],
+    comm: dict[str, int] | None = None,
+    rounds: int = 200,
+    seed: int = 20261112,
+    weight_of: Callable[[dict], float] | None = None,
+) -> dict[str, Any]:
+    """随机图基线：Q 到底是不是「比随便连连都好」？
+
+    随机化协议（与 docs/GRAPH-COMMUNITY-STUDY.md 2.3 节完全一致，改之前先读那份文档）：
+    **被引方（target）不动，引用方（source）洗牌**。这样保留谁引了几篇、每篇被引几次，
+    只打散「谁引了谁」——如果连这种打散后的图都能拿到同样的 Q，说明社区结构不是真信号。
+
+    不做完全随机的端点重连：那会同时改变入度和出度分布，
+    Q 的对比就混进了"度分布变了"这个额外变量，不再是单一变量的检验。
+
+    每洗一次牌都重新跑 `communities()` 得到划分，再用**同一个** `modularity()` 算 Q——
+    两边口径一致，才能比。固定种子，同一份数据每次结果完全相同（答辩可复现）。
+
+    `comm` 可显式传入真实划分（测试或调用方已经算过 community 时用），
+    不传则内部调用 `communities()` 现算。
+    """
+    import random  # 只在做基线实验时用到，不放模块顶部
+
+    if comm is None:
+        comm = communities(nodes, edges, weight_of=weight_of)
+    real = modularity(nodes, edges, comm, weight_of)
+    if not edges:
+        return {"rounds": 0, "real": real}
+    rng = random.Random(seed)
+    qs: list[float] = []
+    for _ in range(rounds):
+        targets = [e["target"] for e in edges]
+        rng.shuffle(targets)
+        fake = [
+            {"source": e["source"], "target": t, "match_method": e.get("match_method", "")}
+            for e, t in zip(edges, targets, strict=False)
+        ]
+        qs.append(modularity(nodes, fake, communities(nodes, fake, weight_of=weight_of), weight_of))
+    qs.sort()
+    # beaten = 有多少张随机图的 Q **不超过** 实际 Q，也就是实际 Q 压过了多少张。
+    # 这个数越高说明实际划越好（Q 越大越好），所以 p 值 = (rounds - beaten) / rounds。
+    # ⚠ 之前写成 `p = beaten/rounds` 并拿它判显著，方向整个反了：
+    # 实际 Q 压过 198/200 会被算成 p=0.99「比随机还差」。这里必须用「不超过」的计数。
+    beaten = sum(1 for q in qs if q <= real)
+    p_index = min(max(int(round(0.95 * rounds)) - 1, 0), len(qs) - 1)
+    p_value = round((rounds - beaten) / len(qs), 4)
+    return {
+        "rounds": rounds,
+        "seed": seed,
+        "real": real,
+        "mean": round(sum(qs) / len(qs), 6),
+        "min": qs[0],
+        "p95": qs[p_index],
+        "max": qs[-1],
+        # 实际 Q 压过了多少张随机图（越高越好）
+        "beaten": beaten,
+        # p = 随机图能追平或超过实际 Q 的比例；越小越显著
+        "p_value": p_value,
+        "significant": p_value <= 0.05,        # 经验口径：p ≤ 0.05 才算「显著好于随机」
+        "node_count": len(nodes),
+    }
+
+
 def edge_weight_by_match(edge: dict) -> float:
     """按引用匹配方式给边定权（负责人专项改造 P0-2 口径 B）。
 
@@ -1943,9 +2046,14 @@ def communities(
 ) -> dict[str, int]:
     """划分子领域社区：Louvain 两阶段（局部移动 + 社区聚合），纯标准库实现。
 
-    ⚠ 定位提醒：算法把图切成若干簇，但**实测本库的划分不通过随机基线检验**
-    （Q=0.1508，200 次随机图里只超过 76 次）。因此对用户一律称「引用关系簇」，
-    不称研究子领域；它只反映引用网络结构，不等于学科分类。
+    ⚠ 定位提醒：算法把图切成若干簇，但**实测本库的划分不通过随机基线检验**。
+    当前数据（38 节点 / 210 边，4 簇 22/14/1/1）实测 Q=0.079184，
+    200 次随机图（target 不动、source 洗牌，seed=20261112）的 Q 均值 0.132341、
+    95 分位 0.173242；实际 Q **只压过 2/200 张随机图**，p≈0.99，判为不显著。
+    因此对用户一律称「引用关系簇」，不称研究子领域；它只反映引用网络结构，不等于学科分类。
+
+    （历史值：36 节点 / 189 边时代实测 Q=0.1508、超 76/200，结论同样是「不显著」。
+    图变大后 Q 下降是正常的——边密度和簇数都变了，两组数字不可直接比较。）
 
     `weight_of(edge) -> float` 决定边的权重；传 None 等价于所有边权重为 1（旧行为）。
     **权重真的进了算法**：它同时参与节点度 `deg`、社区连接强度 `to_comm`
@@ -1953,7 +2061,7 @@ def communities(
     会改变划分结果，而不是只改一个显示字段。
 
     为什么不用现成的：
-      - 标签传播 LPA：实测在本库 36 点 189 边上**收敛成 1 个社区**，等于没划分；
+      - 标签传播 LPA：实测在本库上（36 点 189 边时代跑过）**收敛成 1 个社区**，等于没划分；
       - 贪心模块度合并（CNM）：实测会一路合并到只剩 1 个大社区，
         因为每次只选全局最大增益、不让节点回退，落进局部最优；
       - python-louvain / scipy 都没装（`nx.pagerank` 就因缺 scipy 报过
@@ -2080,6 +2188,8 @@ def graph_view(data: dict[str, Any], limit_reviews: int = 60) -> dict[str, Any]:
     comm = communities(nodes, edges)
     corner = cornerstone_scores(nodes, edges)
 
+    # 三项指标各自的**全库分位**：前端拿它给节点上大小/排序，不需要再自己算排名。
+    # 分位只在「有引用往来」的节点内部算（见下方 active_out），孤立节点之间比名次没有意义。
     out: list[dict] = []
     for n in nodes:
         nid = n["canonical_id"]
@@ -2100,7 +2210,7 @@ def graph_view(data: dict[str, Any], limit_reviews: int = 60) -> dict[str, Any]:
                 "community": comm.get(nid, -1),
                 "isolated": bool(n.get("isolated")),
                 "match_methods": dict(n.get("match_methods") or {}),
-                # 基石节点（1.5）：分数 + 角色 + 内部名次
+                # 关键论文（1.5）：分数 + 角色 + 内部名次
                 "cornerstone": float(cs.get("score") or 0.0),
                 "cornerstone_rank": int(cs.get("rank") or 0),
                 "role": cs.get("role") or "isolated",
@@ -2110,6 +2220,16 @@ def graph_view(data: dict[str, Any], limit_reviews: int = 60) -> dict[str, Any]:
             }
         )
     out.sort(key=lambda x: (-x["cited_by"], -x["pagerank"]))
+
+    # 三项分位统一在「有引用往来的节点」范围内算，口径和 key_papers 的排序完全一致
+    active_out = [x for x in out if x["cornerstone_rank"]]
+    pr_pct = _rank_pct({x["id"]: x["pagerank"] for x in active_out})
+    cited_pct = _rank_pct({x["id"]: float(x["cited_by"]) for x in active_out})
+    bc_pct = _rank_pct({x["id"]: x["betweenness"] for x in active_out})
+    for x in out:
+        x["pagerank_pct"] = pr_pct.get(x["id"], 0.0)
+        x["cited_pct"] = cited_pct.get(x["id"], 0.0)
+        x["betweenness_pct"] = bc_pct.get(x["id"], 0.0)
 
     # 社区规模，前端按大小分配配色
     sizes: dict[int, int] = defaultdict(int)
@@ -2122,10 +2242,85 @@ def graph_view(data: dict[str, Any], limit_reviews: int = 60) -> dict[str, Any]:
         {"id": cid, "size": cnt} for cid, cnt in sorted(sizes.items(), key=lambda kv: -kv[1])
     ]
 
+    # 指标口径：每个数字都能在代码里找到出处，前端直接展示，不靠文案记忆
+    refs = dict(summary.get("refs") or {})
+    # 候选里两类要分开数：arxiv_absent 是"库里根本没有这篇"（正常缺口），
+    # title_fuzzy 才是"标题像但分数不够"（有误连风险，值得人过一眼）。
+    # 只给总数会让评委以为 1295 条都是"可能进图但被拦下了"。
+    n_absent = int(refs.get("arxiv_absent") or 0) + int(refs.get("arxiv_conflict") or 0)
+    n_fuzzy = int(refs.get("review_title_fuzzy") or 0)
+    summary["quality"] = {
+        "refs_entries": int(refs.get("entries_total") or 0),
+        "matched": int(refs.get("matched_arxiv") or 0)
+        + int(refs.get("matched_exact") or 0)
+        + int(refs.get("matched_fuzzy") or 0),
+        "matched_arxiv": int(refs.get("matched_arxiv") or 0),
+        "matched_exact": int(refs.get("matched_exact") or 0),
+        "matched_fuzzy": int(refs.get("matched_fuzzy") or 0),
+        "unmatched": int(refs.get("unmatched") or 0),
+        "review_total": int(refs.get("review") or len(reviews)),
+        "review_arxiv_absent": n_absent,
+        "review_title_fuzzy": n_fuzzy,
+        "thresholds": dict(summary.get("thresholds") or {}),
+        # 这张图里**没有任何一条边**来自候选：edges 只由 arxiv/title_exact/title_fuzzy 三种命中产生
+        "edges_from_reviews": sum(
+            1 for e in edges if (e.get("match_method") or "") in {"review", "arxiv_absent"}
+        ),
+    }
+
+    # 节点大小口径的原始值：前端要按 PageRank 画半径，得有最大值可除
+    summary["max_pagerank"] = round(max((x["pagerank"] for x in out), default=0.0), 6)
+    summary["max_cited_by"] = max((x["cited_by"] for x in out), default=0)
+
+    # 引用关系簇到底靠不靠谱：实测 Q + 随机图基线（实测 0.4 秒，不必离线跑）
+    community_q = random_q_baseline(nodes, edges, rounds=200)
+    summary["community_q"] = community_q
+
+    def _top(key: str, title: str, unit: str, explain: str, limit: int = 10) -> dict[str, Any]:
+        """三种排序各自独立出一条榜——不允许「一张综合分榜打天下」。"""
+        rows = sorted(active_out, key=lambda x: (-x[key], x["id"]))[:limit]
+        return {
+            "key": key,
+            "title": title,
+            "unit": unit,
+            "explain": explain,
+            "rows": [
+                {
+                    "rank": i + 1,
+                    "id": x["id"],
+                    "title": x["title"],
+                    "value": round(x[key], 6) if key == "pagerank" else x[key],
+                    "community": x["community"],
+                }
+                for i, x in enumerate(rows)
+            ],
+        }
+
+    rankings = [
+        _top(
+            "cited_by",
+            "被引次数",
+            "篇",
+            "库里有多少篇论文直接引用了它。最直白，但只看「数量」不看「引它的人是谁」。",
+        ),
+        _top(
+            "pagerank",
+            "PageRank",
+            "",
+            "被重要论文引用才算数：被一篇边缘论文引 10 次，不如被一篇高影响力论文引 1 次。",
+        ),
+        _top(
+            "betweenness",
+            "中介中心性",
+            "",
+            "有多少条最短路经过它。高不代表重要，代表它是两个引用关系簇之间的「桥」。",
+        ),
+    ]
+
     return {
         "summary": summary,
         "nodes": out,
-        # 基石节点榜（1.5 核心产出）：只列有引用往来的，按分排好序
+        # 关键论文榜（1.5 核心产出）：只列有引用往来的，按综合分排好序
         "cornerstones": [
             {
                 "rank": n["cornerstone_rank"],
@@ -2142,6 +2337,13 @@ def graph_view(data: dict[str, Any], limit_reviews: int = 60) -> dict[str, Any]:
                 (x for x in out if x["cornerstone_rank"]), key=lambda x: x["cornerstone_rank"]
             )
         ],
+        # 三种指标各自独立的 Top 10（P0-3）：前端可切换，切换时榜单一句话解释口径
+        "key_papers": {
+            "weights": {"cited_by": 0.45, "pagerank": 0.40, "betweenness": 0.15},
+            "normalization": "rank_pct",
+            "note": "综合分代表网络结构重要性，不是论文质量。",
+            "rankings": rankings,
+        },
         "isolated": list(data.get("isolated") or []),
         "edges": edges,
         "reviews": reviews[:limit_reviews],

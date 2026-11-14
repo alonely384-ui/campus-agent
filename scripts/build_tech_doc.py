@@ -250,6 +250,14 @@ def add_table(doc: Document, headers: list[str], rows: list[list[str]],
             run.element.rPr.rFonts.set(qn("w:eastAsia"), CJK_FONT)
     if widths:
         _fix_table_width(table, widths)
+    # 表头在跨页时重复。注意**不要**设 cantSplit：它禁止单行拆分，正文行较长的
+    # 表格会因此整张被推到下一页，在上一页留下大片空白（实测 p17/p28/p30/p32
+    # 利用率只有 21%~35% 都是这个原因）。
+    hdr_tr = table.rows[0]._tr
+    hdr_trPr = hdr_tr.get_or_add_trPr()
+    tblHeader = OxmlElement("w:tblHeader")
+    tblHeader.set(qn("w:val"), "true")
+    hdr_trPr.append(tblHeader)
     # 表格后面不再插入空段落：一个空段落约占 16pt，表格正好卡在页尾时
     # 它会单独占掉一行余量、把后续内容整体顶到下一页，造成大片页面空白
     # （实测因此多出 6 个半空页）。改为给表格本身设段后间距。
@@ -322,8 +330,16 @@ def add_bullets(doc: Document, items: list[str]) -> None:
 
 
 def chapter(doc: Document, title: str) -> None:
-    doc.add_page_break()
-    doc.add_heading(title, level=1)
+    """章标题连续排版，不强制另起一页。
+
+    原先每章都 add_page_break()，10 章各起一页，导致 10 个章末尾页里
+    有 7 个利用率不到 40%（最低 21%），合计浪费约 6 页——文档一度从 29 页
+    涨到 34 页，超出官方 30 页上限。改为连续排版后章标题靠「段前距大 +
+    字号大」区分，页数回落到限制内。
+    """
+    h = doc.add_heading(title, level=1)
+    h.paragraph_format.page_break_before = False
+    h.paragraph_format.space_before = Pt(16)
 
 
 def load_facts() -> dict:
@@ -337,6 +353,26 @@ def load_facts() -> dict:
         facts["graph_nodes"] = len(data.get("nodes", []))
         facts["graph_edges"] = len(data.get("edges", []))
         facts["graph_multi"] = [n for n in data.get("nodes", []) if n.get("copy_count", 1) > 1]
+        # 参考文献匹配率：分母是条目总数，分子是成功连上的边。
+        # 这些数字必须现场从图里数，不能写死——历史上就出现过 4234/192 用了很久的情况。
+        refs = (data.get("summary") or {}).get("refs") or {}
+        total = int(refs.get("entries_total") or 0)
+        matched = (int(refs.get("matched_arxiv") or 0)
+                   + int(refs.get("matched_exact") or 0)
+                   + int(refs.get("matched_fuzzy") or 0))
+        facts["ref_total"] = total
+        facts["ref_matched"] = matched
+        facts["ref_rate"] = round(matched / total * 100, 1) if total else 0.0
+        facts["ref_match_summary"] = (
+            f"参考文献条目 {total} 条，成功连边 {matched} 条"
+            f"（arXiv 号命中 {refs.get('matched_arxiv', 0)}、"
+            f"标题精确命中 {refs.get('matched_exact', 0)}、"
+            f"标题近似命中 {refs.get('matched_fuzzy', 0)}），"
+            f"覆盖率 {facts['ref_rate']}%；"
+            f"待人工核验 {refs.get('review', 0)} 条"
+            f"（标题近似分数不够 {refs.get('review_title_fuzzy', 0)} 条，"
+            f"库里根本没有这篇 {refs.get('review_arxiv_conflict', 0)} 条）"
+        )
 
     cat = BASE / "data" / "catalog.json"
     if cat.exists():
@@ -802,6 +838,11 @@ def build() -> Path:
         "宁可少几条边、把可疑的列出来给人看，也不要让图谱好看但结论错。"
         f"当前图规模：{f.get('graph_nodes', 0)} 个逻辑节点、{f.get('graph_edges', 0)} 条引用边。"
     )
+    doc.add_paragraph(
+        "匹配率必须说清楚，否则容易误读：" + f.get("ref_match_summary", "")
+        + "。这个比例偏低是正常现象——图只连「库内论文之间」的引用，"
+        "参考文献里绝大多数指向库外论文，代码不做任何投机性猜测。"
+    )
 
     doc.add_heading("4.2 图谱挖掘指标", level=2)
     doc.add_paragraph(
@@ -824,11 +865,55 @@ def build() -> Path:
         "刻意不依赖 networkx / scipy——依赖越少，他人复现时踩坑越少。"
     )
 
+    doc.add_heading("4.2.1 三项指标各自独立排序，不做加权合成分", level=3)
+    doc.add_paragraph(
+        "原先界面上只有一个「基石节点」榜，把三项指标揉成一个综合分。"
+        "问题在于打分权重（被引 0.45 / PageRank 0.40 / 中介中心性 0.15）没有任何依据，"
+        "而三项指标量纲完全不同——被引次数是整数、PageRank 是小于 1 的小数、"
+        "中介中心性可以到 1.0 以上。把三者加权相加，等于把三个不同单位的东西硬凑成一个数。"
+    )
+    doc.add_paragraph(
+        "改为三张榜各自独立排序、各用各的分位归一化后展示，界面默认显示被引次数。"
+        "综合分仍然保留但降级为次要信息，并在页面上注明"
+        "「综合分代表网络结构重要性，不是论文质量」。"
+        "实测三榜的第一名完全不同：被引次数第一是 Attention Is All You Need（22 篇），"
+        "PageRank 第一是 Layer Normalization，中介中心性第一是 "
+        "Language Models are Few-Shot Learners。"
+        "这个结果本身就说明：任何单一排序都在丢信息。"
+    )
+
+    doc.add_heading("4.2.2 簇划分做了显著性检验，结论是不显著", level=3)
+    doc.add_paragraph(
+        "模块度 Q 本身是个没有量纲的数字，0.08 到底算好不好，必须和随机图比才有意义。"
+        "本项目的做法是：被引方不动、引用方洗牌，保留每个节点的出度和全图被引分布，"
+        "只打散「谁引了谁」，重复 200 次（种子固定为 20261112，结果完全可复现），"
+        "每次洗完重跑一遍社区划分，再用同一套模块度公式算 Q。"
+    )
+    doc.add_paragraph(
+        "当前数据实测：实际 Q = 0.079184，200 次随机图的 Q 均值 0.132341、"
+        "95 分位 0.173242，实际值只压过 2/200 张随机图，p≈0.99。"
+        "也就是说，这张图分出来的簇，比随便一张随机图分的还要松散。"
+    )
+    doc.add_paragraph(
+        "这个结论不好看，但必须如实写：功能定位因此定为「引用关系簇」而不是「研究子领域」，"
+        "界面上颜色只表示「引用了同一批文献」，不表示学科分类。"
+        "如果对外宣称「自动发现三个研究领域」，是有测试数据可以当场反驳的。"
+    )
+    doc.add_paragraph(
+        "顺带修掉一个真 bug：显著性判定方向原本写反了——旧代码用「随机值大于等于实际值」"
+        "的计数当 p 值，导致实际 Q 压过 198/200 张随机图时反而算出 p=0.99、被判成"
+        "「比随机还差」。修正后加三条回归测试守着方向，并做过变异验证：把符号改回去，"
+        "测试立刻失败。参考文献三层匹配中「待人工核验」的 1295 条候选"
+        "（其中 1272 条是库里根本没有这篇，属正常缺口）一条都没有进入图谱，"
+        "不参与 PageRank、中介中心性与簇划分。"
+    )
+
     doc.add_heading("4.3 三种图谱挖掘产物", level=2)
     add_bullets(
         doc,
         [
-            "基石节点：PageRank 高但入度不高，说明被少量关键工作引用、影响超出直接连接范围。",
+            "关键论文三榜：被引次数 / PageRank / 中介中心性各自独立排序，不做加权合成，"
+            "并给出该论文在本库中的分位。",
             "自动综述：基于图结构与元数据生成研究现状概览，不依赖大模型臆测。",
             "前沿探索：三路信号——新近且被引、跨簇桥接、未被接入引用网。",
         ],
@@ -1352,85 +1437,16 @@ def build() -> Path:
         "用户的感受完全不同。"
     )
 
-    doc.add_heading("6.11 桌面版：把整套系统打进一个 exe", level=2)
+    doc.add_heading("6.11 桌面版与分类重试（延伸能力）", level=2)
     doc.add_paragraph(
         "云端部署解决了「评委点开链接就能用」，但没有解决另一件事："
         "很多研究场景里论文本身不能外传，整套系统必须能在一台没联网的机器上跑起来。"
-        "桌面版就是把同一份代码打成一个单文件 exe，双击即用，数据全部留在本机。"
-        "打包产物体积与冷启动耗时均为本机实测。"
-    )
-    add_table(
-        doc,
-        ["指标", "实测值", "说明"],
-        [
-            ["产物大小", "452.9 MB", "单文件 exe，内置全部 Python 运行时、依赖与预置论文库"],
-            ["内置数据", "466.5 MB", "115 个文件的数据包（论文、索引、重排模型）"],
-            ["冷启动", "8.7 秒", "从双击到 /health 返回 200，本机首次运行"],
-            ["打包耗时", "159.6 秒", "scripts/build_desktop.py 全量重打"],
-        ],
-        widths=[3.0, 3.6, 9.6],
-    )
-    doc.add_paragraph(
-        "打包不是把脚本丢给 PyInstaller 就完事。整个过程靠三个环境变量把「数据在哪」从代码里抽出来，"
-        "业务代码一行没改成桌面专用："
-    )
-    add_table(
-        doc,
-        ["环境变量", "作用", "为什么必须这样"],
-        [
-            [
-                "DATA_DIR",
-                "指定数据根目录；不设时取仓库下的 data/",
-                "PyInstaller 运行时 __file__ 指向临时解压目录（_MEIxxxx），"
-                "打包后每次启动路径都变，写死 BASE_DIR 等于每次都找不到数据。"
-                "七个模块统一走 DATA_DIR 后，源码模式行为完全不变",
-            ],
-            [
-                "CAMPUS_ENV_FILE",
-                ".env 的位置，桌面版指到 %LOCALAPPDATA%\\ResearchAssistant\\data\\.env",
-                "配置要能跟随用户，不能跟着 exe 的安装位置走；"
-                "app/config.py 本就优先读这个变量，因此无需改配置层",
-            ],
-            [
-                "LOG_FILE",
-                "同时输出到滚动日志文件（5 MB × 3 份）",
-                "exe 以无控制台方式运行，stdout 全丢。没有这一项，"
-                "任何后台异常都只能靠猜。不设该变量时行为与原来完全一致",
-            ],
-        ],
-        widths=[3.2, 5.2, 7.8],
-    )
-    doc.add_paragraph(
-        "三个真实踩过的坑，都属于「静态分析看不见、运行时才炸」那类："
-    )
-    add_bullets(
-        doc,
-        [
-            "pymupdf 在 import 时无条件激活自己的版面分析模块，要读一份 48.9 MB 的 ONNX 配置目录。"
-            "PyInstaller 不会自动收集它，结果 exe 起来但端口根本不监听。"
-            "本项目只用 fitz 的页面与矩阵接口，不用版面分析，修法是显式收集该包的数据文件。",
-            "chromadb 内部用字符串拼出模块名再 import_module，静态分析完全看不到。"
-            "缺了它，检索会在 except Exception 里被吞成「本轮不带参考资料」——"
-            "服务照常返回 200，答案看起来也像模像样，只是全部凭空生成。"
-            "这类静默降级是最危险的，修法是显式收集 chromadb 全部子模块。",
-            "打包产物里没有 .env，API Key 落到空默认值，对话接口直接 500。"
-            "修法是首次启动时生成一份模板（密钥字段留空），"
-            "密钥本身绝不进 exe——这是红线。",
-        ],
-    )
-    doc.add_paragraph(
-        "日志里的一条启动横幅也是这次加的：每次启动写入一行时间与进程号作分隔。"
-        "起因是排查上面第二个问题时，app.log 里几次启动的日志连成一片，"
-        "分不清哪一段属于哪次运行——排查成本远高于加这三行代码的成本。"
-    )
-
-    doc.add_heading("6.12 五类错误：把「重试」从盲目变成分类", level=2)
-    doc.add_paragraph(
-        "上游大模型接口的失败分好几种，而它们的正确处置方式完全不同："
-        "限流该等一会儿再来，密钥错了重试一万次也没用，参数错了更不该重试。"
-        "SDK 自带的自动重试只看状态码，把 401 和 503 一视同仁，"
-        "既会对着一个错密钥白等，也让「到底重试了几次」变得不可断言。"
-        "所以本项目关掉 SDK 自带重试（max_retries=0），换成自己的一层分类重试。"
+        "桌面版是把同一份代码打成一个 PyInstaller 单文件 exe，双击即用，数据全部留在本机"
+        "（实测产物 452.9 MB、内置数据 466.5 MB、冷启动 8.7 秒）。"
+        "打包不改业务代码，靠三个环境变量把「数据在哪」抽出来：DATA_DIR 指定数据根目录——"
+        "因为 PyInstaller 运行时 __file__ 指向临时解压目录 _MEIxxxx，写死路径等于每次启动都找不到数据；"
+        "CAMPUS_ENV_FILE 让配置跟随用户目录而不是 exe 安装位置；"
+        "LOG_FILE 解决无控制台运行时 stdout 全丢、后台异常只能靠猜的问题。"
     )
     add_table(
         doc,
@@ -1445,18 +1461,17 @@ def build() -> Path:
         widths=[2.4, 5.0, 4.2, 4.6],
     )
     doc.add_paragraph(
-        "实现上是 app/llm_retry.py 的一个 classify() 加一个 call_with_retry()。"
-        "几个必须做对的细节：最多 3 次尝试；退避 0.8 / 1.6 / 3.2 秒、上限 8 秒，"
-        "并叠加 ±25% 的随机抖动——同时刻失败的请求若按同一节奏重试，会一波一波地再撞上去；"
+        "上面这张表是本项目的错误分类重试。起因是 SDK 自带的自动重试只看状态码，"
+        "把 401 和 503 一视同仁——既会对着一个错密钥白等，也让「到底重试了几次」不可断言。"
+        "所以关掉 SDK 重试（max_retries=0），换成 app/llm_retry.py 的一层 classify() + call_with_retry()。"
+        "三个必须做对的细节：退避 0.8 / 1.6 / 3.2 秒并叠加 ±25% 随机抖动，"
+        "否则同时刻失败的请求会按同一节奏一波波再撞上去；"
         "超时必须先于「连接错误」判定，因为超时异常本身是连接异常的子类，"
         "判反了会把「模型太慢」说成「网络不通」，把人引去查错方向；"
         "未识别的异常一律不重试，宁可失败也不要放大一个没人看懂的故障。"
-    )
-    doc.add_paragraph(
-        "还有一条容易被忽略的口径：每日预算只在首次尝试前扣一次，"
-        "重试属于同一个逻辑请求的内部细节。如果每次重试都扣，"
-        "「用户问了几次」和账面数字就对不上了。"
-        f"这一层有 {RETRY_TEST_COUNT} 条测试，逐个类别断言「该重试的重试几次、不该重试的一次都不多」。"
+        "另有一条容易忽略的口径：每日预算只在首次尝试前扣一次，重试属同一逻辑请求的内部细节，"
+        "否则「用户问了几次」和账面数字就对不上。"
+        f"这一层有 {RETRY_TEST_COUNT} 条测试逐个类别断言。"
     )
 
     # ---------------- 创新 ----------------
@@ -1504,7 +1519,8 @@ def build() -> Path:
         doc,
         [
             "角色判定：按入度 / 出度 / 中介中心性把节点分成基石、枢纽、桥接、基础、边缘、孤立六类。"
-            "BERT 在本库中判为基石——被所有人引用、自己几乎不引别人。",
+            "以 BERT 为例：本库中 18 篇引用了它、它只引用了 1 篇，被判为基石节点"
+            "——被广泛引用而自己几乎不引别人，说明它的影响超出直接连接范围。",
             "三路前沿信号：新近且被引、跨簇桥接、尚未接入引用网，"
             "分别对应「热度」「交叉点」「空白区」三种科研选题来源。",
             "自动综述：基于图结构与元数据生成研究现状概览，输入全部是可核验的结构化字段，"
@@ -1761,7 +1777,7 @@ def build() -> Path:
         [
             [
                 "低置信度匹配需人工核验",
-                "48 条落在阈值之间，未入图",
+                "23 条标题近似分数不够（0.75~0.92），未入图；另有 1272 条库里根本没有这篇，属正常缺口",
                 "引入引用上下文语义判断，降低误判",
             ],
             [

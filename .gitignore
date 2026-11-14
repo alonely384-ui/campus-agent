@@ -33,6 +33,10 @@ data/meta/*.pre-rebuild.json
 # （部署时自动创建，删了也只是当天计数归零）
 data/meta/llm-budget.json
 
+# 论文库大类的运行时状态：用户新建/改名/删除的大类与人工指定的归属。
+# 这是每台机器各自的管理状态，不是代码，也不该被 git reset 冲掉。
+data/meta/review_buckets.json
+
 # 1.6 写作助手的生成物，全部按内容哈希命名，随时可重新生成。
 # 注意：.gitignore 不支持行尾注释，# 必须独占一行，否则整行会被当成字面路径。
 data/meta/charts/

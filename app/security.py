@@ -57,8 +57,34 @@ ADMIN_PATHS: frozenset[str] = frozenset(
         "/settings/providers",            # 厂商预设里没有密钥，但属于配置面，一并收进
         "/settings/provider",             # 一键切厂商 = 改 base_url + 模型 + key
         "/papers/{paper_id}",             # DELETE 删论文
+        # ---- 大类管理：会改 data/meta/review_buckets.json，属于配置面 ----
+        # 建类/改名/删类会改变全站的筛选条，人工指定会改变论文归属，
+        # 都必须是管理员操作；只读的 GET /buckets 仍公开（筛选条启动时要用）。
+        "/buckets/rename",
+        "/buckets/delete",
+        "/buckets/assign",
+        "/buckets/unassign",
+        # 注意：`/buckets` 的 GET（读名单）与 POST（新建大类）同路径，
+        # 不能整条登记成管理接口，否则筛选条拉不到名单。
+        # 见 path_methods_admin()：只把写方法拦下来。
     }
 )
+
+# 少数路径 GET 公开、写方法要管理员：`{路径: 需要管理员的方法集合}`。
+# 之所以不拆成两条路径，是因为前端就一个地址，拆了反而多一层跳转。
+METHOD_ADMIN_PATHS: dict[str, frozenset[str]] = {
+    "/buckets": frozenset({"POST", "PUT", "PATCH", "DELETE"}),
+}
+
+
+def path_methods_admin(path: str, method: str) -> bool:
+    """这个路径的**这个方法**是否需要管理员认证。
+
+    用途：路由对账（main.py 的 `_check_routes`）与中间件都问这一处，
+    避免两处各写一份判断而慢慢走样。
+    """
+    rules = METHOD_ADMIN_PATHS.get(path)
+    return bool(rules) and (method or "").upper() in rules
 
 # 公开：演示功能 + 只读数据 + 页面本身
 PUBLIC_PATHS: frozenset[str] = frozenset(
@@ -323,6 +349,17 @@ _RATE_TABLE: dict[str, Bucket] = {
     "/papers/files": BUCKET_LIGHT,
     "/papers/topics": BUCKET_LIGHT,
     "/papers/classify": BUCKET_LIGHT,
+    # /buckets 漏登记时走 DEFAULT_BUCKET（BUCKET_CPU，rate=0.05），
+    # 实测进论文库点几篇就 429：页面开一次就要 /buckets + /papers/classify，
+    # 每指定一次分类还要再拉 /buckets。分类名单是纯内存读，按轻量档。
+    "/buckets": BUCKET_LIGHT,
+    # 分类管理的四个写接口：都是内存状态 + 一次 JSON 落盘（data/meta/review_buckets.json），
+    # 单次实测 < 5ms。管理员自己点按钮，给轻量档即可；漏登记会掉进 DEFAULT_BUCKET
+    # （BUCKET_CPU，20 秒回 1 个），改个名都得等。
+    "/buckets/rename": BUCKET_LIGHT,
+    "/buckets/delete": BUCKET_LIGHT,
+    "/buckets/assign": BUCKET_LIGHT,
+    "/buckets/unassign": BUCKET_LIGHT,
     "/reader/papers": BUCKET_LIGHT,
     "/recommendations": BUCKET_LIGHT,
     "/graph": BUCKET_LIGHT,
@@ -811,6 +848,7 @@ def redact(text: str) -> str:
 
 __all__ = [
     "ADMIN_PATHS",
+    "METHOD_ADMIN_PATHS",
     "PUBLIC_PATHS",
     "PUBLIC_PREFIXES",
     "DOC_PATHS",
@@ -838,6 +876,7 @@ __all__ = [
     "limiter",
     "login_guard",
     "normalize_path",
+    "path_methods_admin",
     "origin_allowed",
     "redact",
     "reserve_llm_call",

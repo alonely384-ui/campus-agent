@@ -116,6 +116,8 @@
 
   /* ---------- 界面语义：背景 ---------- */
   --bg-page:      var(--gray-100);   /* 页面底色 */
+  --bg-base:      var(--gray-0);     /* 输入框、下拉框的内底（与容器同色系、略抬一层） */
+  --bg-subtle:    var(--gray-50);    /* 提示条、代码块这类弱底 */
   --bg-surface:   var(--gray-0);     /* 卡片 / 面板 */
   --bg-surface-2: var(--gray-50);    /* 卡片内的次级区块、表头 */
   --bg-muted:     var(--gray-150);   /* 标签、代码行、悬停底 */
@@ -166,6 +168,7 @@
   /* ---------- 界面语义：边框 ---------- */
   --border-color:     var(--gray-200);  /* 默认分割线 / 卡片边 */
   --border-color-alt: var(--gray-150);  /* 极淡分割线（列表项之间） */
+  --border-subtle:    var(--gray-150);  /* 同 --border-color-alt 的新名字，语义更直白 */
   --border-strong:    var(--gray-300);  /* 输入框、按钮的可见边 */
   --border-brand:     var(--blue-500);
   --border-focus:     var(--blue-500);

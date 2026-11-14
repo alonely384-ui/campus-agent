@@ -1343,3 +1343,63 @@ def test_merge_column_splits_respects_stop():
     assert "Author. Title" in joined
 
 
+# ---------- 模块度与随机基线（P0-1：顶部结论必须能被代码复算）----------
+
+
+def _two_blobs() -> tuple[list[dict], list[dict]]:
+    """两个互不相连的团：模块度应该接近 0.5，远高于同规模随机图。
+
+    节点必须用 `canonical_id`（`communities()` 与 `graph_view()` 都用这个键），
+    用 `id` 会直接 KeyError。
+    """
+    nodes = [{"canonical_id": f"n{i}", "id": f"n{i}", "title": f"n{i}"} for i in range(6)]
+    edges = [
+        {"source": "n0", "target": "n1"},
+        {"source": "n1", "target": "n2"},
+        {"source": "n2", "target": "n0"},
+        {"source": "n3", "target": "n4"},
+        {"source": "n4", "target": "n5"},
+        {"source": "n5", "target": "n3"},
+    ]
+    return nodes, edges
+
+
+def test_modularity_of_two_disjoint_triangles():
+    """两个不相连的三角形，Q 应该明显大于 0（分层清楚）。"""
+    nodes, edges = _two_blobs()
+    comm = {"n0": 0, "n1": 0, "n2": 0, "n3": 1, "n4": 1, "n5": 1}
+    q = graph.modularity(nodes, edges, comm)
+    assert q > 0.4, q
+
+
+def test_random_baseline_direction_and_fields():
+    """实际 Q 明显好于随机时，beaten 必须接近满分、p_value 必须很小。
+
+    这个用例专门守住一个真 bug：`beaten` 曾用 `q >= real` 计数、p 又写成
+    `beaten / rounds`，方向全反——实际 Q 压过 198/200 会被报成 p≈0.99「比随机还差」。
+    """
+    nodes, edges = _two_blobs()
+    comm = {"n0": 0, "n1": 0, "n2": 0, "n3": 1, "n4": 1, "n5": 1}
+    real = graph.modularity(nodes, edges, comm)
+    res = graph.random_q_baseline(nodes, edges, comm, rounds=50, seed=20261112)
+
+    assert res["real"] == real
+    assert res["node_count"] == 6
+    # 方向：实际明显好于随机 -> 压过绝大多数随机图，p 很小
+    assert res["beaten"] >= 45, res
+    assert res["p_value"] <= 0.1, res
+    assert res["significant"] is True, res
+    # p 值与 beaten 必须自洽：p = (rounds - beaten) / rounds
+    assert abs(res["p_value"] - (res["rounds"] - res["beaten"]) / res["rounds"]) < 1e-9
+
+
+def test_random_baseline_is_reproducible_with_seed():
+    """同一个 seed 必须给出完全相同的基线，否则页面上的结论没法复现。"""
+    nodes, edges = _two_blobs()
+    comm = {"n0": 0, "n1": 0, "n2": 0, "n3": 1, "n4": 1, "n5": 1}
+    a = graph.random_q_baseline(nodes, edges, comm, rounds=30, seed=7)
+    b = graph.random_q_baseline(nodes, edges, comm, rounds=30, seed=7)
+    assert a == b
+    assert a["seed"] == 7 and a["rounds"] == 30
+
+
