@@ -37,6 +37,10 @@ data/meta/llm-budget.json
 # 这是每台机器各自的管理状态，不是代码，也不该被 git reset 冲掉。
 data/meta/review_buckets.json
 
+# 用户反馈的运行数据：线上每收到一条反馈就追加，dev 机器上通常不存在。
+# 不是代码，提交它只会让 git status 长期挂一个未跟踪项。
+data/meta/feedback.json
+
 # 1.6 写作助手的生成物，全部按内容哈希命名，随时可重新生成。
 # 注意：.gitignore 不支持行尾注释，# 必须独占一行，否则整行会被当成字面路径。
 data/meta/charts/
