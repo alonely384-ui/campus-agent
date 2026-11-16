@@ -977,6 +977,31 @@ function renderLayoutPanel() {
 }
 
 /** 侧栏的表格 / 公式 / 图表清单：原文里的公式和表格保持 PDF 原样，这里只负责"点一下就定位到那页"。 */
+/** 缩略图加载失败时退避重试一次。
+ *
+ * 为什么需要：右侧图表清单是一次性把几十个 <img> 塞进 DOM 的，浏览器随即并发
+ * 请求 /paper/{f}/figure/{i}。服务端按令牌桶限流，偶发的 429（同一篇重复打开、
+ * 或与其它接口抢额度）会让这批图变成一排裂开的图标——用户看不出是限流，
+ * 只觉得"图没显示"。
+ *
+ * 为什么用内联 onerror 而不是 addEventListener：图片在 innerHTML 赋值的那一刻
+ * 就开始请求，等赋值返回再挂监听，失败的 error 事件可能已经派发完了。
+ * 内联属性写在标签上，解析即生效，不会漏。
+ */
+window.retryFig = function retryFig(img) {
+  const tries = Number(img.dataset.retry || 0);
+  if (tries >= 2) {
+    img.classList.add('fig-broken');
+    return;
+  }
+  img.dataset.retry = String(tries + 1);
+  const idx = img.dataset.figIdx || '';
+  // 限流是按令牌补充的，等一会儿再要；时间戳绕过浏览器对失败响应的缓存
+  setTimeout(() => {
+    img.src = `/paper/${encodeURIComponent(state.paperName)}/figure/${idx}?r=${Date.now()}`;
+  }, 800 * (tries + 1));
+};
+
 function renderLists(meta) {
   const tables = (meta && meta.tables) || [];
   const formulas = (meta && meta.formula_pages) || [];
@@ -1008,6 +1033,8 @@ function renderLists(meta) {
     ? figures.map(f =>
         `<a class="fig" href="#" data-page="${f.page}" title="${escapeHtml(f.caption)}">` +
         `<img loading="lazy" alt="图${escapeHtml(f.number || '')}" ` +
+        `data-fig-idx="${f.index}" ` +
+        `onerror="retryFig(this)" ` +
         `src="/paper/${encodeURIComponent(state.paperName)}/figure/${f.index}">` +
         `<span class="cap"><span class="txt">` +
         `图${escapeHtml(f.number || '')} ${escapeHtml(f.caption.slice(0, 46))}` +

@@ -223,9 +223,17 @@ def test_route_count_matches_design():
     新增 /buckets（读写同路径，GET 公开 / 写要管理员，登记在 METHOD_ADMIN_PATHS）
     与 /buckets/rename、/buckets/delete、/buckets/assign、/buckets/unassign 四条，
     后四条都归管理员。
+    2026-11-15：54 → 56，新增 /graph/local 与 /graph/local/upload（赛题 1.5 局域图谱），
+    两条都归公开：和 /graph 一样是只读的图计算，不写任何数据；
+    上传那条额外登记在 body_limit_for() 里，给到 256MB 批量额度，
+    而不是沿用 /papers/upload 的 24MB 单品上限。
+    2026-11-16：56 → 58，新增两条（「顺着参考文献下载」改成推荐列表 + 逐篇下载）：
+    GET /paper/{filename}/references/plan（只挑不下，公开，限流 BUCKET_LLM，
+    因为逐条调模型写理由会消耗额度）与 POST /paper/{filename}/references/download-one
+    （单篇下载入库，公开，限流 BUCKET_HEAVY，与批量下载同档）。
     """
     templates = main_mod._route_templates()
-    assert len(templates) == 54, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
+    assert len(templates) == 58, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
 
 
 def test_admin_paths_have_no_public_overlap():
@@ -416,6 +424,93 @@ def test_heavy_endpoints_get_stricter_limits_than_light_ones():
     """/graph/survey 单次 626ms、并发 16 要 10 秒；绝不能和 /health 同档。"""
     assert bucket_for("/graph/survey").rate < bucket_for("/health").rate
     assert bucket_for("/settings/index/health").rate < bucket_for("/health").rate
+
+
+def test_local_graph_is_not_throttled_to_heavy_tier():
+    """局域图谱的两个接口不能沿用 BUCKET_HEAVY。
+
+    回归的真实 bug：/graph/local/upload 当初按「和 /papers/upload 一样有副作用」
+    归到 BUCKET_HEAVY（rate=0.02 → 50 秒才回 1 个令牌，burst=2）。
+    但局域图谱只是把 PDF 解到临时目录、算完就删，不写入库也不连外网，
+    实测 6 篇 7s / 20 篇 19s / 40 篇 65s，属于纯计算。
+    后果：用户点两次建图后就被 429 锁近一分钟，页面停在"正在解析…"，
+    看起来像功能坏了（真实反馈："没显示"、"一片空白一直转圈"）。
+    """
+    heavy = bucket_for("/papers/upload")
+    lib = bucket_for("/graph/local")
+    up = bucket_for("/graph/local/upload")
+    # 两个都比 HEAVY 宽松，否则演示时反复试一次就撞 429
+    assert lib.burst > heavy.burst, "库内建图突发额度不能低于重量级写入"
+    assert up.burst > heavy.burst, "上传建图突发额度不能低于重量级写入"
+    assert lib.rate > heavy.rate
+    assert up.rate > heavy.rate
+    # 但上传版要收更大的请求体、还要落盘解析，额度必须比库内版紧
+    assert up.burst <= lib.burst
+    assert up.rate <= lib.rate
+    assert up.burst >= 2, "至少要能连续试两次（用户第一次失败一定会重试）"
+
+
+def test_figure_thumbnails_are_not_throttled_to_light_tier():
+    """阅读器侧栏的缩略图不能挂在 BUCKET_LIGHT。
+
+    回归的真实 bug：/paper/{f}/figure/{i} 原来按「轻量只读」归到
+    BUCKET_LIGHT（rate=2.0, burst=10）。但阅读器右侧图表清单是一次性并发
+    渲染的，Llama 2 一篇就有 34 张图。实测连打 40 次：
+    200×11 / 429×29 —— 第 11 张起全部裂开，用户看到「左边的图没显示」。
+
+    它每张只是从本地 PDF 裁一小块或直接读缓存，不连外网、不耗模型额度，
+    所以突发额度要撑得住「一次把一篇展开完」。
+    """
+    fig = bucket_for("/paper/{filename}/figure/{index}")
+    light = bucket_for("/health")
+    assert fig.burst > light.burst, "缩略图并发量大，突发额度必须高于普通只读接口"
+    assert fig.burst >= 40, "要覆盖单篇最多 30+ 张缩略图，且允许同一篇再打开一次"
+    assert fig.rate >= 1.0, "补得太慢时，用户切走再回来会看到满屏 429"
+
+
+def test_layout_endpoint_survives_browsing_several_papers():
+    """连续看几篇论文时 /layout 不能 429。
+
+    回归的真实 bug：/paper/{f}/layout 原来挂在 BUCKET_CPU（rate=0.05, burst=2）。
+    每打开一篇论文前端都要调它一次判断单栏/双栏，实测连开 5 篇：
+    第 3、4、5 篇全部 429，页面上「单栏/双栏」徽章一直显示"未知"。
+    直接连打 12 篇实测：[200, 200, 429, 429, ...] —— 只放行 2 次。
+
+    它确实重（抽样 40 页，冷启动 194–1419 ms），所以不能给轻量档；
+    但也不该按"20 秒才回 1 个"处理——用户正常翻论文就会撞上。
+    """
+    lay = bucket_for("/paper/{filename}/layout")
+    light = bucket_for("/health")
+    assert lay.burst >= 5, "至少要能连续打开 5 篇论文而不被拦"
+    assert lay.burst < light.burst, "它比普通只读重，突发额度要更小"
+    assert lay.rate > 0, "完全不给补充会把缓存失效后的正常浏览也锁死"
+
+
+def test_browsing_one_paper_stays_within_limits():
+    """打开一篇论文（含展开图表清单）的全部请求，在补满状态下不能撞 429。
+
+    这条是"新加论文不出问题"的守门测试：把一次真实阅读会打的请求量
+    按档位汇总，要求每个档位消耗的令牌数 ≤ 该档位的 burst。
+    数字取自 2026-11-16 实测（Llama 2，34 张图）：
+        /paper/{filename}/figure/{index}  34 次   ← 侧栏缩略图
+        /paper/{filename}                  7 次   ← PDF 本体 + 6 个 Range(206)
+        /paper/{filename}/structure        1 次
+        /paper/{filename}/layout           1 次
+        /paper/{filename}/translation      1 次
+    """
+    reading = {
+        "/paper/{filename}/figure/{index}": 34,
+        "/paper/{filename}": 7,
+        "/paper/{filename}/structure": 1,
+        "/paper/{filename}/layout": 1,
+        "/paper/{filename}/translation": 1,
+    }
+    over = []
+    for template, need in reading.items():
+        bt = bucket_for(template)
+        if need > bt.burst:
+            over.append(f"{template} 需要 {need} 个令牌，但 burst 只有 {bt.burst}")
+    assert not over, "打开一篇论文就会撞限流：\n  " + "\n  ".join(over)
 
 
 # ============================================================ 8. 每日预算
