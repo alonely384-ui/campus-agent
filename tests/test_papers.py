@@ -89,3 +89,41 @@ def test_similarity_is_symmetric_and_bounded(library):
     a, b = "同一段文字内容" * 30, "同一段文字内容" * 30
     assert library.similarity(a, b) == 1.0
     assert library.similarity(a, "完全不同的另一段") < 0.5
+
+
+def test_upload_merges_structure_into_total_table(library, tmp_path, monkeypatch):
+    """上传进来的论文，结构必须写进 structures.json 总表。
+
+    回归背景（2026-11-16）：`save_paper` 以前只写旁挂的
+    `data/papers/<id>.structure.json`，没调 `merge_structure`。阅读页和
+    `/paper/{f}/structure` 查的是按文件名索引的总表，于是从「上传」入口进来的
+    论文全都 404、标题显示成「未解析出标题」——只有 `/library/download`
+    那条链路显式合并过，所以问题一直藏在下载路径之外。
+    """
+    import app.structure as structure_mod
+
+    # 让结构解析走一张已知的假结果，不必依赖真 PDF 的版式
+    fake = {
+        "title": "Language Models are Unsupervised Multitask Learners",
+        "authors": ["Alec Radford"],
+        "affiliations": [],
+        "abstract": "abstract text",
+        "sections": [{"level": 1, "number": "1", "title": "Introduction", "page": 1}],
+        "tables": [],
+        "figures": [],
+        "formulas": [],
+        "references": {"page": 9, "count": 113, "first": "", "last": ""},
+        "source": "text",
+    }
+    monkeypatch.setattr(structure_mod, "parse_structure", lambda *a, **k: dict(fake))
+    monkeypatch.setattr(library, "merge_structure", lambda fn, st: library.__dict__.setdefault(
+        "_merged", []).append((fn, st)) or True, raising=False)
+
+    paper, _, _ = library.save_paper(
+        *_fake_pdf("gpt2.pdf"), text_extractor=lambda p: "论文正文内容，用于上传路径测试。" * 5
+    )
+
+    merged = library.__dict__.get("_merged") or []
+    assert merged, "上传路径没有调用 merge_structure，阅读页会查不到章节树"
+    assert merged[0][0] == paper.filename
+    assert merged[0][1]["title"].startswith("Language Models are Unsupervised")

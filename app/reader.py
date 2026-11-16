@@ -12,12 +12,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 
 from app.layout import layout_summary
 from app.logging_config import get_logger
-from app.papers import PAPERS_DIR, load_structures
+from app.papers import PAPERS_DIR, _load_index, load_structures, paper_path
 
 logger = get_logger(__name__)
 
@@ -34,6 +35,11 @@ def safe_paper_path(filename: str) -> Path | None:
         1. 带路径的：`../app/main.py`、`C:\\Windows\\x.pdf`、`sub/dir.pdf`
         2. 非 PDF：`structures.json`
         3. 解析后不在 data/papers 里的（软链接指向别处也算）
+
+    两种命名都要认：手动拷进 data/papers 的保留原名，走上传接口存进来的是
+    `<paper_id>.pdf`。后者磁盘上根本没有 `paper.filename` 这个文件，只按名字直查
+    会一律 404（实测 44 篇里有 5 篇是这样：GPT-2、1602.07776、1705.03122、
+    1610.08613、2312.00752）。所以直查落空时回落到索引，用 paper_id 找。
     """
     if not filename or filename != Path(filename).name:
         return None
@@ -41,9 +47,22 @@ def safe_paper_path(filename: str) -> Path | None:
         return None
     root = PAPERS_DIR.resolve()
     candidate = (root / filename).resolve()
-    if candidate.parent != root or not candidate.is_file():
-        return None
-    return candidate
+    if candidate.parent == root and candidate.is_file():
+        return candidate
+
+    # 直查落空：按索引里的 filename 反查 paper_id，再走 paper_path（它认两种命名）。
+    # 索引项必须重新校验名字，别信 index.json 里存的任意值。
+    with contextlib.suppress(Exception):
+        for row in _load_index():
+            if row.filename != filename:
+                continue
+            found = paper_path(row.paper_id)
+            if found is None:
+                continue
+            resolved = found.resolve()
+            if resolved.parent == root and resolved.is_file():
+                return resolved
+    return None
 
 
 def list_reader_papers() -> list[dict]:

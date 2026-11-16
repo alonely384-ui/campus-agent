@@ -496,6 +496,11 @@ def save_paper(
         structure = parse_structure(str(dest))
         if structure.get("title") or structure.get("authors"):
             save_structure(paper_id, structure)
+            # 旁挂 JSON 只是备份，阅读页与 /paper/{f}/structure 查的是
+            # data/meta/structures.json 那张按文件名索引的总表。不合并进去，
+            # 上传进来的论文就永远没有章节树——下载链路（/library/download）
+            # 一直是显式合并的，这里以前漏了。
+            merge_structure(safe_name, structure)
     except Exception:  # noqa: BLE001
         logger.exception("结构化解析失败，跳过（不影响上传）")
 
