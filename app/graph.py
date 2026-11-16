@@ -2606,6 +2606,28 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
             }
             for n in reps
         ],
+        # 可引用清单：**全量**参与本次综述的论文，供大模型写作时点名。
+        #
+        # 为什么不复用 representatives：那一个是 Top 5 的展示榜，综述五段只给模型 5 篇
+        # 会写得极空。这里必须与 pool 一一对应——上层 narrative.py 的引用校验拿它当
+        # 唯一白名单，模型引用清单之外的 id 一律判越界。
+        #
+        # 为什么不会混进低置信条目：pool 来自 view["nodes"]，而 graph_view() 造节点时
+        # 只用 data["nodes"]；reviews（待人工核验队列）从未进入节点，也不产生边，
+        # 所以这里天然不含待审核记录。
+        "citable": [
+            {
+                "id": n["id"],
+                "title": n["title"],
+                "year": n.get("year"),
+                "role": n["role"],
+                "cited_by": n["cited_by"],
+                "category": n.get("category") or "",
+                # 写作用的事实句：摘要首句。补不上就是空串，绝不用标题冒充摘要。
+                "abstract_lead": _first_sentence(n.get("abstract", "")),
+            }
+            for n in pool
+        ],
         "topics": sorted({n["category"] for n in enriched if n.get("category")}),
     }
 

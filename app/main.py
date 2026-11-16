@@ -38,7 +38,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 from starlette.routing import Mount
 
-from app import kb_health, llm, scheduler, settings_api
+from app import kb_health, llm, narrative, scheduler, settings_api
 from app.agent import run_agent, run_agent_stream
 from app.chart import make_chart
 from app.config import settings
@@ -601,6 +601,18 @@ class ChatRequest(BaseModel):
         default=True,
         description="是否启用稠密向量召回。前端「智能搜索」关掉时传 false，只跑哈希 + BM25",
     )
+
+
+class NarrativeRequest(BaseModel):
+    """POST /graph/survey/narrative 的请求体。
+
+    focus 与 GET /graph/survey 同义：给某个主题名时只综述该主题。
+    这里不传论文列表，因为综述永远基于整张图谱（全库或局域）——
+    局域图谱请先把局域结果当作 view 再调，前端传的是「哪个 view」这件事的
+    后端等价物就是 focus，其余口径由图谱自身决定。
+    """
+
+    focus: str = Field(default="", max_length=64, description="主题名，留空综述全库")
 
 
 def trim_history(history: list[dict] | None) -> list[dict]:
@@ -2222,6 +2234,57 @@ async def graph_frontier(limit: int = 8) -> dict:
         return {"ready": False, "detail": "图谱缓存还没生成，请先运行 python scripts/build_graph.py"}
     view = await run_in_threadpool(graph_view, raw)
     return await run_in_threadpool(frontier, view, max(1, min(limit, 50)))
+
+
+@app.post("/graph/survey/narrative", summary="自动综述的大模型论述层（1.5.3，SSE）")
+async def graph_survey_narrative(req: NarrativeRequest) -> StreamingResponse:
+    """把 survey() 算好的图谱事实交给模型写成五段论述，逐段校验后流式下发。
+
+    与 GET /graph/survey 的分工：
+        GET  /graph/survey           模板拼串，零模型调用，毫秒级，数字 100% 可复核
+        POST /graph/survey/narrative 在同一批事实之上加一层模型论述，10–40 秒
+
+    为什么不合并成一个：模板版在模型不可用时仍能出结果（降级路径），
+    而且它的每一个数字都是当场算出来的，答辩时可以直接对着数字讲。
+    论述版只是"更好读"，不能取代它。
+    """
+
+    async def event_generator():
+        try:
+            raw = await run_in_threadpool(load_graph)
+            if not raw:
+                yield narrative.encode_event(
+                    {"type": "error", "message": "图谱缓存还没生成，请先运行 python scripts/build_graph.py"}
+                )
+                yield narrative.encode_event({"type": "done"})
+                return
+            view = await run_in_threadpool(graph_view, raw)
+            data = await run_in_threadpool(survey, view, req.focus)
+            if not data.get("ready"):
+                yield narrative.encode_event(
+                    {"type": "error", "message": data.get("detail") or "图谱为空，无法生成综述"}
+                )
+                yield narrative.encode_event({"type": "done"})
+                return
+            async for chunk in sse_with_heartbeat(narrative.narrative_events(data)):
+                yield chunk
+        except ClientDisconnect:
+            # 客户端断开：静默收尾，不再写事件（写也写不出去，还会刷日志）
+            logger.info("综述流被客户端中断")
+        except Exception:
+            logger.exception("综述生成失败")
+            yield narrative.encode_event({"type": "error", "message": "综述生成失败，请稍后重试"})
+            yield narrative.encode_event({"type": "done"})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ---------------- 写作助手（1.6） ----------------

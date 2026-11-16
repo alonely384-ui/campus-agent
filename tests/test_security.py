@@ -231,9 +231,12 @@ def test_route_count_matches_design():
     GET /paper/{filename}/references/plan（只挑不下，公开，限流 BUCKET_LLM，
     因为逐条调模型写理由会消耗额度）与 POST /paper/{filename}/references/download-one
     （单篇下载入库，公开，限流 BUCKET_HEAVY，与批量下载同档）。
+    2026-11-17：58 → 59，新增 POST /graph/survey/narrative（赛题 1.5.3 自动综述的
+    模型论述层，SSE，公开）：它和 /graph/survey 同一批事实，但内部连写 5 段、
+    每段一次模型调用，所以单独挂 BUCKET_NARRATIVE，不挂 BUCKET_CPU。
     """
     templates = main_mod._route_templates()
-    assert len(templates) == 58, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
+    assert len(templates) == 59, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
 
 
 def test_admin_paths_have_no_public_overlap():

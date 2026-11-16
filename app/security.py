@@ -123,6 +123,10 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/recommendations/schedule",
         "/graph",
         "/graph/survey",
+        # 综述的模型论述层：与 /graph/survey 同一批事实，只是多一层 LLM 写作。
+        # 它会消耗模型额度，所以必须挂在 M 档限流 + daily_budget 下面，
+        # 不能按只读接口的宽松档。
+        "/graph/survey/narrative",
         "/graph/frontier",
         # 局域图谱（赛题 1.5.1/1.5.2）：见下面 _RATE_TABLE 里的说明。
         # 它不是 /papers/upload 那种"下载 + 建索引 + 落盘"的重量级写入，
@@ -372,6 +376,15 @@ BUCKET_REF_PLAN = Bucket(rate=0.1, burst=8)
 # 上传版更重（要收最多 256MB 请求体、落盘再解析），给 5 次突发、20 秒补 1 个。
 BUCKET_LOCAL_GRAPH = Bucket(rate=0.1, burst=8)
 BUCKET_LOCAL_GRAPH_UPLOAD = Bucket(rate=0.05, burst=5)
+# 档位 M 综述生成：一次请求内会**连写 5 段**，每段一次模型调用（实测单段 2–8 秒），
+# 合计 10–40 秒。不能挂 BUCKET_CPU（rate=0.05, burst=2）：那个档位是给
+# /graph/survey 这种纯 CPU 拼串标定的，突发 2 意味着点第三次就被 429，
+# 而用户换一个 focus 再看一遍是很自然的行为。
+# 也不能直接挂 BUCKET_LLM（burst=3）：它按"单次模型调用"标定，
+# 而这里一次请求就是 5 次调用，真实成本由 daily_budget 与
+# narrative.MAX_NARRATIVE_LLM_CALLS 双重兜住。
+# 标定：突发 3 次（等同一轮演示里换库/换主题重开两次），之后每 30 秒补 1 个。
+BUCKET_NARRATIVE = Bucket(rate=0.033, burst=3)
 # 档位 I 侧栏缩略图：阅读器右侧的图表清单一次会并发请求几十张
 # /paper/{f}/figure/{i}（Llama 2 一篇就 34 张）。单张只是从本地 PDF 裁一小块
 # 或直接读 data/meta/figures 缓存，**不连外网、不耗模型额度**，风险只在于
@@ -444,6 +457,11 @@ _RATE_TABLE: dict[str, Bucket] = {
     "/graph/local/upload": BUCKET_LOCAL_GRAPH_UPLOAD,
     "/recommendations/{key}/feedback": BUCKET_LIGHT,
     "/recommendations/schedule": BUCKET_LIGHT,
+    # ---- M 综述生成（LLM + CPU 混合） ----
+    # 一次请求内部连写 5 段、每段一次模型调用，合计 10–40 秒。
+    # 不能沿用下面的 /graph/survey（BUCKET_CPU：rate=0.05, burst=2，
+    # 点第三次就 429），也不能沿用 BUCKET_LLM（按单次调用标定，突发 3）。
+    "/graph/survey/narrative": BUCKET_NARRATIVE,
     # ---- E CPU 密集 ----
     "/graph/survey": BUCKET_CPU,
     "/graph/frontier": BUCKET_CPU,
@@ -929,6 +947,7 @@ __all__ = [
     "BUCKET_LLM",
     "BUCKET_LOCAL_GRAPH",
     "BUCKET_LOCAL_GRAPH_UPLOAD",
+    "BUCKET_NARRATIVE",
     "BUCKET_REF_PLAN",
     "BUCKET_SCAN",
     "COOKIE_NAME",

@@ -29,6 +29,65 @@
     .spacer { flex: 1; }
 
     #hint { font-size: 12px; color: var(--text-muted); max-width: 640px; line-height: 1.5; }
+    #commNote {
+      margin-top: 6px; padding: 6px 10px; border-radius: 8px;
+      background: var(--bg-surface-alt, #f5f6f8);
+      border-left: 3px solid var(--warning, #d97706);
+      font-size: 11.5px; color: var(--text-muted); max-width: 680px; line-height: 1.55;
+    }
+
+    /* ---------- 自动综述（1.5.3） ---------- */
+    #narBar {
+      margin: 10px 16px 0;
+      padding: 12px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      background: var(--bg-surface);
+    }
+    #narBar[hidden] { display: none; }
+    .nar-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .nar-head b { font-size: 14px; }
+    .nar-sub { font-size: 12px; color: var(--text-subtle); line-height: 1.6; }
+    .nar-btn {
+      padding: 5px 14px; font-size: 12.5px; border-radius: 6px;
+      border: 1px solid var(--border-color); background: var(--accent); color: #fff; cursor: pointer;
+    }
+    .nar-btn.ghost { background: transparent; color: var(--text-secondary); }
+    .nar-btn[disabled] { opacity: .55; cursor: not-allowed; }
+    .nar-msg { margin-top: 8px; font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); }
+    .nar-msg.err { color: var(--danger); }
+    .nar-stages { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .nar-stages:empty { display: none; }
+    .nar-stage {
+      flex: 1 1 190px; min-width: 0;
+      border: 1px solid var(--border-color); border-radius: 8px;
+      padding: 8px 10px; font-size: 12px; line-height: 1.65;
+      color: var(--text-secondary); background: var(--bg-muted);
+    }
+    .nar-stage.on { border-color: var(--accent); }
+    .nar-stage.done { border-color: var(--hl-find-current-ring); }
+    .nar-stage h4 { margin: 0 0 4px; font-size: 12.5px; color: var(--text-primary); }
+    .nar-stage .k { color: var(--text-subtle); }
+    .nar-body { margin-top: 10px; }
+    .nar-body:empty { display: none; }
+    .nar-sec { margin: 0 0 14px; }
+    .nar-sec h3 {
+      margin: 0 0 4px; font-size: 13.5px; color: var(--text-primary);
+      border-left: 3px solid var(--accent); padding-left: 8px;
+    }
+    .nar-sec p { margin: 0; font-size: 13px; line-height: 1.85; color: var(--text-secondary); }
+    .nar-cite {
+      font-size: 11px; padding: 0 4px; margin: 0 1px; border-radius: 4px;
+      background: var(--hl-find-text); color: var(--text-primary); cursor: pointer;
+    }
+    .nar-cite:hover { text-decoration: underline; }
+    .nar-rej {
+      margin: 0 0 10px; padding: 8px 10px;
+      border: 1px dashed var(--border-color); border-radius: 8px;
+      font-size: 12px; color: var(--text-subtle);
+    }
+    .nar-rej b { color: var(--text-secondary); font-weight: 600; }
+
     /* 社区口径的限定说明：这条必须显眼，否则读者会把"颜色"当成研究领域分类 */
     #commNote {
       margin-top: 6px; padding: 6px 10px; border-radius: 8px;
@@ -583,6 +642,24 @@
     <div id="csList"></div>
   </div>
 
+  <!-- 自动综述（赛题 1.5.3）：在模板版 /graph/survey 的事实之上，让模型写一遍论述。
+       没有模板版那样的降级义务——模型不可用时这里会明确报错，讲稿里就依赖
+       /graph/survey 的数字。四个阶段是真实交接物，不是时间轴装饰：
+       Planner 出提纲、Analyst 出证据、Writer 逐段写作、Verifier 逐段校验。 -->
+  <div id="narBar" hidden>
+    <div class="nar-head">
+      <b>自动综述</b>
+      <span class="nar-sub">基于当前图谱的全部论文，由模型写成五段论述；每段先校验引用再展示，
+        <b>校验不通过的整段丢弃</b>，所以段数会少于 5。</span>
+      <span class="spacer"></span>
+      <button class="nar-btn" id="narRun">生成综述</button>
+      <button class="nar-btn ghost" id="narStop" hidden>停止</button>
+    </div>
+    <div id="narMsg" class="nar-msg" hidden></div>
+    <div id="narStages" class="nar-stages"></div>
+    <div id="narBody" class="nar-body"></div>
+  </div>
+
   <div id="focusBar" hidden>
     <span class="fb-title" id="fbTitle"></span>
     <span class="fb-meta" id="fbMeta"></span>
@@ -643,8 +720,267 @@ let nodeById = new Map();
 // 各自有一份渲染函数；切换时由 switchMode() 负责销毁 ECharts 实例和显隐容器。
 let mode = 'global';
 
+// ---------- 自动综述（赛题 1.5.3） ----------
+// 后端的四阶段是真实交接物：Planner 出提纲、Analyst 出证据、Writer 逐段写、
+// Verifier 逐段校验。这里只负责把交接物摊开给人看，不自己编任何内容。
+// 关键一点：answer_delta 只有在**该段校验通过**之后才会到达，所以页面上
+// 出现的每一段都是验过的；被丢弃的段落进 #narBody 的虚线框里并写明原因。
+const NAR_STAGE_LABEL = { planner: '规划 Planner', analyst: '证据 Analyst', writer: '撰写 Writer', verifier: '校验 Verifier' };
+let narCtl = null;          // 当前未结束的 AbortController
+let narCitationIndex = {};  // id -> {title, year, role, cited_by}，点角标时用
+let narProgress = { total: 5, started: 0, ok: 0 };  // 只为收尾时把 writer 卡片改成完成态
+
+function narMsg(text, isErr) {
+  const el = $('narMsg');
+  if (!text) { el.hidden = true; el.textContent = ''; return; }
+  el.hidden = false;
+  el.className = 'nar-msg' + (isErr ? ' err' : '');
+  el.textContent = text;
+}
+
+function narReset() {
+  $('narStages').innerHTML = '';
+  $('narBody').innerHTML = '';
+  narMsg('');
+  narCitationIndex = {};
+  narProgress = { total: 5, started: 0, ok: 0 };
+}
+
+function narStageCard(role) {
+  const box = document.createElement('div');
+  box.className = 'nar-stage';
+  box.dataset.role = role;
+  const h = document.createElement('h4');
+  h.textContent = NAR_STAGE_LABEL[role] || role;
+  const body = document.createElement('div');
+  body.className = 'k';
+  body.textContent = '等待中…';
+  box.appendChild(h);
+  box.appendChild(body);
+  $('narStages').appendChild(box);
+  return { box: box, body: body };
+}
+
+function narStageText(role, ev) {
+  const out = ev.output || {};
+  if (role === 'planner') {
+    const secs = out.sections || [];
+    return `五段提纲：${secs.map(s => s.heading).join(' / ') || '（无）'}`
+      + `\n覆盖 ${out.stats ? out.stats.papers : '?'} 篇，写作计划已随段下发`;
+  }
+  if (role === 'analyst') {
+    const secs = out.sections || [];
+    const picks = secs.reduce((n, s) => n + ((s.picks || []).length), 0);
+    return `为 ${secs.length} 段共挑出 ${picks} 条证据（每篇带标题、年份、被引次数、摘要首句）`
+      + `\n括号里的编号就是后面能引用的清单`;
+  }
+  if (role === 'writer') {
+    return `分 ${narProgress.total} 段生成，每段一次模型调用；段一写完就送去校验，不等全部写完`;
+  }
+  if (role === 'verifier') {
+    const rej = out.rejected || [];
+    const unv = out.unverified || [];
+    let t = `引用 ${out.citations || 0} 处，段通过 ${out.sections_ok}/${out.sections_total}`
+      + `\n丢弃 ${rej.length} 段，待人工留意 ${unv.length} 处`;
+    if (unv.length) {
+      t += '\n' + unv.slice(0, 3).map(u => `· ${u.id}：${u.reason}`).join('\n');
+    }
+    return t;
+  }
+  return '';
+}
+
+function renderNarCites(container, text, index) {
+  // 把 [arxiv:xxxx] / [hash:xxx] 变成可点的角标：点开就是阅读页对应页，
+  // 和对话页的证据链接同一套口径（paper 参数 + hl=1 高亮）。
+  const re = /[\[【]\s*(?:cite:|CITE:|@)?([A-Za-z0-9][\w:.\-]*?)\s*[\]】]/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const token = m[1];
+    const info = index[token];
+    if (!info) continue;             // 不在 citable 里的编号，原样留文字
+    if (m.index > last) container.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const span = document.createElement('span');
+    span.className = 'nar-cite';
+    span.textContent = token;
+    span.title = `${info.title}（${info.year || '年份未知'}，库内被引 ${info.cited_by || 0}）`;
+    if (info.paper) {
+      span.addEventListener('click', () => { window.open(info.paper, '_blank'); });
+    }
+    container.appendChild(span);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
+}
+
+function narAddSection(ev) {
+  const sec = document.createElement('div');
+  sec.className = 'nar-sec';
+  const h = document.createElement('h3');
+  h.textContent = ev.heading || ev.key;
+  const p = document.createElement('p');
+  const body = String(ev.text || '').replace(/^\s*#{1,6}\s*[^\n]*\n/, '').trim();
+  renderNarCites(p, body, narCitationIndex);
+  sec.appendChild(h);
+  sec.appendChild(p);
+  $('narBody').appendChild(sec);
+}
+
+function narAddRejected(ev) {
+  const box = document.createElement('div');
+  box.className = 'nar-rej';
+  const b = document.createElement('b');
+  b.textContent = `已丢弃：${ev.heading || ev.key}`;
+  box.appendChild(b);
+  box.appendChild(document.createElement('br'));
+  box.appendChild(document.createTextNode(ev.reason || '校验未通过'));
+  $('narBody').appendChild(box);
+}
+
+function narFinish(stats) {
+  $('narRun').disabled = false;
+  $('narRun').textContent = '重新生成';
+  $('narStop').hidden = true;
+  narCtl = null;
+  if (!stats) return;
+  const miss = 5 - (stats.sections_ok || 0);
+  if (stats.budget_exhausted) {
+    narMsg('模型调用预算今天已用完，后面的段落没有生成。已生成的段落仍是校验过的结果。', true);
+  } else if (miss > 0) {
+    narMsg(`共 ${stats.sections_ok}/5 段通过校验，其余 ${miss} 段已丢弃（原因见下方虚线框）。`
+      + `模型调用 ${stats.llm_calls} 次。`, false);
+  } else {
+    narMsg(`五段全部通过校验，共调用模型 ${stats.llm_calls} 次。`, false);
+  }
+}
+
+async function runNarrative() {
+  if (narCtl) return;              // 防重复点击：上一次还没结束
+  narReset();
+  const ctl = new AbortController();
+  narCtl = ctl;
+  $('narRun').disabled = true;
+  $('narRun').textContent = '生成中…';
+  $('narStop').hidden = false;
+  narMsg('正在生成。五段依次写、依次校验，每段十几秒，请勿刷新页面。');
+
+  const b = newAccountableTimer();
+  let stats = null;
+  try {
+    const resp = await fetch(`${API}/graph/survey/narrative`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: JSON.stringify({ focus: '' }),
+      signal: ctl.signal,
+    });
+    if (!resp.ok) {
+      let detail = `HTTP ${resp.status}`;
+      try { const j = await resp.json(); detail = j.detail || detail; } catch (_) { /* 非 JSON 忽略 */ }
+      throw new Error(detail);
+    }
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    const stageEls = {};
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      // SSE 以空行分帧；心跳是注释行（以 : 开头），直接跳过
+      let cut;
+      while ((cut = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, cut);
+        buf = buf.slice(cut + 2);
+        const line = frame.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch (_) { continue; }
+        if (ev.type === 'role') {
+          const role = ev.role;
+          const el = stageEls[role] || (stageEls[role] = narStageCard(role));
+          el.box.classList.add('done');
+          el.body.textContent = narStageText(role, ev);
+          if (role === 'analyst') {
+            // Analyst 的交接物里就带全部可引用论文，正好用来做角标索引
+            (ev.output && ev.output.sections || []).forEach(s => {
+              (s.picks || []).forEach(p => { narCitationIndex[p.id] = p; });
+            });
+          }
+          if (role === 'verifier') {
+            (ev.output && ev.output.citations_detail || []).forEach(c => {
+              narCitationIndex[c.id] = narCitationIndex[c.id] || c;
+            });
+          }
+        } else if (ev.type === 'section_start') {
+          const el = stageEls.writer || (stageEls.writer = narStageCard('writer'));
+          el.body.textContent = `正在写第 ${ev.index}/${ev.total} 段：${ev.heading}`;
+          narProgress.total = ev.total || 5;
+          narProgress.started = ev.index || narProgress.started + 1;
+        } else if (ev.type === 'answer_delta') {
+          narAddSection(ev);
+          narProgress.ok += 1;
+        } else if (ev.type === 'section_rejected') {
+          narAddRejected(ev);
+        } else if (ev.type === 'done') {
+          stats = ev.stats || null;
+          // 流结束后 writer 卡片不该还停在「正在写第 k 段」——那时已经写完了。
+          const we = stageEls.writer;
+          if (we) {
+            const okN = narProgress.ok;
+            const rejN = Math.max(0, narProgress.started - okN);
+            we.body.textContent = `已写完 ${narProgress.started}/${narProgress.total} 段，`
+              + `其中 ${okN} 段通过校验、${rejN} 段被丢弃`;
+          }
+        } else if (ev.type === 'error') {
+          throw new Error(ev.message || '服务端返回错误');
+        }
+      }
+    }
+    narFinish(stats);
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      narMsg('已停止。已经出来的段落都是校验通过的，可以继续看。', false);
+      narFinish(null);
+    } else {
+      narMsg(`综述生成失败：${e.message}`, true);
+      $('narRun').disabled = false;
+      $('narRun').textContent = '生成综述';
+      $('narStop').hidden = true;
+      narCtl = null;
+    }
+  } finally {
+    b.clear();
+  }
+}
+
+function newAccountableTimer() {
+  // 只为了在"长时间无输出"时不让页面看起来像卡死；真正超时由后端每段的 90 秒把关。
+  let t0 = Date.now();
+  const id = setInterval(() => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    const el = $('narMsg');
+    if (!el.hidden && el.className === 'nar-msg' && s >= 15) {
+      el.textContent = `正在生成（已 ${s} 秒）。五段依次写、依次校验，每段十几秒，请勿刷新页面。`;
+    }
+  }, 1000);
+  return {
+    clear: () => { clearInterval(id); t0 = 0; },
+  };
+}
+
+function stopNarrative() {
+  if (narCtl) narCtl.abort();
+}
+
+function bindNarrative() {
+  $('narRun').addEventListener('click', runNarrative);
+  $('narStop').addEventListener('click', stopNarrative);
+}
+
 async function boot() {
   bindModeTabs();
+  bindNarrative();
   let data;
   try {
     const resp = await fetch(`${API}/graph`, { headers: { Accept: 'application/json' } });
@@ -658,6 +994,8 @@ async function boot() {
     showEmpty(`${esc(data.detail || '图谱还没生成')}<br/><br/>在项目根目录运行：<code>python scripts/build_graph.py</code>`);
     return;
   }
+  // 综述面板只在全库图谱就绪后才出现：没图就没有事实，点按钮也只会拿到一句错误。
+  $('narBar').hidden = false;
   render(data);
 }
 
@@ -1710,6 +2048,10 @@ function switchMode(next) {
   $('hint').hidden = isLocal;
   $('commNote').hidden = isLocal;
   $('csBar').hidden = isLocal;
+  // 综述面板跟着图谱数据走：后端综述读的是全库 /graph 产物，
+  // 局域图那批论文单独走 /graph/local，两者事实不同，所以切到局域就藏起来，
+  // 避免"看着局域图、读着全库综述"的错配。局域综述是 A-1 之后的事。
+  $('narBar').hidden = isLocal;
   $('reviewBar').hidden = isLocal;
   $('chartWrap').hidden = isLocal;
   $('localView').hidden = !isLocal;
