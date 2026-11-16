@@ -144,16 +144,17 @@
           <div id="discStatus"></div>
         </div>
 
-        <!-- 1.4.2 顺着参考文献下载 -->
+        <!-- 1.4.2 顺着参考文献找重点 -->
         <div class="panel">
-          <h2>顺着参考文献下载 <span class="sub">按正文引用次数挑重点，去掉为引用而引用的</span></h2>
+          <h2>顺着参考文献找重点 <span class="sub">按正文引用次数挑重点，去掉为引用而引用的</span></h2>
           <div class="disc-row">
             <select id="refPaper" style="flex:1;min-width:180px"></select>
-            <label class="sub">最多 <input type="number" class="num" id="refLimit" value="3" min="1" max="20" /> 篇</label>
+            <label class="sub">最多 <input type="number" class="num" id="refLimit" value="5" min="1" max="20" /> 篇</label>
             <label class="sub">引用 ≥ <input type="number" class="num" id="refMin" value="2" min="1" max="30" /> 次</label>
-            <button class="btn-sm btn-primary" id="refGo">开始下载</button>
+            <button class="btn-sm btn-primary" id="refGo">获取推荐</button>
           </div>
           <div id="refStatus"></div>
+          <div id="refList" class="rec-list"></div>
         </div>
 
         <!-- 1.4.3 新论文推荐 -->
@@ -186,6 +187,7 @@
     const refMinEl = document.getElementById('refMin');
     const refGoEl = document.getElementById('refGo');
     const refStatusEl = document.getElementById('refStatus');
+    const refListEl = document.getElementById('refList');
     const recListEl = document.getElementById('recList');
     const recUpdatedEl = document.getElementById('recUpdated');
     const recRefreshEl = document.getElementById('recRefresh');
@@ -234,11 +236,14 @@
 
     async function loadRefPapers() {
       try {
-        const d = await (await fetch('/papers/files')).json();
+        // meta=true 让后端带上标题：用户认论文名，不认 1706.03762v1.pdf 这种文件名
+        const d = await (await fetch('/papers/files?meta=true')).json();
         const files = d.files || d.papers || [];
         refPaperEl.innerHTML = files.map(f => {
           const name = typeof f === 'string' ? f : (f.filename || '');
-          return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+          const title = typeof f === 'string' ? f : (f.title || name);
+          // value 仍是文件名（后端按它找文件与 arXiv 号），只有显示文字是标题
+          return `<option value="${escapeHtml(name)}">${escapeHtml(title)}</option>`;
         }).join('');
       } catch (e) {
         refPaperEl.innerHTML = '<option value="">加载失败</option>';
@@ -274,32 +279,88 @@
       }
     }
 
-    async function downloadReferences() {
+    // 参考文献推荐列表：点「获取推荐」只挑不下，列表里每行一个「下载」按钮，
+// 点哪篇才下哪篇。和「新论文推荐」复用同一套 .rec-row 卡片外观。
+    async function loadReferencePlan() {
       const filename = refPaperEl.value;
       if (!filename) { refStatusEl.textContent = '先选一篇论文。'; return; }
       refGoEl.disabled = true;
-      refStatusEl.textContent = '正在取引用关系并挑重点引用…';
+      refListEl.innerHTML = '';
+      refStatusEl.textContent = '正在取引用关系、并逐条生成推荐理由…';
       try {
-        const resp = await fetch(`/paper/${encodeURIComponent(filename)}/references/download`, {
+        const qs = new URLSearchParams({
+          limit: String(Number(refLimitEl.value) || 5),
+          min_cites: String(Number(refMinEl.value) || 2),
+        });
+        const resp = await fetch(`/paper/${encodeURIComponent(filename)}/references/plan?${qs}`);
+        const d = await resp.json();
+        if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
+        const items = d.items || [];
+        if (!items.length) {
+          refStatusEl.textContent =
+            `没有符合条件的参考文献（候选 ${d.candidates || 0} 篇，正文引用要 ≥${d.min_cites} 次）。` +
+            '可以把这个阈值调小再试。';
+          return;
+        }
+        refStatusEl.textContent = `共 ${d.candidates} 篇候选，按正文引用次数取前 ${items.length} 篇。` +
+          '点右侧「下载」才会入库。';
+        renderReferencePlan(items);
+      } catch (e) {
+        refStatusEl.textContent = '获取推荐失败：' + e.message;
+      } finally {
+        refGoEl.disabled = false;
+      }
+    }
+
+    function renderReferencePlan(items) {
+      window.__refItems = items;
+      refListEl.innerHTML = items.map((it, i) => {
+        const title = escapeHtml(it.title || it.arxiv_id);
+        const link = it.url ? `<a href="${escapeHtml(it.url)}" target="_blank" rel="noopener">${title}</a>` : title;
+        const meta = [
+          `<span>arXiv ${escapeHtml(it.arxiv_id)}</span>`,
+          it.year ? `<span>${it.year}</span>` : '',
+          `<span class="score">正文引用 ${it.cites} 次</span>`,
+          it.cited_by ? `<span>S2 被引 ${it.cited_by}</span>` : '',
+        ].filter(Boolean).join('');
+        const btn = it.in_library
+          ? '<button class="btn-sm" disabled title="库里已有这篇">已在库</button>'
+          : `<button class="btn-sm btn-primary" data-ref-down="${i}">下载</button>`;
+        return `<div class="rec-row" data-idx="${i}">
+          <div class="rec-title">${link}</div>
+          <div class="rec-reason">${escapeHtml(it.reason || '')}</div>
+          <div class="rec-meta">${meta}<span class="act">${btn}</span></div>
+        </div>`;
+      }).join('');
+      refListEl.querySelectorAll('[data-ref-down]').forEach(btn => {
+        btn.addEventListener('click', () => downloadOneReference(btn));
+      });
+    }
+
+    async function downloadOneReference(btn) {
+      const row = btn.closest('.rec-row');
+      const idx = Number(row.dataset.idx);
+      const it = (window.__refItems || [])[idx];
+      if (!it) { return; }
+      btn.disabled = true;
+      btn.textContent = '下载中…';
+      try {
+        const resp = await fetch(`/paper/${encodeURIComponent(refPaperEl.value)}/references/download-one`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit: Number(refLimitEl.value) || 3, min_cites: Number(refMinEl.value) || 2 }),
+          body: JSON.stringify({ arxiv_id: it.arxiv_id, title: it.title || '' }),
         });
         const d = await resp.json();
         if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
-        const lines = [`候选 ${d.candidates} 篇（正文引用 ≥${d.min_cites} 次的才下）`];
-        (d.results || []).forEach(r => {
-          const mark = r.status === '已入库' ? '✓' : r.status === '已有' ? '·' : '✗';
-          lines.push(`${mark} [${r.cites} 次] ${r.arxiv_id} ${r.status}` +
-            (r.filename ? ` → ${r.filename}（索引 ${r.indexed} 块）` : '') +
-            (r.error ? `：${r.error}` : ''));
-        });
-        refStatusEl.textContent = lines.join('\n');
+        btn.className = 'btn-sm';
+        btn.textContent = d.downloaded ? '已入库 ✓' : '已在库';
         await loadRefPapers();
       } catch (e) {
-        refStatusEl.textContent = '下载失败：' + e.message;
-      } finally {
-        refGoEl.disabled = false;
+        btn.disabled = false;
+        btn.className = 'btn-sm btn-primary';
+        btn.textContent = '重试';
+        row.querySelector('.rec-reason').innerHTML =
+          `<span class="offline-tip" style="display:inline-block">下载失败：${escapeHtml(e.message)}</span>`;
       }
     }
 
@@ -415,7 +476,7 @@
 
     discGoEl.addEventListener('click', downloadByName);
     discQueryEl.addEventListener('keydown', e => { if (e.key === 'Enter') downloadByName(); });
-    refGoEl.addEventListener('click', downloadReferences);
+    refGoEl.addEventListener('click', loadReferencePlan);
     recRefreshEl.addEventListener('click', refreshRecs);
 
     Promise.all([loadRefPapers(), loadRecs()]);
