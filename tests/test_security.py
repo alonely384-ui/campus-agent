@@ -234,9 +234,12 @@ def test_route_count_matches_design():
     2026-11-17：58 → 59，新增 POST /graph/survey/narrative（赛题 1.5.3 自动综述的
     模型论述层，SSE，公开）：它和 /graph/survey 同一批事实，但内部连写 5 段、
     每段一次模型调用，所以单独挂 BUCKET_NARRATIVE，不挂 BUCKET_CPU。
+    2026-11-17：59 → 60，新增 POST /graph/directions（赛题 1.5.4 未来工作探索，
+    SSE，公开）：每个方向一次判断调用 + 一次 arXiv 外网检索，比综述更重，
+    单独挂 BUCKET_DIRECTION（rate=0.017, burst=2）。
     """
     templates = main_mod._route_templates()
-    assert len(templates) == 59, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
+    assert len(templates) == 60, f"路由数变成 {len(templates)}，请确认新接口的权限归属"
 
 
 def test_admin_paths_have_no_public_overlap():

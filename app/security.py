@@ -127,6 +127,9 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         # 它会消耗模型额度，所以必须挂在 M 档限流 + daily_budget 下面，
         # 不能按只读接口的宽松档。
         "/graph/survey/narrative",
+        # 未来工作探索：每个方向一次判断调用 + 一次 arXiv 外网检索，
+        # 同样消耗模型额度、且会打到外部 API，必须挂 N 档限流 + daily_budget。
+        "/graph/directions",
         "/graph/frontier",
         # 局域图谱（赛题 1.5.1/1.5.2）：见下面 _RATE_TABLE 里的说明。
         # 它不是 /papers/upload 那种"下载 + 建索引 + 落盘"的重量级写入，
@@ -385,6 +388,11 @@ BUCKET_LOCAL_GRAPH_UPLOAD = Bucket(rate=0.05, burst=5)
 # narrative.MAX_NARRATIVE_LLM_CALLS 双重兜住。
 # 标定：突发 3 次（等同一轮演示里换库/换主题重开两次），之后每 30 秒补 1 个。
 BUCKET_NARRATIVE = Bucket(rate=0.033, burst=3)
+# 未来工作探索（1.5.4）：比综述更重——除了每个方向一次判断调用，
+# 还要对每个方向打一次 arXiv 检索（库外网络请求，有超时与失败兜底）。
+# 方向和判断都封顶在 future_work.MAX_DIRECTIONS，真实成本仍由 daily_budget 兜住。
+# 标定：突发 2 次（一轮演示里重开一次足够），之后每 60 秒补 1 个。
+BUCKET_DIRECTION = Bucket(rate=0.017, burst=2)
 # 档位 I 侧栏缩略图：阅读器右侧的图表清单一次会并发请求几十张
 # /paper/{f}/figure/{i}（Llama 2 一篇就 34 张）。单张只是从本地 PDF 裁一小块
 # 或直接读 data/meta/figures 缓存，**不连外网、不耗模型额度**，风险只在于
@@ -462,6 +470,9 @@ _RATE_TABLE: dict[str, Bucket] = {
     # 不能沿用下面的 /graph/survey（BUCKET_CPU：rate=0.05, burst=2，
     # 点第三次就 429），也不能沿用 BUCKET_LLM（按单次调用标定，突发 3）。
     "/graph/survey/narrative": BUCKET_NARRATIVE,
+    # ---- N 未来工作探索（LLM + 库外检索） ----
+    # 每个方向一次判断调用 + 一次 arXiv 检索；比综述更重，突发只给 2。
+    "/graph/directions": BUCKET_DIRECTION,
     # ---- E CPU 密集 ----
     "/graph/survey": BUCKET_CPU,
     "/graph/frontier": BUCKET_CPU,
@@ -948,6 +959,7 @@ __all__ = [
     "BUCKET_LOCAL_GRAPH",
     "BUCKET_LOCAL_GRAPH_UPLOAD",
     "BUCKET_NARRATIVE",
+    "BUCKET_DIRECTION",
     "BUCKET_REF_PLAN",
     "BUCKET_SCAN",
     "COOKIE_NAME",

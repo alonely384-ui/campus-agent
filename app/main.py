@@ -38,7 +38,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 from starlette.routing import Mount
 
-from app import kb_health, llm, narrative, scheduler, settings_api
+from app import future_work, kb_health, llm, narrative, scheduler, settings_api
 from app.agent import run_agent, run_agent_stream
 from app.chart import make_chart
 from app.config import settings
@@ -115,6 +115,7 @@ from app.security import (
 )
 from app.translate import (
     load_translation,
+    page_texts,
     references_page_of,
     translate_pages,
     translate_text,
@@ -124,6 +125,11 @@ from app.zh2en import parse_glossary, translate_zh2en
 
 setup_logging()
 logger = get_logger(__name__)
+
+#: 抽 Future Work 时每篇最多读多少页。
+#: Conclusion / Limitations 这类节几乎都在前 60 页内；而 Llama 2 这类长文
+#: 全文解析一遍要好几秒，46 篇乘起来就是把演示拖垮的量级。
+_FUTURE_WORK_MAX_PAGES = 60
 
 # 版本号只从 pyproject.toml 读，不在代码里第二次硬编码。
 # 原来这里写死 VERSION = "0.1.0"，pyproject 里也写一份，两处迟早对不上
@@ -2275,6 +2281,105 @@ async def graph_survey_narrative(req: NarrativeRequest) -> StreamingResponse:
             logger.exception("综述生成失败")
             yield narrative.encode_event({"type": "error", "message": "综述生成失败，请稍后重试"})
             yield narrative.encode_event({"type": "done"})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+def _extract_library_future_work() -> list[dict]:
+    """逐篇抽作者自述的 Future Work / Limitations，返回每条都带 extraction_status 的列表。
+
+    为什么单独抽成函数、并且必须在线程池里跑：
+        46 篇论文要逐篇打开 PDF 抽文字（``translate.page_texts``，pymupdf 绑定），
+        实测整批几秒到十几秒。落在事件循环里会把这期间的心跳帧也堵住，
+        前端看到的表现就是「进度条不动了」。
+
+    为什么失败也照样返回一条记录：
+        赛题要的是「不要提出已被最新论文做过的 idea」，而能不能抽到作者的
+        future work 本身就有很大不确定性（页面布局、双栏、扫描件都会影响）。
+        与其把抽不到的论文悄悄丢掉、只展示成功案例，不如原样返回
+        status=no_section / no_valid_sentence / parse_error，
+        答辩时点开统计就能说清「系统怎么处理信息缺失」。
+    """
+    structures = load_structures()
+    if not structures:
+        return []
+    items: list[dict] = []
+    for filename, structure in structures.items():
+        path = PAPERS_DIR / filename
+        if not path.exists():
+            # 库里有解析结果但 PDF 不见了（迁移/手动删过），如实记成解析失败
+            items.append(
+                {
+                    "source": filename,
+                    "title": (structure or {}).get("title") or filename,
+                    "status": "parse_error",
+                    "section": "",
+                    "sentences": [],
+                }
+            )
+            continue
+        try:
+            pages = page_texts(path, max_pages=_FUTURE_WORK_MAX_PAGES)
+        except Exception:  # noqa: BLE001 —— 单篇打不开不该中断整批
+            logger.warning("抽取 Future Work 时 PDF 打不开：%s", filename, exc_info=True)
+            items.append(
+                {
+                    "source": filename,
+                    "title": (structure or {}).get("title") or filename,
+                    "status": "parse_error",
+                    "section": "",
+                    "sentences": [],
+                }
+            )
+            continue
+        items.append(future_work.extract_future_work(filename, structure or {}, pages))
+    return items
+
+
+@app.post("/graph/directions", summary="未来工作探索（1.5.4，SSE）")
+async def graph_directions() -> StreamingResponse:
+    """从论文库抽作者自述的 Future Work / Limitations，结合图谱缺口归纳方向，再查库外最新论文。
+
+    这条流水线里有两处要跟外部打交道，都是「失败也要如实说」的地方：
+        1. 抽取：章节里找不到、句子质量不合格、PDF 解析失败，都如实记成
+           extraction_status（success / no_section / no_valid_sentence / parse_error），
+           答辩时能直接展示「系统怎么处理真实论文里的信息缺失」。
+        2. 判重：只查 arXiv 一个来源，检索词由方向描述生成，召回必然不全。
+           所以结论只分「可能已被做过」「没检索到」「判断不了」，
+           **任何情况下都不会说「原创」**——这步的职责是排雷，不是认证。
+    """
+
+    async def event_generator():
+        try:
+            raw = await run_in_threadpool(load_graph)
+            if not raw:
+                yield future_work.encode_event(
+                    {"type": "error", "message": "图谱缓存还没生成，请先运行 python scripts/build_graph.py"}
+                )
+                yield future_work.encode_event({"type": "done"})
+                return
+            view = await run_in_threadpool(graph_view, raw)
+            # 抽取要逐篇开 PDF 抽文字，几十篇就是几秒到十几秒，必须放线程池，
+            # 否则会卡住整个事件循环、连心跳都发不出去。
+            extractions = await run_in_threadpool(_extract_library_future_work)
+            async for chunk in sse_with_heartbeat(
+                future_work.direction_events(view, extractions)
+            ):
+                yield chunk
+        except ClientDisconnect:
+            logger.info("未来工作探索流被客户端中断")
+        except Exception:
+            logger.exception("未来工作探索失败")
+            yield future_work.encode_event({"type": "error", "message": "未来工作探索失败，请稍后重试"})
+            yield future_work.encode_event({"type": "done"})
 
     return StreamingResponse(
         event_generator(),

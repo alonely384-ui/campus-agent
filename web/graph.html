@@ -88,6 +88,70 @@
     }
     .nar-rej b { color: var(--text-secondary); font-weight: 600; }
 
+    /* ---------- 未来工作探索（1.5.4） ---------- */
+    #dirBar {
+      margin: 10px 16px 0;
+      padding: 12px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      background: var(--bg-surface);
+    }
+    #dirBar[hidden] { display: none; }
+    .dir-body { margin-top: 10px; display: flex; flex-direction: column; gap: 12px; }
+    .dir-body:empty { display: none; }
+    .dir-card {
+      border: 1px solid var(--border-color); border-radius: 10px;
+      padding: 10px 12px; background: var(--bg-muted);
+    }
+    .dir-card--flat { border-style: dashed; background: transparent; }
+    .dir-card h3 {
+      margin: 0 0 6px; font-size: 13.5px; color: var(--text-primary);
+      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    }
+    .dir-card h3 .dir-idx {
+      font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+      background: var(--accent); color: #fff;
+    }
+    .dir-card h3 .dir-kind {
+      font-size: 11px; font-weight: 400; padding: 1px 6px; border-radius: 999px;
+      background: var(--hl-find-text); color: var(--text-primary);
+    }
+    .dir-sect { margin: 8px 0 0; }
+    .dir-sect:first-of-type { margin-top: 4px; }
+    .dir-sect > .dir-k {
+      font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+      letter-spacing: .02em; margin-bottom: 3px;
+    }
+    .dir-basis { font-size: 12.5px; line-height: 1.75; color: var(--text-secondary); }
+    .dir-quote {
+      margin: 0 0 5px; padding: 6px 10px; border-left: 3px solid var(--hl-find-current-ring);
+      background: var(--bg-surface); border-radius: 0 6px 6px 0;
+      font-size: 12.5px; line-height: 1.8; color: var(--text-secondary);
+    }
+    .dir-quote--none {
+      border-left-color: var(--border-color); color: var(--text-subtle); font-style: normal;
+    }
+    .dir-cand {
+      display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+      font-size: 12.5px; line-height: 1.75; padding: 3px 0;
+      border-bottom: 1px dashed var(--border-color);
+    }
+    .dir-cand:last-child { border-bottom: none; }
+    .dir-cand a { color: var(--accent); text-decoration: none; }
+    .dir-cand a:hover { text-decoration: underline; }
+    .dir-cand .dir-yr {
+      font-size: 11px; padding: 0 5px; border-radius: 4px;
+      background: var(--hl-find-text); color: var(--text-primary);
+    }
+    .dir-verdict {
+      display: inline-block; font-size: 12px; font-weight: 600;
+      padding: 2px 8px; border-radius: 6px; margin-right: 6px;
+    }
+    .dir-verdict--likely { background: #fdecec; color: #b42318; }
+    .dir-verdict--notfound { background: #ecfdf3; color: #027a48; }
+    .dir-verdict--unknown { background: var(--bg-surface-alt, #f5f6f8); color: var(--text-muted); }
+    .dir-reason { font-size: 12.5px; line-height: 1.75; color: var(--text-secondary); }
+
     /* 社区口径的限定说明：这条必须显眼，否则读者会把"颜色"当成研究领域分类 */
     #commNote {
       margin-top: 6px; padding: 6px 10px; border-radius: 8px;
@@ -660,6 +724,24 @@
     <div id="narBody" class="nar-body"></div>
   </div>
 
+  <!-- 未来工作探索（赛题 1.5.4）：先抽作者自己写的 Future Work / Limitations，
+       再按图谱缺口（桥接 / 孤岛 / 低被引）归纳方向，最后去 arXiv 查最新论文排雷。
+       这里展示三样东西，缺一不可：作者原话、图谱依据、库外检索结果。
+       结论一律保守——「可能已被做过」或「没检索到」，不出现「原创」类断言。 -->
+  <div id="dirBar" hidden>
+    <div class="nar-head">
+      <b>未来工作探索</b>
+      <span class="nar-sub">从论文作者自述的 Future Work / Limitations 出发，结合图谱缺口归纳方向，
+        再到库外检索最新论文。抽不到的作者原话会如实标出原因，不编造方向。</span>
+      <span class="spacer"></span>
+      <button class="nar-btn" id="dirRun">探索方向</button>
+      <button class="nar-btn ghost" id="dirStop" hidden>停止</button>
+    </div>
+    <div id="dirMsg" class="nar-msg" hidden></div>
+    <div id="dirStages" class="nar-stages"></div>
+    <div id="dirBody" class="dir-body"></div>
+  </div>
+
   <div id="focusBar" hidden>
     <span class="fb-title" id="fbTitle"></span>
     <span class="fb-meta" id="fbMeta"></span>
@@ -973,6 +1055,301 @@ function stopNarrative() {
   if (narCtl) narCtl.abort();
 }
 
+// ---------- 未来工作探索（赛题 1.5.4） ----------
+// 和后端的分工：Extractor / Mapper / Searcher 都是纯代码，只有 Judge 调模型。
+// 页面只负责把「作者原话 / 图谱依据 / 库外检索 / 保守判断」摊开，不自造结论。
+// 判断结论只有三种，措辞是硬约束：可能已被做过 / 没检索到 / 判断不了。
+// **任何情况下都不出现「原创」，后端 prompt 里已经禁掉了，这里再加一道兜底。**
+const DIR_VERDICT_LABEL = {
+  likely_done: '可能已被做过',
+  not_found: '没检索到高度相似的工作',
+  unclear: '判断不了',
+  unchecked: '未做判断',
+};
+const DIR_STATUS_NOTE = {
+  success: '已抽到作者自述',
+  no_section: '这篇没有 Future Work / Limitations 这类章节',
+  no_valid_sentence: '有章节，但里面没有可用的句子',
+  parse_error: 'PDF 解析失败',
+};
+const DIR_FORBIDDEN = ['原创', '首次提出', '没人做过', '首创'];
+
+let dirCtl = null;
+
+function dirMsg(text, isErr) {
+  const el = $('dirMsg');
+  if (!text) { el.hidden = true; el.textContent = ''; return; }
+  el.hidden = false;
+  el.className = 'nar-msg' + (isErr ? ' err' : '');
+  el.textContent = text;
+}
+
+function dirReset() {
+  $('dirStages').innerHTML = '';
+  $('dirBody').innerHTML = '';
+  dirMsg('');
+}
+
+function dirStageCard(role) {
+  const box = document.createElement('div');
+  box.className = 'nar-stage';
+  box.dataset.role = role;
+  const h = document.createElement('h4');
+  h.textContent = { extractor: '抽取 Extractor', mapper: '归纳 Mapper', searcher: '检索 Searcher', judge: '判断 Judge' }[role] || role;
+  const body = document.createElement('div');
+  body.className = 'k';
+  body.textContent = '等待中…';
+  box.appendChild(h);
+  box.appendChild(body);
+  $('dirStages').appendChild(box);
+  return { box: box, body: body };
+}
+
+function dirStageText(role, ev) {
+  const out = ev.output || {};
+  if (role === 'extractor') {
+    const s = out.summary || {};
+    const st = out.statuses || {};
+    const parts = Object.keys(st).map(k => `${DIR_STATUS_NOTE[k] || k} ${st[k]} 篇`);
+    return `逐篇读 PDF 章节树，共产出 ${s.sentence_total || 0} 句作者自述\n`
+      + `${s.total || 0} 篇里：${parts.join('；') || '（无）'}`;
+  }
+  if (role === 'mapper') {
+    return `按图谱缺口（桥接 / 孤岛 / 低被引）归纳出 ${out.directions || 0} 个方向\n`
+      + `证据优先取作者明确写在 Future Work / Limitations 里的句子`;
+  }
+  if (role === 'searcher') {
+    return `检索词：${out.query || '（空）'}\n在 arXiv 找到 ${out.found || 0} 篇候选`;
+  }
+  return '';
+}
+
+// 后端已经把「原创」这类断言从 prompt 里禁掉了；这里再挡一层，
+// 万一模型还是吐出来，直接改写成保守措辞，不让它出现在页面上。
+function dirSanitize(text) {
+  let s = String(text == null ? '' : text);
+  for (const w of DIR_FORBIDDEN) {
+    if (s.indexOf(w) >= 0) s = s.split(w).join('尚待核实');
+  }
+  return s;
+}
+
+function dirVerdictClass(verdict) {
+  if (verdict === 'likely_done') return 'dir-verdict--likely';
+  if (verdict === 'not_found') return 'dir-verdict--notfound';
+  return 'dir-verdict--unknown';
+}
+
+function dirSection(parent, label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'dir-sect';
+  const k = document.createElement('div');
+  k.className = 'dir-k';
+  k.textContent = label;
+  wrap.appendChild(k);
+  parent.appendChild(wrap);
+  return wrap;
+}
+
+function dirAddDirection(ev) {
+  const it = ev.item || {};
+  const card = document.createElement('div');
+  card.className = 'dir-card';
+
+  const h = document.createElement('h3');
+  const idx = document.createElement('span');
+  idx.className = 'dir-idx';
+  idx.textContent = `方向 ${ev.index}/${ev.total}`;
+  const title = document.createElement('span');
+  // 后端的 item.title 来自 anchor_title，字段名以 item 为准
+  title.textContent = dirSanitize(it.title || it.anchor_title || '（未命名）');
+  const kind = document.createElement('span');
+  kind.className = 'dir-kind';
+  kind.textContent = it.kind_label || it.kind || '';
+  h.appendChild(idx);
+  h.appendChild(title);
+  h.appendChild(kind);
+  card.appendChild(h);
+
+  // 1) 图谱依据：纯粹是算出来的数，没有任何模型参与
+  const s1 = dirSection(card, '图谱依据');
+  const basis = document.createElement('div');
+  basis.className = 'dir-basis';
+  basis.textContent = dirSanitize(it.basis || '');
+  s1.appendChild(basis);
+
+  // 2) 作者原话：抽不到就如实说明原因，不留空
+  const s2 = dirSection(card, `作者原话（${it.evidence_section || '未定位到章节'}）`);
+  const quotes = it.evidence || [];
+  if (quotes.length) {
+    quotes.forEach(q => {
+      const p = document.createElement('div');
+      p.className = 'dir-quote';
+      p.textContent = dirSanitize(q);
+      s2.appendChild(p);
+    });
+  } else {
+    const p = document.createElement('div');
+    p.className = 'dir-quote dir-quote--none';
+    p.textContent = `这篇论文没有可用的作者自述：${DIR_STATUS_NOTE[it.evidence_status] || it.evidence_status || '未知原因'}`;
+    s2.appendChild(p);
+  }
+
+  // 3) 库外检索：只来自 arXiv 一个来源，必须把来源和日期都摆出来
+  const s3 = dirSection(card, `库外最新论文（检索词：${it.query || '（空）'}）`);
+  const cands = it.candidates || [];
+  if (cands.length) {
+    cands.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'dir-cand';
+      const a = document.createElement('a');
+      a.href = c.url || '#';
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = dirSanitize(c.title || c.arxiv_id || '（无标题）');
+      const yr = document.createElement('span');
+      yr.className = 'dir-yr';
+      yr.textContent = c.year ? `${c.year}` : '年份未知';
+      const src = document.createElement('span');
+      src.textContent = c.source || 'arXiv';
+      row.appendChild(a);
+      row.appendChild(yr);
+      row.appendChild(src);
+      s3.appendChild(row);
+    });
+  } else {
+    const p = document.createElement('div');
+    p.className = 'dir-reason';
+    p.textContent = '这一次没有检索到候选论文（可能是关键词不匹配或网络不可用）。没检索到不等于没人做过。';
+    s3.appendChild(p);
+  }
+
+  // 4) 判断结论：只有"可能已被做过 / 没检索到 / 判断不了"，从不说"原创"
+  const s4 = dirSection(card, '相似性判断');
+  const badge = document.createElement('span');
+  badge.className = 'dir-verdict ' + dirVerdictClass(it.verdict);
+  badge.textContent = DIR_VERDICT_LABEL[it.verdict] || it.verdict || '未做判断';
+  const reason = document.createElement('span');
+  reason.className = 'dir-reason';
+  reason.textContent = dirSanitize(it.reason || '');
+  s4.appendChild(badge);
+  s4.appendChild(reason);
+
+  $('dirBody').appendChild(card);
+}
+
+function dirFinish(stats) {
+  $('dirRun').disabled = false;
+  $('dirRun').textContent = '重新探索';
+  $('dirStop').hidden = true;
+  if (!stats) { dirCtl = null; return; }
+  const ex = stats.extraction || {};
+  const n = stats.directions || 0;
+  let t = `共 ${n} 个方向。抽取覆盖 ${ex.total || 0} 篇，其中 `
+    + `${(ex.counts && ex.counts.success) || 0} 篇抽到了作者原话，共 ${ex.sentence_total || 0} 句。`;
+  if (stats.budget_exhausted) {
+    t += ' 模型调用预算已用完，后面几个方向没有做相似性判断。';
+  }
+  t += ' 判断只覆盖 arXiv 一个来源，结论一律是「可能已被做过」或「没检索到」，不代表新颖性认证。';
+  dirMsg(t, false);
+  dirCtl = null;
+}
+
+async function runDirections() {
+  if (dirCtl) return;              // 防重复点击
+  dirReset();
+  const ctl = new AbortController();
+  dirCtl = ctl;
+  $('dirRun').disabled = true;
+  $('dirRun').textContent = '探索中…';
+  $('dirStop').hidden = false;
+  dirMsg('正在逐篇抽取作者自述，再去库外检索。抽取要开几十个 PDF，头几秒可能没有输出，请勿刷新。');
+
+  const stageEls = {};
+  const b = newAccountableTimer();
+  let stats = null;
+  try {
+    const resp = await fetch(`${API}/graph/directions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: '{}',
+      signal: ctl.signal,
+    });
+    if (!resp.ok) {
+      let detail = `HTTP ${resp.status}`;
+      try { const j = await resp.json(); detail = j.detail || detail; } catch (_) { /* 非 JSON 忽略 */ }
+      throw new Error(detail);
+    }
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let cut;
+      while ((cut = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, cut);
+        buf = buf.slice(cut + 2);
+        const line = frame.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch (_) { continue; }
+        if (ev.type === 'role') {
+          const role = ev.role;
+          const el = stageEls[role] || (stageEls[role] = dirStageCard(role));
+          el.box.classList.add('done');
+          el.body.textContent = dirStageText(role, ev);
+        } else if (ev.type === 'direction_start') {
+          const el = stageEls.judge || (stageEls.judge = dirStageCard('judge'));
+          el.box.classList.add('on');
+          el.body.textContent = `正在判断第 ${ev.index}/${ev.total} 个方向：${dirSanitize(ev.title || '')}`;
+        } else if (ev.type === 'direction') {
+          dirAddDirection(ev);
+          const el = stageEls.judge;
+          if (el) el.box.classList.remove('on');
+        } else if (ev.type === 'done') {
+          stats = ev.stats || null;
+          const je = stageEls.judge;
+          if (je) {
+            const n = (stats && stats.judge_calls) || 0;
+            je.body.textContent = `共做了 ${n} 次相似性判断`;
+            je.box.classList.remove('on');
+          }
+        } else if (ev.type === 'error') {
+          throw new Error(ev.message || '服务端返回错误');
+        }
+      }
+    }
+    dirFinish(stats);
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      dirMsg('已停止。已经算出来的方向可以继续看。', false);
+      $('dirRun').disabled = false;
+      $('dirRun').textContent = '探索方向';
+      $('dirStop').hidden = true;
+      dirCtl = null;
+    } else {
+      dirMsg(`未来工作探索失败：${e.message}`, true);
+      $('dirRun').disabled = false;
+      $('dirRun').textContent = '探索方向';
+      $('dirStop').hidden = true;
+      dirCtl = null;
+    }
+  } finally {
+    b.clear();
+  }
+}
+
+function stopDirections() {
+  if (dirCtl) dirCtl.abort();
+}
+
+function bindDirections() {
+  $('dirRun').addEventListener('click', runDirections);
+  $('dirStop').addEventListener('click', stopDirections);
+}
+
 function bindNarrative() {
   $('narRun').addEventListener('click', runNarrative);
   $('narStop').addEventListener('click', stopNarrative);
@@ -981,6 +1358,7 @@ function bindNarrative() {
 async function boot() {
   bindModeTabs();
   bindNarrative();
+  bindDirections();
   let data;
   try {
     const resp = await fetch(`${API}/graph`, { headers: { Accept: 'application/json' } });
@@ -996,6 +1374,7 @@ async function boot() {
   }
   // 综述面板只在全库图谱就绪后才出现：没图就没有事实，点按钮也只会拿到一句错误。
   $('narBar').hidden = false;
+  $('dirBar').hidden = false;
   render(data);
 }
 
@@ -2052,6 +2431,9 @@ function switchMode(next) {
   // 局域图那批论文单独走 /graph/local，两者事实不同，所以切到局域就藏起来，
   // 避免"看着局域图、读着全库综述"的错配。局域综述是 A-1 之后的事。
   $('narBar').hidden = isLocal;
+  // 未来工作探索同理：它读的是全库图谱 + 全库 PDF 抽取结果，
+  // 局域图那批论文的缺口不能拿全库结论去套，所以局域模式下一起藏起来。
+  $('dirBar').hidden = isLocal;
   $('reviewBar').hidden = isLocal;
   $('chartWrap').hidden = isLocal;
   $('localView').hidden = !isLocal;
