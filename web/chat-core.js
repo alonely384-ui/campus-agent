@@ -470,8 +470,10 @@
         '<span title="' + escapeHtml(scoreTip) + '">' + scoreLabel + ' ' + Number(it.score).toFixed(4) + '</span>' +
         '<span>命中通道 ' + escapeHtml(channels) + '</span>' +
         '<span class="ev-badge">' + escapeHtml(it.source) + '</span>' +
-        '<a class="ev-open" target="_blank" rel="noopener" href="' +
-        escapeHtml(paperHref(it.source, it.page, it.text)) + '">打开原文</a>' +
+        (isOpenable(it.source, it.page)
+          ? '<a class="ev-open" target="_blank" rel="noopener" href="' +
+            escapeHtml(paperHref(it.source, it.page, it.text)) + '">打开原文</a>'
+          : '<span class="ev-open ev-open--off" title="这条来自论文目录，不对应某一页 PDF，没有原文可跳">目录条目</span>') +
         '</div>' +
         '<div class="ev-text">' + escapeHtml(it.text).slice(0, 400) + (it.text.length > 400 ? '…' : '') + '</div>';
       // 点一下把长证据展开/收起
@@ -503,6 +505,22 @@
 
     botEl.insertAdjacentElement('afterend', box);
     return box;
+  }
+
+  /**
+   * 这条证据能不能跳去看原文。
+   *
+   * 只有「真论文文件」才给链接：后端对「库里有哪些论文」这类目录问题会造一条
+   * source="论文库清单" 的伪证据（没有页码、没有对应 PDF），拿它去拼阅读页链接，
+   * 阅读页按 paper=论文库清单 找不到 .pdf，pdf.js 就报 Missing PDF
+   * （2026-11-17 用户报的那条）。目录类渠道一律不给入口。
+   */
+  function isOpenable(source, page) {
+    var src = str(source).trim();
+    if (!src) return false;
+    if (/\.pdf$/i.test(src)) return true;
+    // 上传入库的论文可能只存了 paper_id（<id>.pdf），来源名未必带后缀，但有页码就说明是正文片段
+    return page != null && !/清单|目录|catalog/i.test(src);
   }
 
   /** 阅读页链接：paper 必带，page 只在有页码时带，hl=1 让阅读页把命中段落高亮。 */
@@ -582,5 +600,6 @@
     buildAnswerCard: buildAnswerCard,
     setTailState: setTailState,
     paperHref: paperHref,
+    isOpenable: isOpenable,
   };
 })();

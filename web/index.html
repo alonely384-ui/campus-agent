@@ -70,6 +70,8 @@
     .ev-open { font-size: 11px; padding: 1px 8px; border-radius: var(--radius-sm); background: var(--brand);
                color: #fff; text-decoration: none; white-space: nowrap; }
     .ev-open:hover { background: var(--brand-active); }
+    /* 目录条目没有对应 PDF，按钮退化成灰字，避免点进去报 Missing PDF */
+    .ev-open--off { background: var(--bg-muted); color: var(--text-subtle); cursor: default; }
 
     /* ---------- 角色时间线：四智能体协作过程可核验 ----------
        官方赛题「AI 技术深度」点名要「多智能体协同」。这里把 Planner/Retriever/
