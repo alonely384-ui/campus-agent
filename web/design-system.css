@@ -150,11 +150,12 @@
   --hl-find-current:   rgba(255, 140, 0, .62);    /* 当前那一处 */
   --hl-find-current-ring: rgba(216, 92, 0, .85);
   /* 引用出处高亮：写作助手「读原文」跳过来时涂的那一段。
-     刻意用跟搜索不同的绿色系——两者可能同时出现在一页上，
-     颜色一样的话用户分不清"这是我搜的词"还是"这是那篇论文支撑那句话的地方"。 */
-  --hl-claim:          rgba(16, 185, 129, .26);
-  --hl-claim-hot:      rgba(16, 185, 129, .55);
-  --hl-claim-ring:     rgba(5, 150, 105, .72);
+     2026-11-17 用户要求「高亮统一颜色」：原来这里单独一套绿色，跟全文搜索的黄色
+     同时出现在一页上时像两种提示。现在对齐搜索高亮的黄色系（--hl-find-text /
+     --hl-find-current），全站只有一种「这里有关键内容」的颜色。 */
+  --hl-claim:          var(--hl-find-text);
+  --hl-claim-hot:      var(--hl-find-current);
+  --hl-claim-ring:     var(--hl-find-current-ring);
 
   /* ---------- 界面语义：文字 ---------- */
   --text-primary:   var(--gray-800);  /* 标题、正文 */

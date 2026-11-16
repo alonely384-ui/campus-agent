@@ -246,20 +246,21 @@
     box-shadow: inset 0 0 0 1.5px var(--hl-find-current-ring);
   }
   /* 引用出处高亮：写作助手点「读原文」跳过来时，把支撑那句话的原文段落涂黄。
-     z-index 比 searchLayer 高一层，两者同时出现（比如定位后又在页内搜词）时不打架。 */
+     z-index 比 searchLayer 高一层，两者同时出现（比如定位后又在页内搜词）时不打架。
+     配色与全文搜索统一为同一套黄色（design-system.css 的 --hl-claim 指向 --hl-find-text）。 */
   .claimLayer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
   .claimLayer .claimBox {
-    position: absolute; border-radius: 3px;
+    position: absolute; border-radius: 2px;
     background: var(--hl-claim);
-    box-shadow: 0 0 0 2px var(--hl-claim-ring);
-    animation: claimPulse 1.1s ease-out 2;
+    box-shadow: 0 0 0 1.5px var(--hl-claim-ring);
+    animation: claimPulse 1.1s ease-out 1;
   }
   /* hl=1 那条路：高亮是"指路"用的，点一下就撤，所以要能收点击 */
   .claimLayer--hl { pointer-events: none; z-index: 4; }
   .claimLayer--hl .claimBox { pointer-events: auto; cursor: pointer; }
   @keyframes claimPulse {
-    0%   { background: var(--hl-claim-hot); box-shadow: 0 0 0 6px var(--hl-claim-ring); }
-    100% { background: var(--hl-claim);     box-shadow: 0 0 0 2px var(--hl-claim-ring); }
+    0%   { background: var(--hl-claim-hot); box-shadow: 0 0 0 5px var(--hl-claim-ring); }
+    100% { background: var(--hl-claim);     box-shadow: 0 0 0 1.5px var(--hl-claim-ring); }
   }
   /* 搜索条：浮在正文顶上，Ctrl+F 或点顶栏「找」呼出 */
   #findBar {
@@ -1551,43 +1552,118 @@ function normText(s) {
     .trim();
 }
 
-/** 在归一化后的整页拼串里找证据原文：先整句，找不到再逐步缩短前缀。 */
-function findClaimSpan(hay, needle) {
-  const n = normText(needle);
-  if (!n || !hay || n.length < 24) return null;   // 太短就不找了：短词到处是，反而误导
-  for (const len of [120, 90, 60, 40, 24]) {
+// ---------- 行级匹配（2026-11-17 用户要求「几行一个段、确保命中率」）----------
+// 老实现的两个毛病：
+//   1) 证据句短于 24 字直接放弃 → 很多证据卡点进来根本没有高亮；
+//   2) 在「整页拼成一条长串」里 indexOf → 证据句一旦跨行（pdf.js 拼串里行与行之间
+//      没有空格，且常夹着连字符、页码、页眉），就永远找不到 → 命中率低。
+// 现在按「行」匹配：拼串先按行切开，用行序列做跨行匹配，命中后再向上下扩到整段。
+
+/** 页拼串 → 行数组（每行去掉首尾空白、内部空白压成一个空格；中英文都不额外插空格）。 */
+function normLines(s) {
+  return String(s || '')
+    .split('\n')
+    .map(line => normText(line))     // 逐行归一化：normText 会把换行也压成空格，所以必须先切行
+    .filter(Boolean);
+}
+
+/** 证据句能用来定位的最短长度：太短（几个单词）到处都有，宁可不高亮也不乱指。 */
+const CLAIM_MIN_CHARS = 8;
+/** 前缀试长：从长到短，先试整句，再一路退到 CLAIM_MIN_CHARS。 */
+const CLAIM_PROBES = [200, 120, 90, 60, 40, 32, 24, 16, 12, 8];
+
+/** 在页的行序列里找证据句，返回命中的行区间 {a, b}（闭区间行号）；找不到返回 null。 */
+function findClaimLines(pageLines, needle) {
+  const n = normText(needle).replace(/\s+/g, ' ');
+  if (!n || !pageLines || !pageLines.length || n.length < CLAIM_MIN_CHARS) return null;
+  // 行与行直接拼接：英文行末常断词（"genera-\ntive"），中文断行也不插空格，
+  // 所以这里插一个空格再归一化，既能跨行匹配又不制造假空格。
+  const joined = pageLines.join(' ');
+  const starts = [];
+  let acc = 0;
+  for (const line of pageLines) {
+    starts.push(acc);
+    acc += line.length + 1;             // +1 是 join 的那个空格
+  }
+  // 字符偏移落在哪一行
+  const lineAt = (off) => {
+    let lo = 0, hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (starts[mid] <= off) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  };
+  for (const len of CLAIM_PROBES) {
     const probe = n.slice(0, Math.min(len, n.length));
-    if (probe.length < 24) break;
-    const at = hay.indexOf(probe);
-    if (at !== -1) return { a: at, b: at + probe.length };
+    if (probe.length < CLAIM_MIN_CHARS) break;
+    const at = joined.indexOf(probe);
+    if (at === -1) continue;
+    return { a: lineAt(at), b: lineAt(at + probe.length - 1) };
   }
   return null;
 }
 
-/** 与 paintSearchPage 相同的「字符偏移 → 行矩形」口径：span.dataset.s/e + rangeRects。 */
-function claimRectsInHolder(holder, span) {
+/** 把命中的那几行向上下扩成一小段（最多 MAX 行），别把整页涂黄、也别只剩几个词。 */
+function expandClaimLines(pageLines, span) {
+  if (!span) return null;
+  const MAX = 8;
+  let a = span.a, b = span.b;
+  while (a > 0 && b - a + 1 < MAX && (pageLines[a - 1] || '').length > 2) a--;
+  while (b < pageLines.length - 1 && b - a + 1 < MAX && (pageLines[b + 1] || '').length > 2) b++;
+  return { a, b };
+}
+
+/** 矩形合并：同一行里被切开的几块并成一块（视觉上「几行一个段」而不是碎词）。 */
+function mergeRects(rects) {
+  const sorted = rects.slice().sort((p, q) => (p.top - q.top) || (p.left - q.left));
   const out = [];
-  const hr = holder.getBoundingClientRect();
-  for (const sp of holder.querySelectorAll('.textLayer > span')) {
-    const s = +(sp.dataset.s || 0);
-    const e = +(sp.dataset.se || 0);
-    if (e <= s) continue;
-    const from = Math.max(span.a, s);
-    const to = Math.min(span.b, e);
-    if (to <= from) continue;
-    const pad = +(sp.dataset.pad || 0);
-    const len = sp.textContent.length;
-    const lf = clamp(from - s - pad, 0, len);
-    const lt = clamp(to - s - pad, 0, len);
-    if (lt <= lf) continue;
-    for (const r of rangeRects(sp, lf, lt)) {
-      if (r.width < 0.5) continue;
-      out.push({ left: r.left - hr.left, top: r.top - hr.top, width: r.width, height: r.height });
+  for (const r of sorted) {
+    const last = out[out.length - 1];
+    // 同一行：竖直中心差不到半个字高
+    if (last && Math.abs((last.top + last.height / 2) - (r.top + r.height / 2)) < Math.max(2, r.height * 0.5)) {
+      const right = Math.max(last.left + last.width, r.left + r.width);
+      last.left = Math.min(last.left, r.left);
+      last.top = Math.min(last.top, r.top);
+      last.width = right - last.left;
+      last.height = Math.max(last.height, r.height);
+    } else {
+      out.push({ left: r.left, top: r.top, width: r.width, height: r.height });
     }
   }
-  // 只留正文区：去掉页面上下 12%（页眉页脚、页码），绝不整页一片黄
-  const H = holder.offsetHeight || hr.height;
-  return out.filter(r => r.top > H * 0.12 && r.top < H * 0.88);
+  return out;
+}
+
+/** 只留正文区的行：页眉页脚（上下各 12%）不涂。 */
+function bodyLineMask(ys, height) {
+  const H = height || 0;
+  const out = [];
+  ys.forEach((y, i) => {
+    if (y > H * 0.12 && y < H * 0.88) out.push(i);
+  });
+  return out;
+}
+
+/**
+ * 文本层的每个 span 落在第几行：同一竖直位置（竖直中心相差不到半个字高）归一行，
+ * 行号按 y 从小到大排。返回与 spans 等长的数组，下标即 spans 下标。
+ */
+function lineIndexOfSpans(spans, ys) {
+  const groups = [];
+  spans.forEach((sp, i) => {
+    const y = ys[i];
+    const h = sp.getBoundingClientRect().height || 1;
+    const hit = groups.find(g => Math.abs(g.y - y) < Math.max(2, h * 0.5));
+    if (hit) return;
+    groups.push({ y, h });
+  });
+  groups.sort((p, q) => p.y - q.y);
+  return spans.map((sp, i) => {
+    const y = ys[i];
+    const h = sp.getBoundingClientRect().height || 1;
+    const idx = groups.findIndex(g => Math.abs(g.y - y) < Math.max(2, h * 0.5));
+    return idx;
+  });
 }
 
 async function paintClaimText(pageNo) {
@@ -1598,14 +1674,42 @@ async function paintClaimText(pageNo) {
     await ensureRendered(pageNo);
   }
   if (holder.dataset.ready !== '1') return false;
+
   if (!state.claim.hits.has(pageNo)) {
-    // 这一页还没算过：拿拼串找一遍，算过就缓存（null 也缓存，避免反复大页搜索）
     const idx = await pageTextIndex(pageNo);
-    state.claim.hits.set(pageNo, findClaimSpan(normText(idx && idx.text), state.claim.text));
+    const pageLines = normLines(idx && idx.text);
+    // 先按行找证据句；找到了再向上下扩成一小段（用户要的「几行一个段」）
+    const span = findClaimLines(pageLines, state.claim.text);
+    state.claim.hits.set(pageNo, span ? expandClaimLines(pageLines, span) : null);
   }
-  const span = state.claim.hits.get(pageNo);
-  if (!span) return false;
-  const rects = claimRectsInHolder(holder, span);
+  const lines = state.claim.hits.get(pageNo);
+  if (!lines) return false;
+
+  const spans = [...holder.querySelectorAll('.textLayer > span')];
+  if (!spans.length) return false;
+  const hr = holder.getBoundingClientRect();
+  const H = holder.offsetHeight || hr.height;
+
+  // 文本层里每个 span 带行号：行号 = 同一竖直位置上 / span.dataset.s 落在第几行。
+  // 拓成整段后，把落在 [lines.a, lines.b] 里的 span 的所有矩形都涂上，
+  // 于是高亮是「几行一条连续色块」，而不是「命中那两个字」。
+  const ys = spans.map(sp => sp.getBoundingClientRect().top - hr.top);
+  const lineOf = lineIndexOfSpans(spans, ys);
+  const keep = bodyLineMask(ys, H);
+
+  const mine = [];
+  spans.forEach((sp, i) => {
+    if (!keep.includes(i)) return;
+    const ln = lineOf[i];
+    if (ln == null || ln < lines.a || ln > lines.b) return;
+    for (const r of rangeRects(sp, 0, sp.textContent.length)) {
+      if (r.width < 0.5) continue;
+      mine.push({ left: r.left - hr.left, top: r.top - hr.top, width: r.width, height: r.height });
+    }
+  });
+
+  // 一行被 pdf.js 切成好几块：并成一条，视觉上才像"一段"
+  const rects = mergeRects(mine).filter(r => r.top > H * 0.10 && r.top < H * 0.90);
   if (!rects.length) return false;
 
   const layer = document.createElement('div');
@@ -1613,9 +1717,9 @@ async function paintClaimText(pageNo) {
   rects.forEach(r => {
     const box = document.createElement('div');
     box.className = 'claimBox';
-    box.style.left = `${(r.left - 2).toFixed(1)}px`;
+    box.style.left = `${(r.left - 3).toFixed(1)}px`;
     box.style.top = `${(r.top - 2).toFixed(1)}px`;
-    box.style.width = `${(r.width + 4).toFixed(1)}px`;
+    box.style.width = `${(r.width + 6).toFixed(1)}px`;
     box.style.height = `${(r.height + 4).toFixed(1)}px`;
     box.title = '点一下取消高亮';
     layer.appendChild(box);
@@ -1673,18 +1777,30 @@ function pdfToCss(viewport, x, y, pageHeightPt) {
  * 否则滚到的是空白占位块，用户看到的是「什么都没高亮」。
  */
 async function scrollToClaim() {
-  // hl=1：先在本页找证据句，找到就画、找不到才退回矩形
+  // hl=1：先在本页找证据句，找到就画；找不到退矩形；矩形也没有就跨页找
+  // （证据卡的页码来自检索分块，未必就是这句话在 PDF 里印的那一页，
+  //   2026-11-17 用户反馈「有些点击不显示高亮」就是这个）。
   if (START_HL && state.claim.text) {
-    const drew = await paintClaimText(START_PAGE);
+    let drew = await paintClaimText(START_PAGE);
     if (!drew && START_RECT.length === 4) {
       state.claim.on = false;          // 让矩形分支照常画
       paintClaimPage(START_PAGE, await pageViewport(START_PAGE));
       state.claim.on = true;
+      drew = !!pagesEl.querySelector(`.page[data-page="${START_PAGE}"] .claimLayer .claimBox`);
     }
+    if (!drew) {
+      const hit = await findClaimPageAcrossDoc();
+      if (hit) {
+        await jumpToPage(hit);
+        await new Promise(r => requestAnimationFrame(r));
+        drew = await paintClaimText(hit);
+      }
+    }
+    if (!drew) toast('没在原文里找到与证据对应的句子，已停在证据标注的那一页');
   }
   for (let i = 0; i < 40; i++) {
     const box = START_HL
-      ? pagesEl.querySelector(`.page[data-page="${START_PAGE}"] .claimLayer--hl .claimBox`)
+      ? pagesEl.querySelector('.claimLayer--hl .claimBox')
       : pagesEl.querySelector(`.page[data-page="${START_PAGE}"] .claimLayer .claimBox`);
     if (box) {
       scrollElIntoView(box);
@@ -1692,8 +1808,25 @@ async function scrollToClaim() {
     }
     await new Promise(r => setTimeout(r, 120));
   }
-  if (START_HL) toast('这一页没找到与证据完全对应的句子，已跳到证据所在页');
-  else console.warn('引用出处高亮迟迟没出现，可能这一页渲染失败');
+  if (!START_HL) console.warn('引用出处高亮迟迟没出现，可能这一页渲染失败');
+}
+
+/** 跨页找证据句：从 START_PAGE 往两边翻，找到第一页就返回页码（找不到返回 0）。 */
+async function findClaimPageAcrossDoc() {
+  const total = state.numPages || 0;
+  if (!total) return 0;
+  const order = [START_PAGE];
+  for (let d = 1; d <= Math.max(START_PAGE - 1, total - START_PAGE); d++) {
+    if (START_PAGE - d >= 1) order.push(START_PAGE - d);
+    if (START_PAGE + d <= total) order.push(START_PAGE + d);
+  }
+  for (const p of order) {
+    if (p === START_PAGE) continue;             // 本页已经试过
+    const idx = await pageTextIndex(p);
+    const lines = normLines(idx && idx.text);
+    if (findClaimLines(lines, state.claim.text)) return p;
+  }
+  return 0;
 }
 
 /** 取某页 pdf.js viewport：没渲染过就先渲一次（renderPage 内部会自己补画高亮）。 */
