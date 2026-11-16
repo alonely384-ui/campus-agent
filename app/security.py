@@ -116,12 +116,19 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/translate/selection",
         "/library/download",
         "/paper/{filename}/references/download",
+        "/paper/{filename}/references/plan",
+        "/paper/{filename}/references/download-one",
         "/recommendations/refresh",
         "/recommendations/{key}/feedback",
         "/recommendations/schedule",
         "/graph",
         "/graph/survey",
         "/graph/frontier",
+        # 局域图谱（赛题 1.5.1/1.5.2）：见下面 _RATE_TABLE 里的说明。
+        # 它不是 /papers/upload 那种"下载 + 建索引 + 落盘"的重量级写入，
+        # 因此不归 BUCKET_HEAVY，走单独的 BUCKET_LOCAL_GRAPH。
+        "/graph/local",
+        "/graph/local/upload",
         "/writing/framework",
         "/writing/diagram",
         "/writing/paper-figures",
@@ -339,6 +346,45 @@ BUCKET_CPU = Bucket(rate=0.05, burst=2)
 # 写作页的候选池有 20-32 篇，用户可能连着点好几篇的「读原文」，
 # 沿用 BUCKET_CPU（20 秒才回 1 个、突发 2）点第 3 篇就被 429 拦住。
 BUCKET_SCAN = Bucket(rate=1.0, burst=8)
+# 档位 L 版式判定：/paper/{f}/layout 抽样前 40 页判单栏/双栏，
+# 单次实测 **冷启动 194–1419 ms**（Llama 2 双栏混排最慢 1.4s），
+# 命中 layout._cache 后是 0.0 ms。
+# 原来挂在 BUCKET_CPU（rate=0.05, burst=2）：实测连开 3 篇论文就 429，
+# 第 3 篇起「单栏/双栏」徽章永远显示"未知"——用户看不出是限流，只觉得功能时灵时不灵。
+# 按"看论文时每篇要一次、切回来再看一次"标定：突发 6 次（够连续翻几篇），
+# 之后每 4 秒补 1 个（1.4s 冷启动的保守系数）。脚本狂刷仍会被挡住。
+BUCKET_LAYOUT = Bucket(rate=0.25, burst=6)
+# 档位 H 参考文献推荐列表：一次请求内部会连调 N 次模型（逐条写理由），
+# 但**结果按论文缓存**，同一篇再点就几乎不花额度；而且首次要 20 秒以上，
+# 用户等不住会反复点，实测连点 4 次就撞 BUCKET_LLM（突发 3）被 429 锁住。
+# 它的真实成本由 daily_budget 兜底，限流只需挡住脚本刷：
+# 给 8 次突发、10 秒补 1 个（6 次/分钟），与局域图谱同一标定思路。
+BUCKET_REF_PLAN = Bucket(rate=0.1, burst=8)
+# 档位 G 局域图谱：单次实测 6 篇 7s / 20 篇约 19s / 40 篇 65s。
+# 它读的是已经解析过的 PDF，上传那版也只是解到临时目录、算完就删，
+# **既不写入库、也不连外网**，所以不能沿用 BUCKET_HEAVY（50 秒才回 1 个）：
+# 那个档位是为 /papers/upload（下载 + 建索引 + 落盘）标定的。
+# 若沿用，用户在局域图谱里点两次建图后就会被 429 锁近一分钟，
+# 页面表现是"点了没反应/一直转圈"，看着像功能坏了。
+# 这里按「单次 20s」标定：正常演示会在一个批次里反复试（换勾选、换上传批次），
+# 而每次建图本身就要 7–65 秒，CPU 已经被"算得久"天然限住了，
+# 限流只需要挡住脚本刷。给 8 次突发、10 秒补 1 个（6 次/分钟）。
+# 上传版更重（要收最多 256MB 请求体、落盘再解析），给 5 次突发、20 秒补 1 个。
+BUCKET_LOCAL_GRAPH = Bucket(rate=0.1, burst=8)
+BUCKET_LOCAL_GRAPH_UPLOAD = Bucket(rate=0.05, burst=5)
+# 档位 I 侧栏缩略图：阅读器右侧的图表清单一次会并发请求几十张
+# /paper/{f}/figure/{i}（Llama 2 一篇就 34 张）。单张只是从本地 PDF 裁一小块
+# 或直接读 data/meta/figures 缓存，**不连外网、不耗模型额度**，风险只在于
+# "被脚本批量刷图把 CPU 打满"。
+# 原来它挂在 BUCKET_LIGHT（rate=2.0, burst=10）：实测连打 40 次，
+# 第 11 次起全部 429（200×11 / 429×29），页面表现就是"缩略图一大片裂开"。
+#
+# 标定依据：一次正常阅读至少会要 30–40 个令牌（一篇 34 张图 + 翻页回来重取），
+# 而 rate 太低时"桶补满要 30 秒"，用户切走再回来就是满屏 429——实测过，
+# 同一篇连开两次：第一次 34/34 正常，紧接着第二次只剩 23/34。
+# 缓存命中后单张只是读一个 30–50 KB 文件，比 /health 还轻，
+# 所以给 60 次突发、每秒补 2 个（与轻量只读同档的补充速率）。
+BUCKET_FIGURE = Bucket(rate=2.0, burst=60)
 
 # 路径 → 档位。路径模板带 {xxx} 的形式与 main.py 的路由模板完全一致，
 # 匹配时先精确查，查不到再按前缀（用于 /paper/{filename}/xxx 这类）。
@@ -382,15 +428,28 @@ _RATE_TABLE: dict[str, Bucket] = {
     "/papers/upload": BUCKET_HEAVY,
     "/library/download": BUCKET_HEAVY,
     "/paper/{filename}/references/download": BUCKET_HEAVY,
+    # 单篇下载：和批量下载同样是外网 + 入库，只是量小，档位一致即可。
+    "/paper/{filename}/references/download-one": BUCKET_HEAVY,
+    # 推荐列表：要连 S2 取引用关系 + 逐条调 LLM 写理由，但**不落盘、不入库**。
+    # 用 BUCKET_REF_PLAN 而不是 BUCKET_LLM：后者按"单次模型调用"标定（突发 3），
+    # 而这条请求内部要连调 N 次、首次 20 秒以上，用户反复点就被 429 锁死。
+    "/paper/{filename}/references/plan": BUCKET_REF_PLAN,
     "/recommendations/refresh": BUCKET_HEAVY,
+    # 局域图谱：抽取 20 篇参考文献是纯 CPU 活，但上传版还要落盘，统一给重量级档
+    # 局域图谱（赛题 1.5.1/1.5.2）：勾选建图只读库内已解析的 PDF；
+    # 上传建图把文件解到临时目录、算完就删，**不写入库、不连外网**，
+    # 单次 6 篇 7s / 40 篇 65s，纯计算。所以走新档位 BUCKET_LOCAL_GRAPH，
+    # 而不是 /papers/upload 那套 BUCKET_HEAVY（50 秒才回 1 个）。
+    "/graph/local": BUCKET_LOCAL_GRAPH,
+    "/graph/local/upload": BUCKET_LOCAL_GRAPH_UPLOAD,
     "/recommendations/{key}/feedback": BUCKET_LIGHT,
     "/recommendations/schedule": BUCKET_LIGHT,
     # ---- E CPU 密集 ----
     "/graph/survey": BUCKET_CPU,
     "/graph/frontier": BUCKET_CPU,
-    "/paper/{filename}/layout": BUCKET_CPU,
+    "/paper/{filename}/layout": BUCKET_LAYOUT,
     "/paper/{filename}/claim-locate": BUCKET_SCAN,
-    "/paper/{filename}/figure/{index}": BUCKET_LIGHT,
+    "/paper/{filename}/figure/{index}": BUCKET_FIGURE,
     "/paper/{filename}/structure": BUCKET_LIGHT,
     "/paper/{filename}/translation": BUCKET_LIGHT,
     "/paper/{filename}": BUCKET_LIGHT,
@@ -767,12 +826,20 @@ def reserve_llm_call(n: int = 1) -> None:
 MAX_JSON_BODY = 1024 * 1024        # 1MB：正常 /chat 请求体 < 4KB，留 250 倍余量
 MAX_UPLOAD_BODY = 24 * 1024 * 1024  # 24MB：单文件业务上限 20MB + multipart 边界余量
 
+# 批量上传（局域图谱一次 20 篇）远不止 24MB。实测测试集 20 篇合计 39.6MB，
+# 所以局域图谱上传单独给一档 256MB —— 20 篇 × 单篇 12MB 的平均值也够用。
+# 为什么不直接把 MAX_UPLOAD_BODY 提到 256MB：/papers/upload 是入库接口，
+# 单篇上限 30MB，把上限定那么高只会让攻击者一次就能塞爆内存。
+MAX_BATCH_UPLOAD_BODY = 256 * 1024 * 1024
+
 
 def _is_upload(path: str) -> bool:
-    return path in ("/upload", "/papers/upload", "/writing/chart")
+    return path in ("/upload", "/papers/upload", "/writing/chart", "/graph/local/upload")
 
 
 def body_limit_for(path: str) -> int:
+    if path == "/graph/local/upload":
+        return MAX_BATCH_UPLOAD_BODY
     return MAX_UPLOAD_BODY if _is_upload(path) else MAX_JSON_BODY
 
 
@@ -855,9 +922,14 @@ __all__ = [
     "DOC_PATHS",
     "BUCKET_CHAT",
     "BUCKET_CPU",
+    "BUCKET_FIGURE",
     "BUCKET_HEAVY",
+    "BUCKET_LAYOUT",
     "BUCKET_LIGHT",
     "BUCKET_LLM",
+    "BUCKET_LOCAL_GRAPH",
+    "BUCKET_LOCAL_GRAPH_UPLOAD",
+    "BUCKET_REF_PLAN",
     "BUCKET_SCAN",
     "COOKIE_NAME",
     "BudgetExceeded",

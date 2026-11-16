@@ -45,6 +45,33 @@ _ARXIV_ID_RE = re.compile(r"(\d{4}\.\d{4,5})")
 _GITHUB_RE = re.compile(r"https?://github\.com/[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+")
 _TAG_RE = re.compile(r"<[^>]+>")
 
+# ------------------------------------------------------------------ 引用写法的四种体
+# 论文标注引用没有统一标准，实测一个 43 篇的库里能同时出现四种：
+#   1. 数字体 [12]、[3, 5]、[7–9]                  —— 计算机视觉/ICLR 常见
+#   2. 方括号作者年 [Krizhevsky et al., 2012]       —— Layer Normalization 这种（还会跨行）
+#   3. 圆括号作者年 (Vaswani et al., 2017)          —— Llama 2 / ViT / CLIP 这类
+#   4. 作者缩写体 [Bel+15]                          —— PPO 用的 LaTeX 风格
+# 只认第 1 种时，实测 43 篇里只有 14 篇能算出候选（33%），其余全被 min_cites 过滤成空。
+_ARXIV_NUM_CITE_RE = re.compile(r"\[([0-9][0-9,;–\-\s]*)\]")
+# 作者名只取姓：允许跨行（PDF 折行会把 "Ioffe and\nSzegedy, 2015" 断开）
+_CITE_SURNAME = r"([A-Z][A-Za-z\-']+)(?:\s+et\s+al\.?)?(?:\s+and\s+[A-Z][A-Za-z\-']+)?"
+_CITE_YEAR = r"(?:19|20)\d{2}"
+_BRACKET_AUTHOR_YEAR_RE = re.compile(
+    r"\[" + _CITE_SURNAME + r"\s*,?\s*" + r"(" + _CITE_YEAR + r")", re.S
+)
+_PAREN_AUTHOR_YEAR_RE = re.compile(
+    r"\(" + _CITE_SURNAME + r"\s*,?\s*" + r"(" + _CITE_YEAR + r")", re.S
+)
+_NARRATIVE_AUTHOR_YEAR_RE = re.compile(
+    r"\b" + _CITE_SURNAME + r"\s*\(" + r"(" + _CITE_YEAR + r")"
+)
+# [Bel+15]：[姓缩写+两位年份]。LaTeX 风格里缩写是**前几个字母**（[Mni+15] = Mnih、
+# [Bel+15] = Bellemare、[Bro+16] = Brockman），不是首字母——所以不能压成单字符。
+_AUTHOR_TAG_RE = re.compile(r"\[([A-Z][A-Za-z]{1,5})\+(\d{2})\]")
+# 另一种写法是把前三位作者的姓氏首字母拼起来：(RWC, 2019) = Radford/Wu/Child。
+# 这个模式只在大写缩写后面紧跟年份时才成立，避免误吞公式里的变量名。
+_INITIALS_YEAR_RE = re.compile(r"\b([A-Z]{2,4})\s*,?\s*((?:19|20)\d{2})\b")
+
 
 class OnlineError(RuntimeError):
     """联网失败（超时、限流、解析不出结果）。调用方应退回缓存。"""
@@ -488,7 +515,7 @@ def references(arxiv_id: str, limit: int = 40) -> list[dict[str, Any]]:
         return []
     data = _s2(
         f"/paper/arXiv:{arxiv_id}/references",
-        {"fields": "title,year,externalIds,abstract,authors", "limit": limit},
+        {"fields": "title,year,externalIds,abstract,authors,citationCount", "limit": limit},
         f"s2_references_{arxiv_id}",
         CITE_TTL,
     )
@@ -511,6 +538,9 @@ def _paper_row(paper: dict[str, Any]) -> dict[str, Any]:
         "abstract": str(paper.get("abstract") or "").strip(),
         "authors": authors[:6],
         "url": f"{ARXIV_BASE}/abs/{arxiv_id}" if arxiv_id else "",
+        # Semantic Scholar 自己统计的被引数。用来给"推荐理由"补一句外部分量，
+        # 取不到就是 0（S2 有时不给这个字段），上层要按 0 处理、不能当错误。
+        "cited_by": int(paper.get("citationCount") or 0),
     }
 
 
@@ -544,3 +574,60 @@ def citation_counts(text: str) -> dict[int, int]:
                 if 0 < num <= 500:
                     counts[num] = counts.get(num, 0) + 1
     return counts
+
+
+def author_year_counts(text: str) -> dict[tuple[str, str], int]:
+    """数正文里每个「作者姓氏 + 年份」被提及了多少次。
+
+    为什么要这条路：``citation_counts`` 只认 ``[12]`` 数字体，而实测库里 2/3 的论文
+    用的是作者-年份体（Llama 2 全是 ``(Scao et al., 2022)``、ViT 是 ``(Vaswani et al., 2017)``、
+    Layer Normalization 是 ``[Krizhevsky et al., 2012]``、PPO 是 ``[Bel+15]``）。
+    只按数字体数，这些论文的候选会被 ``min_cites`` 全部过滤掉，用户看到的是
+    「候选 0 篇」—— 明明 S2 返回了 40 条引用。
+
+    键统一成 ``(姓氏, 四位年份)``；``[Bel+15]`` 这种两位年份还原成 19xx/20xx
+    （按 ``<= 当前年份后两位`` 判 20xx，否则 19xx）。
+
+    **按姓氏计数会串味**：同姓不同人（多个 Zhang / Wang）会被合并，所以这只是一个
+    近似信号，用来给 S2 的第 n 条引用加权；它不下结论、不判断对错，只在数字体
+    完全数不出来时作为回退。
+    """
+    found: dict[tuple[str, str], int] = {}
+    if not text:
+        return found
+
+    def _bump(surname: str, year: str) -> None:
+        key = (surname, year)
+        found[key] = found.get(key, 0) + 1
+
+    for match in _BRACKET_AUTHOR_YEAR_RE.finditer(text):
+        _bump(match.group(1), match.group(2))
+    for match in _PAREN_AUTHOR_YEAR_RE.finditer(text):
+        _bump(match.group(1), match.group(2))
+    for match in _NARRATIVE_AUTHOR_YEAR_RE.finditer(text):
+        _bump(match.group(1), match.group(2))
+
+    # [Bel+15] 这种写法里没有四位年份，单独补一遍
+    this_yy = datetime.now().year % 100
+    for match in _AUTHOR_TAG_RE.finditer(text):
+        # 保留原样（Mni/Bel/Bro），后面用前缀匹配去找对应作者
+        yy = int(match.group(2))
+        year = f"20{yy:02d}" if yy <= this_yy else f"19{yy:02d}"
+        _bump(match.group(1), year)
+    # (RWC, 2019) 这种前三作者首字母缩写
+    for match in _INITIALS_YEAR_RE.finditer(text):
+        _bump(match.group(1), match.group(2))
+    return found
+
+
+def _surname_matches(abbrev: str, surname: str) -> bool:
+    """``Mni`` 能不能对上 ``Mnih``：缩写是姓氏的前缀（大小写无关）。"""
+    if not abbrev or not surname:
+        return False
+    low_a, low_s = abbrev.lower(), surname.lower()
+    return low_s.startswith(low_a) or low_a.startswith(low_s)
+
+
+def _initials_of(surname: str) -> str:
+    """``Radford`` -> ``R``；用于匹配 ``(RWC, 2019)`` 这种三首字母缩写。"""
+    return surname[:1].upper() if surname else ""
