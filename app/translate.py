@@ -48,7 +48,11 @@ SYSTEM_PROMPT = (
     "参考文献编号（如 [12]、[38, 24]）、图表编号（Table 2、Figure 3）一律原样保留，不要翻译。\n"
     "3. 输出 Markdown：段落之间空一行；保留原文的小标题层级（## / ###）；列表保持列表。\n"
     "4. 只输出译文本身，不要写「以下是翻译」之类的开场白，也不要复述原文。\n"
-    "5. 遇到参考文献列表时，保留每条编号和文献信息（作者/年份/标题可保留英文），不要自行删减。"
+    "5. 遇到参考文献列表时，保留每条编号和文献信息，不要自行删减；"
+    "作者名、论文标题、会议名、arXiv 编号、URL 保持英文原样，"
+    "但其中的说明性成分（如 leaderboard→榜单、preprint→预印本、"
+    "et al.→等）要译成中文。**禁止把整段输入原样返回**："
+    "即使这一页几乎都是文献条目，也必须至少译出其中的说明性文字。"
 )
 
 
@@ -155,6 +159,71 @@ def _chunks(text: str) -> list[str]:
     return chunks
 
 
+def _looks_untranslated(source: str, markdown: str) -> bool:
+    """模型把原文原样抄回来 = 这一页没翻成中文。
+
+    为什么需要这个检查（实测踩到的）：
+        拿一整页参考文献条目（作者名 + arXiv 编号 + URL）去翻，模型会判断
+        「这些本来就不该翻」，直接把输入原封不动吐回来。我们把它当译文
+        写进缓存、显示在译文栏，用户看到的就是「翻译出来还是英文原文」。
+        证据：`_digest` 那次复现里 same-as-input=True、汉字数 0、
+        finish_reason=stop、completion_tokens=366，说明不是报错也不是截断。
+
+    判定口径：输出里几乎没有汉字，且输出和输入高度重合。两者同时满足才判失败，
+    避免把「公式/代码页」这种本来就该保真、汉字天然为零的正常结果误杀——
+    那种情况下模型不会逐字复述输入，重合度远低于阈值。
+    """
+    if not markdown:
+        return True
+    cjk = sum(1 for ch in markdown if "\u4e00" <= ch <= "\u9fff")
+    # 汉字占比 ≥ 5% 就认为确实译成了中文（纯公式页也可能低于这个值，
+    # 所以下面还要看重合度）
+    if cjk / max(1, len(markdown)) >= 0.05:
+        return False
+    a = " ".join((source or "").split())
+    b = " ".join(markdown.split())
+    if not a or not b:
+        return False
+    # 用公共前缀长度估重合：模型回显时开头会完全一致
+    n = min(len(a), len(b))
+    same = 0
+    while same < n and a[same] == b[same]:
+        same += 1
+    return same >= max(80, int(n * 0.8))
+
+
+# 模型把原文原样吐回来时，用这条更硬的提示词再要一次。
+# 为什么不是直接报错：用户要的是「看懂这页」，重试一次往往就翻了；
+# 只有重试仍是原文才认输，由上层显示"这一页没翻出来"。
+_RETRY_PROMPT = (
+    SYSTEM_PROMPT
+    + "\n6. 上面这段文字必须译成简体中文。即使它是参考文献条目、作者名、"
+    "arXiv 编号或网址，也要把其中的说明性文字译成中文，不能原样返回英文；"
+    "只有人名、编号、网址本身保持原样。"
+)
+
+
+async def _translate_chunk(chunk: str) -> str:
+    """译一块，并在模型原样回显时用更强的提示重试一次。"""
+    out = await chat(
+        [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": chunk},
+        ],
+        temperature=0.2,
+    )
+    if _looks_untranslated(chunk, out):
+        logger.warning("翻译返回的是原文（模型未译），改用强制提示重试一次")
+        out = await chat(
+            [
+                {"role": "system", "content": _RETRY_PROMPT},
+                {"role": "user", "content": chunk},
+            ],
+            temperature=0.2,
+        )
+    return out
+
+
 async def translate_text(text: str) -> str:
     """译一段文本（选中翻译 / 摘要翻译走这里）。空文本直接返回空串。"""
     text = (text or "").strip()
@@ -164,13 +233,7 @@ async def translate_text(text: str) -> str:
         text = text[:SELECTION_MAX_CHARS]
     pieces: list[str] = []
     for chunk in _chunks(text):
-        pieces.append(await chat(
-            [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": chunk},
-            ],
-            temperature=0.2,
-        ))
+        pieces.append(await _translate_chunk(chunk))
     return "\n\n".join(p.strip() for p in pieces if p.strip())
 
 
@@ -210,7 +273,14 @@ async def translate_pages(
         source = texts[page_no]
         digest = _digest(source)
         hit = stored.get(str(page_no)) or {}
-        if not force and hit.get("hash") == digest and hit.get("markdown"):
+        # 命中缓存还要再过一次语言检查：老版本会把「模型回显原文」写进缓存，
+        # 那些记录 hash 对得上、内容是英文，不查就会一直显示英文原文。
+        if (
+            not force
+            and hit.get("hash") == digest
+            and hit.get("markdown")
+            and not _looks_untranslated(source, hit["markdown"])
+        ):
             done += 1
             translated.append(page_no)
             yield {
@@ -227,6 +297,17 @@ async def translate_pages(
         except Exception as exc:  # 单页失败不影响后面的页
             logger.exception("第 %d 页翻译失败", page_no)
             yield {"type": "error", "page": page_no, "message": str(exc)[:200]}
+            continue
+        # 重试后仍是原文：不写缓存（否则下次点「本页」直接命中这条坏记录，
+        # 用户以为翻过了，其实看到的还是英文），并把原因说清楚
+        if _looks_untranslated(source, markdown):
+            logger.warning("第 %d 页翻译结果仍是原文，不入缓存", page_no)
+            done += 1
+            yield {
+                "type": "error",
+                "page": page_no,
+                "message": "这一页模型没有给出中文译文（多为参考文献/图注页），已跳过且未写入缓存",
+            }
             continue
         stored[str(page_no)] = {"hash": digest, "markdown": markdown, "chars": len(source)}
         save_translation(filename, cache)
