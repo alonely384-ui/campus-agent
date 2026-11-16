@@ -133,6 +133,13 @@ _CATALOG_QUESTION = re.compile(
     r"(多少篇|几篇|哪些论文|都有(?:哪些|什么)|所有论文|全部论文|论文库(?:里|中)?(?:一共)?有"
     r"|什么类型|哪些类型|几个领域|哪些领域|多少种论文|推荐|哪几篇|列一下|哪些是)"
 )
+# 纯统计类问题（"多少篇/都有哪些/什么类型"）：答案完全来自清单，检索片段纯属噪声。
+# 「推荐一篇 X 的论文」虽然也命中上面的正则（要借清单知道库里有啥），但它还想看
+# 具体论文内容，检索片段是有用的，不能丢——所以单独用一个更窄的正则区分。
+_CATALOG_STATS_ONLY = re.compile(
+    r"(多少篇|几篇|什么类型|哪些类型|几个领域|哪些领域|多少种论文|都有(?:哪些|什么)论文"
+    r"|所有论文|全部论文|论文库(?:里|中)?(?:一共)?有(?:多少|哪些|几))"
+)
 
 
 def load_catalog() -> list[dict]:
@@ -1091,21 +1098,14 @@ async def _rag_context_with_evidence(
     # 否则模型只能数检索片段里出现过几篇（见 docs/RESEARCH-MEMORY-COUNT.md 问题 A）。
     catalog_hit = not multi and not source and _is_catalog_question(question)
     catalog_block = _catalog_block() if catalog_hit else ""
-    catalog_evidence = (
-        Evidence(
-            rank=1,
-            source="论文库清单",
-            page=None,
-            score=0.0,
-            channels=["catalog"],
-            text=catalog_block[:160],
-        )
-        if catalog_block
-        else None
-    )
+
+    # 清单只进上下文（见下方 lines.append(catalog_block)），不进证据列表：
+    # 它没有页码、没有相似度分，只讲"库里有哪些论文"。放进证据列表会在界面上
+    # 显示成「证据 #1 · 第 ? 页 · 融合分 0.0000 · 目录条目」，读起来像一条坏证据
+    # （2026-11-17 用户反馈）。检索片段照旧保留，给「推荐哪一篇」这类问题补原文依据。
 
     if not scored:
-        final_evidence = [catalog_evidence] if catalog_evidence else []
+        final_evidence = []
         # 即使没检索到，也要把 Extractor/Verifier 写进时间线：
         # 否则界面停在 Retriever，"为什么没答案"就无从解释。
         if roles is not None:
@@ -1236,8 +1236,12 @@ async def _rag_context_with_evidence(
             )
     if card_evidences:
         evidence = card_evidences + evidence
-    if catalog_evidence:
-        evidence.insert(0, catalog_evidence)
+    # 纯统计类问题（"一共有多少篇/都有哪些论文"）的答案完全来自清单，
+# 检索片段只是被同一个词碰巧召回的东西，挂上去只会误导。
+# 用户 2026-11-17 明确要求：清单命中就不带检索证据。
+# 但「推荐一篇 X 的论文」这类要有原文做依据，检索片段保留。
+    if catalog_block and _CATALOG_STATS_ONLY.search(question or ""):
+        evidence = []
     for i, ev in enumerate(evidence, 1):
         ev.rank = i
     chunks = [chunk for chunk, _score, _channels in scored]
@@ -1506,6 +1510,10 @@ class Evidence:
     score: float
     channels: list[str]
     text: str
+    # 全库清单不是检索片段：它没有页码、没有相似度分，只是「库里有哪些论文」的
+    # 全局事实。前端据此把它渲染成一条说明而不是证据卡（2026-11-17 用户反馈
+    # 「证据 #1 … 第 ? 页 … 目录条目」读起来像一条坏证据）。
+    kind: str = "chunk"
 
     def to_dict(self) -> dict:
         return {
@@ -1516,6 +1524,7 @@ class Evidence:
             "score_type": "rerank" if "rerank" in self.channels else "rrf",
             "channels": self.channels,
             "text": self.text,
+            "kind": self.kind,
         }
 
 

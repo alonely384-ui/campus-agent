@@ -438,6 +438,11 @@
     opts = opts || {};
     var preview = Number.isFinite(opts.preview) ? opts.preview : EVIDENCE_PREVIEW;
 
+    // 用全库清单回答的问题（「一共有多少篇」「推荐一篇 X 的论文」）本来就不吃检索片段，
+    // 证据为 0 是正常结果而不是"没找到"——这时不画任何东西，免得写一句
+    // 「证据不足 · 论文库里没有找到能回答这个问题的段落」自相矛盾。
+    if (opts.catalog) return null;
+
     var box = document.createElement('div');
     box.className = 'evidence';
 

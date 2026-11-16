@@ -69,8 +69,9 @@ async def test_catalog_question_injects_block_and_evidence(tmp_path, monkeypatch
 
     assert "【论文库清单】" in context
     assert "共 1 篇" in context
-    assert evidence and evidence[0].channels == ["catalog"]
-    assert evidence[0].source == "论文库清单"
+    # 清单是上下文材料，不是检索片段：它没有页码、没有相似度分，
+    # 放进证据列表会让界面出现「证据 #1 · 第 ? 页 · 融合分 0.0000」这种坏卡片。
+    assert evidence == []
 
 
 async def test_normal_question_gets_no_catalog_block(tmp_path, monkeypatch):

@@ -733,7 +733,11 @@ async function send() {
     // 2026-11-16 用户要求「多智能体协作也放到展开隐藏中」：并进回答卡片的折叠区，
     // 与依据/局限一起展开，不再单独占一块外露区域。
     streamAns.foldRoles(roleItems, statusText);
-    ChatCore.renderEvidence(botEl, evidenceItems);
+    // 证据为 0 且正文提到【论文库清单】→ 这是清单类问题，不画证据区
+    // （否则会显示「证据不足」，而答案其实来自全库清单，自相矛盾）。
+    ChatCore.renderEvidence(botEl, evidenceItems, {
+      catalog: !evidenceItems.length && /论文库清单/.test(answer || '')
+    });
 
     // 成功拿到回答才记入历史：失败/空回答不污染下一轮
     if (answer) {
