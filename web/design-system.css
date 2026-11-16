@@ -869,6 +869,8 @@ body.app {
 .app--collapsed .sb-label,
 .app--collapsed .sb-item__txt,
 .app--collapsed .sb-new__txt,
+.app--collapsed .sb-cmp-head__caret,
+.app--collapsed .sb-cmp-list,
 .app--collapsed .sb-history { display: none; }
 .app--collapsed .sb-head { padding-left: 0; padding-right: 0; justify-content: center; }
 .app--collapsed .sb-head-act { display: flex; }
