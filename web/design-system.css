@@ -755,6 +755,8 @@ body.app {
 }
 .sb-new:hover { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-active); }
 .sb-new__plus { font-size: 15px; font-weight: 600; line-height: 1; }
+/* 「全库问答」是次一级入口：跟「开启新对话」同一行样式，但边框更淡，免得两个按钮抢焦点 */
+.sb-new--alt { border-style: dashed; color: var(--text-secondary); font-weight: 400; }
 
 /* 功能入口 / 历史列表通用行 */
 .sb-group { display: flex; flex-direction: column; gap: 1px; }
@@ -869,8 +871,6 @@ body.app {
 .app--collapsed .sb-label,
 .app--collapsed .sb-item__txt,
 .app--collapsed .sb-new__txt,
-.app--collapsed .sb-cmp-head__caret,
-.app--collapsed .sb-cmp-list,
 .app--collapsed .sb-history { display: none; }
 .app--collapsed .sb-head { padding-left: 0; padding-right: 0; justify-content: center; }
 .app--collapsed .sb-head-act { display: flex; }

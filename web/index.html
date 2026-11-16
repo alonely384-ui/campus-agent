@@ -62,8 +62,10 @@
     .ev-head { font-size: 12px; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; }
     .ev-head b { color: var(--brand); font-weight: 600; }
     .ev-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-top: 6px;
-               max-height: 96px; overflow: hidden; position: relative; cursor: pointer; }
-    .ev-text.open { max-height: none; }
+               max-height: 96px; overflow: hidden; position: relative; }
+    /* 点卡片任何空白处展开/收起长证据（不用精准点到正文那几行） */
+    .ev-clickable { cursor: pointer; }
+    .ev-clickable.open .ev-text { max-height: none; }
     .ev-badge { font-size: 11px; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--bg-muted); color: var(--text-muted); }
     .ev-open { font-size: 11px; padding: 1px 8px; border-radius: var(--radius-sm); background: var(--brand);
                color: #fff; text-decoration: none; white-space: nowrap; }
@@ -126,41 +128,30 @@
     table.cmp tbody tr:nth-child(even) td, table.cmp tr:nth-child(even) td { background: var(--gray-25); }
     table.cmp tr:hover td { background: var(--brand-soft); }
 
-    /* ---------- 侧栏「多篇对比」栏目 ---------- */
-    .sb-group--cmp { flex: 0 0 auto; margin-top: 4px; }
-    .sb-cmp-head { position: relative; }
-    .sb-cmp-head__caret { flex: 0 0 auto; margin-left: auto; font-size: 10px; color: var(--text-subtle);
-                          transition: transform var(--dur-fast) var(--ease); }
-    .sb-cmp-head[aria-expanded="true"] .sb-cmp-head__caret { transform: rotate(180deg); }
-    .sb-cmp-list { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 4px; }
-    .sb-cmp-list[hidden] { display: none; }
-    /* 折叠态必须压过上面的 display:flex——design-system.css 里的 .app--collapsed 规则
-       优先级相同但先加载，会被这条覆盖，所以在这里按同样选择器补一条。 */
-    .app--collapsed .sb-cmp-list { display: none; }
-    .app--collapsed .sb-group--cmp { display: none; }
-    .sb-cmp {
-      display: flex; align-items: flex-start; gap: 8px; width: 100%;
-      padding: 6px 10px; border: none; border-radius: var(--radius-control);
-      background: transparent; color: var(--text-secondary); cursor: pointer; box-shadow: none;
-      font-size: 13px; line-height: 1.45; text-align: left;
-      transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-    }
-    .sb-cmp:hover { background: var(--bg-hover); color: var(--text-primary); }
-    .sb-cmp:focus-visible { outline: 2px solid var(--brand-ring); outline-offset: -2px; }
-    .sb-cmp__no {
-      flex: 0 0 18px; height: 18px; margin-top: 1px;
-      display: inline-flex; align-items: center; justify-content: center;
-      border-radius: 5px; background: var(--brand-soft); color: var(--brand-text);
-      font-size: 11px; font-weight: 600; line-height: 1;
-    }
-    .sb-cmp__body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-    .sb-cmp__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sb-cmp__papers { display: block; font-size: 11.5px; color: var(--text-subtle);
-                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sb-cmp--missing .sb-cmp__no { background: var(--warning-bg, var(--bg-surface-2));
-                                   color: var(--warning, var(--text-secondary)); }
-    .sb-cmp__tip { display: block; padding: 4px 10px 2px 36px; font-size: 11.5px;
-                   color: var(--text-subtle); line-height: 1.5; }
+    /* ---------- 回答分区：外露【结论】+【下一步】，其余折叠 ----------
+       2026-11-16 用户要求「我要的是首和尾，其他隐藏，没有则无」。
+       样式与 web/chat-core.js 的 renderAnswer 一一对应，compare.html 复用同一套类名。 */
+    .ans { display: flex; flex-direction: column; gap: 8px; }
+    .ans-lead { white-space: pre-wrap; }
+    .ans-tag { display: inline-block; margin-right: 6px; font-size: 12px; font-weight: 600;
+               color: var(--brand-text); }
+    .ans-tail { white-space: pre-wrap; border-left: 2px solid var(--brand-soft); padding-left: 10px;
+                color: var(--text-secondary); font-size: 14px; }
+    .ans-tail--empty { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
+    .ans-fold { display: flex; flex-direction: column; gap: 10px; }
+    .ans-fold[hidden] { display: none; }
+    .ans-part__body { white-space: pre-wrap; font-size: 14px; color: var(--text-secondary); }
+    .ans-toggle { align-self: flex-start; font-size: 12px; padding: 4px 12px; cursor: pointer;
+                  border: 1px solid var(--border-color); border-radius: var(--radius-chip);
+                  background: var(--bg-surface); color: var(--text-secondary); }
+    .ans-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    /* 证据超过 3 条时被折叠的那几张（chat-core.js 的 renderEvidence 只加类名） */
+    .ev--more { display: none; }
+    .ev-more { align-self: flex-start; font-size: 12px; padding: 5px 12px; cursor: pointer;
+               border: 1px solid var(--border-color); border-radius: var(--radius-chip);
+               background: var(--bg-surface); color: var(--text-secondary); }
+    .ev-more:hover { background: var(--bg-hover); color: var(--text-primary); }
 
     /* 装填案例后给输入框一个短促的底色闪烁，让用户看见"填进去了" */
     .dock__ta--filled { background: var(--brand-soft); transition: background 900ms var(--ease); }
@@ -182,6 +173,13 @@
     <button class="sb-new" id="newChat" title="清空当前对话，开启新的会话">
       <span class="sb-new__plus">＋</span>
       <span class="sb-new__txt">开启新对话</span>
+    </button>
+    <!-- 「全库问答」紧挨着新对话：它就是「新开一个会话 + 不限定论文」，
+         以前只能靠自己记住「勾 0 篇=全库」这个隐式规则（2026-11-16 用户要求显式化）。 -->
+    <button class="sb-new sb-new--alt" id="openAllScope" type="button"
+            title="开启一个全库范围的会话：不限定论文，在整个论文库里检索">
+      <span class="sb-new__plus">⌘</span>
+      <span class="sb-new__txt">全库问答</span>
     </button>
 
     <div class="sb-group sb-group--nav">
@@ -205,16 +203,14 @@
       </a>
     </div>
 
-    <!-- 多篇对比：官方 1.2.2 的四道题是评测题目，做成侧栏可一键装填的案例。
-         点一下只「装填」——勾好涉及的论文 + 填好问题，不自动发送，用户看清再按发送。 -->
-    <div class="sb-group sb-group--cmp">
-      <button class="sb-item sb-cmp-head" id="cmpToggle" type="button" aria-expanded="false"
-              title="官方题目的多篇对比：选一个案例，自动勾好论文并填入问题（不会自动发送）">
-        <span class="sb-item__ico">⇄</span>
-        <span class="sb-item__txt">多篇对比</span>
-        <span class="sb-cmp-head__caret" aria-hidden="true">▾</span>
-      </button>
-      <div class="sb-cmp-list" id="cmpList" hidden></div>
+    <!-- 全库问答 / 多篇对比：两者都是「换一个范围去问」的独立整页，不再是侧栏里
+         竖排 1/2/3/4 的装填列表（2026-11-16 用户要求：点一下直接进专属页面对话）。
+         全库问答的按钮在「开启新对话」下面；这里只放多篇对比。 -->
+    <div class="sb-group sb-group--nav">
+      <a class="sb-item" id="openCompare" href="compare.html"
+         title="多篇对比专属页面：选中若干篇论文，逐项对比（对比表可选）">
+        <span class="sb-item__ico">⇄</span><span class="sb-item__txt">多篇对比</span>
+      </a>
     </div>
 
     <div class="sb-history" id="sbHistory"></div>
@@ -288,6 +284,9 @@
        而且和其余五个整页页面交互不一致。 -->
 
 <script src="sidebar.js?v=20261031mobile"></script>
+<!-- 回答分段折叠 + 证据卡 + 角色时间线：与 compare.html 共用同一份实现，
+     避免两个页面各画一套导致展示走形。必须在下面的页面脚本之前加载。 -->
+<script src="chat-core.js?v=20261116"></script>
 
 <script>
 const chatEl = document.getElementById('chat');
@@ -497,12 +496,12 @@ if (UI_DEV_SAMPLE) {
   document.body.classList.add('has-conv');
   addMsg('Attention Is All You Need 的第 6 作者是谁？', 'user');
   const demoBot = addMsg('', 'bot');
-  renderAnswer(demoBot, '第 6 作者是 **Noam Shazeer**，论文首页作者列表的第 7 位' +
+  ChatCore.renderAnswer(demoBot, '第 6 作者是 **Noam Shazeer**，论文首页作者列表的第 7 位' +
     '（第 1 位 Ashish Vaswani 记为第 1 作者，按作者序号排下来第 6 位是 Noam Shazeer）。\n\n' +
     '下表是原论文前 8 位作者的信息，方便核对：\n\n' +
     '| 序号 | 姓名 | 单位 |\n|---|---|---|\n' +
     '| 1 | Ashish Vaswani | Google Brain |\n| 2 | Noam Shazeer | Google Brain |\n| 3 | Niki Parmar | Google Research |');
-  renderEvidence(demoBot, [
+  ChatCore.renderEvidence(demoBot, [
     { rank: 1, page: 1, score: 0.9123, score_type: 'rerank', channels: ['dense', 'bm25'],
       source: '1706.03762v7.pdf', text: 'Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin. Google Brain, Google Research, University of Toronto.' },
   ]);
@@ -552,203 +551,34 @@ function loadPaperFiles() {
         pickListEl.appendChild(label);
       });
       refreshPickSummary();
-      // 论文列表刷新后重画案例的「可用/缺哪篇」标记——它依赖库里的实际文件
-      if (typeof renderCompareCases === 'function') renderCompareCases();
     })
     .catch(() => {});
 }
 
 loadPaperFiles();
 
-// ---------- 多篇对比：官方 1.2.2 四道题的预设案例 ----------
-// 题目原文取自赛题 PDF「1.2.2 针对多篇论文的问答」第 1~4 题（科研小助手\科研小助手Agent-AI大模型.pdf 第 2 页），
-// 一字未改。论文按标题关键字在库里现找，不写死文件名——同一篇论文在库里有
-// 1706.03762v1.pdf / v7.pdf / v1_img.pdf 等多个版本，写死会漏掉用户实际保留的那份。
-//
-// 交互刻意只做「装填」不做「自动发送」：点一下就自动提问会让人不知道自己在测什么，
-// 也浪费一次完整的多智能体调用。装填后用户看得见勾了哪几篇、问题是什么，再按发送。
-const CMP_CASES = [
-  {
-    id: 'q1-bert-attention',
-    no: 1,
-    name: 'BERT 与 Transformer 架构对比',
-    papers: [
-      { label: 'Attention', keys: ['attention is all you need'], power: ['1706.03762v7.pdf', '1706.03762v1.pdf'] },
-      { label: 'BERT', keys: ['bert: pre-training'], power: ['N19-1423.pdf'] },
-    ],
-    question: '根据《Attention Is All You Need》和《BERT: Pre-training of Deep Bidirectional Transformers '
-      + 'for Language Understanding》。请对比：BERT 的架构和原始 Transformer 的 Encoder 有什么承袭关系？'
-      + 'BERT 丢弃了原始 Transformer 的哪个部分？',
-  },
-  {
-    id: 'q2-gpt-scale',
-    no: 2,
-    name: 'GPT-1 / 2 / 3 参数规模变化',
-    papers: [
-      { label: 'GPT-1', keys: ['improving language understanding'], power: ['language_understanding_paper.pdf'] },
-      { label: 'GPT-2', keys: ['unsupervised multitask learners'], power: [] },
-      { label: 'GPT-3', keys: ['few-shot learners'], power: ['2005.14165v4.pdf'] },
-    ],
-    question: '对比GPT-1、GPT-2和GPT-3的论文，说明这些模型的参数的变化。',
-  },
-  {
-    id: 'q3-gpt2-ln',
-    no: 3,
-    name: 'GPT-2 相对 GPT-1 的 LN 位置调整',
-    papers: [
-      { label: 'GPT-1', keys: ['improving language understanding'], power: ['language_understanding_paper.pdf'] },
-      { label: 'GPT-2', keys: ['unsupervised multitask learners'], power: [] },
-    ],
-    question: 'GPT-2 相比于 GPT-1，在 Transformer 的 Layer Normalization（LN）位置上做了什么关键的调整？',
-  },
-  {
-    id: 'q4-gpt-context',
-    no: 4,
-    name: 'GPT-1 → GPT-3 上下文窗口递增',
-    papers: [
-      { label: 'GPT-1', keys: ['improving language understanding'], power: ['language_understanding_paper.pdf'] },
-      { label: 'GPT-2', keys: ['unsupervised multitask learners'], power: [] },
-      { label: 'GPT-3', keys: ['few-shot learners'], power: ['2005.14165v4.pdf'] },
-    ],
-    question: '从 GPT-1 到 GPT-3，模型的最大上下文 Token 长度（Context Window）分别递增到了多少？',
-  },
-];
-
-// 库里「文件名 -> 标题」的当前快照，由 loadPaperFiles 之后的第一轮渲染填上
-let paperTitles = [];
-let cmpExpanded = false;
-
-function ensurePaperTitles() {
-  // loadPaperFiles 只拉 /papers/files（纯文件名），标题要单独问一次 /papers。
-  // 失败就让 titleOf 回落成文件名，功能不因此中断。
-  if (paperTitles.length) return Promise.resolve();
-  return fetch('/papers')
-    .then(r => r.json())
-    .then(d => {
-      // /papers 的顶层键是 papers（不是 items），字段 filename/title 直接给
-      paperTitles = (d.papers || d.items || []).map(p => ({ filename: p.filename || p.file || '', title: p.title || '' }));
-    })
-    .catch(() => {});
-}
-
-function titleOf(fn) {
-  const hit = paperTitles.find(p => p.filename === fn);
-  return (hit && hit.title) ? hit.title : fn;
-}
-
-function resolveCase(kase) {
-  // 返回 {picked: [文件名], missing: [标签], fetched: [标题]}
-  const available = pickListEl ? Array.from(pickListEl.querySelectorAll('input[type="checkbox"]')).map(i => i.value) : [];
-  const picked = [];
-  const missing = [];
-  const fetched = [];
-  kase.papers.forEach(spec => {
-    const hit = available.find(fn => {
-      const t = titleOf(fn).toLowerCase();
-      return spec.keys.some(k => t.includes(k));
-    });
-    if (!hit) { missing.push(spec.label); return; }
-    if (picked.includes(hit)) return;           // GPT 三篇可能命中同一份，去重
-    picked.push(hit);
-    fetched.push(titleOf(hit));
-  });
-  return { picked, missing, fetched };
-}
-
-function renderCompareCases() {
-  const listEl = document.getElementById('cmpList');
-  if (!listEl) return;
-  listEl.innerHTML = '';
-
-  CMP_CASES.forEach(kase => {
-    const { picked, missing } = resolveCase(kase);
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'sb-cmp' + (missing.length ? ' sb-cmp--missing' : '');
-    btn.dataset.caseId = kase.id;
-    btn.title = picked.length
-      ? `${kase.name}\n将勾选：${picked.join('、')}\n（不会自动发送，装填后请确认再按发送）`
-      : `${kase.name}\n库里缺少这篇论文`;
-
-    const no = document.createElement('span');
-    no.className = 'sb-cmp__no';
-    no.textContent = String(kase.no);
-
-    const body = document.createElement('span');
-    body.className = 'sb-cmp__body';
-    const nm = document.createElement('span');
-    nm.className = 'sb-cmp__name';
-    nm.textContent = kase.name;
-    const sub = document.createElement('span');
-    sub.className = 'sb-cmp__papers';
-    sub.textContent = missing.length
-      ? `缺 ${missing.join('、')}　可用 ${picked.length} 篇`
-      : `${picked.length} 篇：${kase.papers.map(p => p.label).join(' / ')}`;
-    body.appendChild(nm);
-    body.appendChild(sub);
-
-    btn.appendChild(no);
-    btn.appendChild(body);
-    btn.addEventListener('click', () => applyCompareCase(kase.id));
-    listEl.appendChild(btn);
-  });
-
-  const tip = document.createElement('div');
-  tip.className = 'sb-cmp__tip';
-  tip.textContent = '点一下只填好问题与勾选，不会自动发送';
-  listEl.appendChild(tip);
-}
-
-function applyCompareCase(caseId) {
-  const kase = CMP_CASES.find(k => k.id === caseId);
-  if (!kase) return;
-  const { picked, missing } = resolveCase(kase);
-
-  if (!picked.length) {
-    statusEl.textContent = `这个案例需要的论文都不在库里：${missing.join('、')}`;
-    statusEl.className = 'status bad';
-    return;
-  }
-
-  // 勾选：先全部取消，再勾案例需要的——案例是"整组对比"，残留别的勾选会污染 range
-  pickListEl.querySelectorAll('input[type="checkbox"]').forEach(box => {
-    box.checked = picked.includes(box.value);
-  });
+// ---------- 全库问答：把「勾 0 篇=全库」这个隐式规则变成一个看得见的入口 ----------
+// 2026-11-16 用户要求「正常开启新会话加一个全库的选项」。这里不改检索逻辑：
+// 全库本来就是「一篇都不勾」，按钮只是替用户清空勾选、新开一个会话，并把范围写在提示条上。
+function startAllScopeChat() {
+  const boxes = pickListEl.querySelectorAll('input[type="checkbox"]');
+  boxes.forEach(b => { b.checked = false; });
   refreshPickSummary();
-
-  inputEl.value = kase.question;
-  autoGrow();
+  startNewChat();
+  statusEl.textContent = '全库问答：本次会话不限定论文，在整个论文库里检索';
+  statusEl.className = 'status ok';
   inputEl.focus();
-  // 让用户看见"填进去了"，否则只看到输入框变了以为是自己打错的
-  inputEl.classList.add('dock__ta--filled');
-  setTimeout(() => inputEl.classList.remove('dock__ta--filled'), 900);
-
-  if (missing.length) {
-    statusEl.textContent = `已装填 ${kase.no}. ${kase.name}（勾了 ${picked.length} 篇）· 注意：库里缺 ${missing.join('、')}，这道题会按现有论文作答并如实说明缺失`;
-    statusEl.className = 'status bad';
-  } else {
-    statusEl.textContent = `已装填 ${kase.no}. ${kase.name}（勾了 ${picked.length} 篇）· 确认后按发送`;
-    statusEl.className = 'status ok';
-  }
 }
 
-function setCompareExpanded(on) {
-  cmpExpanded = on;
-  const listEl = document.getElementById('cmpList');
-  const headEl = document.getElementById('cmpToggle');
-  if (listEl) listEl.hidden = !on;
-  if (headEl) headEl.setAttribute('aria-expanded', on ? 'true' : 'false');
-}
-
-(function bindComparePanel() {
-  const headEl = document.getElementById('cmpToggle');
-  if (!headEl) return;
-  headEl.addEventListener('click', () => setCompareExpanded(!cmpExpanded));
-  // 标题必须先拉到，否则案例会全部显示成"缺"
-  ensurePaperTitles().then(() => renderCompareCases());
-})();
+const openAllScopeEl = document.getElementById('openAllScope');
+if (openAllScopeEl) openAllScopeEl.addEventListener('click', startAllScopeChat);
 
 // ---------- 健康检查：确认后端活着 ----------
+// ?scope=all：从别的页面点「全库问答」跳回来时，等 /papers/files 拉完再清空勾选——
+// 勾选列表是异步填的，立刻清会清到空 DOM，存下来的勾选还在。
+Promise.resolve(loadPaperFiles()).then(() => {
+  if (new URLSearchParams(location.search).get('scope') === 'all') startAllScopeChat();
+});
 // 安全整改后 /health 对匿名访客只返回 {status, version}，模型名与当日预算只在
 // 管理员登录后才给（那属于运维细节，不该暴露给公开演示的评委）。所以这里不能
 // 无条件拼 `模型 ${d.model}`，否则页脚会显示「模型 undefined」。
@@ -765,159 +595,6 @@ fetch('/health')
   });
 
 
-// ---------- 证据卡片：把检索到的原文、页码、融合分、命中通道摊开给用户看 ----------
-function renderEvidence(botEl, items) {
-  const box = document.createElement('div');
-  box.className = 'evidence';
-
-  if (!items || items.length === 0) {
-    const miss = document.createElement('div');
-    miss.className = 'ev miss';
-    miss.innerHTML = '<div class="ev-head"><b>证据不足</b><span class="ev-badge">未检索到原文</span></div>' +
-      '<div class="ev-text open">论文库里没有找到能回答这个问题的段落，因此系统应当拒答，而不是编造。</div>';
-    box.appendChild(miss);
-  } else {
-    items.forEach(it => {
-      const card = document.createElement('div');
-      card.className = 'ev';
-      const channels = (it.channels || []).join(' + ') || '未知';
-      // score 有两种口径，后端用 score_type 区分（app/agent.py:980）：
-      //   rrf    —— RRF 融合分，由多路名次换算，恒为正，不是"相似度概率"
-      //   rerank —— 交叉编码器的原始 logit，可为负，越大越相关
-      // 二者不可比，标签必须分开写；否则用户看到"融合分 -0.0777"会以为融合分能是负的。
-      const isRerank = it.score_type === 'rerank';
-      const scoreLabel = isRerank ? '重排分' : '融合分';
-      const scoreTip = isRerank
-        ? '交叉编码器对"问题—原文"打的原始分，可为负，越大越相关'
-        : '多路召回按名次融合得到的分，恒为正，不是相似度概率';
-      card.innerHTML =
-        '<div class="ev-head">' +
-        `<b>证据 #${it.rank}</b>` +
-        `<span>第 ${it.page == null ? '?' : it.page} 页</span>` +
-        `<span title="${scoreTip}">${scoreLabel} ${Number(it.score).toFixed(4)}</span>` +
-        `<span>命中通道 ${channels}</span>` +
-        `<span class="ev-badge">${it.source}</span>` +
-        // 点一下直接翻到原文那一页：paper=文件名，page=1 基页码（阅读页会把该页滚到顶部）
-        `<a class="ev-open" target="_blank" rel="noopener" ` +
-        `href="/ui/reader.html?paper=${encodeURIComponent(it.source)}&page=${it.page == null ? 1 : it.page}">打开原文</a>` +
-        '</div>' +
-        `<div class="ev-text">${escapeHtml(it.text).slice(0, 400)}${it.text.length > 400 ? '…' : ''}</div>`;
-      card.querySelector('.ev-text').addEventListener('click', e => {
-        e.currentTarget.classList.toggle('open');
-      });
-      box.appendChild(card);
-    });
-  }
-  botEl.insertAdjacentElement('afterend', box);
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ));
-}
-
-// ---------- 角色时间线：Planner → Retriever → Extractor → Verifier → Writer ----------
-// 后端 app/agent.py 的 RoleRun 已经按执行顺序追加，这里按顺序画即可。
-function renderRoles(botEl, items, status) {
-  if (!items || items.length === 0) return null;
-  const box = document.createElement('div');
-  box.className = 'roles';
-
-  const head = document.createElement('div');
-  head.className = 'roles-head';
-  head.innerHTML = '<b>多智能体协作</b>';
-  if (status) {
-    const st = document.createElement('span');
-    st.className = 'role-status';
-    st.textContent = status;
-    head.appendChild(st);
-  }
-  box.appendChild(head);
-
-  const list = document.createElement('div');
-  list.className = 'role-list';
-  items.forEach(it => {
-    const row = document.createElement('div');
-    row.className = 'role' + (it.ok === false ? ' fail' : '');
-    const ms = Number(it.duration_ms || 0);
-    row.innerHTML =
-      '<div class="role-dot"><i></i><span></span></div>' +
-      '<div class="role-body">' +
-      '<div class="role-title"><b>' + escapeHtml(it.label || it.role) + '</b>' +
-      (ms ? `<span class="role-ms">${ms} ms</span>` : '') +
-      '</div>' +
-      '<div class="role-text">' + escapeHtml(it.summary || '') + '</div>' +
-      '</div>';
-    list.appendChild(row);
-  });
-  box.appendChild(list);
-  botEl.insertAdjacentElement('afterend', box);
-  return box;
-}
-
-function addMsg(text, cls) {
-  const div = document.createElement('div');
-  div.className = 'msg ' + cls;
-  div.textContent = text;
-  chatEl.appendChild(div);
-  chatScrollEl.scrollTop = chatScrollEl.scrollHeight;
-  return div;
-}
-
-// ---------- 把模型输出的 Markdown 表格渲染成真表格（其余文字原样保留） ----------
-function looksLikeRow(line) {
-  return /^\s*\|.*\|\s*$/.test(line);
-}
-
-function buildTable(rows) {
-  // 去掉 |---|---| 这种分隔行
-  const body = rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r));
-  if (body.length < 2) return null;
-  const splitCells = r => r.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(s => s.trim());
-  const table = document.createElement('table');
-  table.className = 'cmp';
-  body.forEach((row, idx) => {
-    const tr = document.createElement('tr');
-    splitCells(row).forEach(text => {
-      const cell = document.createElement(idx === 0 ? 'th' : 'td');
-      cell.textContent = text;  // 用 textContent，不解析 HTML，防注入
-      tr.appendChild(cell);
-    });
-    table.appendChild(tr);
-  });
-  // 外面套一层：手机上表格可以横向滚动，不把整页撑破
-  const wrap = document.createElement('div');
-  wrap.className = 'table-wrap';
-  wrap.appendChild(table);
-  return wrap;
-}
-
-function renderAnswer(el, text) {
-  el.textContent = '';
-  const lines = text.split('\n');
-  let buffer = [];
-  const flush = () => {
-    if (!buffer.length) return;
-    const block = document.createElement('div');
-    block.textContent = buffer.join('\n');
-    el.appendChild(block);
-    buffer = [];
-  };
-  for (let i = 0; i < lines.length; i++) {
-    if (looksLikeRow(lines[i])) {
-      const rows = [];
-      while (i < lines.length && looksLikeRow(lines[i])) { rows.push(lines[i]); i++; }
-      i--;
-      const table = buildTable(rows);
-      if (table) { flush(); el.appendChild(table); }
-      else { buffer.push(...rows); }
-    } else {
-      buffer.push(lines[i]);
-    }
-  }
-  flush();
-}
 
 // ---------- 核心：消费 SSE 流 ----------
 async function send() {
@@ -1000,6 +677,8 @@ async function send() {
           statusText = ev.text || '';
         } else if (ev.type === 'answer_delta') {
           answer += ev.text;
+          // 流式期间先原样显示（逐段折叠会让文字在用户眼皮底下跳来跳去），
+          // 收尾时再统一交给 renderAnswer 折成【结论】+【下一步】。
           botEl.textContent = answer;
         } else if (ev.type === 'tool_call') {
           traceEl = traceEl || addMsg('', 'trace');
@@ -1015,9 +694,11 @@ async function send() {
     }
 
     if (!answer) botEl.textContent = '（没有返回内容）';
-    // 先画协作时间线，再画证据卡片：时间线讲"怎么找到这些证据"，放在证据上方更顺
-    const rolesBox = roleItems.length ? renderRoles(botEl, roleItems, statusText) : null;
-    renderEvidence(rolesBox || botEl, evidenceItems);
+    else ChatCore.renderAnswer(botEl, answer);
+    // 先画协作时间线，再画证据卡片：时间线讲"怎么找到这些证据"，放在证据上方更顺。
+    // 证据默认只摊开前 3 条，其余点「展开全部」再看（2026-11-16 用户要求）。
+    const rolesBox = roleItems.length ? ChatCore.renderRoles(botEl, roleItems, statusText) : null;
+    ChatCore.renderEvidence(rolesBox || botEl, evidenceItems);
 
     // 成功拿到回答才记入历史：失败/空回答不污染下一轮
     if (answer) {

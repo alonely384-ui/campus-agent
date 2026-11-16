@@ -254,6 +254,9 @@
     box-shadow: 0 0 0 2px var(--hl-claim-ring);
     animation: claimPulse 1.1s ease-out 2;
   }
+  /* hl=1 那条路：高亮是"指路"用的，点一下就撤，所以要能收点击 */
+  .claimLayer--hl { pointer-events: none; z-index: 4; }
+  .claimLayer--hl .claimBox { pointer-events: auto; cursor: pointer; }
   @keyframes claimPulse {
     0%   { background: var(--hl-claim-hot); box-shadow: 0 0 0 6px var(--hl-claim-ring); }
     100% { background: var(--hl-claim);     box-shadow: 0 0 0 2px var(--hl-claim-ring); }
@@ -533,6 +536,10 @@ const START_RECT = (qs.get('rect') || '')
   .split(',')
   .map(v => parseFloat(v))
   .filter(v => Number.isFinite(v));
+// hl=1：证据卡片点过来时走这条路。服务端没算矩形（或矩形太粗）的情况下，
+// 就按 q 里的证据原文自己在本页找那一段，整段涂黄并滚到视口中间；
+// 高亮只是「指路」，点一下即取消（用户 2026-11-16 的要求）。
+const START_HL = qs.get('hl') === '1';
 
 const viewerEl = document.getElementById('viewer');
 const pagesEl = document.getElementById('pages');
@@ -620,6 +627,12 @@ const state = {
     texts: new Map(),   // 页码 -> {text, runs}：该页拼串 + 每个 text item 的偏移区间
     scanId: 0,          // 扫描序号：新查询一来，旧扫描结果直接丢弃
     navId: 0,           // 跳转序号：连按回车只认最后一次
+  },
+  claim: {
+    on: false,          // 证据段落高亮是否活着（点一下就灭）
+    box: null,          // 当前那块的 .claimBox，供 scrollToClaim 快速判断
+    hits: new Map(),    // 页码 -> {a, b} | null：证据句在该页拼串里的落点（null = 本页没有）
+    text: '',           // 用来匹配的证据原文
   },
   trans: {
     open: false,        // 译文栏是否展开
@@ -1185,11 +1198,16 @@ async function renderPage(pageNo) {
     holder.appendChild(tag);
 
     holder.dataset.ready = '1';
-    state.rendered.set(pageNo, { canvas, textLayer });
+    state.rendered.set(pageNo, { canvas, textLayer, viewport });
     // 这一页可能落在已有搜索结果里：渲染完立刻补上高亮（缩放/换版式重渲也走这里）
     paintSearchPage(pageNo);
-    // 「读原文」带过来的矩形高亮也在这里补画：缩放/换版式会让它跟着重算
-    paintClaimPage(pageNo, viewport);
+    // 「读原文」带过来的高亮也在这里补画：缩放/换版式会让它跟着重算。
+    // hl=1 走段落级（按证据原文落行），其余走服务端给的矩形。
+    if (START_HL) {
+      if (state.claim.on) paintClaimText(pageNo);
+    } else {
+      paintClaimPage(pageNo, viewport);
+    }
   } catch (e) {
     console.warn('page render failed', pageNo, e);
   } finally {
@@ -1485,6 +1503,9 @@ function paintClaimPage(pageNo, viewport) {
   if (!holder) return;
   holder.querySelectorAll('.claimLayer').forEach(el => el.remove());
   if (holder.dataset.ready !== '1') return;
+  if (state.claim.box && state.claim.box.isConnected === false) state.claim.box = null;
+  // 已经点掉高亮：不画。别的页上残留的旧图层上面已经一并清掉了。
+  if (START_HL && !state.claim.on) return;
   if (!START_RECT || START_RECT.length !== 4 || pageNo !== START_PAGE) return;
   if (!viewport) return;
 
@@ -1511,7 +1532,122 @@ function paintClaimPage(pageNo, viewport) {
   box.style.height = `${(height + 4).toFixed(1)}px`;
   layer.appendChild(box);
   holder.appendChild(layer);
+  state.claim.box = box;
 }
+
+// ---------- hl=1：按证据原文画「段落级」高亮 ----------
+// 证据卡片给的 q 是一段原文摘句。这里把它落到具体行上，整段涂黄，
+// 让人一眼看到"这句话在这一段的哪里"，而不用自己拿眼睛去扫整页。
+
+/** 归一化：小写、引号/连字统一、空白压成一个空格。srcText 与页拼串两边都过一遍。 */
+function normText(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g, '-')
+    .replace(/[\u00a0\u2000-\u200b\u3000]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** 在归一化后的整页拼串里找证据原文：先整句，找不到再逐步缩短前缀。 */
+function findClaimSpan(hay, needle) {
+  const n = normText(needle);
+  if (!n || !hay || n.length < 24) return null;   // 太短就不找了：短词到处是，反而误导
+  for (const len of [120, 90, 60, 40, 24]) {
+    const probe = n.slice(0, Math.min(len, n.length));
+    if (probe.length < 24) break;
+    const at = hay.indexOf(probe);
+    if (at !== -1) return { a: at, b: at + probe.length };
+  }
+  return null;
+}
+
+/** 与 paintSearchPage 相同的「字符偏移 → 行矩形」口径：span.dataset.s/e + rangeRects。 */
+function claimRectsInHolder(holder, span) {
+  const out = [];
+  const hr = holder.getBoundingClientRect();
+  for (const sp of holder.querySelectorAll('.textLayer > span')) {
+    const s = +(sp.dataset.s || 0);
+    const e = +(sp.dataset.se || 0);
+    if (e <= s) continue;
+    const from = Math.max(span.a, s);
+    const to = Math.min(span.b, e);
+    if (to <= from) continue;
+    const pad = +(sp.dataset.pad || 0);
+    const len = sp.textContent.length;
+    const lf = clamp(from - s - pad, 0, len);
+    const lt = clamp(to - s - pad, 0, len);
+    if (lt <= lf) continue;
+    for (const r of rangeRects(sp, lf, lt)) {
+      if (r.width < 0.5) continue;
+      out.push({ left: r.left - hr.left, top: r.top - hr.top, width: r.width, height: r.height });
+    }
+  }
+  // 只留正文区：去掉页面上下 12%（页眉页脚、页码），绝不整页一片黄
+  const H = holder.offsetHeight || hr.height;
+  return out.filter(r => r.top > H * 0.12 && r.top < H * 0.88);
+}
+
+async function paintClaimText(pageNo) {
+  const holder = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
+  if (!holder) return false;
+  // 懒加载：跳过去的那一页可能还没渲染，文本层不在就量不出行矩形
+  if (holder.dataset.ready !== '1' || !holder.querySelector('.textLayer span')) {
+    await ensureRendered(pageNo);
+  }
+  if (holder.dataset.ready !== '1') return false;
+  if (!state.claim.hits.has(pageNo)) {
+    // 这一页还没算过：拿拼串找一遍，算过就缓存（null 也缓存，避免反复大页搜索）
+    const idx = await pageTextIndex(pageNo);
+    state.claim.hits.set(pageNo, findClaimSpan(normText(idx && idx.text), state.claim.text));
+  }
+  const span = state.claim.hits.get(pageNo);
+  if (!span) return false;
+  const rects = claimRectsInHolder(holder, span);
+  if (!rects.length) return false;
+
+  const layer = document.createElement('div');
+  layer.className = 'claimLayer claimLayer--hl';
+  rects.forEach(r => {
+    const box = document.createElement('div');
+    box.className = 'claimBox';
+    box.style.left = `${(r.left - 2).toFixed(1)}px`;
+    box.style.top = `${(r.top - 2).toFixed(1)}px`;
+    box.style.width = `${(r.width + 4).toFixed(1)}px`;
+    box.style.height = `${(r.height + 4).toFixed(1)}px`;
+    box.title = '点一下取消高亮';
+    layer.appendChild(box);
+  });
+  holder.appendChild(layer);
+  hintClaimText();
+  return true;
+}
+
+function hintClaimText() {
+  setTimeout(() => toast('已高亮这段原文 · 点高亮可取消'), 600);
+}
+
+/** 点掉高亮：全部页清干净，只留正文。 */
+function clearClaimHighlight() {
+  state.claim.on = false;
+  state.claim.box = null;
+  pagesEl.querySelectorAll('.claimLayer').forEach(el => el.remove());
+}
+
+// 点高亮即取消。.claimLayer 本身 pointer-events:none，只有 .claimBox 收事件，
+// 所以不会挡住选字和正文里的引用点击。
+pagesEl.addEventListener('click', ev => {
+  if (!START_HL || !state.claim.on) return;
+  const hit = ev.target.closest('.claimBox');
+  if (!hit) return;
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && String(sel)) return;   // 正在选字就放过
+  ev.stopPropagation();
+  clearClaimHighlight();
+  toast('高亮已取消');
+}, true);
 
 /** PDF 用户坐标 → 页面内 CSS 像素（左上原点）。
  *
@@ -1537,16 +1673,48 @@ function pdfToCss(viewport, x, y, pageHeightPt) {
  * 否则滚到的是空白占位块，用户看到的是「什么都没高亮」。
  */
 async function scrollToClaim() {
+  // hl=1：先在本页找证据句，找到就画、找不到才退回矩形
+  if (START_HL && state.claim.text) {
+    const drew = await paintClaimText(START_PAGE);
+    if (!drew && START_RECT.length === 4) {
+      state.claim.on = false;          // 让矩形分支照常画
+      paintClaimPage(START_PAGE, await pageViewport(START_PAGE));
+      state.claim.on = true;
+    }
+  }
   for (let i = 0; i < 40; i++) {
-    const box = pagesEl.querySelector(
-      `.page[data-page="${START_PAGE}"] .claimLayer .claimBox`);
+    const box = START_HL
+      ? pagesEl.querySelector(`.page[data-page="${START_PAGE}"] .claimLayer--hl .claimBox`)
+      : pagesEl.querySelector(`.page[data-page="${START_PAGE}"] .claimLayer .claimBox`);
     if (box) {
       scrollElIntoView(box);
       return;
     }
     await new Promise(r => setTimeout(r, 120));
   }
-  console.warn('引用出处高亮迟迟没出现，可能这一页渲染失败');
+  if (START_HL) toast('这一页没找到与证据完全对应的句子，已跳到证据所在页');
+  else console.warn('引用出处高亮迟迟没出现，可能这一页渲染失败');
+}
+
+/** 取某页 pdf.js viewport：没渲染过就先渲一次（renderPage 内部会自己补画高亮）。 */
+async function pageViewport(pageNo) {
+  let rec = state.rendered.get(pageNo);
+  if (!(rec && rec.viewport)) {
+    await ensureRendered(pageNo);
+    rec = state.rendered.get(pageNo);
+  }
+  return (rec && rec.viewport) || null;
+}
+
+/** 取某页 pdf.js viewport（已渲染过就复用，没渲染就先渲一页）。 */
+async function waitForPageViewport(pageNo) {
+  for (let i = 0; i < 40; i++) {
+    const holder = pagesEl.querySelector(`.page[data-page="${pageNo}"]`);
+    const rec = state.rendered.get(pageNo);
+    if (holder && rec && rec.canvas) return rec.canvas.__viewport || null;
+    await new Promise(r => setTimeout(r, 120));
+  }
+  return null;
 }
 
 /** 当前命中染成橙色：所有页一起刷，切页后旧页不会残留橙色。 */
@@ -2837,11 +3005,20 @@ async function showPaperPicker() {
   } catch (e) { /* 下拉失败不影响主流程 */ }
 
   if (!PAPER) { showPaperPicker(); return; }
+  // hl=1（证据卡片点过来）：证据句只用来画段落高亮，不塞搜索框——
+  // 逐字搜索和段落高亮会叠在一起，而且回译句常常搜不到，反而像"没定位上"。
+  if (START_HL) {
+    state.claim.text = START_QUERY;
+    state.claim.on = true;
+    state.claim.hits.clear();
+  }
   await openPaper(PAPER, START_PAGE);
   // 带 rect 进来的（服务端已经定位好出处）：矩形高亮由 renderPage → paintClaimPage 画，
   // 这里只把命中块滚进视口。**不再跑逐字搜索**——回译出的英文往往不是论文原话，
   // 搜了也是「没有找到」，反倒让用户以为没定位上。
-  if (START_RECT.length === 4) {
+  if (START_HL) {
+    await scrollToClaim();
+  } else if (START_RECT.length === 4) {
     await scrollToClaim();
   } else if (START_QUERY) {
     // 没算出处（定位失败或外部链接）时的兜底：拿英文句当搜索词整篇搜。

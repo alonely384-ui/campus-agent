@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>多篇对比 · 科研小助手</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="design-system.css" />
+  <!-- 侧栏宽度要在首帧之前就填进 :root，否则会先按默认宽度画一帧再跳 -->
+  <script>
+    (function () {
+      try {
+        var w = parseInt(localStorage.getItem('campus-agent-sidebar-w-v1') || '', 10);
+        if (w >= 200 && w <= 480) document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+      } catch (e) { /* 隐私模式读不到，用默认宽度 */ }
+    })();
+  </script>
+  <style>
+    /* ---------- 页面骨架 ---------- */
+    .main__inner--cmp { padding: 20px 26px 0; display: flex; flex-direction: column; height: 100%; }
+
+    .cmp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 2px; }
+    .cmp-head h1 { font-size: 20px; font-weight: 600; letter-spacing: -.2px; margin: 0; }
+    .cmp-scope { font-size: 12px; padding: 3px 10px; border-radius: var(--radius-chip);
+                 background: var(--brand-soft); color: var(--brand-text); }
+    .cmp-sub { font-size: 12.5px; color: var(--text-secondary); margin: 6px 0 12px; line-height: 1.7; }
+
+    /* ---------- 官方题目：横排一行，不再是侧栏那种竖排编号列表 ----------
+       2026-11-16 用户要求「没有竖排 1,2,3,4 的显示」：四道题做成横向 chip，
+       装填进对话区，不跳页、不占侧栏。 */
+    .cmp-qs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .cmp-qs__label { font-size: 12px; color: var(--text-subtle); margin-right: 2px; }
+    .cmp-q { font-size: 12.5px; padding: 6px 12px; border-radius: var(--radius-chip);
+             border: 1px solid var(--border-color); background: var(--bg-surface);
+             color: var(--text-secondary); cursor: pointer; line-height: 1.4; }
+    .cmp-q:hover { border-color: var(--border-brand); color: var(--text-primary); }
+    .cmp-q.on { background: var(--brand-soft); border-color: var(--border-brand); color: var(--brand-text); }
+    .cmp-q--missing { border-style: dashed; }
+
+    /* ---------- 参与对比的论文 ---------- */
+    .cmp-papers { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;
+                  font-size: 12.5px; color: var(--text-secondary); }
+    .cmp-papers__label { color: var(--text-subtle); }
+    .cmp-paper { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+                 border-radius: var(--radius-chip); background: var(--bg-muted); color: var(--text-secondary); }
+    .cmp-paper b { font-weight: 600; color: var(--text-primary); }
+    .cmp-paper button { border: none; background: none; color: var(--text-subtle); cursor: pointer;
+                        font-size: 13px; line-height: 1; padding: 0 2px; }
+    .cmp-paper button:hover { color: var(--danger); }
+    .cmp-papers .btn-mini { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-chip);
+                            border: 1px dashed var(--border-strong); background: transparent;
+                            color: var(--text-secondary); cursor: pointer; }
+    .cmp-papers .btn-mini:hover { border-color: var(--brand); color: var(--brand-text); }
+
+    /* ---------- 对话区 ---------- */
+    .cmp-chat { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+                padding: 4px 2px 20px; min-height: 240px; }
+    .cmp-chat:empty::before {
+      content: '选一篇或几篇论文，直接提问；想逐项对照再按「生成对比表」。';
+      color: var(--text-subtle); font-size: 13px; padding: 24px 4px;
+    }
+    .msg { max-width: 86%; padding: 11px 15px; border-radius: var(--radius-card);
+           line-height: 1.6; white-space: pre-wrap; word-break: break-word; font-size: 15px; }
+    .user { align-self: flex-end; background: var(--brand-grad); color: var(--text-on-brand);
+            border-bottom-right-radius: 6px; box-shadow: 0 4px 14px rgba(26, 115, 232, .28); }
+    .bot  { align-self: flex-start; background: var(--bg-surface); color: var(--text-primary);
+            border: 1px solid var(--border-color); border-bottom-left-radius: 6px;
+            box-shadow: var(--shadow-card); max-width: 92%; }
+    .err { align-self: center; color: var(--danger); font-size: 13px; }
+    .trace { align-self: flex-start; font-size: 12px; color: var(--text-muted); background: var(--bg-muted);
+             border-radius: var(--radius-control); padding: 8px 12px; font-family: var(--font-mono);
+             max-width: 86%; white-space: pre-wrap; }
+
+    /* ---------- 回答分区（与 index.html / chat-core.js 同一套类名） ---------- */
+    .ans { display: flex; flex-direction: column; gap: 8px; }
+    .ans-lead { white-space: pre-wrap; }
+    .ans-tag { display: inline-block; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--brand-text); }
+    .ans-tail { white-space: pre-wrap; border-left: 2px solid var(--brand-soft); padding-left: 10px;
+                color: var(--text-secondary); font-size: 14px; }
+    .ans-tail--empty { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
+    .ans-fold { display: flex; flex-direction: column; gap: 10px; }
+    .ans-fold[hidden] { display: none; }
+    .ans-part__body { white-space: pre-wrap; font-size: 14px; color: var(--text-secondary); }
+    .ans-toggle { align-self: flex-start; font-size: 12px; padding: 4px 12px; cursor: pointer;
+                  border: 1px solid var(--border-color); border-radius: var(--radius-chip);
+                  background: var(--bg-surface); color: var(--text-secondary); }
+    .ans-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    /* ---------- 表格与证据 ---------- */
+    .table-wrap { overflow-x: auto; margin: 10px 0; }
+    table.cmp { border-collapse: collapse; width: 100%; font-size: 13px; background: var(--bg-surface); }
+    table.cmp th, table.cmp td { border: 1px solid var(--border-color); padding: 7px 9px;
+                                 text-align: left; vertical-align: top; line-height: 1.55; }
+    table.cmp th { background: var(--bg-surface-2); font-weight: 600; font-size: 12.5px; }
+    table.cmp td:first-child { background: var(--bg-surface-2); font-weight: 500; }
+
+    .evidence { align-self: flex-start; width: 92%; display: flex; flex-direction: column; gap: 8px; }
+    .ev { background: var(--bg-surface); border: 1px solid var(--border-color);
+          border-left: 3px solid var(--brand); border-radius: var(--radius-control);
+          padding: 11px 13px; box-shadow: var(--shadow-card); }
+    .ev.miss { border-left-color: var(--danger); }
+    .ev-head { font-size: 12px; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; }
+    .ev-head b { color: var(--brand); font-weight: 600; }
+    .ev-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-top: 6px;
+               max-height: 96px; overflow: hidden; cursor: pointer; }
+    .ev-text.open { max-height: none; }
+    .ev-badge { font-size: 11px; padding: 1px 6px; border-radius: var(--radius-sm);
+                background: var(--bg-muted); color: var(--text-muted); }
+    .ev-open { font-size: 11px; padding: 1px 8px; border-radius: var(--radius-sm); background: var(--brand);
+               color: #fff; text-decoration: none; white-space: nowrap; }
+    .ev-open:hover { background: var(--brand-active); }
+    .ev--more { display: none; }
+    .ev-more { align-self: flex-start; font-size: 12px; padding: 5px 12px; cursor: pointer;
+               border: 1px solid var(--border-color); border-radius: var(--radius-chip);
+               background: var(--bg-surface); color: var(--text-secondary); }
+    .ev-more:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    .roles { align-self: flex-start; width: 92%; background: var(--bg-surface); border: 1px solid var(--border-color);
+             border-radius: var(--radius-control); padding: 11px 13px; box-shadow: var(--shadow-card); }
+    .roles-head { font-size: 12px; color: var(--text-muted); display: flex; gap: 10px;
+                  align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .roles-head b { color: var(--text-primary); font-size: 13px; font-weight: 600; }
+    .role-status { font-size: 11px; padding: 2px 9px; border-radius: var(--radius-chip);
+                   background: var(--bg-muted); color: var(--text-secondary); }
+    .role-list { display: flex; flex-direction: column; gap: 7px; }
+    .role { display: flex; gap: 8px; font-size: 12.5px; }
+    .role-dot { flex: 0 0 8px; display: flex; align-items: center; justify-content: center; }
+    .role-dot i { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); display: block; }
+    .role.fail .role-dot i { background: var(--danger); }
+    .role-title b { font-weight: 600; color: var(--text-primary); }
+    .role-ms { margin-left: 6px; font-size: 11px; color: var(--text-subtle); }
+    .role-text { color: var(--text-secondary); line-height: 1.55; }
+
+    /* ---------- 输入坞：固定在页面底部 ---------- */
+    .cmp-dock { flex: 0 0 auto; padding: 10px 0 14px; background: var(--bg-page);
+                border-top: 1px solid var(--border-color); }
+    .cmp-dock__box { border: 1px solid var(--border-strong); border-radius: var(--radius-card);
+                     background: var(--bg-surface); box-shadow: var(--shadow-card); padding: 10px 12px; }
+    .cmp-dock textarea { width: 100%; border: none; outline: none; resize: none; font: inherit;
+                         font-size: 15px; line-height: 1.55; background: transparent;
+                         color: var(--text-primary); max-height: 30vh; }
+    .cmp-dock__tools { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .cmp-dock__spacer { flex: 1; }
+    .cmp-dock__send { width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--brand);
+                      color: #fff; font-size: 16px; cursor: pointer; }
+    .cmp-dock__send:disabled { background: var(--text-subtle); cursor: default; }
+    .cmp-dock__status { margin-top: 6px; font-size: 12px; color: var(--text-secondary); min-height: 16px; }
+    .cmp-dock__status.bad { color: var(--danger); }
+    .cmp-dock__status.ok { color: var(--success); }
+
+    /* ---------- 论文多选弹层 ---------- */
+    .pick { position: relative; }
+    .pick summary { list-style: none; cursor: pointer; font-size: 12.5px; padding: 5px 11px;
+                    border-radius: var(--radius-chip); border: 1px solid var(--border-color);
+                    color: var(--text-secondary); background: var(--bg-surface); }
+    .pick summary::-webkit-details-marker { display: none; }
+    .pick[open] summary { border-color: var(--border-brand); color: var(--brand-text); }
+    .pick-list { position: absolute; bottom: 38px; left: 0; min-width: 260px; max-height: 260px;
+                 overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-color);
+                 border-radius: var(--radius-control); box-shadow: var(--shadow-lg, var(--shadow-card));
+                 padding: 6px; display: flex; flex-direction: column; gap: 2px; z-index: 20; }
+    .pick-list label { display: flex; gap: 7px; align-items: center; font-size: 12.5px;
+                       padding: 4px 6px; border-radius: var(--radius-sm); cursor: pointer;
+                       color: var(--text-secondary); }
+    .pick-list label:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .chip-toggle { font-size: 12.5px; padding: 5px 11px; border-radius: var(--radius-chip);
+                   border: 1px solid var(--border-color); background: var(--bg-surface);
+                   color: var(--text-subtle); cursor: pointer; }
+    .chip-toggle.on { border-color: var(--border-brand); background: var(--brand-soft); color: var(--brand-text); }
+  </style>
+</head>
+<body class="app" data-nav="compare">
+  <aside class="sidebar" id="sidebar" aria-label="功能导航与对话历史">
+    <div class="sb-head">
+      <a class="sb-logo" href="index.html" title="科研小助手">
+        <img class="sb-logo__mark" src="logo.svg" alt="" width="26" height="26">
+        <span class="sb-logo__name">科研小助手</span>
+      </a>
+      <button class="sb-toggle" id="sbToggle" title="收起侧栏（Ctrl+Shift+B）" aria-label="收起侧栏">☰</button>
+      <button class="sb-toggle sb-head-act" id="sbToggleAct" title="展开侧栏（Ctrl+Shift+B）" aria-label="展开侧栏">☰</button>
+    </div>
+
+    <button class="sb-new" id="newChat" title="回到对话页开启新的会话">
+      <span class="sb-new__plus">＋</span>
+      <span class="sb-new__txt">开启新对话</span>
+    </button>
+
+    <div class="sb-group sb-group--nav">
+      <a class="sb-item" data-nav="library" href="library.html" title="上传、查看、删除论文（支持批量，自动查重）">
+        <span class="sb-item__ico">▤</span><span class="sb-item__txt">论文库</span>
+      </a>
+      <a class="sb-item" data-nav="discover" href="discover.html" title="按论文名下载、批量下参考文献、看新论文推荐（1.4）">
+        <span class="sb-item__ico">◎</span><span class="sb-item__txt">发现</span>
+      </a>
+      <a class="sb-item" data-nav="graph" href="graph.html" title="论文引用关系图谱：谁引用了谁、哪些是基石节点（1.5）">
+        <span class="sb-item__ico">◈</span><span class="sb-item__txt">引用图谱</span>
+      </a>
+      <a class="sb-item" data-nav="analysis" href="analysis.html" title="论文分析：自动综述与前沿探索（1.5）">
+        <span class="sb-item__ico">◧</span><span class="sb-item__txt">论文分析</span>
+      </a>
+      <a class="sb-item" data-nav="writing" href="writing.html" title="写作助手：框架生成、架构图、数据可视化、中译英（1.6）">
+        <span class="sb-item__ico">✎</span><span class="sb-item__txt">写作助手</span>
+      </a>
+    </div>
+
+    <div class="sb-group sb-group--nav">
+      <a class="sb-item" data-nav="allscope" href="index.html?scope=all"
+         title="回到对话页，开启一个全库范围的会话">
+        <span class="sb-item__ico">⌘</span><span class="sb-item__txt">全库问答</span>
+      </a>
+      <a class="sb-item" data-nav="compare" href="compare.html"
+         title="多篇对比专属页面：选中若干篇论文，逐项对比（对比表可选）">
+        <span class="sb-item__ico">⇄</span><span class="sb-item__txt">多篇对比</span>
+      </a>
+    </div>
+
+    <div class="sb-history" id="sbHistory"></div>
+
+    <div class="sb-foot">
+      <a class="sb-item" data-nav="settings" href="settings.html" title="设置中心：模型、检索参数、定时刷新、知识库">
+        <span class="sb-item__ico">⚙︎</span><span class="sb-item__txt">设置</span>
+      </a>
+    </div>
+
+    <div class="sb-resizer" id="sbResizer" title="拖动调整侧栏宽度（双击恢复默认）" role="separator"
+         aria-orientation="vertical" aria-label="拖动调整侧栏宽度"></div>
+  </aside>
+
+  <div class="app__main">
+    <div class="main__scroll">
+      <div class="main__inner main__inner--cmp">
+        <div class="cmp-head">
+          <h1>多篇对比</h1>
+          <span class="cmp-scope" id="scopeChip">尚未选论文</span>
+        </div>
+        <div class="cmp-sub">
+          对比对话常驻在这里：选好参与的论文就能直接问。想逐项对照时再按「生成对比表」——
+          表格按「维度 × 论文」排列，每格都会标出出处。
+        </div>
+
+        <!-- 官方 1.2.2 四道题：横排装填，不是侧栏那种竖排编号列表 -->
+        <div class="cmp-qs" id="cmpQs">
+          <span class="cmp-qs__label">官方题目：</span>
+        </div>
+
+        <div class="cmp-papers" id="cmpPapers">
+          <span class="cmp-papers__label">参与对比：</span>
+        </div>
+
+        <div class="cmp-chat" id="cmpChat" aria-live="polite"></div>
+
+        <div class="cmp-dock">
+          <div class="cmp-dock__box">
+            <textarea id="cmpQ" rows="1" placeholder="想问这几篇论文什么？Enter 发送，Shift+Enter 换行"
+                      aria-label="输入对比问题"></textarea>
+            <div class="cmp-dock__tools">
+              <button class="chip-toggle on" id="cmpTableBtn" type="button" aria-pressed="true"
+                      title="开启后每次提问都包含一张「维度 × 论文」的对比表；关闭则只给结论">
+                <span aria-hidden="true">▦</span> 生成对比表
+              </button>
+              <span class="cmp-dock__spacer"></span>
+              <details class="pick" id="cmpPick">
+                <summary id="cmpPickSummary" title="勾选参与本次对比的论文">选择论文</summary>
+                <div class="pick-list" id="cmpPickList"></div>
+              </details>
+              <button class="cmp-dock__send" id="cmpSend" type="button" title="发送" aria-label="发送">↑</button>
+            </div>
+          </div>
+          <div class="cmp-dock__status" id="cmpStatus"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="sidebar.js?v=20261031mobile"></script>
+  <script src="chat-core.js?v=20261116"></script>
+  <script>
+'use strict';
+
+const chatEl = document.getElementById('cmpChat');
+const inputEl = document.getElementById('cmpQ');
+const sendEl = document.getElementById('cmpSend');
+const statusEl = document.getElementById('cmpStatus');
+const qsEl = document.getElementById('cmpQs');
+const papersEl = document.getElementById('cmpPapers');
+const scopeChipEl = document.getElementById('scopeChip');
+const tableBtnEl = document.getElementById('cmpTableBtn');
+const pickListEl = document.getElementById('cmpPickList');
+const pickSummaryEl = document.getElementById('cmpPickSummary');
+
+// ---------- 官方 1.2.2 四道题 ----------
+// 题目原文取自赛题 PDF「1.2.2 针对多篇论文的问答」第 1~4 题
+// （科研小助手\科研小助手Agent-AI大模型.pdf 第 2 页），一字未改。
+// 论文按标题关键字在库里现找，不写死文件名——同一篇论文在库里有 v1/v7/v1_img 多个版本。
+const COMPARE_CASES = [
+  {
+    id: 'q1-bert-attention',
+    label: 'BERT 与 Transformer 架构对比',
+    papers: [
+      { label: 'Transformer', keys: ['attention is all you need'] },
+      { label: 'BERT', keys: ['bert: pre-training'] },
+    ],
+    question: '根据《Attention Is All You Need》和《BERT: Pre-training of Deep Bidirectional Transformers '
+      + 'for Language Understanding》。请对比：BERT 的架构和原始 Transformer 的 Encoder 有什么承袭关系？'
+      + 'BERT 丢弃了原始 Transformer 的哪个部分？',
+    // 这道题固定列：用户确认「四道题各一套固定列」
+    table: ['核心思路', '整体架构', 'Encoder 结构', '是否保留 decoder', '预训练目标'],
+  },
+  {
+    id: 'q2-gpt-scale',
+    label: 'GPT-1/2/3 参数规模',
+    papers: [
+      { label: 'GPT-1', keys: ['improving language understanding'] },
+      { label: 'GPT-2', keys: ['unsupervised multitask learners'] },
+      { label: 'GPT-3', keys: ['few-shot learners'] },
+    ],
+    question: '对比GPT-1、GPT-2和GPT-3的论文，说明这些模型的参数的变化。',
+    table: ['参数量', '层数', '隐藏维度', '训练数据规模'],
+  },
+  {
+    id: 'q3-gpt2-ln',
+    label: 'GPT-2 的 LN 位置',
+    papers: [
+      { label: 'GPT-1', keys: ['improving language understanding'] },
+      { label: 'GPT-2', keys: ['unsupervised multitask learners'] },
+    ],
+    question: 'GPT-2 相比于 GPT-1，在 Transformer 的 Layer Normalization（LN）位置上做了什么关键的调整？',
+    table: ['LN 类型', 'LN 位置', '对训练/深度的意义'],
+  },
+  {
+    id: 'q4-gpt-context',
+    label: 'GPT-1→3 上下文窗口',
+    papers: [
+      { label: 'GPT-1', keys: ['improving language understanding'] },
+      { label: 'GPT-2', keys: ['unsupervised multitask learners'] },
+      { label: 'GPT-3', keys: ['few-shot learners'] },
+    ],
+    question: '从 GPT-1 到 GPT-3，模型的最大上下文 Token 长度（Context Window）分别递增到了多少？',
+    table: ['上下文窗口', '跨窗口机制', '论文原文出处'],
+  },
+];
+
+// 通用列：不属于上面四道题的自定义提问用这一套
+const GENERIC_TABLE = ['研究方法', '数据集', '主要结论', '局限'];
+
+// ---------- 状态 ----------
+let paperFiles = [];          // 库里的文件名
+let paperTitles = new Map();  // 文件名 -> 标题
+let picked = [];              // 参与对比的文件名（顺序即表头顺序）
+let activeCase = null;        // 当前装填的官方题目 id
+let wantTable = true;         // 是否生成对比表（默认开，用户可关）
+let busy = false;
+
+function titleOf(fn) { return paperTitles.get(fn) || fn; }
+
+function shortTitle(fn) {
+  const t = titleOf(fn);
+  return t.length > 28 ? t.slice(0, 28) + '…' : t;
+}
+
+// ---------- 论文库与题目解析 ----------
+Promise.all([
+  fetch('/papers/files').then(r => r.json()).catch(() => ({ files: [] })),
+  fetch('/papers').then(r => r.json()).catch(() => ({ papers: [] })),
+]).then(([filesRes, papersRes]) => {
+  paperFiles = filesRes.files || [];
+  const list = papersRes.papers || papersRes.items || [];
+  paperTitles = new Map(list.map(p => [p.filename || p.file || '', p.title || '']));
+  renderPickList();
+  renderQuestions();
+  syncPickedToUrl();
+  renderPicked();
+});
+
+function renderPickList() {
+  pickListEl.innerHTML = '';
+  if (!paperFiles.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:12px;color:var(--text-subtle);padding:6px';
+    empty.textContent = '论文库是空的，先去「论文库」上传 PDF';
+    pickListEl.appendChild(empty);
+    return;
+  }
+  paperFiles.forEach(fn => {
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.value = fn;
+    box.checked = picked.includes(fn);
+    box.addEventListener('change', () => {
+      if (box.checked) { if (!picked.includes(fn)) picked.push(fn); }
+      else picked = picked.filter(x => x !== fn);
+      activeCase = null;   // 手动改选就不再是对应官方题目了
+      renderQuestions();
+      renderPicked();
+    });
+    label.appendChild(box);
+    const name = document.createElement('span');
+    name.textContent = shortTitle(fn);
+    name.title = titleOf(fn);
+    label.appendChild(name);
+    pickListEl.appendChild(label);
+  });
+}
+
+/** 官方题目：用题目里的关键字去比对论文标题和文件名，缺的标虚线。 */
+function resolveCase(kase) {
+  // 用文件名当标题的条目（没解析出标题的 PDF）只比文件名，所以两边都过一遍
+  const textOf = fn => `${titleOf(fn)} ${fn}`.toLowerCase();
+  const hit = [];
+  const missing = [];
+  kase.papers.forEach(spec => {
+    const found = paperFiles.find(fn => spec.keys.some(k => textOf(fn).includes(k)));
+    if (!found) { missing.push(spec.label); return; }
+    if (!hit.includes(found)) hit.push(found);
+  });
+  return { hit, missing };
+}
+
+function renderQuestions() {
+  // 保留前面的标签，只重建 chip
+  qsEl.querySelectorAll('.cmp-q').forEach(el => el.remove());
+  COMPARE_CASES.forEach(kase => {
+    const { hit, missing } = resolveCase(kase);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cmp-q' + (activeCase === kase.id ? ' on' : '') + (missing.length ? ' cmp-q--missing' : '');
+    btn.textContent = kase.label;
+    btn.title = missing.length
+      ? `缺 ${missing.join('、')}，可用的 ${hit.length} 篇先参与对比`
+      : `装填：${hit.map(shortTitle).join(' / ')}`;
+    btn.addEventListener('click', () => applyCase(kase.id));
+    qsEl.appendChild(btn);
+  });
+}
+
+function applyCase(id) {
+  const kase = COMPARE_CASES.find(k => k.id === id);
+  if (!kase) return;
+  const { hit, missing } = resolveCase(kase);
+  if (!hit.length) {
+    statusEl.textContent = `这道题需要的论文都不在库里：${missing.join('、')}`;
+    statusEl.className = 'cmp-dock__status bad';
+    return;
+  }
+  picked = hit;
+  activeCase = id;
+  inputEl.value = kase.question;
+  autoGrow();
+  renderQuestions();
+  renderPicked();
+  pickListEl.querySelectorAll('input[type="checkbox"]').forEach(b => { b.checked = picked.includes(b.value); });
+  statusEl.textContent = missing.length
+    ? `已装填「${kase.label}」· 库里缺 ${missing.join('、')}，按现有 ${hit.length} 篇作答并会如实说明缺失`
+    : `已装填「${kase.label}」（${hit.length} 篇）· 确认后按发送`;
+  statusEl.className = missing.length ? 'cmp-dock__status bad' : 'cmp-dock__status ok';
+  inputEl.focus();
+}
+
+function renderPicked() {
+  papersEl.querySelectorAll('.cmp-paper, .btn-mini').forEach(el => el.remove());
+  if (!picked.length) {
+    const hint = document.createElement('span');
+    hint.className = 'cmp-papers__label';
+    hint.textContent = '还没选论文——至少选一篇才能对比';
+    papersEl.appendChild(hint);
+    scopeChipEl.textContent = '尚未选论文';
+    return;
+  }
+  picked.forEach(fn => {
+    const chip = document.createElement('span');
+    chip.className = 'cmp-paper';
+    chip.innerHTML = '<b></b><span></span>';
+    chip.querySelector('b').textContent = shortTitle(fn);
+    const t = titleOf(fn);
+    chip.title = t;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.title = '从本次对比里移除';
+    x.textContent = '×';
+    x.addEventListener('click', () => {
+      picked = picked.filter(p => p !== fn);
+      activeCase = null;
+      renderQuestions();
+      renderPicked();
+      pickListEl.querySelectorAll('input[type="checkbox"]').forEach(b => { b.checked = picked.includes(b.value); });
+    });
+    chip.appendChild(x);
+    papersEl.appendChild(chip);
+  });
+  if (picked.length === 1) {
+    const more = document.createElement('a');
+    more.className = 'btn-mini';
+    more.href = 'javascript:void(0)';
+    more.textContent = '再加一篇才算「对比」';
+    more.addEventListener('click', () => pickSummaryEl.click());
+    papersEl.appendChild(more);
+  }
+  scopeChipEl.textContent = `本次对比 ${picked.length} 篇`;
+}
+
+// 支持从对话页带参数过来：compare.html?papers=a.pdf,b.pdf
+function syncPickedToUrl() {
+  const raw = new URLSearchParams(location.search).get('papers');
+  if (!raw) return;
+  // 只保留库里真的存在的文件：URL 可能是别人分享的旧链接
+  picked = raw.split(',').map(s => s.trim()).filter(f => paperFiles.includes(f));
+}
+
+// ---------- 对比表开关 ----------
+function applyTableBtn() {
+  tableBtnEl.classList.toggle('on', wantTable);
+  tableBtnEl.setAttribute('aria-pressed', wantTable ? 'true' : 'false');
+  tableBtnEl.title = wantTable
+    ? '生成对比表：开启中。点击关闭后只给结论 + 下一步建议'
+    : '生成对比表：已关闭。点击开启，回答里会多一张「维度 × 论文」对照表';
+}
+tableBtnEl.addEventListener('click', () => { wantTable = !wantTable; applyTableBtn(); });
+applyTableBtn();
+
+// ---------- 对话渲染 ----------
+function addMsg(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  return div;
+}
+
+function currentCaseColumns() {
+  const kase = COMPARE_CASES.find(k => k.id === activeCase);
+  return kase ? kase.table : GENERIC_TABLE;
+}
+
+/**
+ * 把「是否生成对比表 + 固定列」拼进问题里。
+ *
+ * 为什么列要写死：arXiv2Table（arXiv 2504.10284）实测过，让模型自己决定表结构时，
+ * 不同论文抽出来的维度对不齐，跨列就没法比。列写死之后，模型只负责逐格找证据。
+ */
+function buildQuestion(raw) {
+  if (!wantTable) {
+    return raw + '\n\n（本次不需要对比表：先给【结论】直接回答，再给【下一步】。依据与局限照常输出。）';
+  }
+  const cols = currentCaseColumns();
+  return raw + '\n\n请先给一张「维度 × 论文」的 Markdown 对比表：'
+    + `第一列是维度，固定用这几行：${cols.join(' / ')}；后面每列一篇论文，表头写论文标题。`
+    + '每个单元格末尾标 [来源: 文件名 第N页]，取自检索片段的正文；'
+    + '某格没有依据时写「依据的片段中未见该点」，不要写「论文未提及」。'
+    + '表后按【结论】【依据】【局限】【下一步】四段回答。';
+}
+
+async function send() {
+  const raw = inputEl.value.trim();
+  if (!raw || busy) return;
+  if (!picked.length) {
+    statusEl.textContent = '先选至少一篇论文，或者点上面的官方题目自动装填';
+    statusEl.className = 'cmp-dock__status bad';
+    return;
+  }
+  busy = true;
+  sendEl.disabled = true;
+  inputEl.value = '';
+  autoGrow();
+
+  addMsg(raw, 'user');
+  const botEl = addMsg('', 'bot');
+  let answer = '';
+  let evidenceItems = [];
+  let roleItems = [];
+  let statusText = '';
+
+  try {
+    // 两篇及以上走多篇对比（后端每篇各取几块再合并），只选一篇就走单篇
+    const payload = { message: buildQuestion(raw) };
+    if (picked.length === 1) payload.source = picked[0];
+    else payload.sources = picked;
+
+    const resp = await fetch('/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()).slice(0, 200));
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data:')) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
+        if (ev.type === 'evidence') evidenceItems = ev.items || [];
+        else if (ev.type === 'roles') roleItems = ev.items || [];
+        else if (ev.type === 'status') statusText = ev.text || '';
+        else if (ev.type === 'answer_delta') { answer += ev.text; botEl.textContent = answer; }
+        else if (ev.type === 'error') addMsg('服务出错：' + ev.message, 'err');
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+    }
+
+    if (!answer) botEl.textContent = '（没有返回内容）';
+    else ChatCore.renderAnswer(botEl, answer);
+    const rolesBox = roleItems.length ? ChatCore.renderRoles(botEl, roleItems, statusText) : null;
+    ChatCore.renderEvidence(rolesBox || botEl, evidenceItems);
+    statusEl.textContent = `本次对比 ${picked.length} 篇 · 证据 ${evidenceItems.length} 条`;
+    statusEl.className = 'cmp-dock__status';
+  } catch (e) {
+    addMsg('请求失败：' + e.message, 'err');
+    statusEl.textContent = '请求失败：' + e.message;
+    statusEl.className = 'cmp-dock__status bad';
+  } finally {
+    busy = false;
+    sendEl.disabled = false;
+    inputEl.focus();
+  }
+}
+
+function autoGrow() {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, Math.round(window.innerHeight * 0.3)) + 'px';
+}
+
+inputEl.addEventListener('input', autoGrow);
+inputEl.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (e.shiftKey || e.isComposing || e.keyCode === 229) return;
+  e.preventDefault();
+  send();
+});
+sendEl.addEventListener('click', send);
+autoGrow();
+inputEl.focus();
+  </script>
+</body>
+</html>
