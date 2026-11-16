@@ -37,13 +37,38 @@
     }
 
     /* ---------- 自动综述（1.5.3） ---------- */
+    /* 高度必须封顶并自带滚动条：本页 body 是 100vh + overflow:hidden，
+       页面本身没有滚动条。这两个面板是 main 的兄弟节点，直接参与 body 的
+       flex 分配——不封顶的话，综述一多就把 main 挤成负高度，
+       表现为「点生成后整页滚不动、下面看不全」（2026-11-17 用户反馈）。
+       min-height:0 + overflow-y:auto 才是那个能被滚轮驱动的滚动条。
+       两个面板同时展开会一起吃掉 2×34vh，图谱主区就没地方了，
+       所以 top10 / 综述 / 方向三者中只允许最多两个同时展开——见 JS 的
+       syncBarsCollapsed()。 */
     #narBar {
       margin: 10px 16px 0;
       padding: 12px 14px;
       border: 1px solid var(--border-color);
       border-radius: 10px;
       background: var(--bg-surface);
+      flex: 0 1 auto;
+      max-height: 34vh;
+      overflow-y: auto;
+      min-height: 0;
     }
+    /* 折叠态：只留标题栏那一行，把高度还给图谱 */
+    #narBar.bar--collapsed {
+      max-height: none;
+      overflow: hidden;
+      padding-bottom: 8px;
+    }
+    #narBar.bar--collapsed .nar-foldable { display: none; }
+    .bar-fold {
+      margin-left: 6px; padding: 2px 9px; font-size: 11.5px; border-radius: 6px;
+      border: 1px solid var(--border-color); background: transparent;
+      color: var(--text-secondary); cursor: pointer;
+    }
+    .bar-fold:hover { background: var(--bg-muted); }
     #narBar[hidden] { display: none; }
     .nar-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .nar-head b { font-size: 14px; }
@@ -89,13 +114,24 @@
     .nar-rej b { color: var(--text-secondary); font-weight: 600; }
 
     /* ---------- 未来工作探索（1.5.4） ---------- */
+    /* 同上：body 无滚动条，这里必须自己封顶并滚动，否则方向卡一多就看不全。 */
     #dirBar {
       margin: 10px 16px 0;
       padding: 12px 14px;
       border: 1px solid var(--border-color);
       border-radius: 10px;
       background: var(--bg-surface);
+      flex: 0 1 auto;
+      max-height: 34vh;
+      overflow-y: auto;
+      min-height: 0;
     }
+    #dirBar.bar--collapsed {
+      max-height: none;
+      overflow: hidden;
+      padding-bottom: 8px;
+    }
+    #dirBar.bar--collapsed .nar-foldable { display: none; }
     #dirBar[hidden] { display: none; }
     .dir-body { margin-top: 10px; display: flex; flex-direction: column; gap: 12px; }
     .dir-body:empty { display: none; }
@@ -718,10 +754,11 @@
       <span class="spacer"></span>
       <button class="nar-btn" id="narRun">生成综述</button>
       <button class="nar-btn ghost" id="narStop" hidden>停止</button>
+      <button class="bar-fold" id="narFold" type="button" title="收起/展开这一栏">收起</button>
     </div>
-    <div id="narMsg" class="nar-msg" hidden></div>
-    <div id="narStages" class="nar-stages"></div>
-    <div id="narBody" class="nar-body"></div>
+    <div id="narMsg" class="nar-msg nar-foldable" hidden></div>
+    <div id="narStages" class="nar-stages nar-foldable"></div>
+    <div id="narBody" class="nar-body nar-foldable"></div>
   </div>
 
   <!-- 未来工作探索（赛题 1.5.4）：先抽作者自己写的 Future Work / Limitations，
@@ -736,10 +773,11 @@
       <span class="spacer"></span>
       <button class="nar-btn" id="dirRun">探索方向</button>
       <button class="nar-btn ghost" id="dirStop" hidden>停止</button>
+      <button class="bar-fold" id="dirFold" type="button" title="收起/展开这一栏">收起</button>
     </div>
-    <div id="dirMsg" class="nar-msg" hidden></div>
-    <div id="dirStages" class="nar-stages"></div>
-    <div id="dirBody" class="dir-body"></div>
+    <div id="dirMsg" class="nar-msg nar-foldable" hidden></div>
+    <div id="dirStages" class="nar-stages nar-foldable"></div>
+    <div id="dirBody" class="dir-body nar-foldable"></div>
   </div>
 
   <div id="focusBar" hidden>
@@ -940,6 +978,10 @@ function narFinish(stats) {
 async function runNarrative() {
   if (narCtl) return;              // 防重复点击：上一次还没结束
   narReset();
+  // 默认是收起的（把高度让给图谱）。用户既然点了生成，就自动展开看结果，
+  // 同时把方向栏收起来，两个面板不叠在一起。
+  toggleBar('nar');
+  if (!barOpen('nar')) setBarOpen('nar', true);
   const ctl = new AbortController();
   narCtl = ctl;
   $('narRun').disabled = true;
@@ -1258,6 +1300,9 @@ function dirFinish(stats) {
 async function runDirections() {
   if (dirCtl) return;              // 防重复点击
   dirReset();
+  // 同 runNarrative：点探索就展开自己、收起另一个，结果才有地方显示
+  if (!barOpen('dir')) setBarOpen('dir', true);
+  Object.keys(BARS).forEach(k => { if (k !== 'dir') setBarOpen(k, false); });
   const ctl = new AbortController();
   dirCtl = ctl;
   $('dirRun').disabled = true;
@@ -1348,11 +1393,51 @@ function stopDirections() {
 function bindDirections() {
   $('dirRun').addEventListener('click', runDirections);
   $('dirStop').addEventListener('click', stopDirections);
+  $('dirFold').addEventListener('click', () => toggleBar('dir'));
 }
 
 function bindNarrative() {
   $('narRun').addEventListener('click', runNarrative);
   $('narStop').addEventListener('click', stopNarrative);
+  $('narFold').addEventListener('click', () => toggleBar('nar'));
+}
+
+/* ---------- 面板折叠：让出高度给图谱 ----------
+   本页 body 是 100vh + overflow:hidden，两个面板和 main 抢同一份高度。
+   只给面板加 overflow-y:auto 还不够——两个 34vh 的框一起压下来，
+   main 会被挤成负高度（2026-11-17 用户反馈「点生成后无法下拉」）。
+   所以再加一层约束：综述栏和方向栏同一时刻最多展开一个，点哪个展哪个，
+   另一个自动收起，只留那条标题栏。 */
+const BARS = { nar: 'narBar', dir: 'dirBar' };
+
+function barOpen(key) {
+  const el = $(BARS[key]);
+  return el && !el.classList.contains('bar--collapsed');
+}
+
+function setBarOpen(key, open) {
+  const el = $(BARS[key]);
+  if (!el) return;
+  el.classList.toggle('bar--collapsed', !open);
+  const btn = $(key + 'Fold');
+  if (btn) btn.textContent = open ? '收起' : '展开';
+}
+
+// 展开一个就收起另一个，保证同一时刻最多一个展开面板
+function toggleBar(key) {
+  const willOpen = !barOpen(key);
+  setBarOpen(key, willOpen);
+  if (willOpen) {
+    Object.keys(BARS).forEach(k => { if (k !== key) setBarOpen(k, false); });
+  }
+}
+
+// 两个面板都出现时，默认收起，把高度还给图谱；用户点「展开」再放出来
+function syncBarsCollapsed() {
+  Object.keys(BARS).forEach(k => {
+    const el = $(BARS[k]);
+    if (el && !el.hidden) setBarOpen(k, false);
+  });
 }
 
 async function boot() {
@@ -1375,6 +1460,8 @@ async function boot() {
   // 综述面板只在全库图谱就绪后才出现：没图就没有事实，点按钮也只会拿到一句错误。
   $('narBar').hidden = false;
   $('dirBar').hidden = false;
+  // 默认收起：两个面板都和 main 抢同一份高度，先让图谱占满
+  syncBarsCollapsed();
   render(data);
 }
 
@@ -2434,6 +2521,7 @@ function switchMode(next) {
   // 未来工作探索同理：它读的是全库图谱 + 全库 PDF 抽取结果，
   // 局域图那批论文的缺口不能拿全库结论去套，所以局域模式下一起藏起来。
   $('dirBar').hidden = isLocal;
+  if (!isLocal) syncBarsCollapsed();
   $('reviewBar').hidden = isLocal;
   $('chartWrap').hidden = isLocal;
   $('localView').hidden = !isLocal;
