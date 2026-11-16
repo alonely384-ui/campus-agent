@@ -140,6 +140,8 @@
     .ans-tail--empty { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-fold { display: flex; flex-direction: column; gap: 10px; }
     .ans-fold[hidden] { display: none; }
+    /* 流式期间【下一步】还没流出来时挂这个类，先写「正在生成…」 */
+    .ans-tail--pending { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-part__body { white-space: pre-wrap; font-size: 14px; color: var(--text-secondary); }
     .ans-toggle { align-self: flex-start; font-size: 12px; padding: 4px 12px; cursor: pointer;
                   border: 1px solid var(--border-color); border-radius: var(--radius-chip);
@@ -573,6 +575,20 @@ function startAllScopeChat() {
 const openAllScopeEl = document.getElementById('openAllScope');
 if (openAllScopeEl) openAllScopeEl.addEventListener('click', startAllScopeChat);
 
+// ---------- 往对话流里加一条气泡 ----------
+// 2026-11-16 回归：抽 chat-core.js 时把这段一并删掉了，却没搬过去，留下 send() 里
+// 对未定义函数的调用。点是同步抛 ReferenceError，用户看到的就是「点发送毫无反应」。
+// 教训：抽公共代码要按「函数名在这份文件里还有没有定义」逐一核，不能只看 diff 里
+// 那一片是不是都搬走了。历史渲染、错误提示、协作轨迹都依赖它，别再顺手删。
+function addMsg(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  chatEl.appendChild(div);
+  chatScrollEl.scrollTop = chatScrollEl.scrollHeight;
+  return div;
+}
+
 // ---------- 健康检查：确认后端活着 ----------
 // ?scope=all：从别的页面点「全库问答」跳回来时，等 /papers/files 拉完再清空勾选——
 // 勾选列表是异步填的，立刻清会清到空 DOM，存下来的勾选还在。
@@ -623,7 +639,14 @@ async function send() {
   saveSessions();
   sbRenderHistory();
 
-  const botEl = addMsg('', 'bot');
+  // 助手气泡自己建：addMsg 对空文本会直接返回 null（它的判空是给渲染历史用的），
+  // 这里要的恰恰是一个先空着、再被流式填进去的容器。
+  const botEl = document.createElement('div');
+  botEl.className = 'msg bot';
+  chatEl.appendChild(botEl);
+  chatScrollEl.scrollTop = chatScrollEl.scrollHeight;
+  // 流式渲染器：回答边到边折叠，收尾时收口（收起按钮文案、把未写完的段落补画）
+  const streamAns = ChatCore.streamAnswer(botEl);
   let traceEl = null;
   let answer = '';
   let evidenceItems = [];
@@ -677,9 +700,9 @@ async function send() {
           statusText = ev.text || '';
         } else if (ev.type === 'answer_delta') {
           answer += ev.text;
-          // 流式期间先原样显示（逐段折叠会让文字在用户眼皮底下跳来跳去），
-          // 收尾时再统一交给 renderAnswer 折成【结论】+【下一步】。
-          botEl.textContent = answer;
+          // 边收边折叠：模型刚吐出【结论】就显示在顶部，依据/局限继续写进下面的折叠区，
+          // 结构一次建好就不再重建，所以文字不会在用户眼皮底下跳位置。
+          streamAns.push(answer);
         } else if (ev.type === 'tool_call') {
           traceEl = traceEl || addMsg('', 'trace');
           traceEl.textContent += `🔧 调用 ${ev.tool}(${ev.arguments})\n`;
@@ -694,7 +717,8 @@ async function send() {
     }
 
     if (!answer) botEl.textContent = '（没有返回内容）';
-    else ChatCore.renderAnswer(botEl, answer);
+    else streamAns.finish();
+    streamAns.stop();
     // 先画协作时间线，再画证据卡片：时间线讲"怎么找到这些证据"，放在证据上方更顺。
     // 证据默认只摊开前 3 条，其余点「展开全部」再看（2026-11-16 用户要求）。
     const rolesBox = roleItems.length ? ChatCore.renderRoles(botEl, roleItems, statusText) : null;
@@ -709,6 +733,9 @@ async function send() {
     }
   } catch (e) {
     addMsg('请求失败：' + e.message, 'err');
+    // 出错时把已经收到的部分按同样结构收口，别留下一坨半渲染的原始文本
+    if (answer) streamAns.finish();
+    streamAns.stop();
   } finally {
     sendEl.disabled = false;
     inputEl.focus();

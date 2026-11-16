@@ -80,6 +80,8 @@
     .ans-tail--empty { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-fold { display: flex; flex-direction: column; gap: 10px; }
     .ans-fold[hidden] { display: none; }
+    /* 流式期间【下一步】还没流出来时挂这个类，先写「正在生成…」 */
+    .ans-tail--pending { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-part__body { white-space: pre-wrap; font-size: 14px; color: var(--text-secondary); }
     .ans-toggle { align-self: flex-start; font-size: 12px; padding: 4px 12px; cursor: pointer;
                   border: 1px solid var(--border-color); border-radius: var(--radius-chip);
@@ -565,7 +567,15 @@ async function send() {
   autoGrow();
 
   addMsg(raw, 'user');
-  const botEl = addMsg('', 'bot');
+  // 助手气泡自己建：addMsg 的返回值只用于普通文本气泡，这里要一个先空着、
+  // 由 streamAnswer 边收边填的容器（与 index.html 用同一套，两个页面展示才一致）。
+  const botEl = document.createElement('div');
+  botEl.className = 'msg bot';
+  chatEl.appendChild(botEl);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  // 2026-11-16 用户反馈「多篇对话中没显示结论」：原来流式期间写纯文本、结束才 renderAnswer，
+  // 现在从一开始就走同一个流式渲染器，【结论】一出来就在最上面。
+  const streamAns = ChatCore.streamAnswer(botEl);
   let answer = '';
   let evidenceItems = [];
   let roleItems = [];
@@ -601,20 +611,23 @@ async function send() {
         if (ev.type === 'evidence') evidenceItems = ev.items || [];
         else if (ev.type === 'roles') roleItems = ev.items || [];
         else if (ev.type === 'status') statusText = ev.text || '';
-        else if (ev.type === 'answer_delta') { answer += ev.text; botEl.textContent = answer; }
+        else if (ev.type === 'answer_delta') { answer += ev.text; streamAns.push(answer); }
         else if (ev.type === 'error') addMsg('服务出错：' + ev.message, 'err');
         chatEl.scrollTop = chatEl.scrollHeight;
       }
     }
 
     if (!answer) botEl.textContent = '（没有返回内容）';
-    else ChatCore.renderAnswer(botEl, answer);
+    else streamAns.finish();
+    streamAns.stop();
     const rolesBox = roleItems.length ? ChatCore.renderRoles(botEl, roleItems, statusText) : null;
     ChatCore.renderEvidence(rolesBox || botEl, evidenceItems);
     statusEl.textContent = `本次对比 ${picked.length} 篇 · 证据 ${evidenceItems.length} 条`;
     statusEl.className = 'cmp-dock__status';
   } catch (e) {
     addMsg('请求失败：' + e.message, 'err');
+    if (answer) streamAns.finish();
+    streamAns.stop();
     statusEl.textContent = '请求失败：' + e.message;
     statusEl.className = 'cmp-dock__status bad';
   } finally {

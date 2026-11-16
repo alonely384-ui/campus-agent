@@ -186,6 +186,202 @@
     }
   }
 
+  // ---------- 流式渲染（边收边折叠） ----------
+  // 2026-11-16 用户反馈：「结论和下一步必须第一时间显示，所有对话中」。原来的做法是
+  // 流式期间 botEl.textContent = 全文，等流结束才 renderAnswer——于是左边整片滚动时
+  // 用户看到的都是【依据】那段，结论要么早就滚走了，要么（对比页那轮）压根没渲染出来。
+  //
+  // 这里改成：第一次拿到正文就把结构一次性建好（结论在上、折叠区在中、下一步在下），
+  // 之后每个增量只改对应节点的文字。结构不重建，所以文字不会跳位置。
+  // 增量渲染是节流的（STREAM_RENDER_MS），既不让每来一个字就排版一次，也不至于卡顿。
+
+  var STREAM_RENDER_MS = 80;
+
+  // 段落标题行。和 splitSections 用同一条正则，避免两边口径走样。
+  var STREAM_HEAD_RE = /^\s*(?:#{1,6}\s*)?[【\[]([^】\]]{1,8})[】\]]\s*:?\s*$/;
+  var STREAM_ORDER = ['conclusion', 'basis', 'limits', 'next'];
+
+  /** 流式口子：把某个分区的当前全文画进对应节点（只在内容真变了时才重排）。 */
+  function paintStreamPart(cache, key, text, render) {
+    var body = String(text || '').replace(/\s+$/, '');
+    if (cache.last[key] === body) return;
+    cache.last[key] = body;
+    render(cache.el[key], body);
+    cache.dirty = true;
+  }
+
+  /**
+   * 边收边折叠的渲染器。
+   *   用法：var s = streamAnswer(botEl); s.push(累计全文); s.finish(); s.stop();
+   * 返回 {push, finish, stop, el, sec}。
+   */
+  function streamAnswer(el) {
+    el.textContent = '';
+    el.classList.add('ans');
+
+    // 结构一次性建好：结论 / 折叠区(依据·局限·其他) / 下一步 / 展开按钮
+    var leadBody = document.createElement('div');
+    leadBody.className = 'ans-lead__body';
+    var lead = document.createElement('div');
+    lead.className = 'ans-lead';
+    lead.appendChild(document.createElement('b')).className = 'ans-tag';
+    lead.querySelector('.ans-tag').textContent = '结论';
+    lead.appendChild(leadBody);
+
+    var fold = document.createElement('div');
+    fold.className = 'ans-fold';
+    fold.hidden = true;
+    var foldBody = {};
+
+    var parts = [['basis', '依据'], ['limits', '局限'], ['rest', '其他']];
+    parts.forEach(function (p) {
+      var wrap = document.createElement('div');
+      wrap.className = 'ans-part';
+      var tag = document.createElement('b');
+      tag.className = 'ans-tag';
+      tag.textContent = p[1];
+      var body = document.createElement('div');
+      body.className = 'ans-part__body';
+      wrap.appendChild(tag);
+      wrap.appendChild(body);
+      fold.appendChild(wrap);
+      foldBody[p[0]] = body;
+    });
+
+    var tail = document.createElement('div');
+    tail.className = 'ans-tail';
+    var tailBody = document.createElement('div');
+    tail.appendChild(document.createElement('b')).className = 'ans-tag';
+    tail.querySelector('.ans-tag').textContent = '下一步';
+    tail.appendChild(tailBody);
+
+    var toggle = document.createElement('button');
+    toggle.className = 'ans-toggle';
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'false');
+
+    el.appendChild(lead);
+    el.appendChild(fold);
+    el.appendChild(tail);
+    el.appendChild(toggle);
+
+    var cache = {
+      el: { conclusion: leadBody, basis: foldBody.basis, limits: foldBody.limits,
+            rest: foldBody.rest, next: tailBody },
+      last: {},
+      dirty: false,
+    };
+    var sec = { conclusion: '', basis: '', limits: '', rest: '', next: '' };
+    var lastText = '';
+    var frozen = false;       // finish 之后不再接受增量
+    var timer = null;
+
+    function textRender(node, text) { node.textContent = text; }
+
+    // 折叠区里只有表格时才需要重排；纯文字直接写 textContent 更省
+    function foldRender(node, text) { renderMarkdown(node, text); }
+
+    function paintToggle() {
+      var n = 0;
+      ['basis', 'limits', 'rest'].forEach(function (k) { if (String(sec[k] || '').trim()) n++; });
+      fold.hidden = n === 0;
+      toggle.hidden = n === 0;
+      if (!n) return;
+      toggle.textContent = (!fold.hidden && toggle.getAttribute('aria-expanded') === 'true')
+        ? '收起依据与局限'
+        : ('展开依据与局限（' + n + ' 段）');
+    }
+
+    function paint() {
+      paintStreamPart(cache, 'conclusion', sec.conclusion, textRender);
+      paintStreamPart(cache, 'basis', sec.basis, foldRender);
+      paintStreamPart(cache, 'limits', sec.limits, foldRender);
+      paintStreamPart(cache, 'rest', sec.rest, foldRender);
+      paintStreamPart(cache, 'next', sec.next, textRender);
+      // 下一步还没出来时，先说清楚"还在写"——否则用户以为这一段被吞了
+      if (!String(sec.next || '').trim()) {
+        tail.classList.add('ans-tail--pending');
+        if (cache.last.__pending !== true) {
+          cache.last.__pending = true;
+          tailBody.textContent = '正在生成…';
+        }
+      } else if (cache.last.__pending) {
+        cache.last.__pending = false;
+        tail.classList.remove('ans-tail--pending');
+      }
+      paintToggle();
+      return cache.dirty;
+    }
+
+    /** 把累计全文重新切段。切段本身很便宜（几行正则），节流只是为了减少 DOM 重排。 */
+    function resplit(text) {
+      if (text === lastText) return false;
+      lastText = text;
+      var got = {};
+      var cur = null;
+      var restLines = [];
+      String(text || '').split('\n').forEach(function (line) {
+        var m = line.match(STREAM_HEAD_RE);
+        if (m && LABEL_TO_KEY[m[1].trim()]) {
+          cur = LABEL_TO_KEY[m[1].trim()];
+          got[cur] = got[cur] || [];
+          return;
+        }
+        if (cur) got[cur].push(line); else restLines.push(line);
+      });
+      var hitAny = Object.keys(got).length > 0;
+      if (!hitAny) {
+        // 还没吐出任何【标题】：把已有正文先当结论显示，别让用户对着空气等
+        sec.conclusion = String(text || '');
+        sec.basis = sec.limits = sec.rest = sec.next = '';
+        return true;
+      }
+      STREAM_ORDER.forEach(function (k) { sec[k] = (got[k] || []).join('\n').replace(/\s+$/, ''); });
+      sec.rest = restLines.join('\n').replace(/\s+$/, '');
+      return true;
+    }
+
+    function push(text) {
+      if (frozen) return;
+      var changed = resplit(text);
+      if (!changed) return;
+      if (timer) return;                    // 已经排了下一帧，等它一起画
+      timer = setTimeout(function () {
+        timer = null;
+        if (frozen) return;
+        paint();
+      }, STREAM_RENDER_MS);
+    }
+
+    toggle.addEventListener('click', function () {
+      var open = fold.hidden;
+      fold.hidden = !open;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      paintToggle();
+    });
+
+    /** 收口：把剩下的全画上，并把按钮文案定下来。 */
+    function finish() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      resplit(lastText);
+      frozen = true;
+      paint();
+      // 一直没等到【下一步】就明说，别留个"正在生成…"骗人
+      if (!String(sec.next || '').trim()) {
+        tail.classList.remove('ans-tail--pending');
+        tail.classList.add('ans-tail--empty');
+        tailBody.textContent = '本次回答没有给出下一步建议';
+      }
+    }
+
+    function stop() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      frozen = true;
+    }
+
+    return { push: push, finish: finish, stop: stop, el: el, sec: sec };
+  }
+
   // ---------- 证据卡片 ----------
   /**
    * 画证据卡片。
@@ -322,6 +518,9 @@
     renderMarkdown: renderMarkdown,
     splitSections: splitSections,
     renderAnswer: renderAnswer,
+    streamAnswer: streamAnswer,
+    paintStreamPart: paintStreamPart,
+    STREAM_RENDER_MS: STREAM_RENDER_MS,
     renderEvidence: renderEvidence,
     renderRoles: renderRoles,
     paperHref: paperHref,
