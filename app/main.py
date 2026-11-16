@@ -13,11 +13,23 @@ import difflib
 import json
 import os
 import re
+import shutil
+import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 
 import fitz
-from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,13 +43,18 @@ from app.agent import run_agent, run_agent_stream
 from app.chart import make_chart
 from app.config import settings
 from app.diagram import find_paper_figures, generate_diagram, renderer_available
-from app.figures import figure_bytes, page_png
+from app.figures import FIGURES_DIR, figure_bytes, page_png
 from app.graph import frontier, graph_view, load_graph, survey
 from app.layout import detect_layout
+from app.llm import chat as llm_chat
+from app.local_graph import build_local_graph, papers_from_library, papers_from_uploads
 from app.logging_config import get_logger, setup_logging
 from app.online import (
     OnlineError,
+    _initials_of,
+    _surname_matches,
     arxiv_id_of,
+    author_year_counts,
     citation_counts,
     download_pdf,
     paper_meta,
@@ -806,20 +823,58 @@ class PaperOut(BaseModel):
     bucket_reason: str = ""
 
 
+class LocalGraphIn(BaseModel):
+    """局域图谱（库内勾选）的请求体。"""
+
+    filenames: list[str] = Field(default_factory=list, description="勾选的论文文件名")
+
+
 @app.get("/papers/files", summary="论文库里的文件名（供单篇选择）")
-async def papers_files() -> dict:
+async def papers_files(meta: bool = Query(default=False)) -> dict:
     """返回 data/papers 下实际存在的 PDF 文件名。
 
     为什么不复用 /papers：/papers 读的是上传索引，批量解压进来的 41 篇不在索引里；
     单篇问答只需要文件名，直接扫磁盘最准。
+
+    ``meta=true`` 时（发现页选论文用）每条带上标题：用户认的是论文名，不是
+    ``1706.03762v1.pdf`` 这种文件名。标题来源有三档，按可靠性从高到低取：
+    论文索引里的记录 → 解析出的 ``structures.json`` → 文件名兜底。
+    默认关掉是因为这个开关会多读两个 json，老调用方没有需要就不该付这个钱。
     """
     # glob 走的是同步 stat 系统调用，论文多时能到几十毫秒——放线程池，别占事件循环
     def _scan() -> list[str]:
-        from app.papers import PAPERS_DIR
+        from app.papers import PAPERS_DIR, _load_index
 
-        return sorted(p.name for p in PAPERS_DIR.glob("*.pdf"))
+        # 上传入口把文件存成 <paper_id>.pdf，索引里记的是上传原名。对外一律用后者：
+        # 全站（证据卡的 source、sources 参数、/paper/{f}/... ）都拿 paper.filename
+        # 当论文标识，这里若漏出 d9d852e28945.pdf 这种哈希名，前端就对不上号。
+        # 索引里存在两条记录指向同一 filename 的历史情况（1706.03762v7.pdf 同时有
+        # 内容哈希 id 与旧式 stem id），映射后名字会撞——用 setdefault 让先到的胜出，
+        # 避免同一个下拉项出现两次。
+        alias: dict[str, str] = {}
+        for row in _load_index():
+            name = f"{row.paper_id}.pdf"
+            if name not in alias:
+                alias[name] = row.filename
+        return sorted({alias.get(p.name, p.name) for p in PAPERS_DIR.glob("*.pdf")})
 
-    return {"files": await run_in_threadpool(_scan)}
+    names = await run_in_threadpool(_scan)
+    if not meta:
+        return {"files": names}
+
+    rows, structures = await asyncio.gather(
+        run_in_threadpool(library_rows), run_in_threadpool(load_structures)
+    )
+    by_name = {str(row.get("filename") or ""): row for row in rows}
+    files = []
+    for name in names:
+        row = by_name.get(name) or {}
+        title = str(row.get("title") or "").strip()
+        if not title:
+            struct = structures.get(name) or {}
+            title = str(struct.get("title") or "").strip()
+        files.append({"filename": name, "title": title or name.rsplit(".", 1)[0]})
+    return {"files": files}
 
 @app.get("/papers", summary="论文列表")
 async def papers_list() -> dict:
@@ -1207,6 +1262,82 @@ async def papers_upload(
     return body
 
 
+@app.post("/graph/local", summary="局域图谱（库内勾选，赛题 1.5.1/1.5.2）")
+async def graph_local(body: LocalGraphIn) -> dict:
+    """只用勾选的这批论文建引用网，算出基石论文与边缘衍生论文。
+
+    为什么要独立于全库图谱：赛题原文是「用这 20 篇 PDF 的**内部**引用网络」。
+    全库图谱的边可以连到库里任何一篇，PageRank 的分母里也含批次外节点，
+    直接截子图会得到错的中心性。这里在子图上重算。
+
+    抽取 20 篇 PDF 的参考文献是纯 CPU 活（实测约 5 秒），丢线程池，
+    不阻塞事件循环——否则同时有人在对话时整个服务会卡住。
+    """
+    names = [str(n) for n in (body.filenames or []) if str(n).strip()]
+    if len(names) < 2:
+        raise HTTPException(status_code=400, detail="局域图谱至少需要勾选 2 篇论文")
+
+    def _run() -> dict:
+        papers = papers_from_library(names, PAPERS_DIR)
+        missing = len(names) - len(papers)
+        if len(papers) < 2:
+            raise ValueError(f"勾选的 {len(names)} 篇里只有 {len(papers)} 篇能在库里找到，不足以建图")
+        result = build_local_graph(papers)
+        result["summary"]["missing"] = missing
+        return result
+
+    try:
+        return await run_in_threadpool(_run)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/graph/local/upload", summary="局域图谱（当场上传 PDF）")
+async def graph_local_upload(
+    files: list[UploadFile] | None = File(default=None),
+    filenames: str = Form(default=""),
+) -> dict:
+    """解析用户当场上传的一批 PDF，只在它们之间连边。
+
+    `filenames` 是前端勾选结果（逗号分隔）：上传后前端会列出所有文件让用户取消勾选，
+    再带勾选结果调本接口。为空表示全部参与。
+
+    上传的文件只落在系统临时目录，建完图即删，不进论文库——
+    赛题说的「上传一个方向的 20 篇」是一次性计算，不是入库。
+    """
+    uploads = [f for f in (files or []) if f and f.filename]
+    if not uploads:
+        raise HTTPException(status_code=400, detail="没有收到文件")
+
+    picked = {s.strip() for s in filenames.split(",") if s.strip()}
+    tmpdir = Path(tempfile.mkdtemp(prefix="local-graph-"))
+    items: list[tuple[str, Path]] = []
+    try:
+        for item in uploads:
+            name = Path(item.filename or "unnamed.pdf").name
+            if not name.lower().endswith(".pdf"):
+                continue
+            if picked and name not in picked:
+                continue
+            dest = tmpdir / name
+            await _save_upload_limited(item, dest, limit=UPLOAD_MAX_BYTES)
+            items.append((name, dest))
+
+        if len(items) < 2:
+            raise HTTPException(status_code=400, detail="勾选的 PDF 少于 2 篇，无法建图")
+
+        def _run() -> dict:
+            papers = papers_from_uploads(items)
+            return build_local_graph(papers)
+
+        try:
+            return await run_in_threadpool(_run)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 @app.delete("/papers/{paper_id}", summary="删除论文", dependencies=[AdminOnly])
 async def papers_delete(paper_id: str) -> dict:
     # 读索引 + 删文件 + 删三路索引都是同步 IO（Chroma 与磁盘），整段丢线程池。
@@ -1297,18 +1428,48 @@ async def paper_layout(filename: str) -> dict:
 _NO_FIGURE = object()
 
 
-def _figure_png(path, index: int) -> object:
+def _figure_png(path, index: int, key: str = "") -> object:
     """裁第 index 张图；裁不出来退回整页预览。返回 `(bytes, crop)` 或 `_NO_FIGURE`。
 
     单独成同步函数是因为要整体丢线程池：`load_structures()`（读 0.8 MB JSON）与
     `figure_bytes()` / `page_png()`（PyMuPDF 渲染）全是同步的。
+
+    ``key`` 是 structures.json 里的键，也就是 ``paper.filename``。必须显式传进来，
+    不能拿 ``path.name`` 顶替：上传入口把文件存成 ``<paper_id>.pdf``，而总表按
+    上传原名索引，两者对不上时 ``load_structures().get(path.name)`` 直接返回 None，
+    表现为「论文有图但每张图都 404」。不传时回落到 ``path.name``，让手工拷进来的
+    文件（两种名字相同）照旧能用。
+
+    三条取图路径，按代价从低到高：
+        1. 重建时预裁好的图（structures.json 的 `figures[i]["image"]`，
+           落在 data/meta/figures/<stem>_fig<N>.png）——直接读文件，不再渲染；
+        2. 按需裁的缓存 data/meta/figures/<stem>/fig<index>.png（figure_bytes）；
+        3. 裁不出来（矢量图）→ 整页预览，并告诉前端这是整页。
+
+    第 1 条是后补的：重建脚本本来就会把图导出来，但接口一直无视它、
+    每次都走第 2 条重新裁一遍，等于白算。
     """
-    figures = (load_structures().get(path.name) or {}).get("figures") or []
+    stem = key or path.name
+    figures = (load_structures().get(stem) or {}).get("figures") or []
     if not (0 <= index < len(figures)):
         return _NO_FIGURE
     fig = figures[index]
     page_no = int(fig.get("page") or 0)
-    data = figure_bytes(path, path.stem, index, page_no, str(fig.get("caption") or ""))
+
+    prebuilt = str(fig.get("image") or "")
+    if prebuilt:
+        shot = FIGURES_DIR / Path(prebuilt).name
+        if shot.is_file():
+            try:
+                data = shot.read_bytes()
+                if data:
+                    return data, "prebuilt"
+            except OSError:  # 读不了就当没有，别把整张图拖死
+                logger.warning("预裁图读取失败，改用按需裁：%s", shot)
+
+    # 缓存目录名也必须用 key：拿 path.stem 会得到 d9d852e28945 这种哈希名，
+    # 换个入口进来（比如以后支持按 paper_id 访问）就又是另一套缓存，白算一遍。
+    data = figure_bytes(path, Path(stem).stem, index, page_no, str(fig.get("caption") or ""))
     crop = "figure"
     if data is None:
         # 矢量图（没有位图块）裁不出来 → 退回整页预览，并告诉前端这是整页
@@ -1329,7 +1490,7 @@ async def paper_figure(filename: str, index: int) -> Response:
     path = await run_in_threadpool(safe_paper_path, filename)
     if path is None:
         raise HTTPException(status_code=404, detail="论文不存在")
-    result = await run_in_threadpool(_figure_png, path, index)
+    result = await run_in_threadpool(_figure_png, path, index, filename)
     if result is _NO_FIGURE:
         raise HTTPException(status_code=404, detail="没有这张图")
     data, crop = result
@@ -1490,6 +1651,14 @@ class ReferenceDownloadRequest(BaseModel):
     min_cites: int = Field(default=2, ge=1, le=30)
 
 
+class ReferenceOneRequest(BaseModel):
+    """单篇下载：推荐列表里点哪篇就下哪篇，靠 arXiv 号定位。"""
+
+    arxiv_id: str = Field(..., min_length=1, max_length=40)
+    # 用来核对下载到的 PDF 确实是这篇（arXiv 偶尔回摘要页或错误页）
+    title: str = Field(default="", max_length=300)
+
+
 class FeedbackRequest(BaseModel):
     """推荐反馈：up / down，传空串表示取消。"""
 
@@ -1632,9 +1801,12 @@ async def library_download(req: DownloadRequest) -> dict:
     }
 
 
-@app.post("/paper/{filename}/references/download", summary="批量下载参考文献入库（1.4.1）")
-async def paper_references_download(filename: str, req: ReferenceDownloadRequest) -> dict:
-    """按正文引用次数挑重点参考文献下载。
+def _rank_references(filename: str, min_cites: int) -> tuple[list[dict], dict[int, int], str]:
+    """挑出"值得下载的重点参考文献"，**只挑不下**。
+
+    返回 (按本文引用次数降序的候选, 正文引用计数表, arXiv 号)。
+    抽成独立函数是因为「先出推荐列表、再逐篇下载」和「一次性批量下载」要挑出
+    完全一样的一批 —— 两边各写一份迟早会漂。
 
     顺序对齐的前提：Semantic Scholar 返回的引用列表顺序 ≈ 论文里的编号顺序，
     所以用 `[n]` 的计数去给第 n 条加权。对不齐时最坏是"重点挑偏"，不会下错文件
@@ -1648,7 +1820,7 @@ async def paper_references_download(filename: str, req: ReferenceDownloadRequest
         raise HTTPException(status_code=400, detail="这篇论文不是 arXiv 来源，取不到参考文献关系")
 
     try:
-        rows = await run_in_threadpool(references, arxiv_id, 40)
+        rows = references(arxiv_id, 40)
     except OnlineError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from None
 
@@ -1659,19 +1831,216 @@ async def paper_references_download(filename: str, req: ReferenceDownloadRequest
     except Exception:
         logger.exception("数引用次数时读 PDF 失败：%s", filename)
     counts = citation_counts(text)
+    # 数字体数不出来时，改用「作者姓氏 + 年份」给同一条引用加权。
+    # 为什么必须回退：实测库里 2/3 的论文用作者-年份体（Llama 2 全是
+    # "(Scao et al., 2022)"、ViT 是 "(Vaswani et al., 2017)"、Layer Normalization 是
+    # "[Krizhevsky et al., 2012]"、PPO 是 "[Bel+15]"），只认数字体时这些论文的候选
+    # 会被 min_cites 全部过滤成空，用户看到「候选 0 篇」而 S2 明明给了 40 条。
+    ay_counts = author_year_counts(text)
+    # 判据不是「有没有数到」而是「数到的够不够」：数字体常常只零星命中几处
+    # （比如正文里恰好有个 [1]），此时全部候选都低于阈值，同样需要回退。
+    picked = counts
+    if sum(1 for v in counts.values() if v >= min_cites) < RANK_MIN_HITS and ay_counts:
+        picked = {"author_year": ay_counts}  # type: ignore[assignment]
 
     ranked: list[dict] = []
     for index, row in enumerate(rows):
-        # S2 列表第 1 条 ≈ 正文 [1]
-        count = counts.get(index + 1, 0)
-        if count < req.min_cites:
-            continue
         if not row.get("arxiv_id"):
+            continue
+        if "author_year" in picked:
+            # 用这一条引用的第一作者姓氏 + 年份去正文里找提及次数
+            authors = row.get("authors") or []
+            surname = str(authors[0]).split()[-1] if authors else ""
+            year = str(int(row.get("year") or 0))
+            count = picked["author_year"].get((surname, year), 0)  # type: ignore[index]
+            if not count:
+                # 缩写体对不上全名时的兜底，两种情况：
+                #   [Mni+15] / [Bel+15]  -> 缩写是姓氏前缀
+                #   (RWC, 2019)          -> 前三作者首字母拼接
+                for (key_name, key_year), times in picked["author_year"].items():  # type: ignore[union-attr]
+                    if key_year != year:
+                        continue
+                    if _surname_matches(key_name, surname):
+                        count = times
+                        break
+                    joined = "".join(_initials_of(str(a).split()[-1]) for a in authors[: len(key_name)])
+                    if key_name.upper() == joined:
+                        count = times
+                        break
+        else:
+            # S2 列表第 1 条 ≈ 正文 [1]
+            count = picked.get(index + 1, 0)
+        if count < min_cites:
             continue
         item = dict(row)
         item["cites"] = count
         ranked.append(item)
     ranked.sort(key=lambda item: item["cites"], reverse=True)
+    return ranked, picked, arxiv_id
+
+
+def _fallback_reason(item: dict) -> str:
+    """不调模型时的理由：只说客观数字，不编内容。"""
+    parts = [f"本文正文引用 {item['cites']} 次"]
+    cited_by = int(item.get("cited_by") or 0)
+    if cited_by:
+        parts.append(f"Semantic Scholar 上被引 {cited_by} 次")
+    year = int(item.get("year") or 0)
+    if year:
+        parts.append(f"{year} 年")
+    return " · ".join(parts)
+
+
+_REASON_CACHE: dict[str, str] = {}
+
+# 数字体至少要数出这么多条「达标引用」才认为它可用，否则改用作者-年份对齐。
+# 定 2 是因为默认 min_cites 就是 2：只数到 1 条达标引用时，候选列表注定被削到 1 条，
+# 而作者-年份那条路通常能给到十几二十条，明显更有参考价值。
+RANK_MIN_HITS = 2
+
+
+async def _reference_reason(source_title: str, item: dict) -> str:
+    """让模型用一句话说清"这篇为什么值得读"，失败就回落到客观数字。
+
+    这里**绝不能抛异常**：理由只是锦上添花，配置没填 Key、额度用完、上游超时
+    都不该让整个推荐列表 500。所以外面包一层 try，任何异常都走 fallback。
+    """
+    fallback = _fallback_reason(item)
+    title = str(item.get("title") or "").strip()
+    if not title:
+        return fallback
+    key = f"{title}|{item.get('cites')}|{item.get('cited_by')}"
+    if key in _REASON_CACHE:
+        return _REASON_CACHE[key]
+
+    abstract = str(item.get("abstract") or "").strip()[:600]
+    prompt = (
+        f"我正在读《{source_title or '一篇论文'}》，它反复引用了下面这篇参考文献。\n"
+        f"标题：{title}\n"
+        f"年份：{item.get('year') or '未知'}\n"
+        f"本文正文引用次数：{item.get('cites')} 次\n"
+        f"Semantic Scholar 被引：{item.get('cited_by') or 0} 次\n"
+        f"摘要（可能有截断）：{abstract or '（无摘要）'}\n\n"
+        "请用一句中文（30~50 字，不要分点、不要客套）说明：它大概解决什么问题、"
+        "为什么值得顺着它继续读。只输出这一句。"
+    )
+    try:
+        answer = await llm_chat(
+            [
+                {"role": "system", "content": "你是科研文献助手，回答简洁、只讲事实，不编造论文内容。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
+            max_tokens=120,
+        )
+    except Exception as exc:  # 理由失败不影响推荐列表
+        logger.warning("生成参考文献推荐理由失败（%s），改用客观数字：%s", title[:40], exc)
+        return fallback
+    reason = " ".join(str(answer or "").split())[:160]
+    if not reason:
+        return fallback
+    if len(_REASON_CACHE) > 500:  # 简单有界，避免长跑后无限增长
+        _REASON_CACHE.clear()
+    _REASON_CACHE[key] = reason
+    return reason
+
+
+@app.get("/paper/{filename}/references/plan", summary="参考文献推荐列表（只挑不下，1.4.1）")
+async def paper_references_plan(
+    filename: str,
+    limit: int = Query(default=5, ge=1, le=20),
+    min_cites: int = Query(default=2, ge=1, le=30),
+) -> dict:
+    """先只挑不下，把候选和"为什么值得读"一起返回，由前端逐篇点下载。"""
+    ranked, _counts, arxiv_id = await run_in_threadpool(_rank_references, filename, min_cites)
+    known = {row["arxiv_id"] for row in library_rows() if row["arxiv_id"]}
+    picked = ranked[:limit]
+
+    source_title = ""
+    source_row = next((row for row in library_rows() if row["filename"] == filename), None)
+    if source_row:
+        source_title = str(source_row.get("title") or "")
+
+    items: list[dict] = []
+    for item in picked:
+        reason = await _reference_reason(source_title, item)
+        items.append(
+            {
+                "arxiv_id": item["arxiv_id"],
+                "title": item.get("title") or "",
+                "year": int(item.get("year") or 0),
+                "cites": item["cites"],
+                "cited_by": int(item.get("cited_by") or 0),
+                "url": item.get("url") or "",
+                "in_library": item["arxiv_id"] in known,
+                "reason": reason,
+            }
+        )
+
+    return {
+        "filename": filename,
+        "arxiv_id": arxiv_id,
+        "min_cites": min_cites,
+        "candidates": len(ranked),
+        "items": items,
+    }
+
+
+@app.post("/paper/{filename}/references/download-one", summary="下载单篇参考文献入库（1.4.1）")
+async def paper_references_download_one(filename: str, req: ReferenceOneRequest) -> dict:
+    """按 arXiv 号下载一篇参考文献入库。
+
+    为什么不用 ``/library/download?query=<arxiv_id>``：那条路会再走一遍
+    arXiv 搜索去取标题，用来做 `_looks_like_paper` 的标题核对；而推荐列表里
+    已经有 S2 给的准确标题，再搜一次既慢又可能搜到别的版本。这里直接按号下。
+    """
+    if safe_paper_path(filename) is None:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    ref_id = arxiv_id_of(req.arxiv_id) or req.arxiv_id.strip()
+    if not ref_id:
+        raise HTTPException(status_code=400, detail="缺少 arXiv 编号")
+
+    known = {row["arxiv_id"] for row in library_rows() if row["arxiv_id"]}
+    if ref_id in known:
+        return {"arxiv_id": ref_id, "status": "已有", "downloaded": False}
+
+    tmp = PAPERS_DIR / f".download_{ref_id}.pdf"
+    try:
+        await run_in_threadpool(download_pdf, ref_id, tmp)
+        if not _looks_like_paper(tmp, req.title or ""):
+            raise HTTPException(status_code=422, detail="下载到的不是有效论文（页数太少或标题对不上），已丢弃")
+        data = tmp.read_bytes()
+    except OnlineError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    paper, dup, _score = await run_in_threadpool(save_paper, f"{ref_id}.pdf", data)
+    structure = get_structure(paper.paper_id)
+    if structure:
+        merge_structure(paper.filename, structure)
+    indexed = 0
+    try:
+        saved_path = paper_path(paper.paper_id)
+        if saved_path is not None:
+            indexed = await run_in_threadpool(index_paper, str(saved_path), paper.filename)
+    except Exception:
+        logger.exception("参考文献入库失败：%s", ref_id)
+
+    return {
+        "arxiv_id": ref_id,
+        "status": "已入库",
+        "downloaded": True,
+        "filename": paper.filename,
+        "indexed": indexed,
+        "duplicate_hit": dup.filename if dup else "",
+    }
+
+
+@app.post("/paper/{filename}/references/download", summary="批量下载参考文献入库（1.4.1）")
+async def paper_references_download(filename: str, req: ReferenceDownloadRequest) -> dict:
+    """按正文引用次数挑重点参考文献下载。"""
+    ranked, counts, arxiv_id = await run_in_threadpool(_rank_references, filename, req.min_cites)
 
     known = {row["arxiv_id"] for row in library_rows() if row["arxiv_id"]}
     picked = ranked[: req.limit]
