@@ -613,12 +613,21 @@ class NarrativeRequest(BaseModel):
     """POST /graph/survey/narrative 的请求体。
 
     focus 与 GET /graph/survey 同义：给某个主题名时只综述该主题。
-    这里不传论文列表，因为综述永远基于整张图谱（全库或局域）——
-    局域图谱请先把局域结果当作 view 再调，前端传的是「哪个 view」这件事的
-    后端等价物就是 focus，其余口径由图谱自身决定。
+
+    filenames：用户勾选的那批论文（库内真实文件名）。空表示全库。
+    为什么现在要传论文列表：赛题 1.5.2 是「上传一个方向的 20 篇 PDF，
+    用这批论文内部的关系做综述」，所以综述的输入范围必须能被前端收窄。
+    匹配口径是节点的 ``copies``（真实文件名）而不是 canonical_id：
+    用户认的是 ``1706.03762v7.pdf``，而节点 id 是规范化后的 ``arxiv:1706.03762``，
+    且一个节点可能挂多份副本（v1/v7/扫描件），勾任意一份都该把它带进来。
     """
 
     focus: str = Field(default="", max_length=64, description="主题名，留空综述全库")
+    filenames: list[str] = Field(
+        default_factory=list,
+        max_length=200,
+        description="只综述这批论文（库内文件名）；空表示全库",
+    )
 
 
 def trim_history(history: list[dict] | None) -> list[dict]:
@@ -2216,17 +2225,23 @@ async def citation_graph(limit_reviews: int = 60) -> dict:
 
 
 @app.get("/graph/survey", summary="自动综述（1.5.3）")
-async def graph_survey(focus: str = "") -> dict:
+async def graph_survey(focus: str = "", filenames: str = Query(default="")) -> dict:
     """基于引用图谱自动生成领域综述。
 
     `focus` 传某个主题名（如「模型架构」）时只综述该主题，不传则综述全库。
+    `filenames` 传逗号分隔的库内文件名时只综述这批论文，不传则综述全库。
     每一句都带具体数字和论文标题，可回溯到图上，不调外部大模型也不会有幻觉引用。
+
+    为什么 filenames 是逗号分隔的字符串而不是 list：GET 端点用重复 query
+    （`?filenames=a&filenames=b`）也要 FastAPI 声明成 list 才认，而前端拼 URL
+    时用逗号更省事；两个 SSE 端点走 JSON body 才用真正的 list。
     """
+    wanted = [s.strip() for s in filenames.split(",") if s.strip()]
     raw = await run_in_threadpool(load_graph)
     if not raw:
         return {"ready": False, "detail": "图谱缓存还没生成，请先运行 python scripts/build_graph.py"}
     view = await run_in_threadpool(graph_view, raw)
-    return await run_in_threadpool(survey, view, focus)
+    return await run_in_threadpool(survey, view, focus, wanted)
 
 
 @app.get("/graph/frontier", summary="前沿探索（1.5.4）")
@@ -2265,7 +2280,7 @@ async def graph_survey_narrative(req: NarrativeRequest) -> StreamingResponse:
                 yield narrative.encode_event({"type": "done"})
                 return
             view = await run_in_threadpool(graph_view, raw)
-            data = await run_in_threadpool(survey, view, req.focus)
+            data = await run_in_threadpool(survey, view, req.focus, req.filenames)
             if not data.get("ready"):
                 yield narrative.encode_event(
                     {"type": "error", "message": data.get("detail") or "图谱为空，无法生成综述"}
@@ -2293,7 +2308,7 @@ async def graph_survey_narrative(req: NarrativeRequest) -> StreamingResponse:
     )
 
 
-def _extract_library_future_work() -> list[dict]:
+def _extract_library_future_work(filenames: list[str] | None = None) -> list[dict]:
     """逐篇抽作者自述的 Future Work / Limitations，返回每条都带 extraction_status 的列表。
 
     为什么单独抽成函数、并且必须在线程池里跑：
@@ -2307,12 +2322,19 @@ def _extract_library_future_work() -> list[dict]:
         与其把抽不到的论文悄悄丢掉、只展示成功案例，不如原样返回
         status=no_section / no_valid_sentence / parse_error，
         答辩时点开统计就能说清「系统怎么处理信息缺失」。
+
+    filenames：只抽这批论文（与 /graph/survey/narrative 的 filenames 同口径）。
+        None 或空表示全库。勾了但库里没有对应解析结果的名字会被忽略——
+        它们本来也抽不出东西，硬塞一条 parse_error 只会让统计数字失真。
     """
     structures = load_structures()
     if not structures:
         return []
+    wanted = {str(f).strip() for f in (filenames or []) if str(f).strip()}
     items: list[dict] = []
     for filename, structure in structures.items():
+        if wanted and filename not in wanted:
+            continue
         path = PAPERS_DIR / filename
         if not path.exists():
             # 库里有解析结果但 PDF 不见了（迁移/手动删过），如实记成解析失败
@@ -2344,8 +2366,24 @@ def _extract_library_future_work() -> list[dict]:
     return items
 
 
+class DirectionsRequest(BaseModel):
+    """POST /graph/directions 的请求体。
+
+    filenames：只从这批论文里抽 Future Work / Limitations。空表示全库。
+    方向归纳用的仍是整张图谱的缺口（桥接 / 孤岛 / 低被引）——
+    缺口说的是「这个方向的边界在哪」，而证据必须来自用户选的那批论文，
+    两者口径不同，不能一起收窄，否则选得少的时候方向会退化成「无缺口」。
+    """
+
+    filenames: list[str] = Field(
+        default_factory=list,
+        max_length=200,
+        description="只抽取这批论文（库内文件名）；空表示全库",
+    )
+
+
 @app.post("/graph/directions", summary="未来工作探索（1.5.4，SSE）")
-async def graph_directions() -> StreamingResponse:
+async def graph_directions(req: DirectionsRequest | None = None) -> StreamingResponse:
     """从论文库抽作者自述的 Future Work / Limitations，结合图谱缺口归纳方向，再查库外最新论文。
 
     这条流水线里有两处要跟外部打交道，都是「失败也要如实说」的地方：
@@ -2355,7 +2393,10 @@ async def graph_directions() -> StreamingResponse:
         2. 判重：只查 arXiv 一个来源，检索词由方向描述生成，召回必然不全。
            所以结论只分「可能已被做过」「没检索到」「判断不了」，
            **任何情况下都不会说「原创」**——这步的职责是排雷，不是认证。
+
+    req 允许为 None：老前端不带请求体调这个端点时要照旧能用。
     """
+    wanted = list(req.filenames) if req else []
 
     async def event_generator():
         try:
@@ -2369,7 +2410,7 @@ async def graph_directions() -> StreamingResponse:
             view = await run_in_threadpool(graph_view, raw)
             # 抽取要逐篇开 PDF 抽文字，几十篇就是几秒到十几秒，必须放线程池，
             # 否则会卡住整个事件循环、连心跳都发不出去。
-            extractions = await run_in_threadpool(_extract_library_future_work)
+            extractions = await run_in_threadpool(_extract_library_future_work, wanted)
             async for chunk in sse_with_heartbeat(
                 future_work.direction_events(view, extractions)
             ):

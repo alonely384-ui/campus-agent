@@ -184,6 +184,42 @@
     .dir-verdict--notfound { background: #ecfdf3; color: #027a48; }
     .dir-verdict--unknown { background: var(--bg-muted); color: var(--text-subtle); }
     .dir-reason { font-size: 12.5px; line-height: 1.85; color: var(--text-secondary); margin-top: 7px; }
+
+    /* ---------- 分析范围（选片） ---------- */
+    .scope-card { position: sticky; top: 0; z-index: 5; }
+    .scope-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .scope-bar input[type=text] {
+      flex: 1 1 240px; min-width: 0; padding: 6px 10px;
+      border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+      background: var(--bg-surface); color: var(--text-primary); font-size: 12.5px;
+    }
+    .scope-bar input[type=text]:focus { outline: none; border-color: var(--border-focus); }
+    .scope-up { display: inline-flex; }
+    .scope-up-btn {
+      display: inline-block; padding: 6px 12px; font-size: 12.5px; cursor: pointer;
+      border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
+      color: var(--text-secondary); background: transparent;
+    }
+    .scope-up-btn:hover { background: var(--bg-muted); }
+    .scope-count {
+      font-size: 12px; color: var(--text-secondary); margin-left: auto;
+      font-variant-numeric: tabular-nums;
+    }
+    .scope-list {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 4px 14px; max-height: 190px; overflow-y: auto;
+      padding: 6px 2px; border-top: 1px solid var(--border-color-alt);
+    }
+    .scope-list:empty { display: none; }
+    .scope-item {
+      display: flex; align-items: baseline; gap: 7px;
+      font-size: 12.5px; line-height: 1.7; cursor: pointer; padding: 2px 0;
+    }
+    .scope-item input { flex-shrink: 0; margin: 0; }
+    .scope-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .scope-item:hover span { color: var(--brand); }
+    .scope-hint { font-size: 12px; color: var(--text-subtle); line-height: 1.7; margin-top: 6px; }
+    .scope-hint.err { color: var(--danger, #b42318); }
   </style>
 </head>
 <body>
@@ -203,6 +239,27 @@
   </header>
 
   <main>
+    <!-- 论文范围：本页三个标签页（自动综述 / 论述版综述 / 未来工作探索）共用同一份输入。
+         口径与图谱页的「局域图谱」一致——先选一批论文，再在这批论文内部做分析。
+         不勾任何论文 = 全库，与改造前的行为完全一样。 -->
+    <div class="card scope-card">
+      <h2>分析范围
+        <span class="sub">勾选的论文是本页三个标签页共同的输入；一篇都不勾就是整个论文库</span>
+      </h2>
+      <div class="scope-bar">
+        <input type="text" id="scopeFilter" placeholder="按标题 / 文件名筛选…" autocomplete="off">
+        <button class="act ghost-btn" id="scopeAll">全选</button>
+        <button class="act ghost-btn" id="scopeNone">清空</button>
+        <label class="scope-up">
+          <input type="file" id="scopeUpload" accept="application/pdf" multiple hidden>
+          <span class="scope-up-btn">上传 PDF 一并分析</span>
+        </label>
+        <span class="scope-count" id="scopeCount"></span>
+      </div>
+      <div class="scope-list" id="scopeList"></div>
+      <div class="scope-hint" id="scopeHint">正在读取论文列表…</div>
+    </div>
+
     <div id="loading">正在读取图谱数据…</div>
 
     <!-- 自动综述 -->
@@ -311,6 +368,135 @@
     let surveyData = null;
     let frontierData = null;
     let chart = null;
+
+    // ---------- 分析范围 ----------
+    // 本页三个标签页共用一份选片：自动综述（模板版）、论述版综述、未来工作探索。
+    // 为什么用 Set 存文件名而不是节点 id：用户在图谱/论文列表里认的是文件名
+    // （1706.03762v7.pdf），而节点的 canonical id 是规范化后的 arxiv:1706.03762，
+    // 且一个节点可能挂多份副本（v1/v7/扫描件）。后端 survey() 与
+    // _extract_library_future_work() 都按 copies 逐份文件名比对，勾任意一份都能命中。
+    let scopeFiles = [];        // [{filename, title}]
+    let scopePicked = new Set(); // 勾中的文件名
+    let scopeLoaded = false;
+
+    function scopePickedList() {
+      // 保持库内顺序，便于肉眼核对，也便于探针断言
+      return scopeFiles.filter(f => scopePicked.has(f.filename)).map(f => f.filename);
+    }
+
+    function scopeIsAll() {
+      // 全选与「还没读到列表」都算全库：后者是降级路径，不能因为列表接口挂了就没法分析
+      if (!scopeLoaded || !scopeFiles.length) return true;
+      return scopePicked.size === scopeFiles.length;
+    }
+
+    // 拼进请求的查询串 / 请求体：全选和不选都发空数组（= 全库），
+    // 这样后端只有一种「全库」语义，不会出现「全选」和「不勾」走两条分支。
+    function scopeArg() {
+      return scopeIsAll() ? [] : scopePickedList();
+    }
+
+    function renderScope() {
+      const kw = ($('scopeFilter').value || '').trim().toLowerCase();
+      const list = $('scopeList');
+      const shown = scopeFiles.filter(f => {
+        if (!kw) return true;
+        return (f.title || '').toLowerCase().includes(kw)
+          || (f.filename || '').toLowerCase().includes(kw);
+      });
+      list.innerHTML = shown.map(f => `
+        <label class="scope-item">
+          <input type="checkbox" data-file="${esc(f.filename)}"${scopePicked.has(f.filename) ? ' checked' : ''}>
+          <span title="${esc(f.filename)}">${esc(f.title || f.filename)}</span>
+        </label>`).join('');
+      const total = scopeFiles.length;
+      const picked = scopePicked.size;
+      $('scopeCount').textContent = total
+        ? (picked === total ? `全部 ${total} 篇（= 全库）` : `已选 ${picked} / ${total} 篇`)
+        : '';
+    }
+
+    function scopeHint(text, isErr) {
+      const el = $('scopeHint');
+      el.textContent = text || '';
+      el.classList.toggle('err', !!isErr);
+    }
+
+    async function loadScope() {
+      try {
+        const d = await getJSON('/papers/files?meta=true');
+        const files = (d.files || []).filter(f => (f.filename || '').toLowerCase().endsWith('.pdf'));
+        scopeFiles = files.map(f => ({ filename: f.filename, title: f.title || '' }));
+        // 默认全选：与改造前「全库综述」的行为一致，用户不动就是原来的样子
+        scopePicked = new Set(scopeFiles.map(f => f.filename));
+        scopeLoaded = true;
+        renderScope();
+        scopeHint(scopeFiles.length
+          ? '默认全选，等于原来的全库分析。取消掉一部分，三个标签页就只在这批论文里做。'
+          : '论文库还是空的，先去阅读页上传 PDF。', !scopeFiles.length);
+      } catch (e) {
+        scopeLoaded = false;
+        scopeHint('论文列表读取失败：' + e.message, true);
+      }
+    }
+
+    // 勾选变化后，已经算好的综述作废——它对应的是旧范围
+    function onScopeChanged() {
+      renderScope();
+      if (surveyData) { surveyData = null; load('survey'); }
+      narMsg('范围变了，请重新生成论述版综述。');
+      dirMsg('范围变了，请重新探索方向。');
+    }
+
+    $('scopeList').addEventListener('change', (e) => {
+      const box = e.target.closest('input[type=checkbox]');
+      if (!box) return;
+      if (box.checked) scopePicked.add(box.dataset.file);
+      else scopePicked.delete(box.dataset.file);
+      onScopeChanged();
+    });
+    $('scopeFilter').addEventListener('input', renderScope);
+    $('scopeAll').addEventListener('click', () => {
+      scopePicked = new Set(scopeFiles.map(f => f.filename));
+      onScopeChanged();
+    });
+    $('scopeNone').addEventListener('click', () => {
+      scopePicked.clear();
+      onScopeChanged();
+    });
+    // 上传即入库：走 /papers/upload（不是 /upload——后者只把文件丢进 data/uploads/，
+    // 不解析、不进库，综述和方向都读不到它）。/papers/upload 会保存 + 解析 + 入库，
+    // 入库完刷新列表并自动勾上——用户上传的 PDF 就是要拿来分析的，不用再点一次。
+    $('scopeUpload').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      const fd = new FormData();
+      files.forEach(f => fd.append('files', f));
+      scopeHint(`正在上传并解析 ${files.length} 篇…`);
+      let added = [];
+      try {
+        const r = await fetch('/papers/upload', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        added = (d.results || []).filter(x => x.filename && !x.error).map(x => x.filename);
+        const failed = (d.results || []).filter(x => x.error);
+        if (failed.length) {
+          scopeHint(`有 ${failed.length} 篇没能入库：` + failed.map(x => x.error).join('；'), true);
+        }
+      } catch (err) {
+        scopeHint('上传失败：' + err.message, true);
+        e.target.value = '';
+        return;
+      }
+      e.target.value = '';
+      await loadScope();
+      // 新入库的论文出现在列表里，但要重新勾上它们：
+      // loadScope 会把选片重置成全选，这里再把「这次上传的」显式并入。
+      // 若原来是部分选中，保留用户原来的选择 + 新上传的这批，不做全选。
+      added.forEach(n => { if (scopeFiles.some(f => f.filename === n)) scopePicked.add(n); });
+      onScopeChanged();
+      if (added.length) scopeHint(`已入库并勾选 ${added.length} 篇。`);
+    });
 
     function $(id) { return document.getElementById(id); }
 
@@ -451,7 +637,11 @@
       try {
         if (which === 'survey') {
           const focus = $('focus').value;
-          surveyData = await getJSON('/graph/survey' + (focus ? '?focus=' + encodeURIComponent(focus) : ''));
+          const files = scopeArg();
+          const qs = [];
+          if (focus) qs.push('focus=' + encodeURIComponent(focus));
+          if (files.length) qs.push('filenames=' + encodeURIComponent(files.join(',')));
+          surveyData = await getJSON('/graph/survey' + (qs.length ? '?' + qs.join('&') : ''));
           if (!surveyData.ready) throw new Error(surveyData.detail || '综述生成失败');
           renderSurvey();
           // 主题下拉只装一次
@@ -693,7 +883,7 @@
         const r = await fetch('/graph/survey/narrative', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ focus: $('focus').value || '' }),
+          body: JSON.stringify({ focus: $('focus').value || '', filenames: scopeArg() }),
           signal: narCtl.signal
         });
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -951,7 +1141,7 @@
         const r = await fetch('/graph/directions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: '{}',
+          body: JSON.stringify({ filenames: scopeArg() }),
           signal: dirCtl.signal
         });
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1009,7 +1199,11 @@
     $('dirRun').addEventListener('click', runDirections);
     $('dirStop').addEventListener('click', () => { if (dirCtl) dirCtl.abort(); });
 
-    switchTab('survey');
+    // 先拿论文列表再切页：switchTab('survey') 会立刻调 load('survey')，
+    // 而那时如果选片还没就绪，综述就会按「全库」算一遍、随后又要重算一次。
+    // loadScope() 失败也不拦人——scopeLoaded 为 false 时 scopeArg() 返回空 = 全库，
+    // 退化成改造前的行为，而不是让整页卡在「加载中」。
+    loadScope().finally(() => { switchTab('survey'); });
 
     // 划词翻译：挂到综述和前沿探索的正文区。选中一段英文，鼠标旁就浮出「译」。
     // 和阅读器里的划词是同一套交互，代码共用 quick-translate.js。

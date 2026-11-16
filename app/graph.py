@@ -2428,7 +2428,11 @@ def _first_sentence(text: str, limit: int = 180) -> str:
     return head if len(head) <= limit else head[: limit - 1].rstrip() + "…"
 
 
-def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
+def survey(
+    view: dict[str, Any],
+    focus: str = "",
+    filenames: list[str] | None = None,
+) -> dict[str, Any]:
     """自动综述（赛题 1.5.3）：用图结构 + 元数据拼出一份有据可查的领域综述。
 
     设计取舍——为什么是「模板 + 图谱事实」而不是「丢给大模型写」：
@@ -2437,6 +2441,11 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
         文本里所有括号内数字都是当场从图里算出来的，没有一个字符是编的。
 
     focus: 可选，给某个主题名时只综述该主题（按 catalog 的 category 过滤）。
+    filenames: 可选，只综述这批文件。None 或空表示全库。
+        为什么按节点 ``copies``（真实文件名）匹配而不是按 canonical_id 匹配：
+        用户勾的是论文库里的文件名（``1706.03762v7.pdf``），而节点 id 是规范化后的
+        ``arxiv:1706.03762``；同一个节点还可能挂着多份副本（v1/v7/扫描件），
+        勾其中任意一份都应该把这个节点带进来。
     """
     nodes = list(view.get("nodes") or [])
     edges = list(view.get("edges") or [])
@@ -2449,17 +2458,31 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
         m = node_meta(n["id"], n["title"], n.get("arxiv_id", ""))
         enriched.append({**n, **m})
 
+    # 2) 先按勾选范围收窄，再按主题收窄。
+    #    顺序不能反：主题过滤命中不了时会退回全库，那样会把范围外的论文带回来。
+    scoped = enriched
+    wanted = [str(f).strip() for f in (filenames or []) if str(f).strip()]
+    if wanted:
+        want = set(wanted)
+        scoped = [n for n in enriched if want & set(n.get("copies") or [])]
+        if not scoped:
+            # 勾的名字一个都对不上，如实报错，不要偷偷退回全库冒充「已按你选的分析」
+            return {
+                "ready": False,
+                "detail": f"勾选的 {len(wanted)} 篇在引用关系图里一个都找不到，无法生成综述",
+            }
+
     if focus:
-        pool = [n for n in enriched if n.get("category") == focus]
+        pool = [n for n in scoped if n.get("category") == focus]
         if not pool:
-            pool = enriched  # 主题名对不上就退回全库，不返回空综述
+            pool = scoped  # 主题名对不上就退回本次范围，不返回空综述
     else:
-        pool = enriched
+        pool = scoped
 
     ids = {n["id"] for n in pool}
     pool_edges = [e for e in edges if e["source"] in ids and e["target"] in ids]
 
-    # 2) 主题聚类：直接沿用图中的社区划分，再按占比排序
+    # 3) 主题聚类：直接沿用图中的社区划分，再按占比排序
     comm_of: dict[int, list[dict]] = defaultdict(list)
     for n in pool:
         comm_of[n["community"]].append(n)
@@ -2480,7 +2503,7 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
         )
     clusters.sort(key=lambda c: -c["size"])
 
-    # 3) 发展脉络：按年份分组
+    # 4) 发展脉络：按年份分组
     timeline: dict[int, list[dict]] = defaultdict(list)
     for n in pool:
         if n.get("year"):
@@ -2496,12 +2519,12 @@ def survey(view: dict[str, Any], focus: str = "") -> dict[str, Any]:
             }
         )
 
-    # 4) 代表性工作：基石分前几名
+    # 5) 代表性工作：基石分前几名
     reps = sorted(
         (n for n in pool if n.get("cornerstone_rank")), key=lambda x: x["cornerstone_rank"]
     )[:5]
 
-    # 5) 枢纽与边缘
+    # 6) 枢纽与边缘
     hubs = sorted(pool, key=lambda x: (-x["cited_by"], -x["pagerank"]))[:3]
     fringe = [n for n in pool if n.get("role") in ("fringe", "isolated")]
     fringe.sort(key=lambda x: (-(x.get("year") or 0), -x["pagerank"]))
