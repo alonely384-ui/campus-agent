@@ -80,6 +80,8 @@
     .ans-tail--empty { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-fold { display: flex; flex-direction: column; gap: 10px; }
     .ans-fold[hidden] { display: none; }
+    /* 没有内容的段（模型没给这一段）不占位、不留空标签 */
+    .ans-part[hidden] { display: none; }
     /* 流式期间【下一步】还没流出来时挂这个类，先写「正在生成…」 */
     .ans-tail--pending { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-part__body { white-space: pre-wrap; font-size: 14px; color: var(--text-secondary); }
@@ -573,7 +575,7 @@ async function send() {
   botEl.className = 'msg bot';
   chatEl.appendChild(botEl);
   chatEl.scrollTop = chatEl.scrollHeight;
-  // 2026-11-16 用户反馈「多篇对话中没显示结论」：原来流式期间写纯文本、结束才 renderAnswer，
+  // 2026-11-16 用户反馈「多篇对话中没显示结论」：原来流式期间写纯文本、结束才切段渲染，
   // 现在从一开始就走同一个流式渲染器，【结论】一出来就在最上面。
   const streamAns = ChatCore.streamAnswer(botEl);
   let answer = '';
@@ -620,8 +622,9 @@ async function send() {
     if (!answer) botEl.textContent = '（没有返回内容）';
     else streamAns.finish();
     streamAns.stop();
-    const rolesBox = roleItems.length ? ChatCore.renderRoles(botEl, roleItems, statusText) : null;
-    ChatCore.renderEvidence(rolesBox || botEl, evidenceItems);
+    // 多智能体协作并进回答折叠区（与 index.html 同口径，2026-11-16 用户要求）
+    streamAns.foldRoles(roleItems, statusText);
+    ChatCore.renderEvidence(botEl, evidenceItems);
     statusEl.textContent = `本次对比 ${picked.length} 篇 · 证据 ${evidenceItems.length} 条`;
     statusEl.className = 'cmp-dock__status';
   } catch (e) {

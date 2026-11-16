@@ -11,26 +11,37 @@
 (function () {
   'use strict';
 
-  // 回答分段标题。后端 app/agent.py:84-91 已固定要求模型输出这四个标题，
+  // 回答分段标题。后端 app/agent.py 已固定要求模型输出这四个标题，
   // 顺序也固定为 结论 → 依据 → 局限 → 下一步，所以这里按这四个认。
+  // 「其他」不是模型给的标题，是四个标题之外的零散内容（开场白之类）的兜底桶。
   var SECTIONS = [
     { key: 'conclusion', label: '结论' },
     { key: 'basis', label: '依据' },
     { key: 'limits', label: '局限' },
     { key: 'next', label: '下一步' },
+    { key: 'rest', label: '其他' },
   ];
   var LABEL_TO_KEY = {};
   SECTIONS.forEach(function (s) { LABEL_TO_KEY[s.label] = s.key; });
 
-  // 默认外露的两段：用户要的「首尾」，其他隐藏。
+  // 段落标题：行内任意位置都认（2026-11-16 实测模型把【结论】【依据】挤在同一行，
+  // 只认「整行只有一个标题」的写法会把两段全吞进「其他」里，结论区就成了空标签）。
+  // 方括号里只收 1~8 个汉字，正文里的 [来源: …] 这类引用标记不会被误认成标题。
+  var SECTION_TAG_RE = /[【\[]\s*([^】\]\s]{1,8}?)\s*[】\]]\s*[:：]?\s*/g;
+
+  // 外露的两段：用户要的「首尾」，其他（含依据/局限/其他/协作）全部折叠。
   var VISIBLE_KEYS = ['conclusion', 'next'];
   // 证据卡片默认显示几条，其余收进「展开全部」。
   var EVIDENCE_PREVIEW = 3;
 
   function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
+    return str(s).replace(/[&<>"']/g, function (c) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
     });
+  }
+
+  function str(s) {
+    return s == null ? '' : String(s);
   }
 
   // ---------- Markdown 表格 ----------
@@ -95,101 +106,219 @@
    * 把回答切成 {conclusion, basis, limits, next, rest}。
    *
    * 容错规则（模型不一定听话，这里必须能优雅降级）：
-   *   1) 只认段首的【标题】（允许前后有空白或 # 井号），正文里出现的方括号词不算；
-   *   2) 四个标题一个都没认出来 → conclusion 回落成整段原文，其余为空；
-   *   3) 认出来了但缺某段 → 那一段留空，调用方据此不画对应的折叠按钮。
+   *   1) 认【标题】，行内任意位置都算标题起点，标题后的文字属于该段；
+   *   2) 第一个标题出现之前的内容是「开场白」，并进结论（归到「其他」会被藏起来，
+   *      而中文回答里"推荐 X 这篇"这种结论经常就写在开头）；
+   *   3) 四个标题一个都没认出来 → conclusion 回落成整段原文；
+   *   4) 认出来了但某段没内容 → 那一段留空，调用方据此不画空壳。
    */
   function splitSections(text) {
     var out = { conclusion: '', basis: '', limits: '', next: '', rest: '' };
-    var lines = String(text || '').split('\n');
-    var cur = null;
     var buckets = {};
-    var headRe = /^\s*(?:#{1,6}\s*)?[【\[]([^】\]]{1,8})[】\]]\s*:?\s*$/;
-    lines.forEach(function (line) {
-      var m = line.match(headRe);
-      if (m && LABEL_TO_KEY[m[1].trim()]) {
-        cur = LABEL_TO_KEY[m[1].trim()];
+    var cur = null;
+    str(text).split('\n').forEach(function (line) {
+      var kept = '';
+      var from = 0;
+      var m;
+      SECTION_TAG_RE.lastIndex = 0;
+      while ((m = SECTION_TAG_RE.exec(line))) {
+        var key = LABEL_TO_KEY[m[1]];
+        if (!key) continue;                     // [来源: …] 之类的方括号词，当正文
+        kept += line.slice(from, m.index);
+        if (cur) buckets[cur].push(kept);
+        else out.conclusion += kept + '\n';
+        kept = '';
+        cur = key;
         buckets[cur] = buckets[cur] || [];
-        return;
+        from = m.index + m[0].length;
       }
-      if (cur) buckets[cur].push(line);
-      else out.rest += line + '\n';
+      kept += line.slice(from);
+      if (cur) buckets[cur].push(kept);
+      else out.conclusion += kept + '\n';
     });
+
     var hit = Object.keys(buckets).length > 0;
     if (!hit) {
-      out.conclusion = String(text || '').trim();
+      out.conclusion = str(text).trim();
+      out.next = '';
+      out.basis = out.limits = out.rest = '';
       return out;
     }
     SECTIONS.forEach(function (s) {
       out[s.key] = (buckets[s.key] || []).join('\n').trim();
     });
-    out.rest = out.rest.trim();
+    out.conclusion = out.conclusion.trim();
     return out;
   }
 
+  // ---------- 回答卡片：结构只建一次 ----------
   /**
-   * 画一条回答：外露【结论】+【下一步】，中间用「展开」按钮收【依据】【局限】。
+   * 建一张回答卡片的骨架：
+   *   .ans-lead   结论（外露）
+   *   .ans-fold   依据 / 局限 / 其他 / 多智能体协作（默认收起）
+   *   .ans-tail   下一步（外露）
+   *   .ans-toggle 展开/收起按钮
    *
-   * 没有可折叠内容时（模型只给了结论），不画按钮——空按钮比没有按钮更让人困惑。
-   * 【结论】也没有时，退化为原文首段，保证永远有东西可看。
+   * 2026-11-16 修的三处：
+   *   1) 原来用 innerHTML 拼字符串，正文没转义。模型/论文原文里一个半角引号就能让
+   *      <div class="ans-lead"> 被提前截断，结论区变成空标签，后续节点全成兄弟——
+   *      用户看到的就是「依据」直接摊在外面，点展开也没反应。改成全 DOM 构建，
+   *      文字一律 textContent，从根上不可能再被截断。
+   *   2) 多智能体协作原来单独露在外面，现在并进同一个折叠区。
+   *   3) 非流式与流式两条路径共用这一个构造函数，两页两路行为不会再走形。
    */
-  function renderAnswer(el, text, opts) {
-    opts = opts || {};
+  function buildAnswerCard(el) {
     el.textContent = '';
     el.classList.add('ans');
 
-    var sec = splitSections(text);
-    var hiddenParts = [];
-    if (sec.basis) hiddenParts.push({ label: '依据', body: sec.basis });
-    if (sec.limits) hiddenParts.push({ label: '局限', body: sec.limits });
-    // 四个标题之外的零散内容（开场白之类）跟着折叠，不然它会顶在结论上面
-    if (sec.rest) hiddenParts.push({ label: '其他', body: sec.rest });
+    var leadBody = document.createElement('div');
+    leadBody.className = 'ans-lead__body';
+    var lead = document.createElement('div');
+    lead.className = 'ans-lead';
+    var leadTag = document.createElement('b');
+    leadTag.className = 'ans-tag';
+    leadTag.textContent = '结论';
+    lead.appendChild(leadTag);
+    lead.appendChild(leadBody);
 
-    var leadHtml = '<div class="ans-lead"><b class="ans-tag">结论</b>' + escapeHtml(sec.conclusion) + '</div>';
-    var tailHtml = sec.next
-      ? '<div class="ans-tail"><b class="ans-tag">下一步</b>' + escapeHtml(sec.next) + '</div>'
-      : '<div class="ans-tail ans-tail--empty">本次回答没有给出下一步建议</div>';
-
-    var foldHtml = '';
-    if (hiddenParts.length) {
-      foldHtml =
-        '<div class="ans-fold" hidden>' +
-        hiddenParts.map(function (p) {
-          return '<div class="ans-part"><b class="ans-tag">' + escapeHtml(p.label) + '</b>' +
-            '<div class="ans-part__body"></div></div>';
-        }).join('') +
-        '</div>';
-    }
-
-    var toggleHtml = hiddenParts.length
-      ? '<button class="ans-toggle" type="button" aria-expanded="false">展开依据与局限（' +
-        hiddenParts.length + ' 段）</button>'
-      : '';
-
-    el.innerHTML = leadHtml + foldHtml + tailHtml + toggleHtml;
-
-    // 折叠区里的正文逐块渲染（要解析表格，不能用 innerHTML 拼）
-    var bodies = el.querySelectorAll('.ans-fold .ans-part__body');
-    hiddenParts.forEach(function (p, i) {
-      if (bodies[i]) renderMarkdown(bodies[i], p.body);
+    var fold = document.createElement('div');
+    fold.className = 'ans-fold';
+    fold.hidden = true;
+    var foldBody = {};
+    [['basis', '依据'], ['limits', '局限'], ['rest', '其他'], ['roles', '协作']].forEach(function (p) {
+      var wrap = document.createElement('div');
+      wrap.className = 'ans-part';
+      wrap.setAttribute('data-part', p[0]);
+      wrap.hidden = true;
+      var tag = document.createElement('b');
+      tag.className = 'ans-tag';
+      tag.textContent = p[1];
+      var body = document.createElement('div');
+      body.className = 'ans-part__body';
+      wrap.appendChild(tag);
+      wrap.appendChild(body);
+      fold.appendChild(wrap);
+      foldBody[p[0]] = body;
     });
 
-    var fold = el.querySelector('.ans-fold');
-    var btn = el.querySelector('.ans-toggle');
-    if (btn && fold) {
-      btn.addEventListener('click', function () {
-        var open = fold.hidden;
-        fold.hidden = !open;
-        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        btn.textContent = open ? '收起依据与局限' : ('展开依据与局限（' + hiddenParts.length + ' 段）');
-      });
+    var tail = document.createElement('div');
+    tail.className = 'ans-tail ans-tail--pending';
+    var tailBody = document.createElement('div');
+    var tailTag = document.createElement('b');
+    tailTag.className = 'ans-tag';
+    tailTag.textContent = '下一步';
+    tail.appendChild(tailTag);
+    tail.appendChild(tailBody);
+    tailBody.textContent = '正在生成…';
+
+    var toggle = document.createElement('button');
+    toggle.className = 'ans-toggle';
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.hidden = true;
+
+    el.appendChild(lead);
+    el.appendChild(fold);
+    el.appendChild(tail);
+    el.appendChild(toggle);
+
+    return {
+      el: el, lead: lead, leadBody: leadBody, fold: fold, foldBody: foldBody,
+      tail: tail, tailBody: tailBody, toggle: toggle,
+    };
+  }
+
+  /**
+   * 打开/收起折叠区。显隐以 aria-expanded 为唯一真相源：
+   * refreshFold 只在「有没有内容」变化时才动它，否则每次重画都会把用户的展开动作抹掉
+   * （2026-11-17 实测：点开之后 refreshFold 又把 fold.hidden 置回 true，看起来「点了没反应」）。
+   */
+  function setFoldOpen(card, open) {
+    card.fold.hidden = !open;
+    card.toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  /** 折叠区里某一段现在算不算「有内容」（依据/局限/其他看正文，协作看有没有时间线节点）。 */
+  function partHas(wrap, key, foldBody) {
+    if (key === 'roles') return !!wrap.querySelector('.roles');
+    var body = foldBody[key];
+    var txt = body ? str(body.textContent).trim() : '';
+    // 正文里可能只有表格：renderMarkdown 会把表格塞进子节点，textContent 在部分实现下为空，
+    // 所以「有子节点」也要算有内容（同一魔法数在 refreshFold 与 setTailState 里必须一致）
+    return !!(txt || (body && body.childNodes && body.childNodes.length));
+  }
+
+  /** 按当前内容刷新折叠区（空段落不占位，全空就整个收掉按钮；不碰展开状态）。 */
+  function refreshFold(card) {
+    var shown = [];
+    var prev = card.__shown || [];
+    ['basis', 'limits', 'rest', 'roles'].forEach(function (k) {
+      var wrap = card.fold.querySelector('[data-part="' + k + '"]');
+      if (!wrap) return;
+      var has = partHas(wrap, k, card.foldBody);
+      wrap.hidden = !has;
+      if (has) shown.push(k);
+    });
+    // 从「无内容」变成「有内容」时回到收起状态；只是内容变多则保留用户当前的展开动作
+    if (!prev.length && shown.length) setFoldOpen(card, false);
+    card.__shown = shown;
+    var open = card.toggle.getAttribute('aria-expanded') === 'true';
+    card.toggle.hidden = shown.length === 0;
+    card.fold.hidden = shown.length === 0 || !open;
+    card.toggle.textContent = open && shown.length
+      ? '收起依据与局限'
+      : ('展开依据与局限（' + shown.length + ' 段）');
+  }
+
+  function bindToggle(card) {
+    if (card.toggle.__bound) return;
+    card.toggle.__bound = true;
+    card.toggle.addEventListener('click', function () {
+      setFoldOpen(card, card.toggle.getAttribute('aria-expanded') !== 'true');
+      refreshFold(card);
+    });
+  }
+
+  /**
+   * 画一条回答（非流式：历史消息回放）。
+   * 与流式版 streamAnswer 共用同一套 DOM 骨架，两页两路展示一致。
+   */
+  function renderAnswer(el, text, opts) {
+    opts = opts || {};
+    var card = buildAnswerCard(el);
+    var sec = splitSections(text);
+
+    card.leadBody.textContent = sec.conclusion;
+    // 四段之外还有零散内容时才挂「其他」，避免空壳
+    card.foldBody.basis.textContent = sec.basis;
+    card.foldBody.limits.textContent = sec.limits;
+    card.foldBody.rest.textContent = sec.rest;
+    card.tailBody.textContent = sec.next;
+    setTailState(card, sec.next, true);
+    bindToggle(card);
+    refreshFold(card);
+    return card;
+  }
+
+  /** 下一步区的三种状态：正常 / 还在写 / 本次没有。 */
+  function setTailState(card, next, finished) {
+    var txt = str(next).trim();
+    card.tail.classList.remove('ans-tail--pending', 'ans-tail--empty');
+    if (txt) {
+      card.tailBody.textContent = txt;
+    } else if (finished) {
+      card.tail.classList.add('ans-tail--empty');
+      card.tailBody.textContent = '本次回答没有给出下一步建议';
+    } else {
+      card.tail.classList.add('ans-tail--pending');
+      card.tailBody.textContent = '正在生成…';
     }
   }
 
   // ---------- 流式渲染（边收边折叠） ----------
   // 2026-11-16 用户反馈：「结论和下一步必须第一时间显示，所有对话中」。原来的做法是
-  // 流式期间 botEl.textContent = 全文，等流结束才 renderAnswer——于是左边整片滚动时
-  // 用户看到的都是【依据】那段，结论要么早就滚走了，要么（对比页那轮）压根没渲染出来。
+  // 流式期间 botEl.textContent = 全文，结束才切段渲染——于是左边整片滚动时用户看到的
+  // 都是【依据】那段，结论要么早就滚走了，要么（对比页那轮）压根没渲染出来。
   //
   // 这里改成：第一次拿到正文就把结构一次性建好（结论在上、折叠区在中、下一步在下），
   // 之后每个增量只改对应节点的文字。结构不重建，所以文字不会跳位置。
@@ -197,9 +326,13 @@
 
   var STREAM_RENDER_MS = 80;
 
-  // 段落标题行。和 splitSections 用同一条正则，避免两边口径走样。
-  var STREAM_HEAD_RE = /^\s*(?:#{1,6}\s*)?[【\[]([^】\]]{1,8})[】\]]\s*:?\s*$/;
-  var STREAM_ORDER = ['conclusion', 'basis', 'limits', 'next'];
+  /** 把切出来的段落抄回流式状态对象（流式与收尾共用，免得两处口径走样）。 */
+  function assign(dst, src) {
+    ['conclusion', 'basis', 'limits', 'rest', 'next'].forEach(function (k) {
+      dst[k] = str(src[k]).replace(/\s+$/, '');
+    });
+    return dst;
+  }
 
   /** 流式口子：把某个分区的当前全文画进对应节点（只在内容真变了时才重排）。 */
   function paintStreamPart(cache, key, text, render) {
@@ -213,63 +346,19 @@
   /**
    * 边收边折叠的渲染器。
    *   用法：var s = streamAnswer(botEl); s.push(累计全文); s.finish(); s.stop();
-   * 返回 {push, finish, stop, el, sec}。
+   * 返回 {push, finish, stop, foldRoles, el, sec, card}。
+   *
+   * 与 renderAnswer 共用 buildAnswerCard 建的同一套骨架：结构只建一次，
+   * 增量只改对应节点的文字，所以文字不会在用户眼皮底下跳位置。
    */
   function streamAnswer(el) {
-    el.textContent = '';
-    el.classList.add('ans');
-
-    // 结构一次性建好：结论 / 折叠区(依据·局限·其他) / 下一步 / 展开按钮
-    var leadBody = document.createElement('div');
-    leadBody.className = 'ans-lead__body';
-    var lead = document.createElement('div');
-    lead.className = 'ans-lead';
-    lead.appendChild(document.createElement('b')).className = 'ans-tag';
-    lead.querySelector('.ans-tag').textContent = '结论';
-    lead.appendChild(leadBody);
-
-    var fold = document.createElement('div');
-    fold.className = 'ans-fold';
-    fold.hidden = true;
-    var foldBody = {};
-
-    var parts = [['basis', '依据'], ['limits', '局限'], ['rest', '其他']];
-    parts.forEach(function (p) {
-      var wrap = document.createElement('div');
-      wrap.className = 'ans-part';
-      var tag = document.createElement('b');
-      tag.className = 'ans-tag';
-      tag.textContent = p[1];
-      var body = document.createElement('div');
-      body.className = 'ans-part__body';
-      wrap.appendChild(tag);
-      wrap.appendChild(body);
-      fold.appendChild(wrap);
-      foldBody[p[0]] = body;
-    });
-
-    var tail = document.createElement('div');
-    tail.className = 'ans-tail';
-    var tailBody = document.createElement('div');
-    tail.appendChild(document.createElement('b')).className = 'ans-tag';
-    tail.querySelector('.ans-tag').textContent = '下一步';
-    tail.appendChild(tailBody);
-
-    var toggle = document.createElement('button');
-    toggle.className = 'ans-toggle';
-    toggle.type = 'button';
-    toggle.setAttribute('aria-expanded', 'false');
-
-    el.appendChild(lead);
-    el.appendChild(fold);
-    el.appendChild(tail);
-    el.appendChild(toggle);
-
+    var card = buildAnswerCard(el);
     var cache = {
-      el: { conclusion: leadBody, basis: foldBody.basis, limits: foldBody.limits,
-            rest: foldBody.rest, next: tailBody },
+      el: {
+        conclusion: card.leadBody, basis: card.foldBody.basis,
+        limits: card.foldBody.limits, rest: card.foldBody.rest, next: card.tailBody,
+      },
       last: {},
-      dirty: false,
     };
     var sec = { conclusion: '', basis: '', limits: '', rest: '', next: '' };
     var lastText = '';
@@ -278,73 +367,27 @@
 
     function textRender(node, text) { node.textContent = text; }
 
-    // 折叠区里只有表格时才需要重排；纯文字直接写 textContent 更省
+    // 折叠区里可能有 Markdown 对比表，必须走 renderMarkdown
     function foldRender(node, text) { renderMarkdown(node, text); }
 
-    function paintToggle() {
-      var n = 0;
-      ['basis', 'limits', 'rest'].forEach(function (k) { if (String(sec[k] || '').trim()) n++; });
-      fold.hidden = n === 0;
-      toggle.hidden = n === 0;
-      if (!n) return;
-      toggle.textContent = (!fold.hidden && toggle.getAttribute('aria-expanded') === 'true')
-        ? '收起依据与局限'
-        : ('展开依据与局限（' + n + ' 段）');
-    }
+    var PAINT = [
+      ['conclusion', textRender], ['basis', foldRender], ['limits', foldRender],
+      ['rest', foldRender], ['next', textRender],
+    ];
 
     function paint() {
-      paintStreamPart(cache, 'conclusion', sec.conclusion, textRender);
-      paintStreamPart(cache, 'basis', sec.basis, foldRender);
-      paintStreamPart(cache, 'limits', sec.limits, foldRender);
-      paintStreamPart(cache, 'rest', sec.rest, foldRender);
-      paintStreamPart(cache, 'next', sec.next, textRender);
-      // 下一步还没出来时，先说清楚"还在写"——否则用户以为这一段被吞了
-      if (!String(sec.next || '').trim()) {
-        tail.classList.add('ans-tail--pending');
-        if (cache.last.__pending !== true) {
-          cache.last.__pending = true;
-          tailBody.textContent = '正在生成…';
-        }
-      } else if (cache.last.__pending) {
-        cache.last.__pending = false;
-        tail.classList.remove('ans-tail--pending');
-      }
-      paintToggle();
-      return cache.dirty;
-    }
-
-    /** 把累计全文重新切段。切段本身很便宜（几行正则），节流只是为了减少 DOM 重排。 */
-    function resplit(text) {
-      if (text === lastText) return false;
-      lastText = text;
-      var got = {};
-      var cur = null;
-      var restLines = [];
-      String(text || '').split('\n').forEach(function (line) {
-        var m = line.match(STREAM_HEAD_RE);
-        if (m && LABEL_TO_KEY[m[1].trim()]) {
-          cur = LABEL_TO_KEY[m[1].trim()];
-          got[cur] = got[cur] || [];
-          return;
-        }
-        if (cur) got[cur].push(line); else restLines.push(line);
-      });
-      var hitAny = Object.keys(got).length > 0;
-      if (!hitAny) {
-        // 还没吐出任何【标题】：把已有正文先当结论显示，别让用户对着空气等
-        sec.conclusion = String(text || '');
-        sec.basis = sec.limits = sec.rest = sec.next = '';
-        return true;
-      }
-      STREAM_ORDER.forEach(function (k) { sec[k] = (got[k] || []).join('\n').replace(/\s+$/, ''); });
-      sec.rest = restLines.join('\n').replace(/\s+$/, '');
-      return true;
+      PAINT.forEach(function (p) { paintStreamPart(cache, p[0], sec[p[0]], p[1]); });
+      // 下一步还没出来时先说清楚"还在写"——否则用户以为这一段被吞了
+      setTailState(card, sec.next, frozen);
+      refreshFold(card);
+      return cache.last;
     }
 
     function push(text) {
       if (frozen) return;
-      var changed = resplit(text);
-      if (!changed) return;
+      if (str(text) === lastText) return;
+      lastText = str(text);
+      assign(sec, splitSections(lastText));
       if (timer) return;                    // 已经排了下一帧，等它一起画
       timer = setTimeout(function () {
         timer = null;
@@ -353,25 +396,12 @@
       }, STREAM_RENDER_MS);
     }
 
-    toggle.addEventListener('click', function () {
-      var open = fold.hidden;
-      fold.hidden = !open;
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      paintToggle();
-    });
-
-    /** 收口：把剩下的全画上，并把按钮文案定下来。 */
+    /** 收口：把剩下的全画上，并把按钮文案与下一步状态定下来。 */
     function finish() {
       if (timer) { clearTimeout(timer); timer = null; }
-      resplit(lastText);
+      assign(sec, splitSections(lastText));
       frozen = true;
       paint();
-      // 一直没等到【下一步】就明说，别留个"正在生成…"骗人
-      if (!String(sec.next || '').trim()) {
-        tail.classList.remove('ans-tail--pending');
-        tail.classList.add('ans-tail--empty');
-        tailBody.textContent = '本次回答没有给出下一步建议';
-      }
     }
 
     function stop() {
@@ -379,9 +409,21 @@
       frozen = true;
     }
 
-    return { push: push, finish: finish, stop: stop, el: el, sec: sec };
-  }
+    /** 把「多智能体协作」时间线并进折叠区（2026-11-16 用户要求一起收起）。 */
+    function foldRoles(items, status) {
+      var body = card.foldBody.roles;
+      if (!items || !items.length) { refreshFold(card); return null; }
+      body.textContent = '';
+      var node = buildRoles(items, status);
+      body.appendChild(node);
+      refreshFold(card);
+      return node;
+    }
 
+    bindToggle(card);
+    refreshFold(card);
+    return { push: push, finish: finish, stop: stop, foldRoles: foldRoles, el: el, sec: sec, card: card };
+  }
   // ---------- 证据卡片 ----------
   /**
    * 画证据卡片。
@@ -475,14 +517,17 @@
   }
 
   // ---------- 角色时间线 ----------
-  function renderRoles(botEl, items, status) {
+  /** 画「多智能体协作」时间线本体（不挂到 DOM 上，由调用方决定放哪）。 */
+  function buildRoles(items, status) {
     if (!items || items.length === 0) return null;
     var box = document.createElement('div');
     box.className = 'roles';
 
     var head = document.createElement('div');
     head.className = 'roles-head';
-    head.innerHTML = '<b>多智能体协作</b>';
+    var title = document.createElement('b');
+    title.textContent = '多智能体协作';
+    head.appendChild(title);
     if (status) {
       var st = document.createElement('span');
       st.className = 'role-status';
@@ -508,6 +553,16 @@
       list.appendChild(row);
     });
     box.appendChild(list);
+    return box;
+  }
+
+  /**
+   * 把协作时间线插到 botEl 后面（保留给只想单独画时间线的调用方）。
+   * 对话页与对比页现在都走 streamAnswer().foldRoles()，把它并进折叠区。
+   */
+  function renderRoles(botEl, items, status) {
+    var box = buildRoles(items, status);
+    if (!box) return null;
     botEl.insertAdjacentElement('afterend', box);
     return box;
   }
@@ -523,6 +578,9 @@
     STREAM_RENDER_MS: STREAM_RENDER_MS,
     renderEvidence: renderEvidence,
     renderRoles: renderRoles,
+    buildRoles: buildRoles,
+    buildAnswerCard: buildAnswerCard,
+    setTailState: setTailState,
     paperHref: paperHref,
   };
 })();

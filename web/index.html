@@ -140,6 +140,8 @@
     .ans-tail--empty { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-fold { display: flex; flex-direction: column; gap: 10px; }
     .ans-fold[hidden] { display: none; }
+    /* 没有内容的段（模型没给这一段）不占位、不留空标签 */
+    .ans-part[hidden] { display: none; }
     /* 流式期间【下一步】还没流出来时挂这个类，先写「正在生成…」 */
     .ans-tail--pending { color: var(--text-subtle); font-size: 13px; border-left-color: var(--border-color); }
     .ans-part__body { white-space: pre-wrap; font-size: 14px; color: var(--text-secondary); }
@@ -457,7 +459,13 @@ function renderConversation(showFallback) {
     document.body.classList.toggle('has-conv', showFallback);
     return;
   }
-  msgs.forEach(m => addMsg(m.content, m.role === 'user' ? 'user' : 'bot'));
+  msgs.forEach(m => {
+    const el = addMsg('', m.role === 'user' ? 'user' : 'bot');
+    if (m.role === 'user') el.textContent = m.content;
+    // 历史里的助手回答也走同一张回答卡片：外露结论+下一步，其余折叠。
+    // 以前直接 addMsg(content,'bot') 会把【依据】整段摊在外面（2026-11-16 用户反馈）。
+    else ChatCore.renderAnswer(el, m.content);
+  });
 }
 
 function startNewChat() {
@@ -720,9 +728,10 @@ async function send() {
     else streamAns.finish();
     streamAns.stop();
     // 先画协作时间线，再画证据卡片：时间线讲"怎么找到这些证据"，放在证据上方更顺。
-    // 证据默认只摊开前 3 条，其余点「展开全部」再看（2026-11-16 用户要求）。
-    const rolesBox = roleItems.length ? ChatCore.renderRoles(botEl, roleItems, statusText) : null;
-    ChatCore.renderEvidence(rolesBox || botEl, evidenceItems);
+    // 2026-11-16 用户要求「多智能体协作也放到展开隐藏中」：并进回答卡片的折叠区，
+    // 与依据/局限一起展开，不再单独占一块外露区域。
+    streamAns.foldRoles(roleItems, statusText);
+    ChatCore.renderEvidence(botEl, evidenceItems);
 
     // 成功拿到回答才记入历史：失败/空回答不污染下一轮
     if (answer) {
