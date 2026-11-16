@@ -93,7 +93,15 @@ SYSTEM_PROMPT = """你是「科研小助手」，帮用户阅读、检索和对�
 
 RETRIEVE_TOP_K = 4
 # 多篇对比：每篇各取几块、合并后最多留几条（防止上下文塞爆、模型看花眼）
-PER_PAPER_TOP_K = 3
+#
+# PER_PAPER_TOP_K 从 3 提到 5 的依据（实测 retrieve_scored，单篇过滤，目标块排第几）：
+#   问「GPT-1 使用的最大上下文窗口长度是多少 token」（目标块含 "sequences of 512 tokens"）
+#     top3 = ×  top4 = ×  top5 = 5   ← 前三名全是公式块（"where k is the size of the context window"），
+#   真正写规格的那句排第 5。每篇只取 3 块时它根本进不了证据池。
+# 代价实测（2 篇 × 5 = 10 块）：约 2073~2594 字符，粗估 1036~1297 token，
+# 而 MULTI_MAX_EVIDENCE 仍是 8，真正喂给模型的条数没变多——只是候选池变宽，
+# 合并时按融合分挑更全，挑完仍截到 8 条。
+PER_PAPER_TOP_K = 5
 MULTI_MAX_EVIDENCE = 8
 
 # 校验回环：Verifier 判定「证据不可溯源」时，让 Retriever 按策略逐个重试。
@@ -584,6 +592,56 @@ _INTENT_TERMS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("文献", "引用", "reference", "citation"), "references citation"),
     (("作者", "author"), "authors"),
     (("数据集", "dataset", "benchmark"), "dataset benchmark"),
+    # 查"配置值"类问题（参数量、上下文窗口、层数、头数、batch size…）时补规格术语。
+    #
+    # 为什么必须补：翻译模型会把中文问句直译成自然语言，
+    #   问「GPT-3 的最大上下文窗口长度是多少 token」
+    #   → "GPT-3 maximum context window token length"
+    # 多出来的是 maximum / length 这类逻辑上有、原文里却几乎不出现的词；
+    # 而原文实际写的是 "nctx = 2048"、"context window"，关键字反而被稀释掉了。
+    # 多篇对比时更糟：问「从 GPT-1 到 GPT-3 …分别递增到多少」会被译成
+    #   "GPT-1 GPT-2 GPT-3 context window token length"
+    # 三篇的实体名挤在一起，每篇都只匹配上一部分，谁都排不进前面。
+    #
+    # 实测（retrieve_scored，单篇过滤，目标块排第几，× = top8 内未命中）：
+    #   检索词                                       GPT-2  GPT-3  GPT-1
+    #   "maximum context window token length"         #6      #2     #5
+    #   "context window nctx"                         #8      #1      ×
+    #   "context size"                                #1       ×     ×
+    #   "context size nctx 512 1024"                  #1      #2     #2
+    #
+    # nctx 是 GPT-3 原文里的变量名（写作 nctx = 2048），BM25 对它极敏感；
+    # 但 GPT-2 与 GPT-1 都不用这个词——GPT-2 写 "context size"，
+    # GPT-1 只在训练设置里写 "sequences of 512 tokens"。
+    # 只补 nctx 会让这两篇完全召回不到上下文句（GPT-1 实测 top8 都没有），
+    # 多篇对比时表现为「GPT-1 的上下文长度查不到」。
+    #
+    # 512 / 1024 必须一起补：这两篇原文里 512 都在目标句里，数字本身是最硬的 BM25 锚。
+    # "context size nctx 512 1024" 是唯一在三篇上都进 top3 的写法，最终采用它。
+    (
+        ("上下文", "context", "窗口", "window", "token 长度", "序列长度"),
+        "context size nctx 512 1024",
+    ),
+    (
+        ("参数", "parameter", "param", "模型大小", "模型规模", "参数量"),
+        "parameters model size",
+    ),
+    (
+        ("层数", "layers", "layer 数", "深度"),
+        "layers n_layers",
+    ),
+    (
+        ("头数", "head", "attention heads"),
+        "attention heads",
+    ),
+    (
+        ("维度", "dimension", "hidden", "d_model"),
+        "dimensional dimensional states",
+    ),
+    (
+        ("batch", "批大小", "学习率", "learning rate", "warmup", "超参"),
+        "hyperparameters batch size learning rate",
+    ),
 )
 
 
@@ -629,7 +687,8 @@ async def _search_query(question: str) -> str:
 
     cached = _QUERY_CACHE.get(question.strip())
     if cached:
-        return cached
+        # 缓存的是纯翻译结果，锚点每次现拼（见下方存缓存处的说明）
+        return _merge_terms(cached, question)
 
     try:
         reserve_llm_call()
@@ -652,10 +711,15 @@ async def _search_query(question: str) -> str:
             max_tokens=64,
         )
         q = (resp.choices[0].message.content or "").strip().strip('"').strip()
-        q = _merge_terms(q or question, question)
+        # 缓存里只存模型的纯翻译结果，不存 _merge_terms 的产物：
+        # 补进去的术语锚（见 _INTENT_TERMS）是会随实测改进的，一旦写进缓存，
+        # 改了锚点老问题还是走旧锚点——实测就撞过：缓存里留着旧的
+        # "context window nctx"，新锚点 "context size nctx 512 1024" 形同虚设，
+        # 检索结果比改之前还差。
+        q = q or question
         _QUERY_CACHE[question.strip()] = q
         _save_query_cache()
-        return q
+        return _merge_terms(q, question)
     except Exception:
         logger.exception("查询翻译失败，改用原问题检索")
         return question
