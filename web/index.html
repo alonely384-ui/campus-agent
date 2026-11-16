@@ -125,6 +125,45 @@
     table.cmp td:first-child { background: var(--bg-surface-2); font-weight: 500; }
     table.cmp tbody tr:nth-child(even) td, table.cmp tr:nth-child(even) td { background: var(--gray-25); }
     table.cmp tr:hover td { background: var(--brand-soft); }
+
+    /* ---------- 侧栏「多篇对比」栏目 ---------- */
+    .sb-group--cmp { flex: 0 0 auto; margin-top: 4px; }
+    .sb-cmp-head { position: relative; }
+    .sb-cmp-head__caret { flex: 0 0 auto; margin-left: auto; font-size: 10px; color: var(--text-subtle);
+                          transition: transform var(--dur-fast) var(--ease); }
+    .sb-cmp-head[aria-expanded="true"] .sb-cmp-head__caret { transform: rotate(180deg); }
+    .sb-cmp-list { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 4px; }
+    .sb-cmp-list[hidden] { display: none; }
+    /* 折叠态必须压过上面的 display:flex——design-system.css 里的 .app--collapsed 规则
+       优先级相同但先加载，会被这条覆盖，所以在这里按同样选择器补一条。 */
+    .app--collapsed .sb-cmp-list { display: none; }
+    .app--collapsed .sb-group--cmp { display: none; }
+    .sb-cmp {
+      display: flex; align-items: flex-start; gap: 8px; width: 100%;
+      padding: 6px 10px; border: none; border-radius: var(--radius-control);
+      background: transparent; color: var(--text-secondary); cursor: pointer; box-shadow: none;
+      font-size: 13px; line-height: 1.45; text-align: left;
+      transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    }
+    .sb-cmp:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .sb-cmp:focus-visible { outline: 2px solid var(--brand-ring); outline-offset: -2px; }
+    .sb-cmp__no {
+      flex: 0 0 18px; height: 18px; margin-top: 1px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 5px; background: var(--brand-soft); color: var(--brand-text);
+      font-size: 11px; font-weight: 600; line-height: 1;
+    }
+    .sb-cmp__body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .sb-cmp__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sb-cmp__papers { display: block; font-size: 11.5px; color: var(--text-subtle);
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sb-cmp--missing .sb-cmp__no { background: var(--warning-bg, var(--bg-surface-2));
+                                   color: var(--warning, var(--text-secondary)); }
+    .sb-cmp__tip { display: block; padding: 4px 10px 2px 36px; font-size: 11.5px;
+                   color: var(--text-subtle); line-height: 1.5; }
+
+    /* 装填案例后给输入框一个短促的底色闪烁，让用户看见"填进去了" */
+    .dock__ta--filled { background: var(--brand-soft); transition: background 900ms var(--ease); }
   </style>
 </head>
 <body class="app">
@@ -164,6 +203,18 @@
          title="写作助手：框架生成、架构图、数据可视化、中译英（1.6）">
         <span class="sb-item__ico">✎</span><span class="sb-item__txt">写作助手</span>
       </a>
+    </div>
+
+    <!-- 多篇对比：官方 1.2.2 的四道题是评测题目，做成侧栏可一键装填的案例。
+         点一下只「装填」——勾好涉及的论文 + 填好问题，不自动发送，用户看清再按发送。 -->
+    <div class="sb-group sb-group--cmp">
+      <button class="sb-item sb-cmp-head" id="cmpToggle" type="button" aria-expanded="false"
+              title="官方题目的多篇对比：选一个案例，自动勾好论文并填入问题（不会自动发送）">
+        <span class="sb-item__ico">⇄</span>
+        <span class="sb-item__txt">多篇对比</span>
+        <span class="sb-cmp-head__caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="sb-cmp-list" id="cmpList" hidden></div>
     </div>
 
     <div class="sb-history" id="sbHistory"></div>
@@ -501,11 +552,201 @@ function loadPaperFiles() {
         pickListEl.appendChild(label);
       });
       refreshPickSummary();
+      // 论文列表刷新后重画案例的「可用/缺哪篇」标记——它依赖库里的实际文件
+      if (typeof renderCompareCases === 'function') renderCompareCases();
     })
     .catch(() => {});
 }
 
 loadPaperFiles();
+
+// ---------- 多篇对比：官方 1.2.2 四道题的预设案例 ----------
+// 题目原文取自赛题 PDF「1.2.2 针对多篇论文的问答」第 1~4 题（科研小助手\科研小助手Agent-AI大模型.pdf 第 2 页），
+// 一字未改。论文按标题关键字在库里现找，不写死文件名——同一篇论文在库里有
+// 1706.03762v1.pdf / v7.pdf / v1_img.pdf 等多个版本，写死会漏掉用户实际保留的那份。
+//
+// 交互刻意只做「装填」不做「自动发送」：点一下就自动提问会让人不知道自己在测什么，
+// 也浪费一次完整的多智能体调用。装填后用户看得见勾了哪几篇、问题是什么，再按发送。
+const CMP_CASES = [
+  {
+    id: 'q1-bert-attention',
+    no: 1,
+    name: 'BERT 与 Transformer 架构对比',
+    papers: [
+      { label: 'Attention', keys: ['attention is all you need'], power: ['1706.03762v7.pdf', '1706.03762v1.pdf'] },
+      { label: 'BERT', keys: ['bert: pre-training'], power: ['N19-1423.pdf'] },
+    ],
+    question: '根据《Attention Is All You Need》和《BERT: Pre-training of Deep Bidirectional Transformers '
+      + 'for Language Understanding》。请对比：BERT 的架构和原始 Transformer 的 Encoder 有什么承袭关系？'
+      + 'BERT 丢弃了原始 Transformer 的哪个部分？',
+  },
+  {
+    id: 'q2-gpt-scale',
+    no: 2,
+    name: 'GPT-1 / 2 / 3 参数规模变化',
+    papers: [
+      { label: 'GPT-1', keys: ['improving language understanding'], power: ['language_understanding_paper.pdf'] },
+      { label: 'GPT-2', keys: ['unsupervised multitask learners'], power: [] },
+      { label: 'GPT-3', keys: ['few-shot learners'], power: ['2005.14165v4.pdf'] },
+    ],
+    question: '对比GPT-1、GPT-2和GPT-3的论文，说明这些模型的参数的变化。',
+  },
+  {
+    id: 'q3-gpt2-ln',
+    no: 3,
+    name: 'GPT-2 相对 GPT-1 的 LN 位置调整',
+    papers: [
+      { label: 'GPT-1', keys: ['improving language understanding'], power: ['language_understanding_paper.pdf'] },
+      { label: 'GPT-2', keys: ['unsupervised multitask learners'], power: [] },
+    ],
+    question: 'GPT-2 相比于 GPT-1，在 Transformer 的 Layer Normalization（LN）位置上做了什么关键的调整？',
+  },
+  {
+    id: 'q4-gpt-context',
+    no: 4,
+    name: 'GPT-1 → GPT-3 上下文窗口递增',
+    papers: [
+      { label: 'GPT-1', keys: ['improving language understanding'], power: ['language_understanding_paper.pdf'] },
+      { label: 'GPT-2', keys: ['unsupervised multitask learners'], power: [] },
+      { label: 'GPT-3', keys: ['few-shot learners'], power: ['2005.14165v4.pdf'] },
+    ],
+    question: '从 GPT-1 到 GPT-3，模型的最大上下文 Token 长度（Context Window）分别递增到了多少？',
+  },
+];
+
+// 库里「文件名 -> 标题」的当前快照，由 loadPaperFiles 之后的第一轮渲染填上
+let paperTitles = [];
+let cmpExpanded = false;
+
+function ensurePaperTitles() {
+  // loadPaperFiles 只拉 /papers/files（纯文件名），标题要单独问一次 /papers。
+  // 失败就让 titleOf 回落成文件名，功能不因此中断。
+  if (paperTitles.length) return Promise.resolve();
+  return fetch('/papers')
+    .then(r => r.json())
+    .then(d => {
+      // /papers 的顶层键是 papers（不是 items），字段 filename/title 直接给
+      paperTitles = (d.papers || d.items || []).map(p => ({ filename: p.filename || p.file || '', title: p.title || '' }));
+    })
+    .catch(() => {});
+}
+
+function titleOf(fn) {
+  const hit = paperTitles.find(p => p.filename === fn);
+  return (hit && hit.title) ? hit.title : fn;
+}
+
+function resolveCase(kase) {
+  // 返回 {picked: [文件名], missing: [标签], fetched: [标题]}
+  const available = pickListEl ? Array.from(pickListEl.querySelectorAll('input[type="checkbox"]')).map(i => i.value) : [];
+  const picked = [];
+  const missing = [];
+  const fetched = [];
+  kase.papers.forEach(spec => {
+    const hit = available.find(fn => {
+      const t = titleOf(fn).toLowerCase();
+      return spec.keys.some(k => t.includes(k));
+    });
+    if (!hit) { missing.push(spec.label); return; }
+    if (picked.includes(hit)) return;           // GPT 三篇可能命中同一份，去重
+    picked.push(hit);
+    fetched.push(titleOf(hit));
+  });
+  return { picked, missing, fetched };
+}
+
+function renderCompareCases() {
+  const listEl = document.getElementById('cmpList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  CMP_CASES.forEach(kase => {
+    const { picked, missing } = resolveCase(kase);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sb-cmp' + (missing.length ? ' sb-cmp--missing' : '');
+    btn.dataset.caseId = kase.id;
+    btn.title = picked.length
+      ? `${kase.name}\n将勾选：${picked.join('、')}\n（不会自动发送，装填后请确认再按发送）`
+      : `${kase.name}\n库里缺少这篇论文`;
+
+    const no = document.createElement('span');
+    no.className = 'sb-cmp__no';
+    no.textContent = String(kase.no);
+
+    const body = document.createElement('span');
+    body.className = 'sb-cmp__body';
+    const nm = document.createElement('span');
+    nm.className = 'sb-cmp__name';
+    nm.textContent = kase.name;
+    const sub = document.createElement('span');
+    sub.className = 'sb-cmp__papers';
+    sub.textContent = missing.length
+      ? `缺 ${missing.join('、')}　可用 ${picked.length} 篇`
+      : `${picked.length} 篇：${kase.papers.map(p => p.label).join(' / ')}`;
+    body.appendChild(nm);
+    body.appendChild(sub);
+
+    btn.appendChild(no);
+    btn.appendChild(body);
+    btn.addEventListener('click', () => applyCompareCase(kase.id));
+    listEl.appendChild(btn);
+  });
+
+  const tip = document.createElement('div');
+  tip.className = 'sb-cmp__tip';
+  tip.textContent = '点一下只填好问题与勾选，不会自动发送';
+  listEl.appendChild(tip);
+}
+
+function applyCompareCase(caseId) {
+  const kase = CMP_CASES.find(k => k.id === caseId);
+  if (!kase) return;
+  const { picked, missing } = resolveCase(kase);
+
+  if (!picked.length) {
+    statusEl.textContent = `这个案例需要的论文都不在库里：${missing.join('、')}`;
+    statusEl.className = 'status bad';
+    return;
+  }
+
+  // 勾选：先全部取消，再勾案例需要的——案例是"整组对比"，残留别的勾选会污染 range
+  pickListEl.querySelectorAll('input[type="checkbox"]').forEach(box => {
+    box.checked = picked.includes(box.value);
+  });
+  refreshPickSummary();
+
+  inputEl.value = kase.question;
+  autoGrow();
+  inputEl.focus();
+  // 让用户看见"填进去了"，否则只看到输入框变了以为是自己打错的
+  inputEl.classList.add('dock__ta--filled');
+  setTimeout(() => inputEl.classList.remove('dock__ta--filled'), 900);
+
+  if (missing.length) {
+    statusEl.textContent = `已装填 ${kase.no}. ${kase.name}（勾了 ${picked.length} 篇）· 注意：库里缺 ${missing.join('、')}，这道题会按现有论文作答并如实说明缺失`;
+    statusEl.className = 'status bad';
+  } else {
+    statusEl.textContent = `已装填 ${kase.no}. ${kase.name}（勾了 ${picked.length} 篇）· 确认后按发送`;
+    statusEl.className = 'status ok';
+  }
+}
+
+function setCompareExpanded(on) {
+  cmpExpanded = on;
+  const listEl = document.getElementById('cmpList');
+  const headEl = document.getElementById('cmpToggle');
+  if (listEl) listEl.hidden = !on;
+  if (headEl) headEl.setAttribute('aria-expanded', on ? 'true' : 'false');
+}
+
+(function bindComparePanel() {
+  const headEl = document.getElementById('cmpToggle');
+  if (!headEl) return;
+  headEl.addEventListener('click', () => setCompareExpanded(!cmpExpanded));
+  // 标题必须先拉到，否则案例会全部显示成"缺"
+  ensurePaperTitles().then(() => renderCompareCases());
+})();
 
 // ---------- 健康检查：确认后端活着 ----------
 // 安全整改后 /health 对匿名访客只返回 {status, version}，模型名与当日预算只在
