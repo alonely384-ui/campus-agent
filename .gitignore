@@ -122,6 +122,12 @@ web/guide.html
 web/project-tour.html
 web/study-plan.html
 
+# ---- 重建解析结果前的命名备份 / 调试截图 ----
+# data/meta/structures.json.bak-before-ocr 这类文件只在本地重建时产生，随时可删；
+# web/shots/ 是排版与图表调试截图，属于临时材料，不入库。
+data/meta/*.bak-*
+web/shots/
+
 # ---- 桌面版打包产物 ----
 # 数据包 470MB、exe 几百 MB，都是可由 scripts/build_desktop.py 重新生成的
 dist/
