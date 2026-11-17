@@ -171,6 +171,7 @@
           </h2>
           <div class="meta-line" id="recSched"></div>
           <div class="offline-tip" id="recOffline" hidden></div>
+          <div class="offline-tip" id="recDelayed" hidden></div>
           <div class="rec-list" id="recList"></div>
         </div>
       </div>
@@ -192,6 +193,9 @@
     const recUpdatedEl = document.getElementById('recUpdated');
     const recRefreshEl = document.getElementById('recRefresh');
     const recOfflineEl = document.getElementById('recOffline');
+    // 强制刷新被拒（未登录）时的提示条，与"抓取失败退回过期缓存"的提示条分开，
+    // 免得把"权限不足"说成"没连上网"。
+    const recDelayedEl = document.getElementById('recDelayed');
     const recPeriodEl = document.getElementById('recPeriod');
     const recSchedEl = document.getElementById('recSched');
 
@@ -439,13 +443,23 @@
     }
 
     async function refreshRecs() {
+      // 2026-11-18：强制刷新改成管理员接口（它会真打 Semantic Scholar + arXiv，
+      // 匿名可触发等于给外部额度开了个公共开关）。这里先带上会话 Cookie 试一次，
+      // 401/503 就跳登录页，登录完回到本页——普通用户点"刷新"不会再触发任何外网请求。
       recRefreshEl.disabled = true;
       recRefreshEl.textContent = '刷新中…';
       const period = recPeriodEl.value || 'daily';
       recUpdatedEl.textContent = `正在抓取：引用关系 + arXiv 近期上架（${period === 'weekly' ? '近两周' : '近一周'}），通常 20~60 秒`;
       try {
         const url = `/recommendations/refresh?max_papers=6&period=${encodeURIComponent(period)}&user=${encodeURIComponent(REC_USER)}`;
-        const resp = await fetch(url, { method: 'POST' });
+        const resp = await fetch(url, { method: 'POST', credentials: 'same-origin' });
+        if (resp.status === 401 || resp.status === 503) {
+          recDelayedEl.hidden = false;
+          recDelayedEl.innerHTML = '强制刷新需要管理员登录（它会实时抓取外部数据）。'
+            + '普通浏览用「读缓存」即可。'
+            + ` <a href="admin-login.html?next=${encodeURIComponent(location.pathname + location.search)}">去登录</a>`;
+          return;
+        }
         const d = await resp.json();
         if (!resp.ok) throw new Error(d.detail || ('HTTP ' + resp.status));
         renderRecs(d);

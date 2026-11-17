@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import difflib
+import inspect
 import json
 import re
 import time
@@ -1768,6 +1769,32 @@ async def run_agent(
     )
 
 
+async def _close_agent_stream(stream: object) -> None:
+    """关掉上游 AsyncStream，**绝不掩盖原始异常或取消信号**。
+
+    几个刻意的取舍：
+
+    - 优先调 `aclose()`（openai 3.35.1 里它是 `close()` 的同义别名，两者都在
+      `AsyncStream` 上），没有就退回 `close()`，再没有就当它本来就不可关。
+    - 用 `try/except Exception` 而不是 `BaseException`：关流过程中抛出
+      `CancelledError` 说明外部又取消了，必须放它继续传播；只有普通异常才吞掉
+      记日志——否则"关连接失败"会把原始的业务异常盖成别的样子。
+    - 幂等性：重复关是安全的（`close()` 最终就是 `response.aclose()`，httpx 的
+      响应关两次不报错），所以正常读完后再关一次不会出问题。
+    """
+    closer = getattr(stream, "aclose", None)
+    if closer is None:
+        closer = getattr(stream, "close", None)
+    if closer is None:
+        return
+    try:
+        result = closer()
+        if inspect.isawaitable(result):
+            await result
+    except Exception:  # noqa: BLE001 —— 关流失败不该影响已吐给用户的内容
+        logger.warning("关闭 Agent 上游流失败（已忽略）", exc_info=True)
+
+
 async def run_agent_stream(
     user_message: str,
     history: list[dict] | None = None,
@@ -1824,27 +1851,39 @@ async def run_agent_stream(
         content_buf = ""
         tool_bufs: dict[int, dict[str, str]] = {}
 
-        async for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
+        # 显式关流（2026-11-18 修）：openai 的 AsyncStream 内部 `__stream__`
+        # 虽然自带 `finally: await response.aclose()`，但那条 finally 只在
+        # 「生成器被推进到结束」或「被显式 aclose()」时才会执行。外层这个
+        # async for 被 CancelledError（用户点停止/断开连接）打断时，两者都不成立，
+        # 底层 httpx 响应只能等 GC 才释放——前端已经显示「已停止生成」，上游却
+        # 还在吐 token 计费。这里补 try/finally 保证四条路径都关：
+        #   正常读完 / 用户取消 / 上游异常 / 工具调用分支继续下一轮。
+        try:
+            async for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
 
-            # 文字内容 → 直接吐给前端
-            if delta.content:
-                content_buf += delta.content
-                yield {"type": "answer_delta", "text": delta.content}
+                # 文字内容 → 直接吐给前端
+                if delta.content:
+                    content_buf += delta.content
+                    yield {"type": "answer_delta", "text": delta.content}
 
-            # 工具调用 → 累积
-            if delta.tool_calls:
-                for tc in delta.tool_calls:
-                    buf = tool_bufs.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
-                    if tc.id:
-                        buf["id"] = tc.id
-                    if tc.function:
-                        if tc.function.name:
-                            buf["name"] += tc.function.name
-                        if tc.function.arguments:
-                            buf["arguments"] += tc.function.arguments
+                # 工具调用 → 累积
+                if delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        buf = tool_bufs.setdefault(
+                            tc.index, {"id": "", "name": "", "arguments": ""}
+                        )
+                        if tc.id:
+                            buf["id"] = tc.id
+                        if tc.function:
+                            if tc.function.name:
+                                buf["name"] += tc.function.name
+                            if tc.function.arguments:
+                                buf["arguments"] += tc.function.arguments
+        finally:
+            await _close_agent_stream(stream)
 
         # 没有工具调用 → 本轮就是最终答案，结束
         if not tool_bufs:

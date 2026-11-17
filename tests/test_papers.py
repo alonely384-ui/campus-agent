@@ -2,11 +2,45 @@
 
 关键技巧：monkeypatch 替换模块级路径 + 注入假的文字抽取函数，
 这样测试既不需要真 PDF，也不会污染你 125MB 的论文库。
+
+2026-11-18：`save_paper` 增加真实 PDF 结构校验以后，`b"%PDF-1.4 fake bytes"`
+这种"只有文件头的字符串"会被拒（pypdf 打不开）。所以这里改用一个**最小的
+合法 PDF**（`_minimal_pdf`），既能通过校验、又能塞进任意不同的正文，
+保持"每个文件内容不同 → paper_id 不同"这条前提。
 """
 
 import pytest
 
 from app import papers as papers_mod
+
+
+def _minimal_pdf(marker: str) -> bytes:
+    """造一份 pypdf 能打开的最小 PDF，`marker` 塞进正文保证内容各不相同。
+
+    结构：对象 1=目录，2=页面树，3=页面，4=内容流，尾部 classic xref。
+    行宽必须精确（尤其 `startxref` 的偏移），所以这里显式拼字节而不是用库生成。
+    """
+    body = f"BT /F1 12 Tf 72 720 Td ({marker}) Tj ET".encode("latin-1")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length " + str(len(body)).encode() + b" >>\nstream\n" + body + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, obj in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n".encode() + obj + b"\nendobj\n"
+    xref_at = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode()
+    out += b"0000000000 65535 f \n"
+    for off in offsets:
+        out += f"{off:010d} 00000 n \n".encode()
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode()
+    return bytes(out)
 
 
 @pytest.fixture
@@ -20,7 +54,7 @@ def library(tmp_path, monkeypatch):
 
 def _fake_pdf(name: str) -> tuple[str, bytes]:
     # 每个文件的内容必须不同，否则 sha256 相同会被当成同一个 paper_id
-    return name, b"%PDF-1.4 fake bytes for " + name.encode("utf-8")
+    return name, _minimal_pdf(name)
 
 
 def test_save_and_list(library):

@@ -1179,6 +1179,35 @@ body.app:not(.has-conv):has(.dock) .greeting { display: block; }
 }
 .dock__send:disabled { background: var(--border-strong); cursor: not-allowed; box-shadow: none; }
 
+/* 停止生成：只在流式期间出现。刻意用实心方块而不是"暂停/叉"图标——
+   它要一眼看出"这是正在发生的事的中止键"，而不是另一个普通工具按钮。 */
+.icon-btn--stop {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  box-shadow: var(--shadow-xs);
+}
+.icon-btn--stop:hover {
+  background: #fdecec;
+  border-color: #f0b4b4;
+  color: #b42318;
+}
+
+/* 回答气泡末尾的弱提示（已停止 / 超时 / 连接中断）。不能抢正文的注意力，
+   所以用次要色 + 略小字号，并用一条细线跟正文分开。 */
+.msg__note {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
 /* 论文选择：空状态时藏在坞上方，正常对话时也在坞内工具行 */
 .dock .pick > summary {
   padding: 6px 11px;

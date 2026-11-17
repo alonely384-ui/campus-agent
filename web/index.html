@@ -272,6 +272,8 @@
               <div class="pick-list" id="pickList"></div>
             </details>
             <button class="icon-btn" id="pickFiles" type="button" title="上传 PDF 到论文库">📎</button>
+            <!-- 停止：只在流式期间出现。没有它时上游一卡，用户只能刷新整页、丢掉会话。 -->
+            <button class="icon-btn icon-btn--stop" id="stop" type="button" title="停止生成" aria-label="停止生成" hidden>■</button>
             <button class="dock__send" id="send" type="button" title="发送" aria-label="发送">↑</button>
           </div>
         </div>
@@ -299,6 +301,7 @@ const chatEl = document.getElementById('chat');
 const chatScrollEl = document.getElementById('chatScroll');
 const inputEl = document.getElementById('q');
 const sendEl = document.getElementById('send');
+const stopEl = document.getElementById('stop');
 const statusEl = document.getElementById('status');
 const pickEl = document.getElementById('pick');
 const pickListEl = document.getElementById('pickList');
@@ -623,13 +626,45 @@ fetch('/health')
 
 
 // ---------- 核心：消费 SSE 流 ----------
+
+// 空转多久算"卡住"。
+// 用**空闲**超时而不是总时长上限：一次正常问答可能要十几秒到一分钟，
+// 长回答的合法总时长没有上界；但后端有 15 秒一次的心跳（SSE 注释行），
+// 只要链路活着，两次数据间隔不会超过 15 秒。留到 45 秒，既不会误杀慢回答，
+// 又能在上游彻底没动静时把界面交还给人。
+const SSE_IDLE_TIMEOUT_MS = 45000;
+// 正在进行的流。一次性只有一个，所以用模块级单例即可（stopStream 要用）。
+let activeStream = null;
+
+function beginStreamUI() {
+  sendEl.disabled = true;
+  stopEl.hidden = false;
+  inputEl.disabled = false;
+}
+
+function endStreamUI() {
+  sendEl.disabled = false;
+  stopEl.hidden = true;
+  inputEl.focus();
+}
+
+// 用户的"停止"按钮：abort 掉 fetch，下面的 reader.read() 会立刻抛 AbortError，
+// 由 catch 分支收口（已经把出来的半段内容按同样结构收尾）。
+function stopStream() {
+  if (!activeStream) return;
+  activeStream.stopReason = 'user';
+  activeStream.ctl.abort();
+}
+
 async function send() {
   const question = inputEl.value.trim();
   if (!question) return;
+  // 上一条还在流：忽略这次发送，避免两条流往同一个会话里交错写
+  if (activeStream) return;
 
   inputEl.value = '';
   autoGrow();
-  sendEl.disabled = true;
+  beginStreamUI();
 
   // 第一句提问就把空状态切成对话流，并开一个会话；后续提问往同一会话里追加
   if (UI_DEV_SAMPLE) { UI_DEV_SAMPLE = false; chatEl.innerHTML = ''; }
@@ -673,10 +708,26 @@ async function send() {
     // 智能搜索关掉 → 只跑 BM25 + 哈希，省掉稠密那一路的 embedding 计算
     if (!searchOn()) payload.use_dense = false;
 
+    const ctl = new AbortController();
+    // stopReason 会被各个 catch 分支读：user=用户点了停止，idle=长时间没数据，
+    // abort=外部打断，其余留给网络/模型错误。
+    activeStream = { ctl, stopReason: '' };
+    let idleTimer = null;
+    const armIdle = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (!activeStream) return;
+        activeStream.stopReason = 'idle';
+        ctl.abort();
+      }, SSE_IDLE_TIMEOUT_MS);
+    };
+    armIdle();
+
     const resp = await fetch('/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: ctl.signal,
     });
 
     if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()).slice(0, 200));
@@ -685,45 +736,57 @@ async function send() {
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    // 收到过 done 事件 = 后端认为这轮已经结束。用它和"流被掐断"区分开。
+    let finished = false;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    try {
+      while (true) {
+        armIdle();  // 每次等待前重置空闲计时：有数据来就说明链路活着
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
 
-      // SSE 用空行分隔每条事件
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop();
+        // SSE 用空行分隔每条事件
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
 
-      for (const part of parts) {
-        const line = part.trim();
-        if (!line.startsWith('data:')) continue;
+        for (const part of parts) {
+          const line = part.trim();
+          // 心跳是 `: ping`，第 735 行那条 startsWith('data:') 会跳过它，
+          // 但计时器在上面已经因为"读到数据"被重置过了——这正是心跳的意义。
+          if (!line.startsWith('data:')) continue;
 
-        let ev;
-        try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
+          let ev;
+          try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
 
-        if (ev.type === 'evidence') {
-          evidenceItems = ev.items || [];
-        } else if (ev.type === 'roles') {
-          roleItems = ev.items || [];
-        } else if (ev.type === 'status') {
-          statusText = ev.text || '';
-        } else if (ev.type === 'answer_delta') {
-          answer += ev.text;
-          // 边收边折叠：模型刚吐出【结论】就显示在顶部，依据/局限继续写进下面的折叠区，
-          // 结构一次建好就不再重建，所以文字不会在用户眼皮底下跳位置。
-          streamAns.push(answer);
-        } else if (ev.type === 'tool_call') {
-          traceEl = traceEl || addMsg('', 'trace');
-          traceEl.textContent += `🔧 调用 ${ev.tool}(${ev.arguments})\n`;
-        } else if (ev.type === 'tool_result') {
-          traceEl = traceEl || addMsg('', 'trace');
-          traceEl.textContent += `   ↳ ${ev.result}\n`;
-        } else if (ev.type === 'error') {
-          addMsg('服务出错：' + ev.message, 'err');
+          if (ev.type === 'evidence') {
+            evidenceItems = ev.items || [];
+          } else if (ev.type === 'roles') {
+            roleItems = ev.items || [];
+          } else if (ev.type === 'status') {
+            statusText = ev.text || '';
+          } else if (ev.type === 'answer_delta') {
+            answer += ev.text;
+            // 边收边折叠：模型刚吐出【结论】就显示在顶部，依据/局限继续写进下面的折叠区，
+            // 结构一次建好就不再重建，所以文字不会在用户眼皮底下跳位置。
+            streamAns.push(answer);
+          } else if (ev.type === 'tool_call') {
+            traceEl = traceEl || addMsg('', 'trace');
+            traceEl.textContent += `🔧 调用 ${ev.tool}(${ev.arguments})\n`;
+          } else if (ev.type === 'tool_result') {
+            traceEl = traceEl || addMsg('', 'trace');
+            traceEl.textContent += `   ↳ ${ev.result}\n`;
+          } else if (ev.type === 'done') {
+            finished = true;
+          } else if (ev.type === 'error') {
+            addMsg('服务出错：' + ev.message, 'err');
+          }
+          chatScrollEl.scrollTop = chatScrollEl.scrollHeight;
         }
-        chatScrollEl.scrollTop = chatScrollEl.scrollHeight;
       }
+    } finally {
+      clearTimeout(idleTimer);
+      ctl.abort();  // 无论如何都释放这条连接（正常结束/中止/异常都走这里）
     }
 
     if (!answer) botEl.textContent = '（没有返回内容）';
@@ -739,7 +802,16 @@ async function send() {
       catalog: !evidenceItems.length && /论文库清单/.test(answer || '')
     });
 
-    // 成功拿到回答才记入历史：失败/空回答不污染下一轮
+    // 没收到 done 就断了：内容可能不全，但已经出来的部分照样存，
+    // 只在气泡上多写一句提醒，免得用户以为这是完整回答。
+    if (!finished && answer) {
+      const tail = document.createElement('div');
+      tail.className = 'msg__note';
+      tail.textContent = '连接提前结束，以上内容可能不完整。';
+      botEl.appendChild(tail);
+    }
+
+    // 拿到回答才记入历史：失败/空回答不污染下一轮
     if (answer) {
       s.messages.push({ role: 'assistant', content: answer });
       s.updatedAt = Date.now();
@@ -747,13 +819,54 @@ async function send() {
       sbRenderHistory();
     }
   } catch (e) {
-    addMsg('请求失败：' + e.message, 'err');
-    // 出错时把已经收到的部分按同样结构收口，别留下一坨半渲染的原始文本
-    if (answer) streamAns.finish();
-    streamAns.stop();
+    // 三种"预期内"的中止各给一句话，其余照旧报错原文。
+    // 关键点：无论哪种，下面都要把已经收到的半段按同样结构收口，
+    // 不能让气泡停在"正在生成…"，也不能留下一个永远转圈的界面。
+    const reason = activeStream ? activeStream.stopReason : '';
+    if (e.name === 'AbortError' && reason === 'user') {
+      if (answer) {
+        streamAns.finish();
+        streamAns.stop();
+        streamAns.foldRoles(roleItems, statusText);
+        ChatCore.renderEvidence(botEl, evidenceItems, { catalog: false });
+        const note = document.createElement('div');
+        note.className = 'msg__note';
+        note.textContent = '已停止生成。';
+        botEl.appendChild(note);
+        // 停止前已经收到的内容照常记进历史——它确实是模型吐出来的文字
+        s.messages.push({ role: 'assistant', content: answer });
+        s.updatedAt = Date.now();
+        saveSessions();
+        sbRenderHistory();
+      } else {
+        botEl.textContent = '已停止生成。';
+      }
+    } else if (e.name === 'AbortError' && reason === 'idle') {
+      if (answer) {
+        streamAns.finish();
+        streamAns.stop();
+        streamAns.foldRoles(roleItems, statusText);
+        ChatCore.renderEvidence(botEl, evidenceItems, { catalog: false });
+        const note = document.createElement('div');
+        note.className = 'msg__note';
+        note.textContent = `已经有 ${Math.round(SSE_IDLE_TIMEOUT_MS / 1000)} 秒没有收到任何数据，已自动中止。上面是中断前的内容。`;
+        botEl.appendChild(note);
+        s.messages.push({ role: 'assistant', content: answer });
+        s.updatedAt = Date.now();
+        saveSessions();
+        sbRenderHistory();
+      } else {
+        botEl.textContent = `等待超时：${Math.round(SSE_IDLE_TIMEOUT_MS / 1000)} 秒没有收到任何数据，请重试。`;
+      }
+    } else {
+      addMsg('请求失败：' + (e.message || e.name || '未知错误'), 'err');
+      // 出错时把已经收到的部分按同样结构收口，别留下一坨半渲染的原始文本
+      if (answer) streamAns.finish();
+      streamAns.stop();
+    }
   } finally {
-    sendEl.disabled = false;
-    inputEl.focus();
+    activeStream = null;
+    endStreamUI();
   }
 }
 
@@ -772,6 +885,7 @@ inputEl.addEventListener('keydown', e => {
   send();
 });
 sendEl.addEventListener('click', send);
+stopEl.addEventListener('click', stopStream);
 autoGrow();
 
 // 侧栏（折叠 / 拖宽 / 历史）由共用的 sidebar.js 负责，在那个 script 标签里

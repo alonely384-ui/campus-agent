@@ -712,6 +712,10 @@
         const lines = [];
         (d.results || []).forEach(r => {
           if (r.error) lines.push(`✗ ${r.filename}：${r.error}`);
+          else if (r.index_ok === false) {
+            // 文件进库了但搜不到内容：必须和"成功"分开说，否则用户以为能问答
+            lines.push(`⚠ ${r.filename}（${r.paper.pages} 页，已保存但未入库：${r.index_error}）`);
+          }
           else lines.push(`✓ ${r.filename}（${r.paper.pages} 页，索引 ${r.indexed} 块）`);
         });
         upStatusEl.textContent = lines.join('\n');

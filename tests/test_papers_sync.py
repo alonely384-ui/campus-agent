@@ -25,8 +25,37 @@ def library(tmp_path, monkeypatch):
     return papers_mod
 
 
+def _minimal_pdf(marker: str) -> bytes:
+    """最小合法 PDF（pypdf 能打开），`marker` 写进正文保证内容各不相同。
+
+    2026-11-18：`save_paper` 开始校验 PDF 结构以后，"只有 %PDF- 文件头的字符串"
+    不再算合法文件，这里补一个真能被解析的最小样本。
+    """
+    body = f"BT /F1 12 Tf 72 720 Td ({marker}) Tj ET".encode("latin-1")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length " + str(len(body)).encode() + b" >>\nstream\n" + body + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, obj in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n".encode() + obj + b"\nendobj\n"
+    xref_at = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode()
+    out += b"0000000000 65535 f \n"
+    for off in offsets:
+        out += f"{off:010d} 00000 n \n".encode()
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode()
+    return bytes(out)
+
+
 def _fake_pdf(name: str) -> tuple[str, bytes]:
-    return name, b"%PDF-1.4 fake bytes for " + name.encode("utf-8")
+    return name, _minimal_pdf(name)
 
 
 def test_sync_index_picks_up_files_on_disk(library):
@@ -129,8 +158,8 @@ def test_batch_upload_reports_each_file(library, monkeypatch):
     resp = client.post(
         "/papers/upload",
         files=[
-            ("files", ("batch-a.pdf", b"%PDF-1.4 a", "application/pdf")),
-            ("files", ("batch-b.pdf", b"%PDF-1.4 b", "application/pdf")),
+            ("files", ("batch-a.pdf", _minimal_pdf("batch A"), "application/pdf")),
+            ("files", ("batch-b.pdf", _minimal_pdf("batch B"), "application/pdf")),
         ],
     )
 
@@ -150,11 +179,11 @@ def test_batch_upload_flags_newer_version(library, monkeypatch):
 
     client.post(
         "/papers/upload",
-        files={"files": ("1706.03762v1.pdf", b"%PDF-1.4 v1", "application/pdf")},
+        files={"files": ("1706.03762v1.pdf", _minimal_pdf("v1 body"), "application/pdf")},
     )
     resp = client.post(
         "/papers/upload",
-        files={"files": ("1706.03762v7.pdf", b"%PDF-1.4 v7", "application/pdf")},
+        files={"files": ("1706.03762v7.pdf", _minimal_pdf("v7 body"), "application/pdf")},
     )
 
     body = resp.json()

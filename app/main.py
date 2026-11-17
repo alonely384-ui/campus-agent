@@ -1257,14 +1257,28 @@ async def papers_upload(
             continue
 
         # 保存成功后立刻入库（切块 → 向量 → BM25），否则会出现"上传了但 AI 检索不到"。
-        # 入库失败不让整个上传 500：文件已经存好了，返回 indexed=0 提示稍后重建。
+        # 2026-11-18 调整：
+        #   1. index_paper 是纯同步 CPU/IO 活（实测切块 0.26~0.9s/篇，向量化约
+        #      222ms/块，一篇 300 块要 60 秒以上），**必须丢线程池**，否则整站卡住。
+        #      同文件另外三处（下载链路）一直是 run_in_threadpool，这里是漏的。
+        #   2. 入库失败不让整个上传 500：文件已经存好了，但要如实标成
+        #      index_error 而不是假装成功（以前只 logger.exception 记一笔，
+        #      前端拿到的仍是"上传成功"）。
         indexed = 0
+        index_error = ""
         try:
             path = paper_path(paper.paper_id)
-            if path is not None:
-                indexed = index_paper(str(path), paper.filename)
-        except Exception:
+            if path is None:
+                index_error = "文件已保存，但在论文库里找不到它的原件路径"
+            else:
+                indexed = await run_in_threadpool(index_paper, str(path), paper.filename)
+        except Exception as exc:  # noqa: BLE001 - 单篇入库失败不能中断整批
             logger.exception("论文已保存，但入库失败（paper_id=%s）", paper.paper_id)
+            index_error = f"入库失败：{type(exc).__name__}"
+        if not index_error and indexed <= 0:
+            # 扫描件没有文字层、又没生成 OCR 缓存时 add_chunks 会返回 0。
+            # 这不等于"损坏"，但等于"检索不到"，必须让用户看见。
+            index_error = "没有可检索的文字（可能是扫描件且尚未生成 OCR 缓存）"
 
         duplicate = None
         if dup is not None:
@@ -1286,6 +1300,10 @@ async def papers_upload(
                 "filename": paper.filename,
                 "paper": PaperOut(**vars(paper)).model_dump(),
                 "indexed": indexed,
+                # 保存成功 ≠ 可用：index_error 非空表示"文件在库里，但搜不到内容"，
+                # 前端据此显示黄色提示而不是绿色成功。
+                "index_ok": not index_error,
+                "index_error": index_error,
                 "duplicate": duplicate,
             }
         )
@@ -1296,11 +1314,19 @@ async def papers_upload(
         "total": len(uploads),
         "saved": len(saved),
         "duplicates": len(dups),
+        # indexed 不等于 saved 时，前端要把"已保存但入库失败"的条数单独说出来
+        "indexed_failed": sum(1 for r in saved if not r.get("index_ok", True)),
         "results": results,
     }
     if len(uploads) == 1 and saved:
         # 单文件的老接口形态（老前端/老测试只读这三个字段）
-        body.update(paper=saved[0]["paper"], indexed=saved[0]["indexed"], duplicate=saved[0]["duplicate"])
+        body.update(
+            paper=saved[0]["paper"],
+            indexed=saved[0]["indexed"],
+            index_ok=saved[0]["index_ok"],
+            index_error=saved[0]["index_error"],
+            duplicate=saved[0]["duplicate"],
+        )
     if not saved and len(uploads) > 1:
         raise HTTPException(status_code=400, detail="一个文件都没存成功")
     return body

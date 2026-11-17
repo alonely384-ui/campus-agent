@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
@@ -223,6 +224,66 @@ def _page_count(path: Path) -> int:
         return len(PdfReader(str(path)).pages)
     except Exception:  # noqa: BLE001
         return 0
+
+
+# PDF 头：规范允许 `%PDF-` 前有少量垃圾字节，所以只在文件开头 1KB 内找
+_PDF_MAGIC = b"%PDF-"
+_PDF_MAGIC_SCAN = 1024
+
+
+class PdfInvalidError(ValueError):
+    """上传的文件不是可用的 PDF。
+
+    继承 ValueError 是有意的：`save_paper` 对「不合法输入」历来抛 ValueError，
+    接口层已经把它转成 400，调用方不需要多认一个异常类型。
+    """
+
+
+def inspect_pdf(content: bytes) -> int:
+    """判断一段字节是不是**完整可用**的 PDF，返回页数。
+
+    - 空内容 → PdfInvalidError("文件是空的")
+    - 文件头不是 %PDF- → PdfInvalidError("文件内容不是 PDF")
+    - pypdf 打不开（截断、交叉引用坏、加密且无法解密）→ PdfInvalidError
+    - 正常 → 返回页数（≥1）
+
+    **扫描件必须判为有效**：整页是图片、没有文字层的 PDF 能正常打开，
+    只是 `extract_text()` 返回空串。那种情况归 OCR 兜底处理，不在这里拦。
+    所以这里只看"结构能不能打开"，不看"有没有字"。
+
+    为什么同时信 pypdf 和 pymupdf 两家的结论：实测（2026-11-18）对
+    「截断到 1/3 的 PDF」，pypdf 报 `PdfStreamError: Stream has ended
+    unexpectedly`，而 pymupdf 仍能打开第 1 页。只信 pymupdf 会把那份截断文件
+    当成功放进去，之后阅读页翻到第 2 页才报错，用户看到的是"上传成功但打不开"。
+    """
+    if not content:
+        raise PdfInvalidError("文件是空的（0 字节）")
+    head = content[:_PDF_MAGIC_SCAN]
+    if _PDF_MAGIC not in head:
+        raise PdfInvalidError("文件内容不是 PDF（缺少 %PDF- 文件头）")
+
+    from pypdf import PdfReader
+
+    try:
+        reader = PdfReader(io.BytesIO(content))
+        pages = len(reader.pages)
+    except Exception as exc:  # noqa: BLE001 - 见 _pdf_error_message 的分类
+        raise PdfInvalidError(_pdf_error_message(type(exc).__name__, exc)) from exc
+
+    if pages <= 0:
+        raise PdfInvalidError("PDF 里没有任何一页")
+    return pages
+
+
+def _pdf_error_message(name: str, exc: Exception) -> str:
+    """把 pypdf 的异常名翻成给用户看的一句话。"""
+    if name == "EmptyFileError":
+        return "文件是空的（0 字节）"
+    if name == "PdfStreamError":
+        return "PDF 数据不完整或已被截断，无法解析"
+    if name == "InvalidPdfError":
+        return f"PDF 文件头异常或已加密无法打开：{exc}"
+    return f"PDF 无法解析（{name}）：{exc}"
 
 
 # ---------------------------------------------------------------- 对外功能
@@ -461,6 +522,7 @@ def save_paper(
     filename: str,
     content: bytes,
     text_extractor=lambda path: _extract_text(path),
+    structure_parser=None,
 ) -> tuple[Paper, Paper | None, float]:
     """保存一篇上传的 PDF。
 
@@ -469,11 +531,21 @@ def save_paper(
     流程：校验 → 落盘 → 抽前几页文字 → 查重 → 记索引。
     重复不拦截，而是「照样存、但标记 duplicate_of」，让用户自己决定留哪版
     —— 赛题原文就是这么要求的（提示用户选择保留哪个版本）。
+
+    **校验放在落盘之前**（2026-11-18 修）：以前只查后缀和大小，一份 24 字节的
+    假 PDF 也能 200 保存成功、pages=0 入库，之后阅读、检索、图谱全线拿它没辙，
+    而用户看到的是"上传成功"。现在先用 `inspect_pdf()` 确认它真是能打开的 PDF，
+    不合格直接抛 `PdfInvalidError`（ValueError 子类），一个字节都不落盘。
+
+    ``structure_parser`` 默认是 `app.structure.parse_structure`；测试可以传
+    一个假函数，免得为了验"半成品清理"而真的去解析 PDF。
     """
     if not filename.lower().endswith(SUPPORTED):
         raise ValueError("只支持 PDF")
     if len(content) > MAX_SIZE:
         raise ValueError(f"文件超过 {MAX_SIZE // 1024 // 1024}MB")
+    # 空文件 / 假 PDF / 截断 / 交叉引用坏：都在这里拦住，不进磁盘
+    pages = inspect_pdf(content)
 
     _ensure_dirs()
 
@@ -482,32 +554,51 @@ def save_paper(
     safe_name = Path(filename).name
 
     dest = PAPERS_DIR / f"{paper_id}.pdf"
-    dest.write_bytes(content)
-
-    text = text_extractor(dest)
     cached = TEXT_DIR / f"{paper_id}.txt"
-    cached.write_text(text, encoding="utf-8")
-
-    # 结构化解析：标题/作者/章节树存成旁挂文件（data/papers/<id>.structure.json）。
-    # 失败只记日志，不影响上传和检索——这是"附加信息"，不是主流程。
+    side_json = structure_path(paper_id)
+    # 合并进总表之前的**快照**，回滚用它精确还原（见 _rollback_saved）。
+    # 记 None 表示"还没碰过总表"，和"碰过、但原来没有这一篇"要区分开。
+    structures_before: dict[str, dict] | None = None
+    dest.write_bytes(content)
     try:
-        from app.structure import parse_structure
+        text = text_extractor(dest)
+        cached.write_text(text, encoding="utf-8")
 
-        structure = parse_structure(str(dest))
-        if structure.get("title") or structure.get("authors"):
-            save_structure(paper_id, structure)
-            # 旁挂 JSON 只是备份，阅读页与 /paper/{f}/structure 查的是
-            # data/meta/structures.json 那张按文件名索引的总表。不合并进去，
-            # 上传进来的论文就永远没有章节树——下载链路（/library/download）
-            # 一直是显式合并的，这里以前漏了。
-            merge_structure(safe_name, structure)
-    except Exception:  # noqa: BLE001
-        logger.exception("结构化解析失败，跳过（不影响上传）")
+        # 结构化解析：标题/作者/章节树存成旁挂文件（data/papers/<id>.structure.json）。
+        # 失败只记日志，不影响上传和检索——这是"附加信息"，不是主流程。
+        try:
+            if structure_parser is None:
+                from app.structure import parse_structure
+
+                structure_parser = parse_structure
+            structure = structure_parser(str(dest))
+            if structure.get("title") or structure.get("authors"):
+                save_structure(paper_id, structure)
+                # 旁挂 JSON 只是备份，阅读页与 /paper/{f}/structure 查的是
+                # data/meta/structures.json 那张按文件名索引的总表。不合并进去，
+                # 上传进来的论文就永远没有章节树——下载链路（/library/download）
+                # 一直是显式合并的，这里以前漏了。
+                #
+                # 合并前先拍快照（2026-11-18 修）：以前这里没接 merge_structure
+                # 的返回值，structure_merged 恒为 False，回滚里的清理分支是死的——
+                # 总表写成功、索引写失败时，PDF 和旁挂 JSON 都被删了，
+                # data/meta/structures.json 里那条却留了下来，成了指向不存在文件的
+                # 幽灵记录。现在整份旧表存下来，回滚时连"这篇新增的键"和
+                # "其他论文被动过的值"一起还原。
+                structures_before = load_structures()
+                merge_structure(safe_name, structure)
+        except Exception:  # noqa: BLE001
+            logger.exception("结构化解析失败，跳过（不影响上传）")
+    except Exception:
+        # 走到这里说明文件已经落盘但后续步骤炸了。不清掉就留下一份
+        # "磁盘上有、索引里没有"的半成品，`sync_index()` 下次启动还会把它
+        # 补登记成一条 pages=0 的幽灵论文（`test_sync_index_picks_up_files_on_disk`
+        # 描述的就是这个机制）。所以失败必须原样撤回，不留残余。
+        _rollback_saved(paper_id, safe_name, dest, cached, side_json, structures_before)
+        raise
 
     # 查重时把自己排除掉：同一个文件重复上传，不该跟自己比
     best, score, reason = _find_duplicate(text, filename=safe_name, exclude_id=paper_id)
-
-    pages = _page_count(dest)
 
     paper = Paper(
         paper_id=paper_id,
@@ -519,8 +610,12 @@ def save_paper(
         duplicate_reason=reason if best else "",
     )
 
-    others = [p for p in _load_index() if p.paper_id != paper_id]
-    _save_index([paper, *others])
+    try:
+        others = [p for p in _load_index() if p.paper_id != paper_id]
+        _save_index([paper, *others])
+    except Exception:
+        _rollback_saved(paper_id, safe_name, dest, cached, side_json, structures_before)
+        raise
     logger.info(
         "保存论文 %s (%s, %d 页, 重复=%s)",
         paper_id,
@@ -529,6 +624,41 @@ def save_paper(
         paper.duplicate_of or "否",
     )
     return paper, best, score
+
+
+def _rollback_saved(
+    paper_id: str,
+    filename: str,
+    dest: Path,
+    cached: Path,
+    side_json: Path,
+    structures_before: dict[str, dict] | None,
+) -> None:
+    """撤回一篇没保存完的论文：原件、文字缓存、旁挂结构、总表条目一起清。
+
+    只删**这次刚写出来**的东西：原件按 paper_id 命名，天然只可能是本次写的。
+
+    ``structures_before`` 是合并进总表**之前**的整份快照：
+    - 为 None 表示这次压根没碰总表，什么都不用还原；
+    - 否则把总表写回这份快照。这样"这次新增的键"会消失，"其他论文被动过的值"
+      也会回到原样，不会出现只删一半的状态。
+
+    为什么用整份快照而不是只删自己那个键：`merge_structure` 走的是
+    `load_structures()` → 改 → `save_structures()` 全量重写，中间任何一步炸掉
+    都可能让总表停在半截；只删自己那一条修不了"别人被改坏"的情况。
+    还原只在**确实写过**时才做，所以别的论文已有的结构数据一个都不会丢。
+    """
+    for path in (dest, cached, side_json):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:  # 删不掉也不能把原始异常盖掉
+            logger.warning("清理半成品失败：%s", path, exc_info=True)
+    if structures_before is not None:
+        try:
+            save_structures(structures_before)
+        except Exception:  # noqa: BLE001
+            logger.warning("回滚 structures.json 失败：%s", filename, exc_info=True)
+    logger.info("已撤回未完成保存的论文 %s（%s）", paper_id, filename)
 
 
 def delete_structure(source: str) -> bool:

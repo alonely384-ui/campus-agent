@@ -64,6 +64,13 @@ ADMIN_PATHS: frozenset[str] = frozenset(
         "/buckets/delete",
         "/buckets/assign",
         "/buckets/unassign",
+        # 强制刷新全库推荐：每次刷新都会串行打 Semantic Scholar + arXiv
+        # （自述「通常 20~60 秒」），并且会覆盖 data/meta/recommendations.json。
+        # 2026-11-18 从公开路径挪到这里：审计实测匿名 POST 一次就真跑了 7.7 秒
+        # 的外部请求，任何人都能反复触发，等于给别人一个消耗我们外部额度的开关。
+        # 只读的 GET /recommendations（读缓存）仍然公开，前端"刷新"按钮因此
+        # 改成先读缓存、需要强制刷新时要求管理员登录。
+        "/recommendations/refresh",
         # 注意：`/buckets` 的 GET（读名单）与 POST（新建大类）同路径，
         # 不能整条登记成管理接口，否则筛选条拉不到名单。
         # 见 path_methods_admin()：只把写方法拦下来。
@@ -118,7 +125,6 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/paper/{filename}/references/download",
         "/paper/{filename}/references/plan",
         "/paper/{filename}/references/download-one",
-        "/recommendations/refresh",
         "/recommendations/{key}/feedback",
         "/recommendations/schedule",
         "/graph",
@@ -455,6 +461,8 @@ _RATE_TABLE: dict[str, Bucket] = {
     # 用 BUCKET_REF_PLAN 而不是 BUCKET_LLM：后者按"单次模型调用"标定（突发 3），
     # 而这条请求内部要连调 N 次、首次 20 秒以上，用户反复点就被 429 锁死。
     "/paper/{filename}/references/plan": BUCKET_REF_PLAN,
+    # 强制刷新全库推荐：现在是管理员接口（2026-11-18 从 PUBLIC_PATHS 挪进
+    # ADMIN_PATHS），档位保持不变——认证先于限流，匿名的请求连令牌都不消耗。
     "/recommendations/refresh": BUCKET_HEAVY,
     # 局域图谱：抽取 20 篇参考文献是纯 CPU 活，但上传版还要落盘，统一给重量级档
     # 局域图谱（赛题 1.5.1/1.5.2）：勾选建图只读库内已解析的 PDF；

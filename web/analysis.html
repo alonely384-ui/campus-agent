@@ -612,7 +612,13 @@
           const d = await r.json();
           added = (d.results || []).filter(x => x.filename && !x.error).map(x => x.filename);
           const failed = (d.results || []).filter(x => x.error);
-          if (failed.length) hint(`有 ${failed.length} 篇没能入库：` + failed.map(x => x.error).join('；'), true);
+          const notIndexed = (d.results || []).filter(x => !x.error && x.index_ok === false);
+          if (notIndexed.length) {
+            hint(`${notIndexed.length} 篇已保存但没能建索引（综述里检索不到内容）：`
+              + notIndexed.map(x => `${x.filename}——${x.index_error}`).join('；'), true);
+          } else if (failed.length) {
+            hint(`有 ${failed.length} 篇没能入库：` + failed.map(x => x.error).join('；'), true);
+          }
         } catch (err) {
           hint('上传失败：' + err.message, true);
           inp.value = '';
