@@ -344,6 +344,78 @@ def _needs_log(values) -> bool:
     return hi / lo >= 100
 
 
+def _export_radar(df: pd.DataFrame, x: str, y: str, ax) -> None:
+    """把多个样本在多个指标上的表现画成极坐标雷达图。
+
+    三个必须处理的问题：
+
+    1. **量纲不同**：accuracy 是 80 多、params_M 是 7000，直接画到同一根轴上，
+       参数量那条边会把其余指标全压成贴着圆心的点。这里按每列自己的
+       min-max 归一到 0-1，坐标轴标签写「列名 (min–max)」交代真实范围。
+    2. **角度闭合**：多边形要首尾相接，否则最后一根轴和第一根轴之间会缺一条边。
+    3. **单列退化**：只有一列数值时画不出多边形，如实退回柱状图而不是硬画。
+
+    样本名取 ``x`` 列（x 列没指定时用行号），每个样本一条闭合折线。
+    """
+    cols = [c for c in y.split(",") if c and c in df.columns][:8]
+    if len(cols) < 2:
+        # 少于两根轴就没有「雷达」可言，如实退回柱状，别画出畸形图
+        means = [float(pd.to_numeric(df[c], errors="coerce").mean()) for c in cols] or [0.0]
+        ax.bar(cols or ["(无数值列)"], means, color="#4a5568")
+        ax.set_ylabel("均值")
+        return
+
+    labels = df[x].astype(str).tolist() if x in df.columns else [str(i) for i in range(len(df))]
+
+    # 每列归一化，并记录真实范围供轴标签使用
+    norm = {}
+    intervals = {}
+    for c in cols:
+        s = pd.to_numeric(df[c], errors="coerce")
+        lo, hi = float(s.min()), float(s.max())
+        span = hi - lo
+        norm[c] = s.apply(lambda v, lo=lo, span=span: 0.5 if span == 0 else (float(v) - lo) / span).tolist()
+        intervals[c] = (lo, hi)
+
+    angles = [n / float(len(cols)) * 2 * 3.141592653589793 for n in range(len(cols))]
+    angles += angles[:1]  # 闭合
+
+    palette = ["#2b6cb0", "#c05621", "#2f855a", "#6b46c1", "#b83280", "#4a5568"]
+    for i, name in enumerate(labels):
+        values = [norm[c][i] for c in cols]
+        values += values[:1]
+        ax.plot(angles, values, linewidth=1.4, color=palette[i % len(palette)], label=name)
+        ax.fill(angles, values, alpha=0.08, color=palette[i % len(palette)])
+
+    # 轴标签写列名 + 真实取值范围，读者才知道 0.8 对应多少。
+    # 单行写，不要换行——极坐标里换行后的第二行会跟前一行挤在一起。
+    tick_labels = [f"{c} ({intervals[c][0]:g}–{intervals[c][1]:g})" for c in cols]
+    ax.set_xticks(angles[:-1])
+    # 标签沿径向向外推一点，避免贴着圆周被裁掉
+    ax.tick_params(axis="x", pad=8)
+    ax.set_xticklabels(tick_labels, fontsize=7)
+    # 给标签加白底：0 度那个标签必然压在圆周线上，不垫白底会和圆线叠在一起看不清
+    for label in ax.get_xticklabels():
+        label.set_bbox(
+            {"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 1.2}
+        )
+    ax.set_yticks([0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels([], fontsize=0)
+    ax.set_ylim(0, 1)
+    ax.spines["polar"].set_color("#cbd5e0")
+    ax.grid(alpha=0.25, linestyle="--")
+    if len(labels) <= 8:
+        # 图例放底部横向排：放右上会跟 3 点钟方向的轴标签抢位置，
+        # 那一侧的标签被圆周和画布边缘夹住（实测踩过）。
+        ax.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=min(len(labels), 6),
+            fontsize=7.5,
+            frameon=False,
+        )
+
+
 def _export_radar3d(df: pd.DataFrame, cols: list[str], title: str, plt) -> bytes:
     """真三维雷达图（matplotlib 3D 投影）：三个指标各占一根轴，样本是空间中的点。
 
@@ -422,6 +494,10 @@ def export_png(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> bytes
             return _export_radar3d(df, cols, title, plt)
 
     fig, ax = plt.subplots(figsize=(6.4, 4.0), dpi=200)
+    if kind == "radar":
+        # 雷达图要极坐标 projection，subplots 建好后改不了，只能重建 figure
+        plt.close(fig)
+        fig, ax = plt.subplots(figsize=(6.4, 4.6), dpi=200, subplot_kw={"polar": True})
 
     if kind == "scatter" and y:
         for col in [c for c in y.split(",") if c]:
@@ -435,12 +511,11 @@ def export_png(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> bytes
         if len(y.split(",")) > 1:
             ax.legend(frameon=False)
     elif kind == "radar":
-        # 雷达图在 matplotlib 里要开极坐标系，导出时简化成柱状对比更稳妥
-        cols = [c for c in y.split(",") if c][:6]
-        mean = [float(pd.to_numeric(df[c], errors="coerce").mean()) for c in cols]
-        ax.bar(cols, mean, color="#4a5568")
-        ax.set_ylabel("均值")
-        plt.xticks(rotation=30, ha="right")
+        # 必须画成真雷达图。早先这里图省事导成了「各列均值」的柱状图，
+        # 结果 caption 按 spec.kind=radar 写成 "Radar chart comparing ..."，
+        # 导出的 PNG 却是柱状图，图文互相矛盾——这种图放进论文是要出事的。
+        # 而且各列均值本身没有语义（把准确率和参数量求平均）。
+        _export_radar(df, x, y, ax)
     elif kind == "pie":
         counts = df[x].value_counts().head(12)
         ax.pie(counts.values, labels=[str(i) for i in counts.index], autopct="%1.1f%%")
@@ -461,10 +536,18 @@ def export_png(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> bytes
     if title:
         ax.set_title(title)
     if kind != "pie":
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
+        # 极坐标（雷达图）没有 top/right 这两个直角坐标系的边框，
+        # 直接索引会抛 KeyError('top')——实测踩过。
+        if "top" in ax.spines:
+            ax.spines["top"].set_visible(False)
+        if "right" in ax.spines:
+            ax.spines["right"].set_visible(False)
         ax.grid(alpha=0.25, linestyle="--")
     fig.tight_layout()
+    if kind == "radar":
+        # 雷达图的轴标签是沿径向铺开的，tight_layout 会把它裁掉一截，
+        # 改用 subplots_adjust 留白
+        fig.subplots_adjust(left=0.20, right=0.80, top=0.92, bottom=0.18)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png")

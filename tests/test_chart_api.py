@@ -58,3 +58,35 @@ def test_caption_never_contains_chinese():
     caption = r.json().get("caption") or ""
     bad = [c for c in caption if "\u4e00" <= c <= "\u9fff"]
     assert not bad, caption
+
+
+def test_radar_export_is_polar_not_bar():
+    """radar 导出的必须是极坐标雷达图，不是柱状图。
+
+    早先这里「图省事」把 radar 导成了一根根柱子（各列均值），结果
+    caption 按 spec.kind=radar 写着 "Radar chart comparing ..."，
+    导出的 PNG 却是柱状图 —— 图文自相矛盾，进论文是要出事的。
+    这里直接盯 matplotlib 的 axes 类型，比比对像素可靠。
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+
+    from app import chart as ch
+
+    df = ch.load_csv(CSV)
+    captured = {}
+    original_savefig = matplotlib.figure.Figure.savefig
+
+    def _spy(self, *a, **kw):
+        captured["polar"] = [getattr(ax, "name", "") for ax in self.axes]
+        return original_savefig(self, *a, **kw)
+
+    matplotlib.figure.Figure.savefig = _spy
+    try:
+        png = ch.export_png(df, {"kind": "radar", "x": "model", "y": "accuracy,f1,params_M"})
+    finally:
+        matplotlib.figure.Figure.savefig = original_savefig
+
+    assert png[:8] == b"\x89PNG\r\n\x1a\n", "导出的不是 PNG"
+    assert captured.get("polar") == ["polar"], f"导出的坐标系是 {captured.get('polar')}"
