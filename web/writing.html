@@ -262,10 +262,9 @@
       <div class="guide-item">
         <h3>1.6.4 中译英</h3>
         <ol>
-          <li>贴入中文段落，可选填术语表，一行一条 <code>中文=English</code>。</li>
-          <li>译文按学术语域输出，可直接塞进 IEEE / ACM 模板。</li>
+          <li>贴入中文段落，译文按学术语域输出，可直接塞进 IEEE / ACM 模板。</li>
         </ol>
-        <div class="tip">术语表能让全文译法统一（比如「重排序」固定译成 reranking），建议先用上。</div>
+        <div class="tip">数字、单位、<code>[12]</code> 这类引用标记与 LaTeX 片段会原样保留，不会被译走。</div>
       </div>
       <div class="guide-item">
         <h3>看英文论文时：划词翻译</h3>
@@ -394,11 +393,6 @@
   <section class="pane" id="p4">
     <label>中文原文</label>
     <textarea id="zh" style="min-height:170px">本文提出一种基于注意力机制的检索增强生成方法。我们发现，当检索到的文档数量超过五个时，模型的回答准确率反而下降，这可能是由于上下文中的噪声累积所致。为了缓解这一问题，我们在重排序阶段引入了对比学习目标，使得不同文档的相关性得分具有更强的区分度。</textarea>
-    <label>术语表（可选，一行一条「中文=English」，用于保证全文译法一致）</label>
-    <textarea id="glossary" style="min-height:90px">注意力机制=attention mechanism
-检索增强生成=retrieval-augmented generation
-重排序=reranking
-对比学习=contrastive learning</textarea>
     <button id="btnZh2en">翻译成学术英文</button>
     <div class="status" id="st4"></div>
     <div class="out" id="out4" style="display:none">
@@ -892,7 +886,7 @@ $('btnZh2en').onclick = async () => {
   try {
     const r = await fetch('/writing/zh2en', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, glossary: $('glossary').value })
+      body: JSON.stringify({ text })
     });
     if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
     const d = await r.json();
