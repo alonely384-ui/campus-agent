@@ -7,7 +7,7 @@
 ![Tests](https://img.shields.io/badge/tests-979%20passed-brightgreen)
 ![Ruff](https://img.shields.io/badge/ruff-clean-brightgreen)
 
-**在线实例**：<https://research-agent.top/ui/>　（公开演示页无需登录；配置中心与论文删除需管理员口令）
+**在线实例**：部署在自有域名下，入口为 `/ui/`（公开演示页无需登录；配置中心与论文删除需管理员口令）
 
 ---
 
@@ -65,7 +65,7 @@
 
 ## 界面
 
-> 截图取自线上实例（`https://research-agent.top`，2026-11-18，1600×1000）。
+> 截图取自线上实例（2026-11-18，1600×1000）。
 
 **对话首页**：左侧栏统一入口，中间是输入坞，回答按「结论 → 依据 → 局限 → 下一步」四段呈现。
 
