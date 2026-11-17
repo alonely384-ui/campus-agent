@@ -380,3 +380,106 @@ def test_candidate_to_dict_includes_openalex_source() -> None:
     c = _cand("X", lit.SOURCE_OPENALEX, year=2025)
     restored = Candidate(**json.loads(json.dumps(c.to_dict())))
     assert restored.source == lit.SOURCE_OPENALEX
+
+
+# --------------------------------------------------------- 相关性门槛（词袋源）
+
+# 以下四条锁住 build_candidates 的两道过滤，理由见 app/literature.py 里
+# ``_keep_relevant`` 的 docstring：它们都是真实网络跑出来才暴露的漏网情况。
+
+
+def test_relevance_terms_splits_camel_case() -> None:
+    """``NativeSparseAttention`` 不先按 camelCase 拆，整串在标题里永远匹配不上。"""
+    assert lit._relevance_terms("NativeSparseAttention") == [
+        "native",
+        "sparse",
+        "attention",
+    ]
+
+
+def test_relevance_terms_keeps_terms_when_query_is_all_generic() -> None:
+    """``long document question answering`` 全是泛词，不能退化成空列表。
+
+    词条为空时 ``_keep_relevant`` 会直接放行，门槛静默失效。
+    """
+    terms = lit._relevance_terms("long document question answering")
+    assert terms, "全泛词查询至少应退回泛词本身"
+    assert set(terms) == {"long", "document", "question", "answering"}
+
+
+def test_keep_relevant_drops_fragment_titles() -> None:
+    """Crossref 把正文表号当独立文献收录，标题命中词一个不少，必须单独挡。"""
+    rows = [
+        _cand("Table 5: Computational overhead comparison."),
+        _cand("Figure 2: Sparse matrix multiplication to minimize computational overhead."),
+        _cand("Supplemental Information 13: Computational Overhead of Fuzzy Optimization."),
+        _cand("Computational overhead in sparse attention"),
+    ]
+    kept = lit._keep_relevant(rows, ["computational", "overhead"], None)
+    assert [c.title for c in kept] == ["Computational overhead in sparse attention"]
+
+
+def test_keep_relevant_topic_gate_only_for_modifier_phrase() -> None:
+    """``computational overhead`` 这一列必须贴主题；普通列不能被主题词卡死。
+
+    实测前者在 OpenAlex 回 MPC 密码学论文，后者
+    （``long document question answering``）的标题里根本不会出现 sparse/attention。
+    """
+    mpc = _cand("Cryptography with constant computational overhead")
+    # 不带主题词时，它自己那列词条是命中的，会被放行
+    assert len(lit._keep_relevant([mpc], ["computational", "overhead"], None)) == 1
+    # 带上「稀疏注意力」主题词后必须挡掉
+    assert lit._keep_relevant([mpc], ["computational", "overhead"], ["sparse", "attention"]) == []
+
+
+def test_build_candidates_skips_bag_sources_for_cjk_query(monkeypatch) -> None:
+    """中文查询只走本库与 arXiv：Crossref/OpenAlex 不做中文分词，回的全是噪声。"""
+    calls = {"crossref": 0, "openalex": 0, "arxiv": 0}
+
+    def fake_crossref(*_a, **_k):
+        calls["crossref"] += 1
+        return [_cand("水文计算在小型水库除险加固设计中需注意的问题", lit.SOURCE_CROSSREF)]
+
+    def fake_openalex(*_a, **_k):
+        calls["openalex"] += 1
+        return [_cand("小学低年级学生注意力问题的成因与干预策略", lit.SOURCE_OPENALEX)]
+
+    def fake_arxiv(*_a, **_k):
+        calls["arxiv"] += 1
+        return []
+
+    monkeypatch.setattr(lit, "search_local", lambda *_a, **_k: [])
+    monkeypatch.setattr(lit, "search_crossref", fake_crossref)
+    monkeypatch.setattr(lit, "search_openalex", fake_openalex)
+    monkeypatch.setattr(lit, "search_arxiv", fake_arxiv)
+
+    pool = lit.build_candidates(["稀疏注意力降低长文档问答中的计算开销"])
+
+    assert calls == {"crossref": 0, "openalex": 0, "arxiv": 1}
+    assert pool == []
+
+
+def test_build_candidates_gates_modifier_column_on_all_bag_sources(monkeypatch) -> None:
+    """修饰短语列在三个词袋源上都要清空，不能漏掉 arXiv。
+
+    实测 ``computational overhead`` 的 arXiv 列回的是
+    ``Low overhead quantum computation using lattice surgery`` 这类量子计算论文，
+    5 条占了 16 个名额的 5 个。
+    """
+    def fake_crossref(*_a, **_k):
+        return [_cand("Table 5: Computational overhead comparison.", lit.SOURCE_CROSSREF)]
+
+    def fake_openalex(*_a, **_k):
+        return [_cand("Cryptography with constant computational overhead", lit.SOURCE_OPENALEX)]
+
+    def fake_arxiv(*_a, **_k):
+        return [_cand("Low overhead quantum computation using lattice surgery")]
+
+    monkeypatch.setattr(lit, "search_local", lambda *_a, **_k: [])
+    monkeypatch.setattr(lit, "search_crossref", fake_crossref)
+    monkeypatch.setattr(lit, "search_openalex", fake_openalex)
+    monkeypatch.setattr(lit, "search_arxiv", fake_arxiv)
+
+    pool = lit.build_candidates(["sparse attention", "computational overhead"])
+
+    assert pool == []

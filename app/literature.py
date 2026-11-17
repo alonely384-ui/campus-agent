@@ -787,6 +787,157 @@ def pool_coverage_gaps(idea: str, pool: list[Candidate]) -> list[str]:
     return [t for t in _concept_terms(idea) if not _covered(t, titles)]
 
 
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+# 标题相关的判词下限：太短的词（单字母、两个字母）在标题里几乎必然命中，
+# 等于把门槛废掉。英文取 3 个字符起（attention / roberta），中文取 2 字起（注意力）。
+_RELEVANCE_MIN_LATIN = 3
+_RELEVANCE_MIN_CJK = 2
+# 判「标题命中」时词条的最短字符数。比检索词下限更严：``overhead`` / ``cost``
+# 这类通用词到处都是，单独命中不能作为「相关」的证据（见 ``_keep_relevant``）。
+_RELEVANCE_HIT_MIN_CHARS = 6
+# 图表 / 补充材料的片段标题，例如 ``Table 5: Computational overhead comparison.``、
+# ``Figure 2: Sparse matrix multiplication...``、``Supplemental Information 13: ...``。
+# 它们被 Crossref 当成独立"论文"收录，标题里查询词一个不少，但是正文里的表号，
+# 不是文献。``_keep_relevant`` 一刀切掉，判据与 terms 无关。
+_FRAGMENT_TITLE_RE = re.compile(
+    r"^\s*(table|figure|fig\.?|supplemental|supplementary)\b[^:]{0,40}?\d+", re.IGNORECASE
+)
+# 「指标修饰词」：出现在查询里时，说明这条查询描述的是某个侧面而不是研究主题。
+# 见 ``_is_modifier_phrase``——这类查询不能当主题词去给别的列放行。
+_RELEVANCE_MODIFIERS = frozenset(
+    {
+        "overhead", "cost", "costs", "latency", "speed", "speedup", "time",
+        "memory", "efficiency", "efficient", "performance", "accuracy", "quality",
+        "size", "scale", "scaling", "budget", "resource", "resources",
+    }
+)
+# 表达「有一篇 / 问一个问题 / 文档」这种结构性含义的泛词。它们几乎出现在
+# 每篇论文标题里（``long document`` 出现在任何长文本论文上），留着当命中词
+# 等于把门槛降到「标题里有个常见词就算相关」。实测这批中文噪声正是靠
+# ``question`` / ``document`` 混进池子的。
+_RELEVANCE_STOPWORDS = frozenset(
+    {
+        "the", "and", "for", "with", "from", "that", "this", "these", "those",
+        "using", "based", "via", "into", "toward", "towards", "their", "its",
+        "are", "was", "were", "have", "has", "been", "can", "may", "not",
+        "new", "novel", "large", "small", "more", "less", "very",
+        "paper", "study", "approach", "method", "methods", "framework", "system",
+        "question", "answering", "answer", "document", "documents", "long",
+        "short", "text",
+    }
+)
+
+
+def _split_camel(text: str) -> list[str]:
+    """把 camelCase / PascalCase 拆开：``NativeSparseAttention`` → 三个词。
+
+    必须在 ``lower()`` **之前**拆，否则大写边界就没了。
+    连续大写（``LLM``）不拆，连同后面的小写一并算一个块。
+    """
+    parts: list[str] = []
+    for chunk in re.split(r"[^0-9A-Za-z]+", text):
+        if not chunk:
+            continue
+        parts.extend(re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+", chunk) or [chunk])
+    return parts
+
+
+def _has_cjk(text: str) -> bool:
+    """是否含汉字。含汉字的查询不送 Crossref/OpenAlex（它们不做中文分词）。"""
+    return bool(_CJK_RE.search(text or ""))
+
+
+def _relevance_terms(query: str) -> list[str]:
+    """把查询词切成用于「标题至少命中一个」判断的词条。
+
+    先按 camelCase 拆，再按非字母数字切分，丢掉太短的词与泛词。
+    含汉字的片段保留为整块（中文没有词边界，硬切只会切出噪声）。
+    """
+    # 去掉 arXiv 的布尔关键字与引号，否则 all / and 这类词会变成"命中词"
+    text = re.sub(r'\b(all|and|or|ti|abs|au)\b|[:"]', " ", query or "")
+    out: list[str] = []
+    generic: list[str] = []
+    for raw in re.split(r"[^0-9a-zA-Z\u4e00-\u9fff]+", text):
+        if not raw:
+            continue
+        if _CJK_RE.search(raw):
+            if len(raw) >= _RELEVANCE_MIN_CJK:
+                out.append(raw.lower())
+            continue
+        for piece in _split_camel(raw):
+            low = piece.lower()
+            if len(low) < _RELEVANCE_MIN_LATIN:
+                continue
+            if low in _RELEVANCE_STOPWORDS:
+                generic.append(low)
+                continue
+            out.append(low)
+    # 整条查询全是泛词时（``long document question answering``），门槛没有可判定词，
+    # 此时退回泛词本身——有门槛总比没有强，它至少还要求标题里出现 ``document``。
+    if not out:
+        out = generic
+    return list(dict.fromkeys(out))
+
+
+def _is_modifier_phrase(terms: list[str]) -> bool:
+    """查询是不是「名词 + 修饰词」结构，例如 ``computational overhead``、``compute cost``。
+
+    这类短语描述的是**某个指标的侧面**，不是研究主题本身：拿它去 Crossref/OpenAlex
+    检索，回的是任何领域里提到这个指标的论文（``Cryptography with constant
+    computational overhead``、``Table 5: Computational overhead comparison.``）。
+    所以它只能当查询用，不能当「主题词」去给别的列放行。
+    """
+    return any(t in _RELEVANCE_MODIFIERS for t in terms)
+
+
+def _keep_relevant(
+    rows: list[Candidate],
+    terms: list[str],
+    topic_terms: list[str] | None = None,
+) -> list[Candidate]:
+    """只留下标题里命中了**足够多**查询词、且**贴着主题**的结果。
+
+    只用于 Crossref/OpenAlex 这类「一定回满 rows 条」的词袋源；
+    本库与 arXiv 走真检索，不过这道门槛。
+
+    三层判据，从宽到严依次收口（每一层都有实测依据）：
+
+    0. **图表片段标题一律丢弃**（``Table 5: ...`` / ``Figure 2: ...`` /
+       ``Supplemental Information 13: ...``）。它们是正文里的表号，不是文献，
+       却能把查询词命中得一个不差。这一层与 ``terms`` 无关，先于其余各层执行。
+    1. **命中数 >= 词条数的一半（至少 1 个）**。只要求命中一个时，
+       ``computational overhead`` 会把 ``Cryptography with constant computational
+       overhead``（MPC 领域的固定说法）捞进稀疏注意力的候选池。
+    2. **至少一个命中词是「够具体」的长词**。``overhead`` / ``cost`` 这类短通用词
+       到处都是，单独命中不算证据。
+    3. **标题里必须出现主题词**（``topic_terms``，即 idea 原始检索词里的英文词）。
+       这一层专门挡「查询词自身就偏、于是整列一起跑偏」的情况：实测
+       ``computational overhead`` 这一列在 Crossref 回的是
+       ``Table 5: Computational overhead comparison.`` 这类图表标题、
+       在 OpenAlex 回的是 MPC / 密码学论文、在 arXiv 回的是 ``Low overhead
+       quantum computation using lattice surgery`` 这类量子计算论文——它们每一个
+       词都命中，但整列与稀疏注意力毫无关系。要求标题里出现 ``sparse`` 或
+       ``attention`` 之后，这一列才被清空，而 ``sparse attention`` /
+       ``long document question answering`` 两列不受影响。
+
+    判据只看标题：摘要太泛（几乎每篇 ML 论文摘要里都有 model / attention）。
+    """
+    strong = [t for t in terms if len(t) >= _RELEVANCE_HIT_MIN_CHARS] or terms
+    need = max(1, (len(strong) + 1) // 2)
+    topic = [t for t in (topic_terms or []) if len(t) >= _RELEVANCE_HIT_MIN_CHARS]
+    kept: list[Candidate] = []
+    for c in rows:
+        title = (c.title or "").lower()
+        if _FRAGMENT_TITLE_RE.match(title):
+            continue
+        if strong and sum(1 for t in strong if t in title) < need:
+            continue
+        if topic and not any(t in title for t in topic):
+            continue
+        kept.append(c)
+    return kept
+
+
 def build_candidates(
     queries: list[str],
     local_limit: int = 6,
@@ -803,26 +954,71 @@ def build_candidates(
     每个查询各自召回一列，再按 RRF 融合（见 ``_rrf_fuse``），而不是先拼接后截断——
     拼接会让第一个查询的名额挤掉后面查询里更贴题的小众论文。
 
-    关于**不做标题相关度过滤**这件事：曾试过「标题必须含某个查询词才保留」，
-    实测两条路都不通——
+    **中文查询不送 Crossref/OpenAlex**。这两个源都不做中文分词，把整块中文当
+    字面词袋硬配：实测「稀疏注意力降低长文档问答中」与「计算开销」两个完全不同的
+    中文查询，Crossref 与 OpenAlex 返回的是**同一批**、与内容毫不相干的文献
+    （《水文计算在小型水库除险加固设计中需注意的问题》《小学低年级学生注意力
+    问题的成因与干预策略》之类）。这些噪声经 RRF 融合后名次不低，会把英文查询
+    命中的真论文挤出 16 个名额——实测同一 idea 只用英文查询跑，前 12 名里是
+    FlashAttention / Native Sparse Attention / XAttention 这类正主。
+    所以中文查询只走本库（字面匹配）与 arXiv，Crossref/OpenAlex 这两个词袋源跳过；
+    英文查询三条路照旧。
 
-    * 整串匹配：查询词常是长词组（``retrieval augmented generation for``），
-      归一化后是 ``retrievalaugmentedgenerationfor``，而命中的标题里写的是
-      ``FAIR-RAG``、``Engineering the RAG Stack``，一个字都匹配不上，
-      正经结果被全部误杀。
-    * 单词匹配：``Super-LoRa``（无线通信协议）、``Szafran, Lora``（人名）与
-      微调技术 ``LoRA`` 字面完全重叠，无法区分，噪声照样进池。
+    **再给所有词袋源的结果加一道相关性门槛**：标题里一个查询词都找不到就整篇
+    丢掉。Crossref/OpenAlex 只要不报错就一定回满 ``rows`` 条，与查询有多相关无关，
+    不设门槛等于把数据源的召回上限当成「相关」。arXiv 也按关键词词袋排序，同样会
+    被 ``computational overhead`` 带回整列量子计算论文，所以一并过门槛。三层判据
+    见 ``_keep_relevant``：图表片段标题直接丢、命中数过半、修饰短语列还要求贴主题。
+    本库 ``search_local`` 是真字面匹配（有命中分数），不设门槛。
 
-    所以这里保留数据源的原始排序，让相关度由上游检索的排名决定；
-    候选池里真有噪声时，正文生成环节会因为「没有合适文献」而不去引用它。
+    **不做更细的标题相关度过滤**：曾试过「标题必须含整串查询词」与「标题必须含
+    查询词的全部单词」，实测两条路都不通——整串匹配时查询词常是长词组
+    （``retrieval augmented generation for``），归一化后
+    ``retrievalaugmentedgenerationfor`` 与标题里的 ``FAIR-RAG``、
+    ``Engineering the RAG Stack`` 一个字都匹配不上，正经结果被全部误杀；
+    全单词匹配时多词查询几乎必然落空。所以门槛只取「至少命中一个」。
     """
     per_query: list[list[Candidate]] = []
+    # 主题词只取**单概念短查询**（1~2 个词条、且不是 ``X overhead`` 这种修饰结构）
+    # 里的具体词。长查询通常是模型拼出来的偏短语，把它当主题词等于承认这条偏查询
+    # 自己就是主题——实测那样一整列 MPC 密码学论文照样能混进来。
+    topic_terms: list[str] = []
+    for q in queries:
+        if _has_cjk(q):
+            continue
+        q_terms = _relevance_terms(q)
+        if 1 <= len(q_terms) <= 2 and not _is_modifier_phrase(q_terms):
+            topic_terms.extend(t for t in q_terms if len(t) >= _RELEVANCE_HIT_MIN_CHARS)
+    topic_terms = list(dict.fromkeys(topic_terms))
+
     for q in queries:
         column: list[Candidate] = []
         column.extend(search_local(q, limit=local_limit))
-        column.extend(search_arxiv(q, limit=arxiv_limit))
-        column.extend(search_crossref(q, limit=crossref_limit))
-        column.extend(search_openalex(q, limit=openalex_limit))
+        # Crossref/OpenAlex 不做中文分词，中文词送过去只会换回一批泛结果
+        if not _has_cjk(q):
+            terms = _relevance_terms(q)
+            # 只有「指标修饰短语」列才额外要求贴主题。``long document question
+            # answering`` 是 idea 的另一个侧面，它列的论文标题里不会出现
+            # ``sparse`` / ``attention``，拿主题词去卡会整列杀光——实测 Crossref
+            # 那 6 条真论文（Structure-Aware Quantized Retrieval for Long-Document
+            # Question Answering 等）全部被误杀。
+            gate_topic = topic_terms if _is_modifier_phrase(terms) else None
+            # arXiv 虽是「真检索」，但它按关键词词袋排序：``computational overhead``
+            # 同样会回整列量子计算论文（``Low overhead quantum computation using
+            # lattice surgery`` 等 5 条，实测占了 16 个名额里的 5 个）。凡按词袋
+            # 匹配的源都要过门槛。
+            column.extend(
+                _keep_relevant(search_arxiv(q, limit=arxiv_limit), terms, gate_topic)
+            )
+            column.extend(
+                _keep_relevant(search_crossref(q, limit=crossref_limit), terms, gate_topic)
+            )
+            column.extend(
+                _keep_relevant(search_openalex(q, limit=openalex_limit), terms, gate_topic)
+            )
+        else:
+            # 中文查询只走本库与 arXiv；arXiv 对中文基本 0 命中，但保留通路
+            column.extend(search_arxiv(q, limit=arxiv_limit))
         if column:
             # 列内先去重：同一篇在 arXiv 和 Crossref 都出现时，
             # 不能算成两个名次，否则它的 RRF 分数会凭空翻倍
