@@ -893,6 +893,9 @@ async def papers_files(meta: bool = Query(default=False)) -> dict:
         run_in_threadpool(library_rows), run_in_threadpool(load_structures)
     )
     by_name = {str(row.get("filename") or ""): row for row in rows}
+    # 主题（catalog 的 category）按文件名反查：用户勾论文时要能按主题分组，
+    # 而 /graph/survey 的 citable 会被 filenames 收窄，不能拿来当全库分组依据。
+    themes = await run_in_threadpool(_file_themes, names)
     files = []
     for name in names:
         row = by_name.get(name) or {}
@@ -900,8 +903,22 @@ async def papers_files(meta: bool = Query(default=False)) -> dict:
         if not title:
             struct = structures.get(name) or {}
             title = str(struct.get("title") or "").strip()
-        files.append({"filename": name, "title": title or name.rsplit(".", 1)[0]})
-    return {"files": files}
+        files.append({
+            "filename": name,
+            "title": title or name.rsplit(".", 1)[0],
+            "theme": themes.get(name, ""),
+        })
+    return {"files": files, "themes": sorted({t for t in themes.values() if t})}
+
+
+def _file_themes(names: list[str]) -> dict[str, str]:
+    """文件名 → 主题（catalog 的 category）。查不到就是空串，绝不瞎猜。"""
+    from app.graph import _meta_index  # noqa: PLC0415
+
+    idx = _meta_index()
+    by_file = {rec.get("file"): rec for rec in idx["by_title"].values() if rec.get("file")}
+    by_file.update({rec.get("file"): rec for rec in idx["by_arxiv"].values() if rec.get("file")})
+    return {name: str((by_file.get(name) or {}).get("category") or "") for name in names}
 
 @app.get("/papers", summary="论文列表")
 async def papers_list() -> dict:

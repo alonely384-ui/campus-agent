@@ -189,14 +189,44 @@
     .dir-verdict--unknown { background: var(--bg-muted); color: var(--text-subtle); }
     .dir-reason { font-size: 12.5px; line-height: 1.85; color: var(--text-secondary); margin-top: 7px; }
 
-    /* ---------- 分析范围（选片） ---------- */
-    .scope-card { position: sticky; top: 0; z-index: 5; }
-    /* 默认折叠：只留标题行，勾选列表要点了「调整范围」才展开 */
-    .scope-toggle { margin-left: 10px; font-size: 12px; padding: 3px 10px; }
-    .scope-fold[hidden] { display: none; }
+    /* ---------- 每个模块自己的论文范围（主题分组 + 单篇勾选） ---------- */
+    .pick { margin-top: 10px; }
+    .pick-tog { font-size: 12px; padding: 3px 10px; }
+    .pick-tog .pick-n { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+    .pick-fold[hidden] { display: none; }
+    .pick-fold { margin-top: 8px; border-top: 1px solid var(--border-color-alt); padding-top: 8px; }
+    .pick-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .pick-bar input[type=text] {
+      flex: 1 1 140px; min-width: 0; padding: 4px 8px;
+      border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+      background: var(--bg-surface); color: var(--text-primary); font-size: 12px;
+    }
+    .pick-bar input[type=text]:focus { outline: none; border-color: var(--border-focus); }
+    .pick-btn { font-size: 11.5px; padding: 2px 9px; }
+    .pick-grp { margin-bottom: 6px; }
+    .pick-grp__head {
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      font-size: 12px; color: var(--text-secondary); padding: 2px 0;
+    }
+    .pick-grp__head b { font-weight: 600; color: var(--text-primary); }
+    .pick-grp__n { font-variant-numeric: tabular-nums; color: var(--text-subtle); }
+    .pick-grp__items {
+      display: grid; grid-template-columns: 1fr; gap: 1px;
+      max-height: 168px; overflow-y: auto; padding-left: 18px; margin-top: 2px;
+    }
+    .pick-item {
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      font-size: 12px; line-height: 1.7; color: var(--text-secondary);
+    }
+    .pick-item span {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .pick-item input { margin: 0; cursor: pointer; flex: 0 0 auto; }
+    .pick-hint { font-size: 11.5px; color: var(--text-subtle); margin-top: 4px; line-height: 1.7; }
+    .pick-hint.err { color: var(--chart-danger, #b42318); }
 
     /* ---------- 两个主功能入口（赛题 1.5.3 / 1.5.4） ---------- */
-    .hero-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .hero-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
     .hero-card { display: flex; flex-direction: column; }
     .hero-card h2 { margin-bottom: 6px; }
     .hero-desc {
@@ -205,22 +235,6 @@
     }
     .hero-btn { padding: 8px 18px; font-size: 13.5px; font-weight: 600; }
     @media (max-width: 900px) { .hero-row { grid-template-columns: 1fr; } }
-
-    /* 主题自选：一行 chip，勾哪个就只在这些主题里归纳方向 */
-    .dir-themes { margin: 10px 0 2px; }
-    .dir-themes__k { font-size: 12px; color: var(--text-subtle); margin-right: 6px; }
-    .dir-themes__list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-    .dir-theme {
-      display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
-      padding: 3px 10px; font-size: 12px; border-radius: 999px;
-      border: 1px solid var(--border-strong); color: var(--text-secondary);
-      background: transparent; user-select: none;
-    }
-    .dir-theme:hover { background: var(--bg-muted); }
-    .dir-theme input { margin: 0; cursor: pointer; }
-    .dir-theme.on { border-color: var(--border-focus); color: var(--text-primary); background: var(--bg-muted); }
-    .dir-theme__n { font-variant-numeric: tabular-nums; color: var(--text-subtle); }
-    .dir-themes__hint { font-size: 11.5px; color: var(--text-subtle); margin-top: 5px; }
 
     /* ---------- 缺口矩阵 ---------- */
     .gap-box { margin-top: 4px; }
@@ -301,6 +315,14 @@
           <button class="act ghost-btn" id="narStop" hidden>停止</button>
           <span class="tr-hint" id="narMsg"></span>
         </div>
+        <!-- 本模块自己的论文范围：与「未来工作探索」互不影响。
+             不勾任何一篇 = 全库，与改造前的行为一致。 -->
+        <div class="pick" data-pick="nar">
+          <button class="act ghost-btn pick-tog" id="narPickToggle" type="button">
+            分析范围：<b class="pick-n" id="narPickN">读取中…</b>
+          </button>
+          <div class="pick-fold" id="narPickFold" hidden></div>
+        </div>
         <div class="nar-stages" id="narStages"></div>
       </div>
 
@@ -312,11 +334,12 @@
           <button class="act ghost-btn" id="dirStop" hidden>停止</button>
           <span class="tr-hint" id="dirMsg"></span>
         </div>
-        <!-- 主题自选：方向是从「某篇论文所在的主题 + 图谱缺口」推出来的，
-             所以限定主题就限定了哪些论文能当方向的锚点。不勾 = 全部主题。 -->
-        <div class="dir-themes" id="dirThemes">
-          <span class="dir-themes__k">参与归纳的主题</span>
-          <div class="dir-themes__list" id="dirThemeList">正在读取主题…</div>
+        <!-- 本模块自己的论文范围：与「论述版综述」互不影响 -->
+        <div class="pick" data-pick="dir">
+          <button class="act ghost-btn pick-tog" id="dirPickToggle" type="button">
+            分析范围：<b class="pick-n" id="dirPickN">读取中…</b>
+          </button>
+          <div class="pick-fold" id="dirPickFold" hidden></div>
         </div>
         <div class="nar-stages" id="dirStages"></div>
       </div>
@@ -334,31 +357,8 @@
       <span class="export-msg" id="exportMsg"></span>
     </div>
 
-    <!-- 论文范围：本页三个标签页（自动综述 / 论述版综述 / 未来工作探索）共用同一份输入。
-         口径与图谱页的「局域图谱」一致——先选一批论文，再在这批论文内部做分析。
-         不勾任何论文 = 全库，与改造前的行为完全一样。
-         默认折叠：43 篇的勾选列表太占首屏，把两个主功能挤到了看不见的地方。 -->
-    <div class="card scope-card scope-card--folded" id="scopeCard">
-      <h2>分析范围
-        <span class="sub">勾选的论文是本页三个标签页共同的输入；一篇都不勾就是整个论文库</span>
-        <button class="act ghost-btn scope-toggle" id="scopeToggle" type="button">调整范围</button>
-        <span class="scope-count" id="scopeCount"></span>
-      </h2>
-      <div class="scope-fold" id="scopeFold" hidden>
-        <div class="scope-bar">
-          <input type="text" id="scopeFilter" placeholder="按标题 / 文件名筛选…" autocomplete="off">
-          <button class="act ghost-btn" id="scopeAll">全选</button>
-          <button class="act ghost-btn" id="scopeNone">清空</button>
-          <label class="scope-up">
-            <input type="file" id="scopeUpload" accept="application/pdf" multiple hidden>
-            <span class="scope-up-btn">上传 PDF 一并分析</span>
-          </label>
-        </div>
-        <div class="scope-list" id="scopeList"></div>
-        <div class="scope-hint" id="scopeHint">正在读取论文列表…</div>
-      </div>
-    </div>
-
+    <!-- 论文范围已经收进上面两张卡片各自的「分析范围」，这里不再放全局选片区：
+         两个模块的范围互不影响，共用一块会让人以为改一个会影响另一个。 -->
     <div id="loading">正在读取图谱数据…</div>
 
     <!-- 自动综述 -->
@@ -434,142 +434,284 @@
     let frontierData = null;
     let chart = null;
 
-    // ---------- 分析范围 ----------
-    // 本页三个标签页共用一份选片：自动综述（模板版）、论述版综述、未来工作探索。
-    // 为什么用 Set 存文件名而不是节点 id：用户在图谱/论文列表里认的是文件名
-    // （1706.03762v7.pdf），而节点的 canonical id 是规范化后的 arxiv:1706.03762，
-    // 且一个节点可能挂多份副本（v1/v7/扫描件）。后端 survey() 与
-    // _extract_library_future_work() 都按 copies 逐份文件名比对，勾任意一份都能命中。
-    let scopeFiles = [];        // [{filename, title}]
-    let scopePicked = new Set(); // 勾中的文件名
-    let scopeLoaded = false;
+    // ---------- 每个模块自己的论文范围 ----------
+    // 两个模块（论述版综述 / 未来工作探索）各选各的：综述可能想看全集，
+    // 方向只想看几篇。所以用同一个工厂造两份互相独立的状态，不是共用一份。
+    //
+    // 为什么存文件名而不是节点 id：用户认的是文件名（1706.03762v7.pdf），
+    // 节点的 canonical id 是 arxiv:1706.03762，且一个节点可能挂多份副本。
+    // 后端 survey() 与 _extract_library_future_work() 都按 copies 逐份比对文件名。
+    let pickFiles = [];   // [{filename, title, theme}]，全库一次读到，两份共用只读
+    let pickLoaded = false;
 
-    function scopePickedList() {
-      // 保持库内顺序，便于肉眼核对，也便于探针断言
-      return scopeFiles.filter(f => scopePicked.has(f.filename)).map(f => f.filename);
-    }
+    function makePicker(key, onChange) {
+      const st = {
+        key,
+        picked: new Set(),     // 勾中的文件名
+        groupsOpen: new Set(), // 展开的主题分组
+        filter: '',
+        loaded: false,
+      };
 
-    function scopeIsAll() {
-      // 全选与「还没读到列表」都算全库：后者是降级路径，不能因为列表接口挂了就没法分析
-      if (!scopeLoaded || !scopeFiles.length) return true;
-      return scopePicked.size === scopeFiles.length;
-    }
+      const list = () => $(key + 'PickFold');
+      const countEl = () => $(key + 'PickN');
 
-    // 拼进请求的查询串 / 请求体：全选和不选都发空数组（= 全库），
-    // 这样后端只有一种「全库」语义，不会出现「全选」和「不勾」走两条分支。
-    function scopeArg() {
-      return scopeIsAll() ? [] : scopePickedList();
-    }
+      function pickedList() {
+        // 保持库内顺序：便于肉眼核对，也便于探针断言
+        return pickFiles.filter(f => st.picked.has(f.filename)).map(f => f.filename);
+      }
 
-    function renderScope() {
-      const kw = ($('scopeFilter').value || '').trim().toLowerCase();
-      const list = $('scopeList');
-      const shown = scopeFiles.filter(f => {
-        if (!kw) return true;
-        return (f.title || '').toLowerCase().includes(kw)
+      function isAll() {
+        // 还没读到列表时按全库处理：这是降级路径，不能因为列表接口挂了就没法分析
+        if (!st.loaded || !pickFiles.length) return true;
+        return st.picked.size === pickFiles.length;
+      }
+
+      function arg() {
+        // 全选与不勾都发空数组（= 全库）：后端只有一种「全库」语义，
+        // 不会出现「全选」和「不勾」走两条分支。
+        return isAll() ? [] : pickedList();
+      }
+
+      function resetAll() {
+        st.picked = new Set(pickFiles.map(f => f.filename));
+      }
+
+      function renderCount() {
+        const total = pickFiles.length;
+        const n = st.picked.size;
+        let text;
+        if (!total) text = '库里没有论文';
+        else if (n === 0) text = '未选（= 全库）';
+        else if (n === total) text = `全部 ${total} 篇`;
+        else text = `已选 ${n} / ${total} 篇`;
+        countEl().textContent = text;
+      }
+
+      // 按主题分组：主题来自 catalog 的 category，查不到一律进「未归入主题」，
+      // 不硬塞。分组的勾选框是「三态」的：全勾 / 部分勾 / 全不勾。
+      function grouped() {
+        const kw = st.filter.trim().toLowerCase();
+        const hit = f => !kw || (f.title || '').toLowerCase().includes(kw)
           || (f.filename || '').toLowerCase().includes(kw);
+        const map = new Map();
+        pickFiles.filter(hit).forEach(f => {
+          const t = f.theme || '未归入主题';
+          if (!map.has(t)) map.set(t, []);
+          map.get(t).push(f);
+        });
+        // 有主题的排前面，未归入主题垫底
+        return [...map.entries()].sort((a, b) => {
+          if (a[0] === '未归入主题') return 1;
+          if (b[0] === '未归入主题') return -1;
+          return b[1].length - a[1].length || a[0].localeCompare(b[0], 'zh');
+        });
+      }
+
+      function render() {
+        renderCount();
+        // 只填分组容器，绝不覆盖整个折叠区：工具条（筛选框/全选/清空/上传）
+        // 和状态提示行都是静态节点，覆盖掉就再也点不到了。
+        const host = list().querySelector('.pick-groups');
+        if (!host) return;
+        const groups = grouped();
+        if (!groups.length) {
+          host.innerHTML = '<div class="pick-hint">没有匹配的论文。</div>';
+          return;
+        }
+        host.innerHTML = groups.map(([theme, items]) => {
+          const on = items.filter(f => st.picked.has(f.filename)).length;
+          // 默认折叠分组，避免一次铺 40 多行；搜索时自动全展开
+          const open = st.groupsOpen.has(theme) || st.filter.trim() ? ' open' : '';
+          return `
+            <div class="pick-grp">
+              <label class="pick-grp__head">
+                <input type="checkbox" data-theme="${esc(theme)}"
+                  class="pick-grp__box"${on === items.length ? ' checked' : ''}
+                  data-indeterminate="${on > 0 && on < items.length ? '1' : ''}">
+                <b>${esc(theme)}</b>
+                <span class="pick-grp__n">${on} / ${items.length}</span>
+              </label>
+              <div class="pick-grp__items"${open}>${items.map(f => `
+                <label class="pick-item">
+                  <input type="checkbox" data-file="${esc(f.filename)}"${st.picked.has(f.filename) ? ' checked' : ''}>
+                  <span title="${esc(f.filename)}">${esc(f.title || f.filename)}</span>
+                </label>`).join('')}
+              </div>
+            </div>`;
+        }).join('');
+        // indeterminate 只能用属性设，HTML 里写不出来
+        host.querySelectorAll('.pick-grp__box').forEach(b => {
+          b.indeterminate = b.dataset.indeterminate === '1';
+        });
+      }
+
+      function hint(text, isErr) {
+        const el = list().querySelector('.pick-hint--status');
+        if (!el) return;
+        el.textContent = text || '';
+        el.classList.toggle('err', !!isErr);
+      }
+
+      function changed() {
+        render();
+        onChange(st);
+      }
+
+      // ---- 事件：全部用委托，因为列表每次渲染都重建
+      list().addEventListener('change', (e) => {
+        const t = e.target;
+        if (t.dataset.file) {
+          if (t.checked) st.picked.add(t.dataset.file);
+          else st.picked.delete(t.dataset.file);
+          changed();
+        } else if (t.dataset.theme) {
+          const theme = t.dataset.theme;
+          const items = pickFiles.filter(f => (f.theme || '未归入主题') === theme);
+          if (t.checked) items.forEach(f => st.picked.add(f.filename));
+          else items.forEach(f => st.picked.delete(f.filename));
+          changed();
+        }
       });
-      list.innerHTML = shown.map(f => `
-        <label class="scope-item">
-          <input type="checkbox" data-file="${esc(f.filename)}"${scopePicked.has(f.filename) ? ' checked' : ''}>
-          <span title="${esc(f.filename)}">${esc(f.title || f.filename)}</span>
-        </label>`).join('');
-      const total = scopeFiles.length;
-      const picked = scopePicked.size;
-      $('scopeCount').textContent = total
-        ? (picked === total ? `全部 ${total} 篇（= 全库）` : `已选 ${picked} / ${total} 篇`)
-        : '';
+      // 点分组名可以展开/收起（点复选框本身不算）
+      list().addEventListener('click', (e) => {
+        const head = e.target.closest('.pick-grp__head');
+        if (!head || e.target.tagName === 'INPUT') return;
+        const theme = head.querySelector('.pick-grp__box').dataset.theme;
+        if (st.groupsOpen.has(theme)) st.groupsOpen.delete(theme);
+        else st.groupsOpen.add(theme);
+        render();
+      });
+      list().addEventListener('input', (e) => {
+        if (e.target.dataset.role !== 'filter') return;
+        st.filter = e.target.value || '';
+        render();
+      });
+      list().addEventListener('click', (e) => {
+        const act = e.target.dataset.act;
+        if (!act) return;
+        if (act === 'all') resetAll();
+        else if (act === 'none') st.picked.clear();
+        else if (act === 'upload') { list().querySelector('input[type=file]').click(); return; }
+        changed();
+      });
+      // 上传即入库：走 /papers/upload（不是 /upload——后者只丢进 data/uploads/
+      // 不解析、不进库，综述和方向都读不到它）
+      list().addEventListener('change', async (e) => {
+        const inp = e.target;
+        if (inp.type !== 'file') return;
+        const files = Array.from(inp.files || []);
+        if (!files.length) return;
+        const fd = new FormData();
+        files.forEach(f => fd.append('files', f));
+        hint(`正在上传并解析 ${files.length} 篇…`);
+        let added = [];
+        try {
+          const r = await fetch('/papers/upload', { method: 'POST', body: fd });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const d = await r.json();
+          added = (d.results || []).filter(x => x.filename && !x.error).map(x => x.filename);
+          const failed = (d.results || []).filter(x => x.error);
+          if (failed.length) hint(`有 ${failed.length} 篇没能入库：` + failed.map(x => x.error).join('；'), true);
+        } catch (err) {
+          hint('上传失败：' + err.message, true);
+          inp.value = '';
+          return;
+        }
+        inp.value = '';
+        const keep = new Set(st.picked);
+        await loadPickFiles();
+        // 保留原来的选择，再把这次上传的并进来——不做全选
+        st.picked = new Set(pickFiles.filter(f => keep.has(f.filename)).map(f => f.filename));
+        added.forEach(n => { if (pickFiles.some(f => f.filename === n)) st.picked.add(n); });
+        render();
+        onChange(st);
+        if (added.length) hint(`已入库并勾选 ${added.length} 篇。`);
+      });
+
+      return {
+        st,
+        arg,
+        pickedList,
+        isAll,
+        render,
+        renderCount,
+        hint,
+        resetAll,
+        load() { st.loaded = true; resetAll(); render(); },
+      };
     }
 
-    function scopeHint(text, isErr) {
-      const el = $('scopeHint');
-      el.textContent = text || '';
-      el.classList.toggle('err', !!isErr);
-    }
+    // 两个模块各自的选片器；onChange 只作废自己那份结果，不碰另一个模块
+    const narPick = makePicker('nar', () => {
+      narMsg('范围变了，请重新生成论述版综述。');
+    });
+    const dirPick = makePicker('dir', () => {
+      dirMsg('范围变了，请重新探索方向。');
+    });
 
-    async function loadScope() {
+    async function loadPickFiles() {
       try {
         const d = await getJSON('/papers/files?meta=true');
         const files = (d.files || []).filter(f => (f.filename || '').toLowerCase().endsWith('.pdf'));
-        scopeFiles = files.map(f => ({ filename: f.filename, title: f.title || '' }));
-        // 默认全选：与改造前「全库综述」的行为一致，用户不动就是原来的样子
-        scopePicked = new Set(scopeFiles.map(f => f.filename));
-        scopeLoaded = true;
-        renderScope();
-        scopeHint(scopeFiles.length
-          ? '默认全选，等于原来的全库分析。取消掉一部分，三个标签页就只在这批论文里做。'
-          : '论文库还是空的，先去阅读页上传 PDF。', !scopeFiles.length);
+        pickFiles = files.map(f => ({
+          filename: f.filename,
+          title: f.title || '',
+          theme: f.theme || '',
+        }));
+        // 两个模块都读同一份库，但各自保留自己的勾选
+        const keepNar = narPick.st.loaded ? new Set(narPick.pickedList()) : null;
+        const keepDir = dirPick.st.loaded ? new Set(dirPick.pickedList()) : null;
+        pickLoaded = true;
+        narPick.load();
+        dirPick.load();
+        if (keepNar) narPick.st.picked = new Set(pickFiles.filter(f => keepNar.has(f.filename)).map(f => f.filename));
+        if (keepDir) dirPick.st.picked = new Set(pickFiles.filter(f => keepDir.has(f.filename)).map(f => f.filename));
+        narPick.render();
+        dirPick.render();
+        const noTheme = pickFiles.filter(f => !f.theme).length;
+        const tip = pickFiles.length
+          ? '不勾任何一篇就是整个论文库；勾主题可一次选中该主题下全部论文。'
+            + (noTheme ? `（库里 ${noTheme} 篇没有主题归属，单列在「未归入主题」）` : '')
+          : '论文库还是空的，先去阅读页上传 PDF。';
+        narPick.hint(tip, !pickFiles.length);
+        dirPick.hint(tip, !pickFiles.length);
       } catch (e) {
-        scopeLoaded = false;
-        scopeHint('论文列表读取失败：' + e.message, true);
+        pickLoaded = false;
+        narPick.hint('论文列表读取失败：' + e.message, true);
+        dirPick.hint('论文列表读取失败：' + e.message, true);
       }
     }
 
-    // 勾选变化后，已经算好的综述作废——它对应的是旧范围
-    function onScopeChanged() {
-      renderScope();
-      if (surveyData) { surveyData = null; load('survey'); }
-      narMsg('范围变了，请重新生成论述版综述。');
-      dirMsg('范围变了，请重新探索方向。');
-    }
-
-    $('scopeList').addEventListener('change', (e) => {
-      const box = e.target.closest('input[type=checkbox]');
-      if (!box) return;
-      if (box.checked) scopePicked.add(box.dataset.file);
-      else scopePicked.delete(box.dataset.file);
-      onScopeChanged();
-    });
-    $('scopeFilter').addEventListener('input', renderScope);
-    // 分析范围默认折叠，点「调整范围」才展开
-    $('scopeToggle').addEventListener('click', () => {
-      const fold = $('scopeFold');
-      const open = fold.hidden;
-      fold.hidden = !open;
-      $('scopeToggle').textContent = open ? '收起' : '调整范围';
-      $('scopeCard').classList.toggle('scope-card--folded', !open);
-    });
-    $('scopeAll').addEventListener('click', () => {
-      scopePicked = new Set(scopeFiles.map(f => f.filename));
-      onScopeChanged();
-    });
-    $('scopeNone').addEventListener('click', () => {
-      scopePicked.clear();
-      onScopeChanged();
-    });
-    // 上传即入库：走 /papers/upload（不是 /upload——后者只把文件丢进 data/uploads/，
-    // 不解析、不进库，综述和方向都读不到它）。/papers/upload 会保存 + 解析 + 入库，
-    // 入库完刷新列表并自动勾上——用户上传的 PDF 就是要拿来分析的，不用再点一次。
-    $('scopeUpload').addEventListener('change', async (e) => {
-      const files = Array.from(e.target.files || []);
-      if (!files.length) return;
-      const fd = new FormData();
-      files.forEach(f => fd.append('files', f));
-      scopeHint(`正在上传并解析 ${files.length} 篇…`);
-      let added = [];
-      try {
-        const r = await fetch('/papers/upload', { method: 'POST', body: fd });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const d = await r.json();
-        added = (d.results || []).filter(x => x.filename && !x.error).map(x => x.filename);
-        const failed = (d.results || []).filter(x => x.error);
-        if (failed.length) {
-          scopeHint(`有 ${failed.length} 篇没能入库：` + failed.map(x => x.error).join('；'), true);
+    // 每个模块的「分析范围」开关：就地展开，不挤占另一侧卡片
+    ['nar', 'dir'].forEach(k => {
+      $(k + 'PickToggle').addEventListener('click', () => {
+        const fold = $(k + 'PickFold');
+        fold.hidden = !fold.hidden;
+        if (!fold.hidden) {
+          const p = k === 'nar' ? narPick : dirPick;
+          // 第一次展开时才画列表，首屏不用付这个渲染开销
+          if (!fold.dataset.drawn) {
+            fold.innerHTML = pickFoldHtml(k);
+            fold.dataset.drawn = '1';
+            p.render();
+          }
         }
-      } catch (err) {
-        scopeHint('上传失败：' + err.message, true);
-        e.target.value = '';
-        return;
-      }
-      e.target.value = '';
-      await loadScope();
-      // 新入库的论文出现在列表里，但要重新勾上它们：
-      // loadScope 会把选片重置成全选，这里再把「这次上传的」显式并入。
-      // 若原来是部分选中，保留用户原来的选择 + 新上传的这批，不做全选。
-      added.forEach(n => { if (scopeFiles.some(f => f.filename === n)) scopePicked.add(n); });
-      onScopeChanged();
-      if (added.length) scopeHint(`已入库并勾选 ${added.length} 篇。`);
+      });
     });
+
+    function pickFoldHtml(key) {
+      return `
+        <div class="pick-bar">
+          <input type="text" data-role="filter" placeholder="按标题 / 文件名筛选…" autocomplete="off">
+          <button class="act ghost-btn pick-btn" type="button" data-act="all">全选</button>
+          <button class="act ghost-btn pick-btn" type="button" data-act="none">清空</button>
+          <button class="act ghost-btn pick-btn" type="button" data-act="upload">上传 PDF</button>
+          <input type="file" accept="application/pdf" multiple hidden>
+        </div>
+        <div class="pick-groups"></div>
+        <div class="pick-hint pick-hint--status"></div>`;
+    }
 
     function $(id) { return document.getElementById(id); }
 
@@ -710,7 +852,7 @@
       try {
         if (which === 'survey') {
           const focus = $('focus').value;
-          const files = scopeArg();
+          const files = narPick.arg();
           const qs = [];
           if (focus) qs.push('focus=' + encodeURIComponent(focus));
           if (files.length) qs.push('filenames=' + encodeURIComponent(files.join(',')));
@@ -732,7 +874,6 @@
             const t = (c && c.category) || '';
             if (t) counts[t] = (counts[t] || 0) + 1;
           });
-          loadDirThemes(surveyData.topics || [], counts);
         } else {
           frontierData = await getJSON('/graph/frontier');
           if (!frontierData.ready) throw new Error(frontierData.detail || '前沿探索失败');
@@ -987,7 +1128,7 @@
         const r = await fetch('/graph/survey/narrative', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ focus: $('focus').value || '', filenames: scopeArg() }),
+          body: JSON.stringify({ focus: '', filenames: narPick.arg() }),
           signal: narCtl.signal
         });
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1060,40 +1201,6 @@
     const DIR_FORBIDDEN = ['原创', '首次提出', '没人做过', '首创'];
     let dirCtl = null;
     let dirItems = [];   // [{...direction 事件里的 item}] 给导出用
-
-    // 主题自选：可选的主题来自 catalog 的 category（surveyData.topics），
-    // 计数是「该主题下有多少篇论文在引用关系图里」——直接可复核，不是模型估的。
-    let dirThemesAll = [];        // [{name, count}]
-    let dirThemesPicked = null;   // Set；null 表示还没读到主题列表（降级 = 全选）
-
-    function dirThemeArg() {
-      // 没读到列表 / 全选 → 空数组（= 全部主题），与 scopeArg() 同一口径
-      if (!dirThemesPicked || !dirThemesAll.length) return [];
-      if (dirThemesPicked.size === dirThemesAll.length) return [];
-      return dirThemesAll.filter(t => dirThemesPicked.has(t.name)).map(t => t.name);
-    }
-
-    function renderDirThemes() {
-      const list = $('dirThemeList');
-      if (!dirThemesAll.length) {
-        list.textContent = '没有读到主题列表（图谱还没生成？），将按全部主题归纳';
-        return;
-      }
-      list.innerHTML = dirThemesAll.map(t => `
-        <label class="dir-theme${dirThemesPicked.has(t.name) ? ' on' : ''}">
-          <input type="checkbox" data-theme="${esc(t.name)}"${dirThemesPicked.has(t.name) ? ' checked' : ''}>
-          <span>${esc(t.name)}</span>
-          <span class="dir-theme__n">${t.count}</span>
-        </label>`).join('');
-    }
-
-    function loadDirThemes(topics, counts) {
-      dirThemesAll = (topics || []).map(name => ({ name, count: (counts || {})[name] || 0 }));
-      // 默认全选：与「不勾主题 = 全部主题」同义，用户不动就是原来的行为
-      if (!dirThemesPicked) dirThemesPicked = new Set(dirThemesAll.map(t => t.name));
-      else dirThemesPicked = new Set(dirThemesAll.filter(t => dirThemesPicked.has(t.name)).map(t => t.name));
-      renderDirThemes();
-    }
 
     function dirMsg(text, isErr) {
       const el = $('dirMsg');
@@ -1410,10 +1517,6 @@
       if (dirCtl) return;
       // 一个主题都不勾：后端语义是「全部主题」，但用户多半是想筛选却忘了勾，
       // 直接跑全库会让人以为筛选生效了。这里拦住并说清楚，让人自己决定。
-      if (dirThemesAll.length && dirThemesPicked && dirThemesPicked.size === 0) {
-        dirMsg('一个主题都没勾。不勾主题等于分析全部主题——想筛选就勾上主题，想全库就全选。', true);
-        return;
-      }
       dirReset();
       dirCtl = new AbortController();
       $('dirRun').disabled = true;
@@ -1427,7 +1530,7 @@
         const r = await fetch('/graph/directions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filenames: scopeArg(), themes: dirThemeArg() }),
+          body: JSON.stringify({ filenames: dirPick.arg() }),
           signal: dirCtl.signal
         });
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1483,22 +1586,11 @@
     $('dirRun').addEventListener('click', runDirections);
     $('dirStop').addEventListener('click', () => { if (dirCtl) dirCtl.abort(); });
 
-    // 主题 chip 用事件委托：列表是动态渲染的，逐项绑监听会在每次重画后失效
-    $('dirThemeList').addEventListener('change', (e) => {
-      const box = e.target.closest('input[data-theme]');
-      if (!box || !dirThemesPicked) return;
-      const name = box.dataset.theme;
-      if (box.checked) dirThemesPicked.add(name);
-      else dirThemesPicked.delete(name);
-      const lab = box.closest('.dir-theme');
-      if (lab) lab.classList.toggle('on', box.checked);
-    });
-
     // 先拿论文列表再切页：switchTab('survey') 会立刻调 load('survey')，
     // 而那时如果选片还没就绪，综述就会按「全库」算一遍、随后又要重算一次。
-    // loadScope() 失败也不拦人——scopeLoaded 为 false 时 scopeArg() 返回空 = 全库，
-    // 退化成改造前的行为，而不是让整页卡在「加载中」。
-    loadScope().finally(() => { switchTab('survey'); });
+    // loadPickFiles() 失败也不拦人——两个选片器的 loaded 都是 false 时
+    // arg() 返回空数组 = 全库，退化成改造前的行为，而不是让整页卡在「加载中」。
+    loadPickFiles().finally(() => { switchTab('survey'); });
 
     // 划词翻译：挂到综述和前沿探索的正文区。选中一段英文，鼠标旁就浮出「译」。
     // 和阅读器里的划词是同一套交互，代码共用 quick-translate.js。

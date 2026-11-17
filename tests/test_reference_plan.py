@@ -161,16 +161,27 @@ def test_papers_files_stays_plain_by_default(monkeypatch):
 
 
 def test_papers_files_meta_returns_titles(monkeypatch):
-    """meta=true 时每条带标题：发现页的下拉框要靠它显示论文名而不是文件名。"""
+    """meta=true 时每条带标题：发现页的下拉框要靠它显示论文名而不是文件名。
+
+    2026-11-17 追加 ``theme``：论文分析页要按主题分组勾选论文
+    （勾主题 = 批量勾该主题下全部论文），分组依据来自这里而不是
+    /graph/survey 的 citable——后者会被 filenames 收窄，当不了全库分组。
+    """
     monkeypatch.setattr(
         main_mod, "library_rows",
         lambda: [{"filename": "1706.03762v1.pdf", "title": "Attention Is All You Need"}],
     )
     resp = client.get("/papers/files?meta=true")
     assert resp.status_code == 200
-    files = resp.json()["files"]
+    body = resp.json()
+    files = body["files"]
     assert files, "论文目录里应该有 PDF"
-    assert all(isinstance(x, dict) and set(x) == {"filename", "title"} for x in files)
+    assert all(isinstance(x, dict) and set(x) == {"filename", "title", "theme"} for x in files)
+    # theme 允许空串（catalog 里没有的论文），但不许是 None：前端按字符串用
+    assert all(isinstance(x["theme"], str) for x in files)
+    # 顶层给一份主题清单，前端不用自己再拼
+    assert isinstance(body["themes"], list)
+    assert body["themes"] == sorted({x["theme"] for x in files if x["theme"]})
 
     by_name = {x["filename"]: x["title"] for x in files}
     if "1706.03762v1.pdf" in by_name:
