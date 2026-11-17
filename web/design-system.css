@@ -657,10 +657,15 @@ select.field { cursor: pointer; }
    ========================================================================== */
 
 :root {
-  --sidebar-w: 264px;
+  --sidebar-w: 276px;
   --sidebar-w-collapsed: 64px;
   --sidebar-bg: var(--gray-50);
-  --sidebar-item-h: 38px;
+  --sidebar-item-h: 42px;
+  /* 2026-11-17 侧栏字号与装饰：菜单项从 13.5px 提到 15px，行高 38→42，
+     标题 15→17。只是视觉层，DOM 与 JS 一律不动。 */
+  --sb-font: 15px;
+  --sb-font-sm: 13px;
+  --sidebar-item-gap: 3px;
 }
 
 body.app {
@@ -679,7 +684,7 @@ body.app {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 8px;
+  padding: 12px 10px;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--border-color);
   transition: width var(--dur-fast) var(--ease), flex-basis var(--dur-fast) var(--ease);
@@ -689,45 +694,48 @@ body.app {
 .sb-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px 10px;
+  gap: 9px;
+  padding: 4px 8px 12px;
   flex: 0 0 auto;
 }
 .sb-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
   text-decoration: none;
   color: var(--text-primary);
 }
 /* 品牌图标：logo.svg 自带渐变，外面不再铺 --brand-grad 底，否则蓝色渐变叠在蓝色底上会糊成一团 */
 .sb-logo__mark {
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
   display: block;
+  border-radius: 9px;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, .22);
 }
 .sb-logo__name {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -.01em;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -.015em;
   white-space: nowrap;
 }
 .sb-toggle {
   margin-left: auto;
   flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
   box-shadow: none;
   cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .sb-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
 .sb-head-act { display: none; }
@@ -739,72 +747,134 @@ body.app {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  margin-bottom: 8px;
+  height: 44px;
+  padding: 0 14px;
+  margin-bottom: 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-chip);
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: var(--sb-font);
   font-weight: 500;
   cursor: pointer;
-  box-shadow: none;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
   white-space: nowrap;
   flex: 0 0 auto;
 }
-.sb-new:hover { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-active); }
-.sb-new__plus { font-size: 15px; font-weight: 600; line-height: 1; }
+.sb-new:hover {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand-active);
+  box-shadow: 0 3px 10px rgba(37, 99, 235, .16);
+  transform: translateY(-1px);
+}
+.sb-new:active { transform: translateY(0); }
+.sb-new__plus { font-size: 16px; font-weight: 600; line-height: 1; }
 /* 「全库问答」是次一级入口：跟「开启新对话」同一行样式，但边框更淡，免得两个按钮抢焦点 */
 .sb-new--alt { border-style: dashed; color: var(--text-secondary); font-weight: 400; }
+.sb-new--alt:hover { box-shadow: 0 3px 10px rgba(15, 23, 42, .08); }
 
 /* 功能入口 / 历史列表通用行 */
-.sb-group { display: flex; flex-direction: column; gap: 1px; }
-.sb-group--nav { flex: 0 0 auto; }
+.sb-group { display: flex; flex-direction: column; gap: var(--sidebar-item-gap); }
+.sb-group--nav {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+/* 侧栏里有两个 .sb-group--nav（五项主入口 + 单独的「多篇对比」），
+   只在「上一个兄弟不是 nav 组」（＝主入口那一块）上面加一道细分隔，
+   免得把「多篇对比」在下边框处割成另一组。 */
+.sb-group--nav:not(.sb-group--nav + .sb-group--nav) {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color-alt);
+  margin-top: 4px;
+}
 .sb-label {
-  padding: 12px 10px 4px;
-  font-size: 11px;
+  padding: 14px 10px 6px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: .04em;
+  letter-spacing: .06em;
   color: var(--text-subtle);
   white-space: nowrap;
 }
 .sb-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   min-height: var(--sidebar-item-h);
-  padding: 0 10px;
+  padding: 0 11px;
   border: none;
-  border-radius: var(--radius-control);
+  border-radius: 10px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: var(--sb-font);
   text-decoration: none;
   cursor: pointer;
   box-shadow: none;
   width: 100%;
   text-align: left;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+              padding-left var(--dur-fast) var(--ease);
 }
-.sb-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sb-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  padding-left: 14px;
+}
+.sb-item:active { background: var(--gray-100, #f1f5f9); }
+.sb-item:focus-visible {
+  outline: 2px solid var(--brand-ring, rgba(37, 99, 235, .45));
+  outline-offset: -2px;
+}
+/* 当前页高亮：左侧一条竖色条 + 浅蓝底。左侧栏里只有 a.sb-item 有 href，
+   页面自己会加 .on / aria-current，两种写法都兜住。 */
+.sb-item.on,
+.sb-item[aria-current="page"],
+.sb-item.sb-item--active {
+  background: var(--brand-soft);
+  color: var(--brand-active);
+  font-weight: 600;
+}
+.sb-item.on::before,
+.sb-item[aria-current="page"]::before,
+.sb-item.sb-item--active::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--brand);
+}
 .sb-item__ico {
-  flex: 0 0 18px;
-  width: 18px;
+  flex: 0 0 22px;
+  width: 22px;
   text-align: center;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
+  opacity: .9;
 }
-.sb-item__txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-item:hover .sb-item__ico,
+.sb-item.on .sb-item__ico { opacity: 1; }
+.sb-item__txt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: .005em;
+}
 
 /* 历史区：能滚动，吃满剩余高度 */
 .sb-history {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  margin-top: 6px;
-  padding-bottom: 6px;
+  margin-top: 4px;
+  padding-bottom: 8px;
 }
 .sb-history::-webkit-scrollbar { width: 6px; }
 .sb-history::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
@@ -812,38 +882,38 @@ body.app {
   display: flex;
   align-items: center;
   gap: 4px;
-  border-radius: var(--radius-control);
+  border-radius: 10px;
   transition: background var(--dur-fast) var(--ease);
 }
 .sb-hist:hover { background: var(--bg-hover); }
 .sb-hist.on { background: var(--brand-soft); }
-.sb-hist.on .sb-item__txt { color: var(--brand-active); font-weight: 500; }
+.sb-hist.on .sb-item__txt { color: var(--brand-active); font-weight: 600; }
 .sb-hist__open {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: var(--sidebar-item-h);
-  padding: 0 10px;
+  min-height: calc(var(--sidebar-item-h) - 2px);
+  padding: 0 11px;
   border: none;
-  border-radius: var(--radius-control);
+  border-radius: 10px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: calc(var(--sb-font) - 1px);
   cursor: pointer;
   box-shadow: none;
   text-align: left;
 }
 .sb-hist.on .sb-hist__open { color: var(--brand-active); }
 .sb-hist__del {
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
   margin-right: 4px;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-subtle);
   font-size: 14px;
@@ -851,15 +921,19 @@ body.app {
   cursor: pointer;
   box-shadow: none;
   opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 .sb-hist:hover .sb-hist__del, .sb-hist__del:focus-visible { opacity: 1; }
 .sb-hist__del:hover { background: var(--danger-bg); color: var(--danger); }
 
 .sb-foot {
   flex: 0 0 auto;
-  padding-top: 8px;
+  padding-top: 10px;
+  margin-top: 2px;
   border-top: 1px solid var(--border-color-alt);
 }
+.sb-foot .sb-item { color: var(--text-muted); }
+.sb-foot .sb-item:hover { color: var(--text-primary); }
 
 /* ---------- 折叠态 ---------- */
 .app--collapsed .sidebar {
