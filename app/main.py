@@ -2380,6 +2380,11 @@ class DirectionsRequest(BaseModel):
         max_length=200,
         description="只抽取这批论文（库内文件名）；空表示全库",
     )
+    themes: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="只在这些主题（catalog 的 category）里归纳方向；空表示全部主题",
+    )
 
 
 @app.post("/graph/directions", summary="未来工作探索（1.5.4，SSE）")
@@ -2397,6 +2402,7 @@ async def graph_directions(req: DirectionsRequest | None = None) -> StreamingRes
     req 允许为 None：老前端不带请求体调这个端点时要照旧能用。
     """
     wanted = list(req.filenames) if req else []
+    wanted_themes = [t for t in (req.themes if req else []) if t.strip()]
 
     async def event_generator():
         try:
@@ -2412,7 +2418,7 @@ async def graph_directions(req: DirectionsRequest | None = None) -> StreamingRes
             # 否则会卡住整个事件循环、连心跳都发不出去。
             extractions = await run_in_threadpool(_extract_library_future_work, wanted)
             async for chunk in sse_with_heartbeat(
-                future_work.direction_events(view, extractions)
+                future_work.direction_events(view, extractions, themes=wanted_themes)
             ):
                 yield chunk
         except ClientDisconnect:

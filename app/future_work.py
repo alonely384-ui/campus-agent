@@ -333,6 +333,15 @@ def _graph_gaps(graph: dict[str, Any]) -> list[dict[str, Any]]:
     nodes = {n["id"]: n for n in graph.get("nodes") or [] if n.get("id")}
     gaps: list[dict[str, Any]] = []
 
+    # 主题（catalog 的 category）只在汇总的那个模块里算，这里按需补一次；
+    # 它既是「主题自选」的过滤依据，也让每个方向能报出自己属于哪个主题。
+    from app.graph import node_meta
+
+    theme_of: dict[str, str] = {}
+    for nid, node in nodes.items():
+        meta = node_meta(nid, _as_text(node.get("title")), _as_text(node.get("arxiv_id")))
+        theme_of[nid] = _as_text(meta.get("category"))
+
     for n in nodes.values():
         role = _as_text(n.get("role"))
         cite_in = n.get("cited_by") or 0
@@ -342,6 +351,7 @@ def _graph_gaps(graph: dict[str, Any]) -> list[dict[str, Any]]:
         # 证据要按文件名去 extractions 里查，所以把副本文件名一起带出去
         community = n.get("community")
         wheel = "" if community is None or int(community) < 0 else str(int(community))
+        theme = theme_of.get(n["id"], "")
         if role == "bridge":
             gaps.append(
                 {
@@ -350,6 +360,7 @@ def _graph_gaps(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "paper": n["id"],
                     "copies": copies,
                     "title": title,
+                    "theme": theme,
                     "wheel": wheel,
                     "basis": f"中介中心性 {n.get('betweenness', '?')}，"
                     f"位于引用关系簇 {wheel or '未划分'}，出 {cite_out} / 入 {cite_in} 条引用",
@@ -363,6 +374,7 @@ def _graph_gaps(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "paper": n["id"],
                     "copies": copies,
                     "title": title,
+                    "theme": theme,
                     "wheel": wheel,
                     "basis": "库内既没有引用它、也没有它引用别的论文的边",
                 }
@@ -375,6 +387,7 @@ def _graph_gaps(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "paper": n["id"],
                     "copies": copies,
                     "title": title,
+                    "theme": theme,
                     "wheel": wheel,
                     "basis": f"出 {cite_out} 条引用，但库内没有任何论文引用它",
                 }
@@ -389,6 +402,7 @@ def build_directions(
     graph: dict[str, Any],
     extractions: list[dict[str, Any]],
     limit: int = MAX_DIRECTIONS,
+    themes: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """把图谱缺口与作者自述拼成方向候选。纯代码，不调模型。
 
@@ -397,9 +411,20 @@ def build_directions(
         「下一步要做什么」，这是赛题要的东西，不能因为图谱分数低就被挤掉；
         第二轮用剩下的缺口补足到 limit，避免方向数不够。
     这样一个方向都没有时也不会空手而归，但更不会出现「5 个方向全没有原文」的情况。
+
+    ``themes`` 是按主题自选：只保留锚点论文属于这些主题（catalog 的 category）的缺口。
+    空列表 / None 表示全部主题——与「不勾论文 = 全库」同一口径，不表示「一个都不要」。
     """
     by_paper = {e["source"]: e for e in extractions if e.get("status") == "success"}
     gaps = _graph_gaps(graph)
+
+    wanted = {_as_text(t).strip() for t in (themes or []) if _as_text(t).strip()}
+    if wanted:
+        gaps = [g for g in gaps if _as_text(g.get("theme")) in wanted]
+        if not gaps:
+            # 勾的主题里一个缺口都没有：如实返回空，让调用方去说清楚，
+            # 而不是悄悄放宽成全库——那会让用户以为筛选没生效。
+            return []
 
     def lookup(gap: dict[str, Any]) -> dict[str, Any] | None:
         # 一个节点可能有多份副本文件，挨个试，命中即用
@@ -433,6 +458,7 @@ def build_directions(
                 "id": f"dir-{len(picked) + 1}",
                 "kind": gap["kind"],
                 "kind_label": gap["label"],
+                "theme": gap.get("theme") or "",
                 "anchor": gap["paper"],
                 "anchor_title": gap["title"],
                 "anchor_file": (gap.get("copies") or [""])[0],
@@ -803,15 +829,19 @@ async def direction_events(
     stream_judge: Any = None,
     search: Any = None,
     timeout: float = JUDGE_TIMEOUT_SECONDS,
+    themes: list[str] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """跑完整条未来工作探索流水线。
 
     事件顺序：
         role(extractor) → role(mapper) → 每个方向 direction_start → role(searcher)
         → role(judge) → direction 结果 → done
+
+    ``themes`` 是用户在界面上勾选的主题（catalog 的 category）；空表示全部主题。
     """
     judge_stream = stream_judge or _stream_judge
     searcher = search or search_latest
+    wanted_themes = [_as_text(t).strip() for t in (themes or []) if _as_text(t).strip()]
 
     # ---- Extractor
     summary = extraction_summary(extractions)
@@ -826,15 +856,26 @@ async def direction_events(
     }
 
     # ---- Mapper
-    directions = build_directions(graph, extractions)
+    directions = build_directions(graph, extractions, themes=wanted_themes)
     yield {
         "type": "role",
         "role": "mapper",
         "label": "归纳",
-        "output": {"directions": len(directions), "candidates": directions},
+        "output": {
+            "directions": len(directions),
+            "candidates": directions,
+            "themes": wanted_themes,
+        },
     }
     if not directions:
-        yield {"type": "error", "message": "图谱里没有可用于归纳的研究缺口，无法提出方向"}
+        if wanted_themes:
+            yield {
+                "type": "error",
+                "message": f"勾选的 {len(wanted_themes)} 个主题（{'、'.join(wanted_themes)}）"
+                           "里没有可用于归纳的研究缺口。放宽主题或多勾几篇论文再试。",
+            }
+        else:
+            yield {"type": "error", "message": "图谱里没有可用于归纳的研究缺口，无法提出方向"}
         yield {"type": "done", "stats": {"directions": 0}}
         return
 
@@ -920,6 +961,7 @@ async def direction_events(
             "id": direction["id"],
             "kind": direction["kind"],
             "kind_label": direction["kind_label"],
+            "theme": direction.get("theme") or "",
             "title": direction["anchor_title"],
             "anchor": direction["anchor"],
             "basis": direction["basis"],

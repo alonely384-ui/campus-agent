@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest import mock
 
 import pytest
 
@@ -167,6 +168,68 @@ def test_build_directions_respects_limit():
 
 def test_empty_graph_yields_no_directions():
     assert future_work.build_directions(_graph([]), []) == []
+
+
+def _two_theme_nodes():
+    """两篇论文各属不同主题（主题来自 node_meta，按 arxiv_id 查 catalog）。
+
+    刻意用两种缺口类型（bridge + isolated）：同类缺口有配额（MAX_PER_GAP_KIND），
+    两个都造 bridge 的话第二个会被配额挤掉，测不到主题过滤本身。
+    """
+    return _graph(
+        [
+            _node("arxiv:1706.03762", "Attention Is All You Need", role="bridge", copies=["a.pdf"]),
+            _node("arxiv:2501.12948", "DeepSeek-R1", role="isolated", cited_by=0, cites=0, copies=["r.pdf"]),
+        ]
+    )
+
+
+def test_directions_filter_by_theme():
+    """主题自选：只保留锚点论文属于所选主题的方向。"""
+
+    def fake_meta(canonical_id, title, arxiv_id=""):
+        # 按节点 id 判主题：真实 node_meta 会从 canonical_id 里拆 arxiv 号去查 catalog，
+        # 桩里不能依赖 arxiv_id 参数（调用方三个位置参数，第三个通常是空串）。
+        theme = "模型架构" if "1706.03762" in canonical_id else "对齐与推理"
+        return {"year": 2020, "category": theme, "abstract": ""}
+
+    with mock.patch("app.graph.node_meta", fake_meta):
+        graph = _two_theme_nodes()
+        all_dirs = future_work.build_directions(graph, [])
+        only = future_work.build_directions(graph, [], themes=["对齐与推理"])
+
+    assert {d["theme"] for d in all_dirs} == {"模型架构", "对齐与推理"}
+    assert len(only) == 1
+    assert only[0]["theme"] == "对齐与推理"
+    assert only[0]["anchor_title"] == "DeepSeek-R1"
+
+
+def test_empty_themes_means_all_themes():
+    """不勾主题 = 全部主题，与「不勾论文 = 全库」同一口径，不能变成「一个都不要」。"""
+    fake = lambda *a, **k: {"year": 2020, "category": "模型架构", "abstract": ""}  # noqa: E731
+    with mock.patch("app.graph.node_meta", fake):
+        graph = _two_theme_nodes()
+        assert future_work.build_directions(graph, [], themes=None) == future_work.build_directions(graph, [])
+        assert future_work.build_directions(graph, [], themes=[]) == future_work.build_directions(graph, [])
+
+
+def test_unknown_theme_yields_empty_not_fallback():
+    """勾了个库里没有的主题：如实返回空，不能悄悄放宽成全库让用户以为筛选生效了。"""
+    fake = lambda *a, **k: {"year": 2020, "category": "模型架构", "abstract": ""}  # noqa: E731
+    with mock.patch("app.graph.node_meta", fake):
+        assert future_work.build_directions(_two_theme_nodes(), [], themes=["不存在的主题"]) == []
+
+
+async def test_direction_events_reports_empty_theme_choice():
+    fake = lambda *a, **k: {"year": 2020, "category": "模型架构", "abstract": ""}  # noqa: E731
+    events = []
+    with mock.patch("app.graph.node_meta", fake):
+        async for ev in future_work.direction_events(_two_theme_nodes(), [], themes=["不存在的主题"]):
+            events.append(ev)
+    errors = [e for e in events if e["type"] == "error"]
+    assert errors, events
+    assert "不存在的主题" in errors[0]["message"]
+    assert events[-1]["type"] == "done"
 
 
 def test_gap_kinds_do_not_starve_each_other():

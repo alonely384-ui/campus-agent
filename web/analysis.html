@@ -166,6 +166,10 @@
       background: var(--hl-find-text); color: var(--text-primary); font-weight: 400;
     }
     .dir-sect { margin-top: 10px; }
+    .dir-theme-tag {
+      font-size: 11.5px; padding: 1px 7px; margin-right: 6px; border-radius: 999px;
+      background: var(--bg-muted); color: var(--text-secondary);
+    }
     .dir-k { font-size: 12px; color: var(--text-muted); margin-bottom: 3px; font-weight: 600; }
     .dir-basis { font-size: 12.5px; line-height: 1.8; color: var(--text-secondary); }
     .dir-quote {
@@ -201,6 +205,22 @@
     }
     .hero-btn { padding: 8px 18px; font-size: 13.5px; font-weight: 600; }
     @media (max-width: 900px) { .hero-row { grid-template-columns: 1fr; } }
+
+    /* 主题自选：一行 chip，勾哪个就只在这些主题里归纳方向 */
+    .dir-themes { margin: 10px 0 2px; }
+    .dir-themes__k { font-size: 12px; color: var(--text-subtle); margin-right: 6px; }
+    .dir-themes__list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .dir-theme {
+      display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+      padding: 3px 10px; font-size: 12px; border-radius: 999px;
+      border: 1px solid var(--border-strong); color: var(--text-secondary);
+      background: transparent; user-select: none;
+    }
+    .dir-theme:hover { background: var(--bg-muted); }
+    .dir-theme input { margin: 0; cursor: pointer; }
+    .dir-theme.on { border-color: var(--border-focus); color: var(--text-primary); background: var(--bg-muted); }
+    .dir-theme__n { font-variant-numeric: tabular-nums; color: var(--text-subtle); }
+    .dir-themes__hint { font-size: 11.5px; color: var(--text-subtle); margin-top: 5px; }
 
     /* ---------- 缺口矩阵 ---------- */
     .gap-box { margin-top: 4px; }
@@ -291,6 +311,12 @@
           <button class="act hero-btn" id="dirRun">探索方向</button>
           <button class="act ghost-btn" id="dirStop" hidden>停止</button>
           <span class="tr-hint" id="dirMsg"></span>
+        </div>
+        <!-- 主题自选：方向是从「某篇论文所在的主题 + 图谱缺口」推出来的，
+             所以限定主题就限定了哪些论文能当方向的锚点。不勾 = 全部主题。 -->
+        <div class="dir-themes" id="dirThemes">
+          <span class="dir-themes__k">参与归纳的主题</span>
+          <div class="dir-themes__list" id="dirThemeList">正在读取主题…</div>
         </div>
         <div class="nar-stages" id="dirStages"></div>
       </div>
@@ -699,6 +725,14 @@
               o.value = t; o.textContent = t; sel.appendChild(o);
             });
           }
+          // 主题自选的候选与计数：直接数 citable 里每篇的 category，
+          // 数字可与图谱节点逐条对账，不是模型估的。
+          const counts = {};
+          (surveyData.citable || []).forEach(c => {
+            const t = (c && c.category) || '';
+            if (t) counts[t] = (counts[t] || 0) + 1;
+          });
+          loadDirThemes(surveyData.topics || [], counts);
         } else {
           frontierData = await getJSON('/graph/frontier');
           if (!frontierData.ready) throw new Error(frontierData.detail || '前沿探索失败');
@@ -1027,6 +1061,40 @@
     let dirCtl = null;
     let dirItems = [];   // [{...direction 事件里的 item}] 给导出用
 
+    // 主题自选：可选的主题来自 catalog 的 category（surveyData.topics），
+    // 计数是「该主题下有多少篇论文在引用关系图里」——直接可复核，不是模型估的。
+    let dirThemesAll = [];        // [{name, count}]
+    let dirThemesPicked = null;   // Set；null 表示还没读到主题列表（降级 = 全选）
+
+    function dirThemeArg() {
+      // 没读到列表 / 全选 → 空数组（= 全部主题），与 scopeArg() 同一口径
+      if (!dirThemesPicked || !dirThemesAll.length) return [];
+      if (dirThemesPicked.size === dirThemesAll.length) return [];
+      return dirThemesAll.filter(t => dirThemesPicked.has(t.name)).map(t => t.name);
+    }
+
+    function renderDirThemes() {
+      const list = $('dirThemeList');
+      if (!dirThemesAll.length) {
+        list.textContent = '没有读到主题列表（图谱还没生成？），将按全部主题归纳';
+        return;
+      }
+      list.innerHTML = dirThemesAll.map(t => `
+        <label class="dir-theme${dirThemesPicked.has(t.name) ? ' on' : ''}">
+          <input type="checkbox" data-theme="${esc(t.name)}"${dirThemesPicked.has(t.name) ? ' checked' : ''}>
+          <span>${esc(t.name)}</span>
+          <span class="dir-theme__n">${t.count}</span>
+        </label>`).join('');
+    }
+
+    function loadDirThemes(topics, counts) {
+      dirThemesAll = (topics || []).map(name => ({ name, count: (counts || {})[name] || 0 }));
+      // 默认全选：与「不勾主题 = 全部主题」同义，用户不动就是原来的行为
+      if (!dirThemesPicked) dirThemesPicked = new Set(dirThemesAll.map(t => t.name));
+      else dirThemesPicked = new Set(dirThemesAll.filter(t => dirThemesPicked.has(t.name)).map(t => t.name));
+      renderDirThemes();
+    }
+
     function dirMsg(text, isErr) {
       const el = $('dirMsg');
       el.textContent = text || '';
@@ -1117,9 +1185,12 @@
       const kind = document.createElement('span');
       kind.className = 'dir-kind';
       kind.textContent = it.kind_label || it.kind || '';
+      const theme = document.createElement('span');
+      theme.className = 'dir-theme-tag';
+      theme.textContent = it.theme || '未分主题';
       const title = document.createElement('span');
       title.textContent = dirSanitize(it.title || it.anchor_title || '（未命名）');
-      h.append(idx, kind, title);
+      h.append(idx, kind, theme, title);
       card.appendChild(h);
 
       const basis = dirSection(card, '图谱依据', 'dir-basis');
@@ -1337,6 +1408,12 @@
 
     async function runDirections() {
       if (dirCtl) return;
+      // 一个主题都不勾：后端语义是「全部主题」，但用户多半是想筛选却忘了勾，
+      // 直接跑全库会让人以为筛选生效了。这里拦住并说清楚，让人自己决定。
+      if (dirThemesAll.length && dirThemesPicked && dirThemesPicked.size === 0) {
+        dirMsg('一个主题都没勾。不勾主题等于分析全部主题——想筛选就勾上主题，想全库就全选。', true);
+        return;
+      }
       dirReset();
       dirCtl = new AbortController();
       $('dirRun').disabled = true;
@@ -1350,7 +1427,7 @@
         const r = await fetch('/graph/directions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filenames: scopeArg() }),
+          body: JSON.stringify({ filenames: scopeArg(), themes: dirThemeArg() }),
           signal: dirCtl.signal
         });
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1405,6 +1482,17 @@
 
     $('dirRun').addEventListener('click', runDirections);
     $('dirStop').addEventListener('click', () => { if (dirCtl) dirCtl.abort(); });
+
+    // 主题 chip 用事件委托：列表是动态渲染的，逐项绑监听会在每次重画后失效
+    $('dirThemeList').addEventListener('change', (e) => {
+      const box = e.target.closest('input[data-theme]');
+      if (!box || !dirThemesPicked) return;
+      const name = box.dataset.theme;
+      if (box.checked) dirThemesPicked.add(name);
+      else dirThemesPicked.delete(name);
+      const lab = box.closest('.dir-theme');
+      if (lab) lab.classList.toggle('on', box.checked);
+    });
 
     // 先拿论文列表再切页：switchTab('survey') 会立刻调 load('survey')，
     // 而那时如果选片还没就绪，综述就会按「全库」算一遍、随后又要重算一次。
