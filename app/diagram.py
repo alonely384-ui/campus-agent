@@ -34,6 +34,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -214,9 +215,27 @@ def render_tikz(code: str, out_dir: Path) -> tuple[bytes | None, str]:
         return png, ""
 
 
+_DIAGRAM_KINDS = ("mermaid", "graphviz", "tikz", "matplotlib")
+
+
 def renderer_available() -> dict[str, bool]:
-    """给前端展示「本机能不能渲染」，避免用户点了才知道不能用。"""
-    return {"mermaid": bool(_which("mmdc")), "graphviz": bool(_which("dot")), "tikz": bool(_which("pdflatex"))}
+    """给前端展示「本机能不能渲染」，避免用户点了才知道不能用。
+
+    matplotlib 不是外部命令而是一个 Python 包，跟着本项目一起装在 venv 里，
+    所以这里探的是 import 而不是 ``_which``。探 import 而不写死 True：
+    纯净部署里可能没装（requirements 里它本来是 chart.py 的可选依赖）。
+    """
+    try:
+        import matplotlib  # noqa: F401
+        has_mpl = True
+    except Exception:  # noqa: BLE001 - 没装就是没装，不让探针本身炸掉
+        has_mpl = False
+    return {
+        "mermaid": bool(_which("mmdc")),
+        "graphviz": bool(_which("dot")),
+        "tikz": bool(_which("pdflatex")),
+        "matplotlib": has_mpl,
+    }
 
 
 # --------------------------------------------------------------------------- prompt
@@ -264,6 +283,24 @@ def build_prompt(description: str, kind: str) -> list[dict]:
             "2. 箭头用 `-{Stealth}`，需要 arrows.meta 之外不要引用其它库；\n"
             "3. 节点用 `\\node[box]` 统一风格，中文节点直接写中文；\n"
             "4. 只输出代码，不要 Markdown 围栏，不要解释。"
+        )
+    elif kind == "matplotlib":
+        spec = (
+            "输出一段 **Matplotlib Python 绘图脚本**，形如：\n"
+            "import matplotlib.pyplot as plt\n"
+            "fig, ax = plt.subplots(figsize=(7, 4))\n"
+            "ax.plot([1, 2, 3], [2, 4, 3], marker='o')\n"
+            "ax.set_xlabel('Stage')\n"
+            "ax.set_ylabel('Accuracy')\n"
+            "fig.savefig(OUT, dpi=200, bbox_inches='tight')\n"
+            "硬性要求：\n"
+            "1. 变量 OUT 已经由系统注入为保存路径，**必须**用 fig.savefig(OUT, …) 存图，"
+            "不要自己拼路径，不要写死 fig.png；\n"
+            "2. 不要调 plt.show()，不要开交互后端，我们跑在无显示环境里；\n"
+            "3. 不要 read_csv / 读本地文件：数据要么写在脚本里，要么留空占位；\n"
+            "4. 中文标签要设 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', "
+            "'DejaVu Sans'] 与 plt.rcParams['axes.unicode_minus'] = False，否则中文全是方框；\n"
+            "5. 只输出代码，不要 Markdown 围栏，不要解释。"
         )
     else:
         raise ValueError(f"不支持的图类型: {kind}")
@@ -497,6 +534,85 @@ def render_graphviz(code: str, out_dir: Path) -> tuple[bytes | None, str]:
         return dst.read_bytes(), ""
 
 
+def render_matplotlib(code: str, out_dir: Path) -> tuple[bytes | None, str]:
+    """把模型写的 Matplotlib 绘图脚本跑成 PNG。返回 (图片字节, 错误信息)。
+
+    **为什么在子进程里跑而不是 exec()**：这段代码是模型生成的，等于把任意
+    Python 交给我们执行。子进程 + 超时 + 独立临时目录，炸了也只死一个短命进程，
+    不会污染主进程（模型偶尔会写出死循环或 ``plt.show()`` 卡住不返回）。
+
+    约定：脚本必须自己 ``plt.savefig(OUT, dpi=200)``，``OUT`` 由我们注入成环境变量
+    而不是让模型猜路径——模型十有八九会写死一个 ``fig.png``，我们收不到。
+    收尾兜底：脚本跑完却没产出 OUT 时，再尝试把当前 figure 存一次。
+    """
+    try:
+        import matplotlib  # noqa: F401
+    except Exception:  # noqa: BLE001
+        return None, "本机未安装 matplotlib"
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / "figure.png"
+    # 每次渲染前先清掉同名旧图：否则脚本没产出时会把上一张图当成本次结果报成功
+    if target.exists():
+        target.unlink()
+    body = (code or "").strip()
+    if body:
+        # 模型偶尔会带上 BOM（U+FEFF），Python 直接语法错，先剥掉
+        body = body.lstrip("\ufeff")
+    if not body:
+        return None, "模型没有返回任何绘图脚本"
+
+    # 兜底：模型没写 savefig 时，脚本正常结束后把当前图存下来
+    runner = (
+        "import os, runpy\n"
+        f"OUT = {str(target)!r}\n"
+        "ns = {'OUT': OUT, '__name__': '__main__'}\n"
+        "src = os.environ['MPL_SCRIPT']\n"
+        "exec(compile(open(src, encoding='utf-8').read(), src, 'exec'), ns)\n"
+        "try:\n"
+        "    import matplotlib.pyplot as _plt\n"
+        "    if _plt.get_fignums() and not os.path.exists(OUT):\n"
+        "        _plt.savefig(OUT, dpi=200, bbox_inches='tight')\n"
+        "except Exception:\n"
+        "    pass\n"
+    )
+    with tempfile.TemporaryDirectory() as td:
+        script = Path(td) / "fig.py"
+        script.write_text(body, encoding="utf-8")
+        runner_file = Path(td) / "_run.py"
+        runner_file.write_text(runner, encoding="utf-8")
+        env_note = os.environ.copy()
+        env_note["MPL_SCRIPT"] = str(script)
+        # 无显示后端：Windows/服务器上都没有 Tk，Agg 才能出图
+        env_note["MPLBACKEND"] = "Agg"
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(runner_file)],
+                cwd=td,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=60,
+                env=env_note,
+            )
+        except subprocess.TimeoutExpired:
+            return None, "绘图脚本执行超时（60s），多半写成了死循环"
+        except OSError as exc:
+            return None, f"无法启动 Python 子进程: {exc}"
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip()
+            # 只回喂最后一个异常行，整段 traceback 模型也读不进去
+            last = ""
+            for line in detail.splitlines():
+                if line and not line.startswith((" ", "\t")) and "Error" in line:
+                    last = line.strip()
+            return None, f"绘图脚本报错: {last or detail[-400:]}"
+        if not target.exists():
+            return None, "脚本跑完了但没有生成图片（没调 savefig？）"
+        return target.read_bytes(), ""
+
+
 def render(kind: str, code: str, out_dir: Path) -> tuple[bytes | None, str]:
     if kind == "mermaid":
         return render_mermaid(code, out_dir)
@@ -504,6 +620,8 @@ def render(kind: str, code: str, out_dir: Path) -> tuple[bytes | None, str]:
         return render_graphviz(code, out_dir)
     if kind == "tikz":
         return render_tikz(code, out_dir)
+    if kind == "matplotlib":
+        return render_matplotlib(code, out_dir)
     return None, f"不支持的图类型: {kind}"
 
 
@@ -567,7 +685,7 @@ async def generate_diagram(description: str, kind: str = "mermaid") -> dict[str,
     description = (description or "").strip()
     if not description:
         raise ValueError("描述不能为空")
-    if kind not in ("mermaid", "graphviz", "tikz"):
+    if kind not in _DIAGRAM_KINDS:
         raise ValueError(f"不支持的图类型: {kind}")
 
     messages = build_prompt(description, kind)

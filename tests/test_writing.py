@@ -427,6 +427,59 @@ def test_tikz_render_reports_missing_latex(monkeypatch, tmp_path):
 def test_renderer_available_reports_tikz():
     av = dg.renderer_available()
     assert "tikz" in av and "mermaid" in av and "graphviz" in av
+    # 赛题 1.6.2 点名四种格式，matplotlib 不能漏
+    assert "matplotlib" in av
+
+
+def test_matplotlib_prompt_injects_out_variable():
+    """脚本必须把图存到系统注入的 OUT，否则我们收不到图。"""
+    mp = dg.build_prompt("a system", "matplotlib")[1]["content"]
+    assert "Matplotlib" in mp
+    assert "OUT" in mp
+    assert "plt.show()" in mp          # 得明确禁止，否则无显示环境里卡住
+    assert "savefig" in mp
+
+
+def test_matplotlib_render_outputs_png(tmp_path):
+    code = (
+        "import matplotlib.pyplot as plt\n"
+        "fig, ax = plt.subplots()\n"
+        "ax.plot([1, 2, 3], [3, 2, 4])\n"
+        "fig.savefig(OUT, dpi=100)\n"
+    )
+    png, err = dg.render_matplotlib(code, tmp_path)
+    if not dg.renderer_available()["matplotlib"]:
+        pytest.skip("本机没装 matplotlib")
+    assert err == ""
+    assert png and png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_matplotlib_render_reports_script_error(tmp_path):
+    """脚本报错必须返回 None + 可读错误，不能假装成功。"""
+    if not dg.renderer_available()["matplotlib"]:
+        pytest.skip("本机没装 matplotlib")
+    png, err = dg.render_matplotlib("raise RuntimeError('boom')\n", tmp_path)
+    assert png is None
+    assert "boom" in err
+
+
+def test_matplotlib_render_flushes_stale_image(tmp_path):
+    """上一张图残留在同一目录时，失败不能把它当成本次结果。"""
+    if not dg.renderer_available()["matplotlib"]:
+        pytest.skip("本机没装 matplotlib")
+    (tmp_path / "figure.png").write_bytes(b"\x89PNG\r\n\x1a\nstale")
+    png, err = dg.render_matplotlib("raise RuntimeError('boom')\n", tmp_path)
+    assert png is None and "boom" in err
+
+
+def test_matplotlib_render_strips_bom(tmp_path):
+    """BOM 会让 Python 报 invalid non-printable character。"""
+    if not dg.renderer_available()["matplotlib"]:
+        pytest.skip("本机没装 matplotlib")
+    code = "\ufeffimport matplotlib.pyplot as plt\nfig = plt.figure()\nfig.savefig(OUT, dpi=80)\n"
+    png, err = dg.render_matplotlib(code, tmp_path)
+    assert err == ""
+    assert png is not None
 
 
 def test_radar3d_option_has_three_axes():
