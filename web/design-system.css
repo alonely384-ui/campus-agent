@@ -1404,3 +1404,270 @@ body.is-resizing .sb-resizer { cursor: col-resize; }
   .msg__body table,
   .msg__body pre { max-width: 100%; overflow-x: auto; }
 }
+
+/* ==========================================================================
+   视觉规整层（2026-11-17）
+   --------------------------------------------------------------------------
+   起因：用户反馈「整体感觉像 AI 问答程序的页面，面向科研差点意思」，要求
+   在不改结构、不动逻辑的前提下把观感统一起来。
+
+   这里为什么另起一段、而不是去改上面的规则：
+     · 上面的「通用组件」「主题层」已经验收过多轮，直接改数值会牵动
+       reader.html / graph.html 里那些靠具体像素对齐的地方（例如高亮框）。
+     · 本段只做两件事：把各页**各自硬编码**的卡片/按钮/输入框收敛到同一套
+       变量；补上差异化的层级（hover、focus、分隔）。选择器一律带上原有
+       类名，不新增结构。
+
+   设计取向（对齐当前主流工具的后台/文档类界面）：
+     1. 卡片「边线为主、阴影极轻」。重投影在浅色页面上会显得廉价，
+        主流做法是 1px 淡边 + 几乎看不见的一层浮起。
+     2. 间距一律走 --space-* 4px 栅格，不再出现 7px / 9px / 13px 这类散值。
+     3. 字号层级拉开：标题与正文差至少 2px，说明文字用 --font-sm 而不是
+        把正文缩到 12px。
+     4. 交互一律有 120ms 过渡，hover 只改一到两个属性，不做位移动画
+        （位移在密集列表里会晃眼）。
+     5. 聚焦环统一为 3px 品牌色浅环，键盘可达。
+   ========================================================================== */
+
+/* ---------- 1. 卡片：把各页各写一套的圆角/阴影收敛到一套 ---------- */
+/* 论文分析页、写作助手页的 .card 用的是 12px 圆角 + 单层 xs 阴影，
+   设计系统主题层给的是 --radius-card(18px) + --shadow-card(双层)。
+   统一到主题层取值，页面自己的 max-width / padding 一律不动。 */
+.card {
+  border-radius: var(--radius-card);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--dur-normal) var(--ease),
+              border-color var(--dur-normal) var(--ease);
+}
+/* 只有「可点/可聚焦」的卡片才在 hover 时浮起来；纯展示卡片悬停不动，
+   否则整页看起来都在抖。 */
+.card:hover:has(> .card__head),
+a.card:hover,
+button.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
+}
+
+/* 卡片的标题行统一节奏：标题与副说明之间 4px，与正文之间 12px */
+.card__head { gap: var(--space-2); }
+.card__head + * { margin-top: var(--space-3); }
+
+/* ---------- 2. 按钮：补 hover 位移与聚焦环，尺寸走栅格 ---------- */
+.btn {
+  padding: 7px 14px;
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-xs);
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
+}
+.btn:hover { box-shadow: var(--shadow-sm); }
+.btn:active { transform: translateY(1px); box-shadow: none; }
+.btn--secondary { box-shadow: none; }
+.btn--secondary:hover { box-shadow: var(--shadow-xs); }
+.btn--ghost { box-shadow: none; }
+.btn--ghost:hover { box-shadow: none; }
+
+/* 各页自己写的「操作按钮」（.act / .scope-btn / .pick-btn 等）统一手型与过渡，
+   不统一它们的配色——那属于各页语义。 */
+.act,
+.pick-btn,
+.scope-btn,
+.nar-btn,
+.dir-btn,
+.ghost-btn {
+  border-radius: var(--radius-control);
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+
+/* ---------- 3. 输入框：焦点环统一成品牌色浅环 ---------- */
+.field {
+  border-radius: var(--radius-control);
+  border-color: var(--border-strong);
+  padding: 8px 12px;
+  transition: border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease);
+}
+.field:hover:not(:focus):not(:disabled) { border-color: var(--gray-400); }
+.field:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+/* ---------- 4. 标签页：把 .tab 做成「药丸 + 选中实心」的清晰层级 ---------- */
+.tab {
+  border-radius: var(--radius-control);
+  transition: background var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+.tab:hover:not(.on):not(.active) { background: var(--bg-muted); }
+
+/* ---------- 5. 徽章 / 状态胶囊：对齐同一套高度与字距 ---------- */
+.tag {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+.status-pill { font-weight: 500; letter-spacing: .01em; }
+
+/* ---------- 6. 表格：表头淡底、单元格细线、末行去线 ---------- */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+table > thead > tr > th {
+  background: var(--bg-surface-2);
+  font-weight: 600;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  letter-spacing: .02em;
+  border-bottom: 1px solid var(--border-color);
+}
+table > tbody > tr > td { border-bottom: 1px solid var(--border-color-alt); }
+table > tbody > tr:last-child > td { border-bottom: 0; }
+table > tbody > tr:hover > td { background: var(--bg-subtle); }
+
+/* ---------- 7. 页面标题：与副说明拉开层级 ---------- */
+.page-title,
+h1 {
+  letter-spacing: -.012em;
+}
+.page-sub {
+  line-height: var(--leading-normal);
+}
+
+/* ---------- 8. 滚动条：更细、更淡，悬停才显形 ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--gray-400); background-clip: content-box; }
+
+/* ---------- 9. 焦点环：统一到品牌色浅环，覆盖浏览器默认的黑色描边 ---------- */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* ---------- 10. 链接：悬停才出现下划线，正文区更干净 ---------- */
+a { text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 1px; }
+
+/* 同一屏里同时出现多张卡片时，卡片之间统一 16px 呼吸感 */
+.card + .card { margin-top: var(--space-4); }
+
+/* ---------- 11. 减少动效偏好：本段新增的过渡也要尊重 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .btn:hover,
+  .btn:active { transform: none; }
+}
+
+/* ==========================================================================
+   视觉规整层 · 第二批：把写作助手 / 论文分析等页自带的控件收敛过来
+   --------------------------------------------------------------------------
+   这两页的历史包袱：writing.html 与 analysis.html 各自在页面里写了一整套
+   .pane / input / button / .tab，圆角 8~12px、边框用的是局部 --line 变量，
+   跟设计系统的 --radius-card / --border-color 是两套。于是「同一个产品里
+   两种卡片、两种输入框、两种标签页」，观感就散了。
+
+   这一批**只做统一，不改尺寸与排布**：
+     · 容器（.pane / .card）→ 同一套圆角与阴影
+     · 控件（input/textarea/select/button）→ 同一套圆角、边框、聚焦环
+     · 标签页（.tab）→ 同一套高度与选中态
+   选择器都限定在 main 内，避开顶栏与全局弹窗；不使用裸 button 全局规则。
+   ========================================================================== */
+
+/* ---------- 容器：.pane（写作助手）与 .card 对齐 ---------- */
+.pane.active {
+  border-radius: var(--radius-card);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- 控件：限定在 main 里，只统一形状与聚焦，不改宽度 ---------- */
+main input[type="text"],
+main input[type="number"],
+main input[type="file"],
+main select,
+main textarea {
+  border-radius: var(--radius-control);
+  border-color: var(--border-strong);
+  transition: border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease);
+}
+main input[type="text"]:hover:not(:focus),
+main input[type="number"]:hover:not(:focus),
+main select:hover:not(:focus),
+main textarea:hover:not(:focus) {
+  border-color: var(--gray-400);
+}
+main input[type="text"]:focus,
+main input[type="number"]:focus,
+main select:focus,
+main textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+/* ---------- 按钮：写作助手/论文分析里的主按钮与幽灵按钮 ---------- */
+main button:not(.tab):not(.sb-toggle):not(.mnav-btn) {
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-xs);
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
+}
+main button.ghost,
+main button.ghost-btn,
+main .act.ghost-btn {
+  box-shadow: none;
+}
+main button:not(:disabled):active { transform: translateY(1px); box-shadow: none; }
+
+/* ---------- 标签页：两页统一成同一高度、同一选中态 ---------- */
+.tabs .tab,
+.tab[data-pane] {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font-size: var(--font-md);
+  font-weight: 500;
+  box-shadow: none;
+}
+.tabs .tab:hover:not(.active):not(.on),
+.tab[data-pane]:hover:not(.active):not(.on) {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+}
+.tabs .tab.active,
+.tab.active {
+  box-shadow: var(--shadow-xs);
+}
+
+/* ---------- 代码块 / 输出框：与单元格同一套边线 ---------- */
+main pre {
+  border-radius: var(--radius-control);
+  border-color: var(--border-color);
+  background: var(--bg-surface-2);
+}
+
+/* ---------- 候选卡片这类小容器：统一细边与圆角 ---------- */
+main .cand,
+main .pick-grp,
+main .dir-card {
+  border-radius: var(--radius-control);
+  border-color: var(--border-color);
+}
