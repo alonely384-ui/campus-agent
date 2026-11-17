@@ -140,6 +140,15 @@ def choose_chart(info: dict[str, Any], df: pd.DataFrame | None = None) -> dict[s
         ys = [c for c in nums if c != axis_col]
         return {"kind": "line", "x": axis_col, "y": ",".join(ys)}
 
+    # 有类别列（model / epoch / 方法名）又有多个数值列时，语义是
+    # 「多个对象在多个指标上的对比」，该画分组柱状图，**类别名必须出现在 x 轴上**。
+    # 旧实现这里直接落到下面的散点分支（nums[0] vs nums[1]），类别列被整个丢掉，
+    # 图上只剩两列数字，看不出哪个点是谁——实测用一张「模型 × 三个基准」的表
+    # 生成图，导出的 PNG 上一个模型名都没有，用户反馈「只有图和数字，没有标注的英文」。
+    if cats and len(nums) >= 2:
+        kind = "line" if rows > 12 else "bar"
+        return {"kind": kind, "x": cats[0], "y": ",".join(nums[:6])}
+
     if len(nums) >= 3 and not cats:
         return {"kind": "radar", "x": "", "y": ",".join(nums[:6])}
     if len(nums) >= 2:
@@ -306,10 +315,51 @@ def build_echarts(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> di
             ],
         }
 
+    ycols = [c for c in (y or "").split(",") if c]
     xs, ys = _series(df, x, y)
+    # 多列 y（分组柱 / 多条折线）：每列一条 series，配图例，y 轴名留空。
+    # 旧实现把 "mmlu,humaneval,gsm8k" 整串塞进 yAxis.name，却只画第一列——
+    # 轴上挂着一串看不懂的列名，图里只有一组柱子，另外两列的数据根本没出现。
+    if len(ycols) > 1:
+        work = df.head(len(xs)) if len(df) > len(xs) else df
+        series: list[dict[str, Any]] = []
+        flat: list[float] = []
+        for c in ycols:
+            try:
+                col = [None if pd.isna(v) else float(v) for v in work[c]]
+            except (TypeError, ValueError):
+                col = work[c].map(str).tolist()
+            series.append(
+                {
+                    "type": "line" if kind == "line" else "bar",
+                    "name": c,
+                    "data": col,
+                    "smooth": kind == "line",
+                }
+            )
+            flat.extend(v for v in col if isinstance(v, (int, float)))
+        legend: dict[str, Any] = {"data": ycols, "type": "scroll"}
+        legend["top"] = 24 if title else 0
+        # 柱状图的零基线不能截：截断 y 轴会让 67 和 86 看起来差三倍。
+        # matplotlib 那边 bar 一定从 0 起，这边贴数据就两张图对不上，
+        # 而页面写的是「这块预览和导出的图是一样的」。
+        y_axis: dict[str, Any] = {"type": "value", "name": ""}
+        if kind != "bar":
+            y_axis.update(_padded_range(flat))
+        return {
+            "title": {"text": title},
+            "tooltip": {"trigger": "axis"},
+            "legend": legend,
+            "xAxis": {"type": "category", "data": [str(v) for v in xs], "name": x},
+            "yAxis": y_axis,
+            "series": series,
+        }
+
     # 折线图的 x 是类别（epoch、模型名之类），只有 y 可能跨数量级。
     # 对数轴与 export_png 保持一致，同样跳过含 0/负数的列（_needs_log 内部已判）。
-    y_axis = {"type": "value", "name": y, **_padded_range(ys)}
+    y_axis = {"type": "value", "name": y}
+    if kind != "bar":
+        y_axis.update(_padded_range(ys))
     if y in df.columns and _needs_log(pd.to_numeric(df[y], errors="coerce").dropna()):
         y_axis = {"type": "log", "logBase": 10, "name": f"{y} (log scale)"}
     return {
@@ -521,17 +571,45 @@ def export_png(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> bytes
         ax.pie(counts.values, labels=[str(i) for i in counts.index], autopct="%1.1f%%")
         ax.axis("equal")
     else:
-        xs, ys = _series(df, x, y)
-        # 纵轴标签只写实际画的那一列（y 可能是多列，_series 取第一列）
-        ylabel = (y or "").split(",")[0].strip()
-        if kind == "line":
-            ax.plot([str(v) for v in xs], ys, marker="o", markersize=3, color="#2b6cb0")
+        ycols = [c for c in (y or "").split(",") if c]
+        if len(ycols) > 1:
+            # 与 build_echarts 的多列分支对齐：一列一条 series，分组柱 / 多条折线 + 图例。
+            # 旧实现走 _series 只取第一列，导出的 PNG 只有一组柱子，而网页预览画了三组，
+            # 页面上又写着「这块预览和导出的图是一样的」，演示时对不上。
+            work = df.head(30) if len(df) > 30 else df
+            xlabels = (
+                [str(v) for v in work[x]]
+                if x and x in work.columns
+                else [str(i) for i in range(len(work))]
+            )
+            if kind == "line":
+                for c in ycols:
+                    ax.plot(xlabels, work[c], marker="o", markersize=3, label=c)
+            else:
+                import numpy as np
+
+                idx = np.arange(len(work))
+                width = 0.8 / len(ycols)
+                for i, c in enumerate(ycols):
+                    ax.bar(idx + (i - (len(ycols) - 1) / 2) * width, work[c], width=width, label=c)
+                ax.set_xticks(idx)
+                ax.set_xticklabels(xlabels)
+            ax.legend(frameon=False)
+            ax.set_xlabel(x)
+            if len(xlabels) > 8:
+                plt.xticks(rotation=45, ha="right")
         else:
-            ax.bar([str(v) for v in xs], ys, color="#4a5568")
-        ax.set_xlabel(x)
-        ax.set_ylabel(ylabel)
-        if len(xs) > 8:
-            plt.xticks(rotation=45, ha="right")
+            xs, ys = _series(df, x, y)
+            # 纵轴标签只写实际画的那一列（y 可能是多列，_series 取第一列）
+            ylabel = (y or "").split(",")[0].strip()
+            if kind == "line":
+                ax.plot([str(v) for v in xs], ys, marker="o", markersize=3, color="#2b6cb0")
+            else:
+                ax.bar([str(v) for v in xs], ys, color="#4a5568")
+            ax.set_xlabel(x)
+            ax.set_ylabel(ylabel)
+            if len(xs) > 8:
+                plt.xticks(rotation=45, ha="right")
 
     if title:
         ax.set_title(title)

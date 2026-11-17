@@ -759,6 +759,48 @@ def test_series_takes_first_column_of_multi_y():
     assert ch._series(df, "epoch", "nope")[1] == []
 
 
+def test_choose_chart_category_with_many_numeric_keeps_category():
+    """类别列 + 多个数值列 → 分组柱状图，类别名必须留在 x 轴上。
+
+    旧实现落到散点分支（nums[0] vs nums[1]），类别列被整个丢掉：
+    一张「模型 × 三个基准」的表生成出来的图上一个模型名都没有，
+    用户看到的就是「只有图和数字，没有标注的英文」。
+    """
+    df = ch.load_csv(
+        "model,mmlu,humaneval,gsm8k\n"
+        "GPT-4,86.4,67.0,92.0\n"
+        "Claude 3 Opus,86.8,84.9,95.0\n"
+        "Gemini 1.5 Pro,85.9,84.1,91.7\n"
+        "Llama 3 70B,82.0,81.7,93.0\n"
+        "Qwen2 72B,84.2,86.6,91.1\n"
+    )
+    spec = ch.choose_chart(ch.profile(df), df)
+    assert spec["kind"] == "bar", spec
+    assert spec["x"] == "model", spec
+    assert spec["y"] == "mmlu,humaneval,gsm8k", spec
+
+
+def test_build_echarts_multi_y_bar_draws_every_column():
+    """多列 y 的柱状图要每列一条 series + 图例，不能只画第一列。"""
+    df = ch.load_csv("model,a,b\nX,1.0,2.0\nY,3.0,4.0\n")
+    opt = ch.build_echarts(df, {"kind": "bar", "x": "model", "y": "a,b"})
+    assert opt["xAxis"]["data"] == ["X", "Y"]
+    assert [s["name"] for s in opt["series"]] == ["a", "b"]
+    assert opt["legend"]["data"] == ["a", "b"]
+    assert opt["yAxis"]["name"] == "", "多列时不能把列名串塞进轴标题"
+
+
+def test_bar_axis_keeps_zero_baseline():
+    """柱状图 y 轴不能贴数据截断。
+
+    截断会让 67 和 86 看起来差三倍；而且 matplotlib 导出的 PNG 一定从 0 起，
+    两张图就对不上了，页面却写着「这块预览和导出的图是一样的」。
+    """
+    df = ch.load_csv("model,score\nA,86.4\nB,92.0\n")
+    opt = ch.build_echarts(df, {"kind": "bar", "x": "model", "y": "score"})
+    assert "min" not in opt["yAxis"], opt["yAxis"]
+
+
 def test_all_chart_kinds_export_png():
     """六种图型逐个出图，任何一个是空的都说明导出链路断了。"""
     png_magic = bytes([0x89]) + b"PNG"
