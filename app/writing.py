@@ -355,6 +355,12 @@ def check_citations(text: str, pool: list[lit.Candidate]) -> CitationCheck:
     典型成因是模型想引用一篇候选池里没有的经典论文（如 Switch Transformer），
     于是硬塞一个看着像的编号。只查编号在不在池里抓不到这种错，
     所以额外做一次词面重叠检查：引用所在句与论文标题/摘要零重叠，判为可疑。
+
+    **References 段要排除在「可疑」判定之外**：模型常在末尾自己写一个
+    ``## References``，按行罗列 ``[C1]`` ``[C2]``——这些标记前面紧挨换行，
+    取句子会拿到空串（或拿到下一行列出的另一篇编号），重叠必然为 0，
+    于是整篇的真实引用会被集体误判成可疑（实测 8/8 全中）。
+    那段本来就是编号列表，没有论述可校验；编号合法性由 cited/unknown 覆盖。
     """
     known = {c.key for c in pool}
     found: list[str] = []
@@ -368,10 +374,19 @@ def check_citations(text: str, pool: list[lit.Candidate]) -> CitationCheck:
     unknown = [k for k in found if k not in known]
     unused = [c.key for c in pool if c.key not in cited]
 
+    body, _ref_head, ref_tail = _split_references(text or "")
+    # 有 References 标题时只校验前半段；没有时整篇都算正文
+    prose = body if ref_tail or _ref_head else (text or "")
+    # 编号列表行（整行只有标记和空白/逗号）一律不参与词面重叠判定
+    prose = re.sub(r"(?m)^[\s\[,;，、C\d】\]]+$", "", prose)
+
     by_key = {c.key: c for c in pool}
     suspicious: list[str] = []
-    for m in _MARK_GROUP_RE.finditer(text or ""):
-        sentence = _sentence_for(text or "", m.start())
+    for m in _MARK_GROUP_RE.finditer(prose):
+        sentence = _sentence_for(prose, m.start()).strip()
+        # 取不到所在句子就无从判断，不能凭「空句子零重叠」定罪
+        if not sentence:
+            continue
         sent_tokens = _tokens_for_overlap(sentence)
         # 同一句里可能有 [C1, C4]，逐个判：只要这篇沾边就不算它可疑
         for k in re.split(r"[,;，、]", m.group(1)):

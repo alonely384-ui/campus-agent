@@ -510,7 +510,10 @@ def _key_numbers(info: dict[str, Any], spec: dict[str, str]) -> list[str]:
                 out.append(f"{col}.{k} = {s[k]}")
     for p in info.get("correlations", [])[:3]:
         out.append(f"r({p['a']}, {p['b']}) = {p['r']}")
-    out.append(f"样本行数 = {info.get('rows')}")
+    # 这一项写成英文：它是 caption 最常引用的数字，而 caption 必须是英文。
+    # 早先写成「样本行数 = 3」，模型照抄进英文句子后出来的是
+    # "The chart comprises 样本行数 = 3 entries in total."（实测踩过）。
+    out.append(f"row_count = {info.get('rows')}")
     return out
 
 

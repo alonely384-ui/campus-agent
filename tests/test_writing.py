@@ -83,6 +83,39 @@ def test_unused_candidates_reported():
     assert check.unused_candidates == ["C2"]
 
 
+def test_model_written_references_list_is_not_suspicious():
+    """模型常自己补一段 ``## References``，按行罗列 ``[C1]``。
+
+    这些标记前面紧挨换行，取句子会拿到空串，词面重叠必然为 0——
+    早先的实现因此把整篇的真实引用集体判成可疑（实测 8/8 全中）。
+    """
+    pool = [
+        _cand("C1", "Attention Is All You Need", abstract="attention mechanism transformer"),
+        _cand("C2", "Sparse Attention for Long Documents", abstract="sparse attention long document"),
+    ]
+    md = (
+        "## Abstract\n\n长文档问答面临计算开销问题。基于 Transformer 的自注意力机制[C1]代价高昂，"
+        "稀疏注意力可以降低这部分开销[C2]。\n\n## References\n\n[C1]\n[C2]\n"
+    )
+    check = w.check_citations(md, pool)
+    assert check.suspicious_keys == []
+    assert check.cited_keys == ["C1", "C2"]
+
+
+def test_bare_marker_line_does_not_convict():
+    """整行只有标记时取不到句子，不能凭「空句子零重叠」定罪。"""
+    pool = [_cand("C1", "Attention Is All You Need", abstract="attention mechanism")]
+    check = w.check_citations("上一段讲稀疏注意力[C1]。\n\n[C1] 单独一行\n", pool)
+    assert check.suspicious_keys == []
+
+
+def test_genuinely_off_topic_citation_still_flagged():
+    """真正的错配引用仍要抓出来：编号合法但内容完全无关。"""
+    pool = [_cand("C1", "Attention Is All You Need", abstract="attention mechanism transformer")]
+    check = w.check_citations("本章讨论餐饮外卖平台的配送路径优化问题[C1]。", pool)
+    assert check.suspicious_keys == ["C1"]
+
+
 def test_reference_list_only_uses_pool_data():
     """参考文献条目必须由候选池数据产生——这是"无幻觉引用"的结构保证。"""
     pool = [_cand("C3", "Sparse Attention Revisited", authors=["Jane Doe", "John Roe"], year=2021)]
@@ -721,7 +754,17 @@ def test_key_numbers_are_preformatted_strings():
     keys = ch._key_numbers(info, spec)
     assert "params.min = 0.34" in keys
     assert "params.max = 540.0" in keys or "params.max = 540" in keys
-    assert "样本行数 = 3" in keys
+    # 行数这一项必须是英文键：caption 是英文，模型会原样照抄这几个词
+    assert "row_count = 3" in keys
+
+
+def test_key_numbers_contain_no_chinese():
+    """关键数值会成为 caption 的一部分，不能含中文。"""
+    df = ch.load_csv("name\nAlice\nBob\nCarol\n")  # 没有数值列，stats 为空
+    info = ch.profile(df)
+    keys = ch._key_numbers(info, {"kind": "pie", "x": "name", "y": ""})
+    joined = " ".join(keys)
+    assert not any("\u4e00" <= ch2 <= "\u9fff" for ch2 in joined), joined
 
 
 def test_unsupported_numbers_accepts_values_from_stats():

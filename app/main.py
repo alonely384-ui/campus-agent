@@ -2512,8 +2512,18 @@ async def writing_paper_figures(paper: str, keyword: str = "architecture", limit
 
 
 @app.post("/writing/chart", summary="CSV 数据可视化（1.6.3）")
-async def writing_chart(file: UploadFile, kind: str = "", note: str = "") -> dict:
-    """上传 CSV，返回 ECharts 配置 + 导出的 PNG + 自动写的英文 caption。"""
+async def writing_chart(
+    file: UploadFile,
+    kind: str = Form(default=""),
+    note: str = Form(default=""),
+) -> dict:
+    """上传 CSV，返回 ECharts 配置 + 导出的 PNG + 自动写的英文 caption。
+
+    ``kind`` / ``note`` 必须用 ``Form(...)`` 声明。写成裸 `str = ""` 时
+    FastAPI 会把它当**查询参数**，前端塞进 multipart 表单里的 kind 永远收不到，
+    结果是用户选了「三维雷达图」却拿到默认选型的折线图（实测踩过：
+    bar/pie/radar/radar3d 六种取值返回的 spec.kind 一律是 line）。
+    """
     # 同样改成计数式分块读取：CSV 一直读到内存里（make_chart 要 bytes），
     # 但超限时立刻中止，不会先把整个文件啃进来再判断。
     buf = bytearray()
