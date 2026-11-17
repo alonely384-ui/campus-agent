@@ -1085,6 +1085,7 @@ body.app:not(.has-conv):has(.dock) .greeting { display: block; }
   max-height: 40vh;
   resize: none;
   border: none;
+  border-radius: 0;
   outline: none;
   background: transparent;
   font-family: var(--font-sans);
@@ -1564,11 +1565,15 @@ h1 {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); background-clip: content-box; }
 
-/* ---------- 9. 焦点环：统一到品牌色浅环，覆盖浏览器默认的黑色描边 ---------- */
+/* ---------- 9. 焦点环：统一到品牌色浅环，覆盖浏览器默认的黑色描边 ----------
+   【不要在这里写 border-radius: inherit】。焦点环的圆角应该跟着元素自己的形状走；
+   写成 inherit 会让元素从父级继承圆角，2026-11-17 实测踩到：对话页输入坞的
+   textarea 本来是无圆角的透明文字区，继承了外层 .dock__box 的 18px，
+   聚焦时描出一圈紧贴文字的小椭圆，看起来像「框里套框」，用户连续反馈两次。
+   这条规则只负责 outline，不碰 border-radius。 */
 :focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
-  border-radius: inherit;
 }
 
 /* ---------- 10. 链接：悬停才出现下划线，正文区更干净 ---------- */
@@ -1631,6 +1636,20 @@ main textarea:focus {
   outline: none;
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+/* 例外：对话页输入坞的文字区。
+   .dock__ta 自己没有边框与背景，聚焦反馈由外层 .dock__box:focus-within
+   的边框变色承担。上面这条 main textarea:focus 会给它贴一圈 3px 品牌色光环，
+   紧贴着文字画成一个小椭圆，和外层大圆角边框叠在一起就是「框里套框」。
+   2026-11-17 用户两次反馈「里面那一层蓝色框框不要」，这里显式豁免：
+   同时把特异性提到 main textarea:focus 之上（0,2,2 > 0,1,2）。 */
+main .dock__ta,
+main .dock__ta:focus,
+main .dock__ta:hover:not(:focus) {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* ---------- 按钮：写作助手/论文分析里的主按钮与幽灵按钮 ---------- */

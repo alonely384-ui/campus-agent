@@ -2796,19 +2796,24 @@ async def admin_logout(request: Request) -> Response:
 # 用绝对路径 WEB_DIR：`Path("web")` 是按 CWD 找的，换个目录启动就挂不上，
 # 表现是 /ui 直接 404 而日志里什么都不说（顶部已经 warning 过一句）。
 class _NoCacheHTML(StaticFiles):
-    """静态页面的缓存策略：HTML 一律重新验证，其它静态资源保留 ETag 协商。
+    """静态页面的缓存策略：一律重新验证，保留 ETag 协商。
 
-    起因：改完 analysis.html 后用户强刷仍然看到旧页面。根因是 StaticFiles 对
-    HTML 不带 Cache-Control，浏览器按启发式规则自行决定缓存多久，本地开发时
-    页面改了却看不到，比任何 bug 都费时间。
-    HTML 加 no-cache 后仍走 ETag：内容没变时服务端回 304，不会真的重复下载；
+    起因有两个：
+    1. 改完 analysis.html 后用户强刷仍然看到旧页面。根因是 StaticFiles 对
+       HTML 不带 Cache-Control，浏览器按启发式规则自行决定缓存多久。
+    2. 2026-11-17 改完 design-system.css 里的输入坞规则后，用户刷新看到的
+       仍是旧样式（服务器返回的 CSS 已含新规则，但响应头里没有 Cache-Control，
+       浏览器不发条件请求，直接吃本地缓存）。只给 HTML 加头不够，
+       CSS/JS 同样会被按启发式缓存。
+
+    所以这里对所有 /ui 资源都发 no-cache（= 每次使用前必须向服务端验证）。
+    仍然走 ETag：内容没变时服务端回 304 Not Modified，不重复下载；
     内容一变立刻拿到新的，不需要用户 Ctrl+F5。
     """
 
     async def get_response(self, path: str, scope):  # type: ignore[override]
         response = await super().get_response(path, scope)
-        if str(path).endswith((".html", ".htm")) or path in ("", "."):
-            response.headers["Cache-Control"] = "no-cache"
+        response.headers["Cache-Control"] = "no-cache"
         return response
 
 
