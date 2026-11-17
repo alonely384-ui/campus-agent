@@ -187,6 +187,20 @@
 
     /* ---------- 分析范围（选片） ---------- */
     .scope-card { position: sticky; top: 0; z-index: 5; }
+    /* 默认折叠：只留标题行，勾选列表要点了「调整范围」才展开 */
+    .scope-toggle { margin-left: 10px; font-size: 12px; padding: 3px 10px; }
+    .scope-fold[hidden] { display: none; }
+
+    /* ---------- 两个主功能入口（赛题 1.5.3 / 1.5.4） ---------- */
+    .hero-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .hero-card { display: flex; flex-direction: column; }
+    .hero-card h2 { margin-bottom: 6px; }
+    .hero-desc {
+      font-size: 12.5px; line-height: 1.85; color: var(--text-secondary);
+      margin: 0 0 12px; flex: 1 1 auto;
+    }
+    .hero-btn { padding: 8px 18px; font-size: 13.5px; font-weight: 600; }
+    @media (max-width: 900px) { .hero-row { grid-template-columns: 1fr; } }
     .scope-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
     .scope-bar input[type=text] {
       flex: 1 1 240px; min-width: 0; padding: 6px 10px;
@@ -238,25 +252,61 @@
   </header>
 
   <main>
+    <!-- 两个主功能做成置顶入口（赛题 1.5.3 / 1.5.4）。
+         之前它们排在「分析范围」长列表和领域概览后面，一打开页面根本看不见，
+         用户以为功能没做出来。同类产品（Consensus Deep Review、Elicit）都是
+         先给出「能做什么」，范围选择放在后面再调。 -->
+    <div class="hero-row">
+      <div class="card hero-card">
+        <h2>① 论述版综述<span class="sub">赛题 1.5.3 · 大模型自动生成</span></h2>
+        <p class="hero-desc">用模型在模板版的事实之上写出五段论述：研究背景、技术路线、代表性工作、演进脉络、现存局限。每一段先校验引用编号，越界的整段丢弃，所以出来的每一句都能追到具体论文。</p>
+        <div class="tr-row" style="margin-top:0">
+          <button class="act hero-btn" id="narRun">生成论述版综述</button>
+          <button class="act ghost-btn" id="narStop" hidden>停止</button>
+          <span class="tr-hint" id="narMsg"></span>
+        </div>
+        <div class="nar-stages" id="narStages"></div>
+      </div>
+
+      <div class="card hero-card">
+        <h2>② 未来工作探索<span class="sub">赛题 1.5.4 · Agent 提方向</span></h2>
+        <p class="hero-desc">先从论文正文抽作者自己写的 Future Work / Limitations，再按图谱缺口（跨簇交界 / 未接入引用网 / 库内无人引用）归纳 3~5 个方向，最后去库外检索最新论文做保守比对：可能已被做过，或没检索到。</p>
+        <div class="tr-row" style="margin-top:0">
+          <button class="act hero-btn" id="dirRun">探索方向</button>
+          <button class="act ghost-btn" id="dirStop" hidden>停止</button>
+          <span class="tr-hint" id="dirMsg"></span>
+        </div>
+        <div class="nar-stages" id="dirStages"></div>
+      </div>
+    </div>
+
+    <!-- 两个功能的产出区：跑了才出现，避免空占首屏 -->
+    <div class="nar-body" id="narBody"></div>
+    <div id="dirBody" class="dir-body"></div>
+
     <!-- 论文范围：本页三个标签页（自动综述 / 论述版综述 / 未来工作探索）共用同一份输入。
          口径与图谱页的「局域图谱」一致——先选一批论文，再在这批论文内部做分析。
-         不勾任何论文 = 全库，与改造前的行为完全一样。 -->
-    <div class="card scope-card">
+         不勾任何论文 = 全库，与改造前的行为完全一样。
+         默认折叠：43 篇的勾选列表太占首屏，把两个主功能挤到了看不见的地方。 -->
+    <div class="card scope-card scope-card--folded" id="scopeCard">
       <h2>分析范围
         <span class="sub">勾选的论文是本页三个标签页共同的输入；一篇都不勾就是整个论文库</span>
-      </h2>
-      <div class="scope-bar">
-        <input type="text" id="scopeFilter" placeholder="按标题 / 文件名筛选…" autocomplete="off">
-        <button class="act ghost-btn" id="scopeAll">全选</button>
-        <button class="act ghost-btn" id="scopeNone">清空</button>
-        <label class="scope-up">
-          <input type="file" id="scopeUpload" accept="application/pdf" multiple hidden>
-          <span class="scope-up-btn">上传 PDF 一并分析</span>
-        </label>
+        <button class="act ghost-btn scope-toggle" id="scopeToggle" type="button">调整范围</button>
         <span class="scope-count" id="scopeCount"></span>
+      </h2>
+      <div class="scope-fold" id="scopeFold" hidden>
+        <div class="scope-bar">
+          <input type="text" id="scopeFilter" placeholder="按标题 / 文件名筛选…" autocomplete="off">
+          <button class="act ghost-btn" id="scopeAll">全选</button>
+          <button class="act ghost-btn" id="scopeNone">清空</button>
+          <label class="scope-up">
+            <input type="file" id="scopeUpload" accept="application/pdf" multiple hidden>
+            <span class="scope-up-btn">上传 PDF 一并分析</span>
+          </label>
+        </div>
+        <div class="scope-list" id="scopeList"></div>
+        <div class="scope-hint" id="scopeHint">正在读取论文列表…</div>
       </div>
-      <div class="scope-list" id="scopeList"></div>
-      <div class="scope-hint" id="scopeHint">正在读取论文列表…</div>
     </div>
 
     <div id="loading">正在读取图谱数据…</div>
@@ -268,40 +318,6 @@
         <div class="stat-row" id="surveyStats"></div>
         <div class="overview" id="surveyOverview"></div>
       </div>
-
-      <!-- 论述版综述（赛题 1.5.3 的「大模型自动生成」）：上面那份概览是
-           模板拼串、数字可复核；这里让模型在同样的事实上写一遍论述。
-           两条路线不是替代关系——模型不可用时仍以模板版为准。 -->
-      <div class="card">
-        <h2>论述版综述
-          <span class="sub">模型在模板版数字之上写成的五段论述，每段先校验引用再展示</span>
-        </h2>
-        <div class="tr-row" style="margin-top:0">
-          <button class="act" id="narRun">生成论述版综述</button>
-          <button class="act ghost-btn" id="narStop" hidden>停止</button>
-          <span class="tr-hint" id="narMsg"></span>
-        </div>
-        <div class="nar-stages" id="narStages"></div>
-        <div class="nar-body" id="narBody"></div>
-      </div>
-
-      <!-- 未来工作探索（赛题 1.5.4）：先抽作者自己写的 Future Work / Limitations，
-           再按图谱缺口（桥接 / 孤岛 / 低被引）归纳方向，最后去 arXiv 查最新论文排雷。
-           三样东西缺一不可：作者原话、图谱依据、库外检索结果。
-           结论一律保守——「可能已被做过」或「没检索到」，不出现「原创」类断言。
-           原来它单占一个标签页，用户默认看不到，所以并进「自动综述」页常驻。 -->
-      <div class="card">
-        <h2>未来工作探索
-          <span class="sub">从作者自述出发，结合图谱缺口归纳方向，再到库外检索最新论文</span>
-        </h2>
-        <div class="tr-row" style="margin-top:0">
-          <button class="act" id="dirRun">探索方向</button>
-          <button class="act ghost-btn" id="dirStop" hidden>停止</button>
-          <span class="tr-hint" id="dirMsg"></span>
-        </div>
-        <div class="nar-stages" id="dirStages"></div>
-      </div>
-      <div id="dirBody" class="dir-body"></div>
 
       <div class="card">
         <h2>发展脉络</h2>
@@ -455,6 +471,14 @@
       onScopeChanged();
     });
     $('scopeFilter').addEventListener('input', renderScope);
+    // 分析范围默认折叠，点「调整范围」才展开
+    $('scopeToggle').addEventListener('click', () => {
+      const fold = $('scopeFold');
+      const open = fold.hidden;
+      fold.hidden = !open;
+      $('scopeToggle').textContent = open ? '收起' : '调整范围';
+      $('scopeCard').classList.toggle('scope-card--folded', !open);
+    });
     $('scopeAll').addEventListener('click', () => {
       scopePicked = new Set(scopeFiles.map(f => f.filename));
       onScopeChanged();
