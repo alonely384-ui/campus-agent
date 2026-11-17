@@ -1730,6 +1730,10 @@ async function paintClaimText(pageNo) {
 }
 
 function hintClaimText() {
+  // hl=1 从证据卡跳进来的：用户是"看证据落到原文哪儿"，弹出「已高亮这段原文」
+  // 只是把用户已经看到的事再说一遍，而且会跟定位滚动抢注意力（2026-11-18 反馈：
+  // 那个提示条一闪而过很碍眼）。只在用户主动点高亮（非 START_HL）时才提示。
+  if (START_HL) return;
   setTimeout(() => toast('已高亮这段原文 · 点高亮可取消'), 600);
 }
 
@@ -1750,7 +1754,6 @@ pagesEl.addEventListener('click', ev => {
   if (sel && !sel.isCollapsed && String(sel)) return;   // 正在选字就放过
   ev.stopPropagation();
   clearClaimHighlight();
-  toast('高亮已取消');
 }, true);
 
 /** PDF 用户坐标 → 页面内 CSS 像素（左上原点）。
@@ -1796,7 +1799,9 @@ async function scrollToClaim() {
         drew = await paintClaimText(hit);
       }
     }
-    if (!drew) toast('没在原文里找到与证据对应的句子，已停在证据标注的那一页');
+    // 找不到就安静地停在证据标注的那一页，不弹提示：用户点的是"打开原文"，
+    // 落点就是这一页，是否精确高亮由页面自己说明；弹一条黑条反而像出了错
+    // （2026-11-18 反馈：提示条在上方一闪而过）。
   }
   for (let i = 0; i < 40; i++) {
     const box = START_HL
