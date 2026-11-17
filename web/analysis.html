@@ -229,7 +229,6 @@
     <div class="spacer"></div>
     <button class="tab on" id="tabSurvey" data-tab="survey">自动综述</button>
     <button class="tab" id="tabFrontier" data-tab="frontier">前沿探索</button>
-    <button class="tab" id="tabDirections" data-tab="directions">未来工作探索</button>
     <button class="tab" id="tabTranslate" data-tab="translate">英译中</button>
     <select id="focus" title="按主题过滤综述范围">
       <option value="">全部主题</option>
@@ -285,6 +284,25 @@
         <div class="nar-stages" id="narStages"></div>
         <div class="nar-body" id="narBody"></div>
       </div>
+
+      <!-- 未来工作探索（赛题 1.5.4）：先抽作者自己写的 Future Work / Limitations，
+           再按图谱缺口（桥接 / 孤岛 / 低被引）归纳方向，最后去 arXiv 查最新论文排雷。
+           三样东西缺一不可：作者原话、图谱依据、库外检索结果。
+           结论一律保守——「可能已被做过」或「没检索到」，不出现「原创」类断言。
+           原来它单占一个标签页，用户默认看不到，所以并进「自动综述」页常驻。 -->
+      <div class="card">
+        <h2>未来工作探索
+          <span class="sub">从作者自述出发，结合图谱缺口归纳方向，再到库外检索最新论文</span>
+        </h2>
+        <div class="tr-row" style="margin-top:0">
+          <button class="act" id="dirRun">探索方向</button>
+          <button class="act ghost-btn" id="dirStop" hidden>停止</button>
+          <span class="tr-hint" id="dirMsg"></span>
+        </div>
+        <div class="nar-stages" id="dirStages"></div>
+      </div>
+      <div id="dirBody" class="dir-body"></div>
+
       <div class="card">
         <h2>发展脉络</h2>
         <div id="chart"></div>
@@ -305,25 +323,6 @@
         <div class="stat-row" id="frontierStats"></div>
       </div>
       <div class="card" id="frontierBody"></div>
-    </div>
-
-    <!-- 未来工作探索（赛题 1.5.4）：先抽作者自己写的 Future Work / Limitations，
-         再按图谱缺口（桥接 / 孤岛 / 低被引）归纳方向，最后去 arXiv 查最新论文排雷。
-         三样东西缺一不可：作者原话、图谱依据、库外检索结果。
-         结论一律保守——「可能已被做过」或「没检索到」，不出现「原创」类断言。 -->
-    <div id="paneDirections" hidden>
-      <div class="card">
-        <h2>未来工作探索
-          <span class="sub">从作者自述出发，结合图谱缺口归纳方向，再到库外检索最新论文</span>
-        </h2>
-        <div class="tr-row" style="margin-top:0">
-          <button class="act" id="dirRun">探索方向</button>
-          <button class="act ghost-btn" id="dirStop" hidden>停止</button>
-          <span class="tr-hint" id="dirMsg"></span>
-        </div>
-        <div class="nar-stages" id="dirStages"></div>
-      </div>
-      <div id="dirBody" class="dir-body"></div>
     </div>
 
     <!-- 英译中：读论文时遇到看不懂的段落，选中贴进来就译 -->
@@ -667,12 +666,11 @@
       document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
       $('paneSurvey').hidden = name !== 'survey';
       $('paneFrontier').hidden = name !== 'frontier';
-      $('paneDirections').hidden = name !== 'directions';
       $('paneTranslate').hidden = name !== 'translate';
       // 主题过滤只对综述有意义
       $('focus').hidden = name !== 'survey';
-      // 翻译与未来工作探索不需要读图谱数据，加载中提示别挡路
-      if (name === 'translate' || name === 'directions') { $('loading').hidden = true; return; }
+      // 翻译不需要读图谱数据，加载中提示别挡路
+      if (name === 'translate') { $('loading').hidden = true; return; }
       if (name === 'survey' && !surveyData) load('survey');
       if (name === 'frontier' && !frontierData) load('frontier');
       if (name === 'survey' && chart) chart.resize();
@@ -780,24 +778,32 @@
       card.classList.remove('on');
       card.classList.add('done');
       const body = card.lastChild;
-      const secs = ev.sections || [];
+      // 后端把各角色的交接物统一放在 output 里（role 事件本身只有 type/role/label）。
+      const out = ev.output || {};
+      const secs = out.sections || [];
       if (role === 'planner') {
         body.textContent = `拟写 ${secs.length} 段：` + secs.map(s => s.heading || s.key).join('、');
       } else if (role === 'analyst') {
         const n = secs.reduce((a, s) => a + (s.picks || []).length, 0);
-        body.textContent = `为 ${secs.length} 段共挑出 ${n} 条证据（来自 ${ev.citable || 0} 篇论文）`;
+        body.textContent = `为 ${secs.length} 段共挑出 ${n} 条证据（来自 ${out.citable || 0} 篇论文）`;
       } else if (role === 'writer') {
-        body.textContent = `分 ${secs.length} 段，每段一次模型调用`;
+        body.textContent = `分 ${secs.length || 5} 段，每段一次模型调用`;
       } else if (role === 'verifier') {
-        const s = ev.stats || {};
-        let t = `引用 ${ev.citations || 0} 处，段通过 ${s.sections_ok ?? '—'}/${secs.length || 5}`;
-        if (ev.rejected && ev.rejected.length) t += `，丢弃 ${ev.rejected.length} 段`;
-        if (ev.unverified && ev.unverified.length) t += `，待人工留意 ${ev.unverified.length} 处`;
+        let t = `引用 ${out.citations || 0} 处，段通过 ${out.sections_ok ?? '—'}/${out.sections_total || 5}`;
+        if (out.rejected && out.rejected.length) t += `，丢弃 ${out.rejected.length} 段`;
+        if (out.unverified && out.unverified.length) t += `，待人工留意 ${out.unverified.length} 处`;
         body.textContent = t;
-        (ev.unverified || []).slice(0, 3).forEach(u => {
+        // 同一篇论文的同一句「未给出事实依据」可能在不同段重复出现，合并计数后再列前 3 条。
+        const agg = new Map();
+        (out.unverified || []).forEach(u => {
+          const k = `${u.id || '—'}|${u.reason || ''}`;
+          agg.set(k, (agg.get(k) || 0) + 1);
+        });
+        Array.from(agg.entries()).slice(0, 3).forEach(([k, n]) => {
+          const [id, reason] = k.split('|');
           const d = document.createElement('div');
           d.className = 'k';
-          d.textContent = `· ${u.citation} ${u.reason || ''}`;
+          d.textContent = `· ${id} ${reason}${n > 1 ? `（${n} 次）` : ''}`;
           body.appendChild(d);
         });
       }
@@ -833,13 +839,22 @@
       const sec = document.createElement('div');
       sec.className = 'nar-sec';
       const h = document.createElement('h3');
-      h.textContent = ev.heading || '';
+      // 后端 answer_delta 只给 text（正文是 "## 段标题\n\n正文" 拼的），没有 heading 字段。
+      // 所以标题要从正文首行取；取不到再退回 ev.heading、最后兜「第 N 段」。
+      let body = String(ev.text || '');
+      const m = body.match(/^\s*#{1,6}\s*([^\n]*)\n/);
+      const headText = (m ? m[1] : '') || ev.heading || '';
+      if (m) body = body.slice(m[0].length);
+      h.textContent = headText.trim() || `第 ${narSectionCount() + 1} 段`;
       sec.appendChild(h);
       const p = document.createElement('p');
-      // 模型偶尔会在正文开头重复一遍 "## 标题"，剥掉
-      renderNarCites(p, String(ev.text || '').replace(/^\s*#{1,6}\s*[^\n]*\n/, ''), narCitationIndex);
+      renderNarCites(p, body, narCitationIndex);
       sec.appendChild(p);
       $('narBody').appendChild(sec);
+    }
+
+    function narSectionCount() {
+      return $('narBody').querySelectorAll('.nar-sec').length;
     }
 
     function narAddRejected(ev) {
@@ -992,8 +1007,10 @@
       const card = $('dirStages').querySelector(`.nar-stage[data-role="${role}"]`);
       if (!card) return;
       const body = card.lastChild;
+      // 同样：交接物在 ev.output 里，role 事件本身只有 type/role/label。
+      const out = ev.output || {};
       if (role === 'extractor') {
-        const e = ev.extraction || {};
+        const e = out.summary || {};
         const c = e.counts || {};
         body.textContent = `读了 ${e.total ?? '—'} 篇，抽到作者自述 ${c.success ?? 0} 篇`
           + (c.no_section ? `，无相关章节 ${c.no_section} 篇` : '')
@@ -1001,12 +1018,13 @@
           + (c.parse_error ? `，解析失败 ${c.parse_error} 篇` : '')
           + `（覆盖率 ${e.coverage != null ? Math.round(e.coverage * 100) + '%' : '—'}）`;
       } else if (role === 'mapper') {
-        body.textContent = `按图谱缺口归纳出 ${ev.directions ?? '—'} 个方向`;
+        body.textContent = `按图谱缺口归纳出 ${out.directions ?? '—'} 个方向`;
       } else if (role === 'searcher') {
-        body.textContent = `检索方向「${dirSanitize(ev.title || '')}」的库外最新论文…`;
-      } else if (role === 'judge') {
-        body.textContent = `判断方向「${dirSanitize(ev.title || '')}」：`
-          + (DIR_VERDICT_LABEL[ev.verdict] || ev.verdict || '—');
+        // 每个方向发一次，累积成多行，否则只能看到最后一个方向的检索词。
+        const line = document.createElement('div');
+        line.className = 'k';
+        line.textContent = `· 「${dirSanitize(out.query || '')}」命中 ${out.found ?? 0} 篇`;
+        body.appendChild(line);
       }
     }
 
@@ -1162,13 +1180,11 @@
               try { ev = JSON.parse(line.slice(6)); } catch { continue; }
               if (ev.type === 'role') {
                 if (!ev.role) continue;
-                if (ev.role !== 'searcher' && ev.role !== 'judge') {
-                  if (!$('dirStages').querySelector(`.nar-stage[data-role="${ev.role}"]`)) dirStageCard(ev.role);
-                } else if (!$('dirStages').querySelector(`.nar-stage[data-role="${ev.role}"]`)) {
-                  dirStageCard(ev.role);
-                }
+                // searcher 是每个方向发一次的重复角色：卡片只建一次，
+                // 每次把最新的检索情况累加进同一张卡，别让它只显示最后一个方向。
+                if (!$('dirStages').querySelector(`.nar-stage[data-role="${ev.role}"]`)) dirStageCard(ev.role);
                 dirStageText(ev.role, ev);
-                if (ev.role !== 'searcher' && ev.role !== 'judge') {
+                if (ev.role !== 'searcher') {
                   const c = $('dirStages').querySelector(`.nar-stage[data-role="${ev.role}"]`);
                   if (c) { c.classList.remove('on'); c.classList.add('done'); }
                 }
