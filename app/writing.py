@@ -240,7 +240,13 @@ class CitationCheck:
     unknown_keys: list[str]
     unused_candidates: list[str]
     #: 编号在池内、但所在句子与对应论文标题/摘要几乎没有词面重叠的引用。
-    #: 这类问题比 unknown_keys 更隐蔽：引用关系看起来成立，实际张冠李戴。
+    #: 这类问题比 unknown_keys 更隐蔽：引用关系看起来成立，实际可能张冠李戴。
+    #:
+    #: 命名与措辞说明（2026-11-17）：这里只是**启发式的弱提示**，不是「引用有错」的结论。
+    #: 模型用中文转述英文标题时，词面天然对不上（「开放基础模型」vs
+    #: "Open Foundation Models"），曾经把正确引用也标出来，公网实测一次生成
+    #: 11 条引用里误标 5 条。前端因此把它呈现成「建议人工核对」，
+    #: 而不是「可疑」，避免让评委以为引用是编的。
     suspicious_keys: list[str] = field(default_factory=list)
 
     @property
@@ -315,8 +321,33 @@ def _candidate_corpus(c: lit.Candidate) -> set[str]:
     return tokens
 
 
+#: 候选文献「信息太少」的门槛：摘要短于这个长度就认为它只有标题可用。
+#: 本库 arXiv 候选摘要普遍 800~1800 字；CrossRef 那批（见 C7/《All about citation
+#: chasing》）常只有几个词甚至空串，此时词面重叠天然几乎不可能命中。
+_THIN_ABSTRACT_CHARS = 200
+
+
+def _is_thin_candidate(c: lit.Candidate) -> bool:
+    """候选信息量是否少到「没法和引用句比对」。
+
+    为什么需要这个判断：模型用中文转述英文标题时，标题词本身并不出现在正文里
+    （「Llama 2: Open Foundation and Fine-Tuned Chat Models」会被写成
+    「开放基础模型与开源权重模型」），两边的英文词一个都对不上。摘要完整时
+    还能靠摘要里的实词兜住；摘要缺失时就只剩标题，重叠必然为 0。
+    这种候选身上的「零重叠」不构成任何证据，不应计入可疑。
+    """
+    return len((c.abstract or "").strip()) < _THIN_ABSTRACT_CHARS
+
+
 #: 英文概念 → 中文表述（双字词）。中文正文与英文标题词面不交叉，
 #: 没有这张表时「基于 Transformer 的自注意力[C1]」这种正确引用会被误判成可疑。
+#:
+#: 2026-11-17 扩表：实测一次生成里 6 条正确引用被判「可疑」，逐句核对后发现
+#: 模型用中文转述了英文摘要（如把 "automated generation of research workflows"
+#: 写成「自动生成研究流程」、把 "blockschain data analytics" 写成「区块链数据分析」），
+#: 而原表只有 24 组概念词，这些转述的实词一个都不在表里，重叠必然为 0。
+#: 补词的原则：只收**论文标题/摘要里常见且无歧义**的学术概念，宁缺毋滥——
+#: 加得太滥会让真正错配的引用也「沾边」，反而降低这个检查的价值。
 _CONCEPT_ALIAS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("attention", ("注意", "留意", "关注")),
     ("self-attention", ("自注", "注意")),
@@ -342,6 +373,48 @@ _CONCEPT_ALIAS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("evaluation", ("评估", "评价", "评测")),
     ("embedding", ("嵌入", "向量")),
     ("token", ("标记", "词元")),
+    # ---- 2026-11-17 扩表：学术综述/工具类常见概念（对应实测误判的句式） ----
+    ("workflow", ("流程", "工作流")),
+    ("automated", ("自动", "自动化")),
+    ("automation", ("自动", "自动化")),
+    ("taxonomy", ("分类", "类别")),
+    ("classification", ("分类", "归类")),
+    ("survey", ("综述", "调研", "调查")),
+    ("review", ("综述", "回顾")),
+    ("scoping", ("范围", "综述")),
+    ("literature", ("文献", "论文")),
+    ("distributed", ("分布", "分布式")),
+    ("blockchain", ("区块", "区块链", "链上")),
+    ("data mining", ("挖", "数据挖掘", "数据")),
+    ("mining", ("挖掘", "挖")),
+    ("education", ("教育", "学习")),
+    ("learning", ("学习", "训练")),
+    ("reproducib", ("复现", "可复现")),
+    ("extraction", ("抽取", "提取")),
+    ("extract", ("抽取", "提取")),
+    ("citation", ("引用", "被引", "引文")),
+    ("chasing", ("追踪", "追溯")),
+    ("visualisation", ("可视", "可视化")),
+    ("visualization", ("可视", "可视化")),
+    ("analysis", ("分析", "剖析")),
+    ("analytic", ("分析", "剖析")),
+    ("assistant", ("助手", "助理")),
+    ("research", ("研究", "科研")),
+    ("academic", ("学术", "论文")),
+    ("scholar", ("学术", "学者")),
+    ("paper", ("论文", "文献")),
+    ("scaling", ("规模", "扩展")),
+    ("inference", ("推理", "推断")),
+    ("adapter", ("适配", "微调")),
+    ("lora", ("低秩", "适配")),
+    ("initialization", ("初始", "初始化")),
+    ("hallucination", ("幻觉", "编造")),
+    ("fair", ("公平", "公")),
+    ("open", ("开放", "开源")),
+    ("foundation", ("基础", "底座")),
+    ("model", ("模型", "建模")),
+    ("chat", ("对话", "问答")),
+    ("fine-tuned", ("微调", "调优")),
 )
 
 
@@ -395,6 +468,13 @@ def check_citations(text: str, pool: list[lit.Candidate]) -> CitationCheck:
             if not c or k in suspicious:
                 continue
             overlap = len(sent_tokens & _candidate_corpus(c))
+            # 候选信息太少（典型是 CrossRef 只有标题、没有摘要的条目）时，
+            # 摘要侧的重叠天然接近不可能，但那不等于引用错配。
+            # 此时退一步：只拿**标题词**正面判定——标题词一个都没沾上才算可疑。
+            # 不直接跳过，否则「讲餐饮配送却引 Attention」这种真错配也会漏掉。
+            if overlap < _SUSPICIOUS_MIN_OVERLAP and _is_thin_candidate(c):
+                title_tokens = _tokens_for_overlap(c.title or "")
+                overlap = len(sent_tokens & title_tokens)
             if overlap < _SUSPICIOUS_MIN_OVERLAP:
                 suspicious.append(k)
 

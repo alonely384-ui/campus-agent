@@ -224,6 +224,15 @@ def renderer_available() -> dict[str, bool]:
     matplotlib 不是外部命令而是一个 Python 包，跟着本项目一起装在 venv 里，
     所以这里探的是 import 而不是 ``_which``。探 import 而不写死 True：
     纯净部署里可能没装（requirements 里它本来是 chart.py 的可选依赖）。
+
+    TikZ 不能只看 ``_which("pdflatex")``（2026-11-17 改）。实测踩过的坑：
+    服务器装了 TeX Live，``pdflatex`` 在、``tikz.sty`` 也在，但缺 ``ctex``
+    的字体映射（``updmap.cfg`` 里的 ``Map fandol.map`` 没生效），
+    于是每次渲染都返回 ``! Critical Package ctex Error: CTeX fontset 'fandol'
+    is unavailable``。前端却因为这里返回 True 而把 TikZ 当成可用，
+    用户点了才发现报错——这正是这段注释本来想避免的情况。
+    所以改成真的编译一次最小样例，编不过就如实报不可用。
+    探测结果缓存，别让每次打开写作页都跑一遍 pdflatex。
     """
     try:
         import matplotlib  # noqa: F401
@@ -233,9 +242,60 @@ def renderer_available() -> dict[str, bool]:
     return {
         "mermaid": bool(_which("mmdc")),
         "graphviz": bool(_which("dot")),
-        "tikz": bool(_which("pdflatex")),
+        "tikz": _tikz_actually_works(),
         "matplotlib": has_mpl,
     }
+
+
+#: 最小 TikZ 编译探测的结果缓存：True/False，None 表示还没测过。
+#: 本机装没装能编译的中文字体，进程生命周期内不会变，缓存一次足够。
+_TIKZ_PROBE_CACHE: bool | None = None
+
+#: 探测用样例。刻意带中文：这个项目生成的图节点基本都是中文，
+#: 只有英文能过的话探测会给出假阳性（正好是服务器上发生的事）。
+_TIKZ_PROBE_SOURCE = r"""\documentclass[border=2pt]{standalone}
+\usepackage{tikz}
+\usepackage{ctex}
+\begin{document}
+\begin{tikzpicture}
+\node[draw] {探测};
+\end{tikzpicture}
+\end{document}
+"""
+
+
+def _tikz_actually_works() -> bool:
+    """真正编译一次最小样例，判断 TikZ 链路是否可用（结果缓存）。"""
+    global _TIKZ_PROBE_CACHE
+    if _TIKZ_PROBE_CACHE is not None:
+        return _TIKZ_PROBE_CACHE
+    exe = _which("pdflatex")
+    if not exe:
+        _TIKZ_PROBE_CACHE = False
+        return False
+    ok = False
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "probe.tex"
+            src.write_text(_TIKZ_PROBE_SOURCE, encoding="utf-8")
+            proc = subprocess.run(
+                [exe, "-interaction=nonstopmode", "-halt-on-error", "probe.tex"],
+                cwd=td,
+                capture_output=True,
+                timeout=120,
+                check=False,
+            )
+            # 退出码 0 之外还要确认真的产出了 PDF：某些错误下 pdflatex 仍返回 0
+            ok = proc.returncode == 0 and (Path(td) / "probe.pdf").exists()
+            if not ok:
+                log = (proc.stdout or b"").decode("utf-8", "ignore")
+                first = next((ln for ln in log.splitlines() if ln.startswith("! ")), "")
+                logger.warning("TikZ 自检未通过，判定为不可用：%s", first or "pdflatex 未产出 PDF")
+    except Exception as exc:  # noqa: BLE001 - 探测失败就当不可用，不能把异常抛给前端
+        logger.warning("TikZ 自检异常，判定为不可用：%s", exc)
+        ok = False
+    _TIKZ_PROBE_CACHE = ok
+    return ok
 
 
 # --------------------------------------------------------------------------- prompt

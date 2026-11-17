@@ -712,12 +712,18 @@ $('btnFramework').onclick = async () => {
     }
     const ck = d.check;
     const okCount = ck.cited_keys.length;
+    // 措辞说明：suspicious 只是词面重叠的启发式提示，不是「引用错了」的结论。
+    // 模型用中文转述英文标题时词面天然对不上，所以呈现成「建议人工核对」。
+    const maybe = ck.suspicious_keys || [];
     $('check1').innerHTML =
       `<div class="status ok">检索词：${d.queries.join(' / ')} ｜ 候选池 ${d.candidates.length} 篇 ｜ ` +
       `正文引用 ${okCount} 篇` +
       (ck.unknown_keys.length
         ? ` ｜ <span style="color:var(--bad)">⚠ ${ck.unknown_keys.length} 条引用不在候选池中：${ck.unknown_keys.join(', ')}</span>`
         : ' ｜ 全部引用均可回溯到候选池') +
+      (maybe.length
+        ? ` ｜ <span style="color:var(--text-subtle)">${maybe.length} 处与候选标题/摘要无词面重合，建议人工核对：${maybe.join(', ')}</span>`
+        : '') +
       `</div>`;
 
     const byKey = Object.fromEntries(d.candidates.map(c => [c.key, c]));
@@ -904,9 +910,20 @@ function escapeHtml(s) {
 }
 
 // 启动时问一下本机有哪些渲染器，没有的把选项灰掉，别让用户点了才报错
+// 措辞说明：TikZ 可能「装了 pdflatex 但缺中文字体映射」，这时说「本机未安装」
+// 是误导；后端只给布尔值，所以按渲染器分别说清可能的原因。
+const RENDERER_HINT = {
+  mermaid: '本机未安装',
+  graphviz: '本机未安装',
+  tikz: '本机 LaTeX 不可用',
+  matplotlib: '本机未安装',
+};
 fetch('/writing/renderers').then(r => r.json()).then(av => {
   [...$('renderer').options].forEach(o => {
-    if (!av[o.value]) { o.disabled = true; o.text = o.text + '（本机未安装）'; }
+    if (!av[o.value]) {
+      o.disabled = true;
+      o.text = o.text + '（' + (RENDERER_HINT[o.value] || '本机不可用') + '）';
+    }
   });
 }).catch(() => {});
 

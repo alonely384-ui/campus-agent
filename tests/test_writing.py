@@ -116,6 +116,43 @@ def test_genuinely_off_topic_citation_still_flagged():
     assert check.suspicious_keys == ["C1"]
 
 
+def test_chinese_paraphrase_of_english_abstract_is_not_suspicious():
+    """模型用中文转述英文摘要时不该被判可疑（2026-11-17 公网实测误判的回归）。
+
+    真实案例：候选 "Automated Generation of Research Workflows from Academic Papers"
+    摘要 1779 字，模型写成「从论文全文中抽取研究流程以提升可复现性[C27]」——
+    句子里没有一个英文词，若别名表覆盖不到「流程/复现/抽取」这些转述词，
+    词面重叠必然为 0，正确引用会被标成可疑。
+    """
+    pool = [_cand(
+        "C27",
+        "Automated Generation of Research Workflows from Academic Papers",
+        abstract="We present a system that automatically extracts research workflows "
+                 "from the full text of academic papers to improve reproducibility.",
+    )]
+    check = w.check_citations(
+        "近年出现的学术文本挖掘工作试图自动化其中的部分环节，"
+        "例如从论文全文中抽取研究流程以提升可复现性[C27]，"
+        "但这类方法的输出是单篇论文内部的过程组件。",
+        pool,
+    )
+    assert check.suspicious_keys == []
+
+
+def test_candidate_without_abstract_falls_back_to_title_overlap():
+    """只有标题、没有摘要的候选（CrossRef 那批）走标题比对，不能一律放过。
+
+    - 「开放基础模型与开源权重模型」引 "Llama 2: Open Foundation and Fine-Tuned
+      Chat Models"：标题词 open/foundation/model 能对上 → 不算可疑
+    - 同一篇候选被引来说「餐饮配送」：标题词一个都不沾 → 仍要判可疑
+    """
+    pool = [_cand("C4", "Llama 2: Open Foundation and Fine-Tuned Chat Models", abstract="")]
+    ok = w.check_citations("开放基础模型与开源权重模型的成熟使本地部署成为可能[C4]。", pool)
+    assert ok.suspicious_keys == []
+    bad = w.check_citations("本章讨论餐饮外卖平台的配送路径优化问题[C4]。", pool)
+    assert bad.suspicious_keys == ["C4"]
+
+
 def test_reference_list_only_uses_pool_data():
     """参考文献条目必须由候选池数据产生——这是"无幻觉引用"的结构保证。"""
     pool = [_cand("C3", "Sparse Attention Revisited", authors=["Jane Doe", "John Roe"], year=2021)]
