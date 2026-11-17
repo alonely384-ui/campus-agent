@@ -1072,7 +1072,12 @@ body.app:not(.has-conv):has(.dock) .greeting { display: block; }
   padding: 12px 14px 10px;
   transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
-.dock__box:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring), var(--shadow-card); }
+/* 聚焦态：只把外层边框换成品牌色。
+   2026-11-17 用户反馈「圈内还高亮，观感不好，里面那一层蓝色框框不要」——
+   原来这里叠了 0 0 0 3px 的品牌色光环，外层本身已经有 1px 边框，
+   于是出现「框里套一个框」的双层观感。文案区（.dock__ta）自己本来就无边框，
+   外层变色已经足够表达聚焦，内层光环整个去掉。 */
+.dock__box:focus-within { border-color: var(--brand); }
 
 .dock__ta {
   width: 100%;
@@ -1089,6 +1094,13 @@ body.app:not(.has-conv):has(.dock) .greeting { display: block; }
   padding: 2px 0;
 }
 .dock__ta::placeholder { color: var(--text-subtle); }
+/* 文字输入框的聚焦反馈交给外层 .dock__box:focus-within（边框变色），
+   .dock__ta 自己不再画 outline。
+   2026-11-17 用户反馈「圈内还高亮，里面那一层蓝色框框不要」——全局
+   :focus-visible 会给 textarea 贴一圈 2px 品牌色 outline，而它四周还有
+   .dock__box 的 1px 边框，于是看起来像框里套了一个框。 */
+.dock__ta:focus,
+.dock__ta:focus-visible { outline: none; }
 
 .dock__tools {
   display: flex;
