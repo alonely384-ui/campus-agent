@@ -2762,8 +2762,25 @@ async def admin_logout(request: Request) -> Response:
 # 把 web/ 目录挂到 /ui，这样访问 http://127.0.0.1:8000/ui/ 就能看到聊天页面。
 # 用绝对路径 WEB_DIR：`Path("web")` 是按 CWD 找的，换个目录启动就挂不上，
 # 表现是 /ui 直接 404 而日志里什么都不说（顶部已经 warning 过一句）。
+class _NoCacheHTML(StaticFiles):
+    """静态页面的缓存策略：HTML 一律重新验证，其它静态资源保留 ETag 协商。
+
+    起因：改完 analysis.html 后用户强刷仍然看到旧页面。根因是 StaticFiles 对
+    HTML 不带 Cache-Control，浏览器按启发式规则自行决定缓存多久，本地开发时
+    页面改了却看不到，比任何 bug 都费时间。
+    HTML 加 no-cache 后仍走 ETag：内容没变时服务端回 304，不会真的重复下载；
+    内容一变立刻拿到新的，不需要用户 Ctrl+F5。
+    """
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        if str(path).endswith((".html", ".htm")) or path in ("", "."):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 if WEB_DIR.is_dir():
-    app.mount("/ui", StaticFiles(directory=WEB_DIR, html=True), name="web")
+    app.mount("/ui", _NoCacheHTML(directory=WEB_DIR, html=True), name="web")
 
 # 所有 @app.get/@app.post 都已执行完，此刻才谈得上「对账」。
 # 它必须在 import 阶段跑完：漏登记的路由让服务直接起不来，而不是悄悄公开。

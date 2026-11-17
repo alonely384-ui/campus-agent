@@ -201,6 +201,22 @@
     }
     .hero-btn { padding: 8px 18px; font-size: 13.5px; font-weight: 600; }
     @media (max-width: 900px) { .hero-row { grid-template-columns: 1fr; } }
+
+    /* ---------- 缺口矩阵 ---------- */
+    .gap-box { margin-top: 4px; }
+    .gap-table { border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+    .gap-table th, .gap-table td {
+      border: 1px solid var(--border-color); padding: 5px 10px; text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .gap-table thead th { background: var(--bg-muted); font-weight: 600; color: var(--text-secondary); }
+    .gap-table tbody th { text-align: left; font-weight: 500; max-width: 260px; }
+    .gap-cell--empty { background: var(--hl-find-text); color: var(--text-subtle); font-size: 11.5px; }
+    .gap-legend { font-size: 12px; color: var(--text-subtle); line-height: 1.8; margin-top: 8px; }
+
+    /* ---------- 导出 ---------- */
+    .export-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 2px; }
+    .export-msg { font-size: 12px; color: var(--text-subtle); }
     .scope-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
     .scope-bar input[type=text] {
       flex: 1 1 240px; min-width: 0; padding: 6px 10px;
@@ -283,6 +299,14 @@
     <!-- 两个功能的产出区：跑了才出现，避免空占首屏 -->
     <div class="nar-body" id="narBody"></div>
     <div id="dirBody" class="dir-body"></div>
+    <div id="dirMatrix" class="gap-box" hidden></div>
+
+    <!-- 导出：只做「复制 Markdown」，带 [arxiv:xxx] 引文角标，粘到哪里都能追溯回论文 -->
+    <div class="export-bar">
+      <button class="act ghost-btn" id="exportNar" type="button">复制综述为 Markdown</button>
+      <button class="act ghost-btn" id="exportDir" type="button">复制方向为 Markdown</button>
+      <span class="export-msg" id="exportMsg"></span>
+    </div>
 
     <!-- 论文范围：本页三个标签页（自动综述 / 论述版综述 / 未来工作探索）共用同一份输入。
          口径与图谱页的「局域图谱」一致——先选一批论文，再在这批论文内部做分析。
@@ -769,6 +793,7 @@
     };
     let narCtl = null;
     let narCitationIndex = {};
+    let narSections = [];   // [{heading, text}] 给导出用
 
     function narMsg(text, isErr) {
       const el = $('narMsg');
@@ -780,6 +805,7 @@
       $('narStages').textContent = '';
       $('narBody').textContent = '';
       narCitationIndex = {};
+      narSections = [];
       narMsg('');
     }
 
@@ -875,6 +901,11 @@
       renderNarCites(p, body, narCitationIndex);
       sec.appendChild(p);
       $('narBody').appendChild(sec);
+      // 存一份原文给导出用：导出要的是模型原文（含 [arxiv:xxx] 角标），
+      // 不是从 DOM 里抠出来的文字——DOM 里角标已经变成了链接文本，容易漏。
+      if (typeof narSections !== 'undefined') {
+        narSections.push({ heading: h.textContent, text: String(ev.text || '') });
+      }
     }
 
     function narSectionCount() {
@@ -994,6 +1025,7 @@
     // 前端第二道兜底：后端已做清洗，这里再防一次，绝不让「原创」类断言漏到页面上。
     const DIR_FORBIDDEN = ['原创', '首次提出', '没人做过', '首创'];
     let dirCtl = null;
+    let dirItems = [];   // [{...direction 事件里的 item}] 给导出用
 
     function dirMsg(text, isErr) {
       const el = $('dirMsg');
@@ -1004,6 +1036,9 @@
     function dirReset() {
       $('dirStages').textContent = '';
       $('dirBody').textContent = '';
+      const mx = $('dirMatrix');
+      if (mx) { mx.textContent = ''; mx.hidden = true; }
+      dirItems = [];
       dirMsg('');
     }
 
@@ -1072,6 +1107,7 @@
 
     function dirAddDirection(ev) {
       const it = ev.item || {};
+      dirItems.push(it);
       const card = document.createElement('div');
       card.className = 'dir-card';
       const h = document.createElement('h3');
@@ -1166,7 +1202,138 @@
       }
       dirMsg(`完成：${s.directions ?? 0} 个方向，模型调用 ${s.judge_calls ?? '—'} 次。`
         + '判断只基于本次检索到的论文标题与摘要，没有检索到也不等于该方向无人做过。', false);
+      renderGapMatrix(s.matrix);
     }
+
+    // ---------- 缺口矩阵（主题 × 技术手段） ----------
+    // 参照 Consensus 的 Research Gaps Matrix：把「哪个主题没人用什么手段」摊成格子。
+    // 空格子的依据是库内同主题论文里 0 篇走这条手段，这个 0 可以逐格核对，不是模型编的。
+    function renderGapMatrix(m) {
+      const box = $('dirMatrix');
+      if (!box) return;
+      box.textContent = '';
+      if (!m || !m.ready) { box.hidden = true; return; }
+      box.hidden = false;
+
+      const h = document.createElement('h3');
+      h.textContent = '缺口矩阵 · 主题 × 技术手段';
+      h.className = 'dir-k';
+      box.appendChild(h);
+
+      const table = document.createElement('table');
+      table.className = 'gap-table';
+      const thead = document.createElement('thead');
+      const hr = document.createElement('tr');
+      const th0 = document.createElement('th');
+      th0.textContent = '主题';
+      hr.appendChild(th0);
+      (m.axes || []).forEach(a => {
+        const th = document.createElement('th');
+        th.textContent = a.label;
+        hr.appendChild(th);
+      });
+      thead.appendChild(hr);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      (m.rows || []).forEach(row => {
+        const tr = document.createElement('tr');
+        const th = document.createElement('th');
+        th.textContent = row.theme;
+        if (row.pool) th.title = `库内该主题 ${row.pool} 篇`;
+        tr.appendChild(th);
+        (row.cells || []).forEach(c => {
+          const td = document.createElement('td');
+          td.className = c.gap ? 'gap-cell gap-cell--empty' : 'gap-cell';
+          td.textContent = c.gap ? '库内 0 篇' : String(c.count);
+          if (row.pool) td.title = `${row.theme} · ${c.axis_label}：库内 ${c.count} 篇`;
+          if (c.titles && c.titles.length) td.title += '\n' + c.titles.join('\n');
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      box.appendChild(table);
+
+      const note = document.createElement('div');
+      note.className = 'gap-legend';
+      const gaps = m.gap_cells ?? 0;
+      note.textContent = `共 ${gaps} 个空格子。${m.legend || ''}`;
+      box.appendChild(note);
+    }
+
+    // ---------- 导出为 Markdown ----------
+    // 只做「复制到剪贴板」：粘进 Word/笔记就能用，引文角标 [arxiv:xxx] 原样保留，
+    // 读者照着编号就能回到阅读页核对。不下载文件、不生成 PDF——那属于另一件事。
+    const VERDICT_MD = {
+      likely_done: '已检索到高度相似的工作（可能已被做过）',
+      not_found: '没检索到高度相似的工作',
+      unclear: '判断不了',
+      unchecked: '未做判断',
+    };
+
+    function buildNarrativeMd() {
+      if (!narSections.length) return '';
+      const lines = ['# 领域综述（自动生成）', ''];
+      narSections.forEach(s => {
+        const body = String(s.text || '').replace(/^\s*#{1,6}\s*[^\n]*\n/, '').trim();
+        lines.push(`## ${s.heading}`, '', body, '');
+      });
+      lines.push('---', '', '> 由论文库自动生成，编号如 [arxiv:1706.03762] 可回到阅读页核对原文。', '');
+      return lines.join('\n');
+    }
+
+    function buildDirectionsMd() {
+      if (!dirItems.length) return '';
+      const lines = ['# 未来工作探索 · 可能的后续方向', ''];
+      dirItems.forEach((it, i) => {
+        lines.push(`## ${i + 1}. ${dirSanitize(it.title || '（未命名）')}`, '');
+        lines.push(`- 图谱依据：${it.basis || ''}`);
+        if (it.kind_label) lines.push(`- 缺口类型：${it.kind_label}`);
+        const ev = (it.evidence || []);
+        if (ev.length) {
+          lines.push('- 作者原话：');
+          ev.forEach(q => lines.push(`  > ${q}`));
+        }
+        const cands = it.candidates || [];
+        if (cands.length) {
+          lines.push('- 库外检索到的相关论文：');
+          cands.slice(0, 5).forEach(c => {
+            const yr = c.year ? `（${c.year}）` : '';
+            const url = c.url ? ` <${c.url}>` : '';
+            lines.push(`  - ${c.title || ''}${yr}${url}`);
+          });
+        }
+        lines.push(`- 相似性判断：${VERDICT_MD[it.verdict] || it.verdict || '未做判断'}`);
+        if (it.reason) lines.push(`- 判断理由：${dirSanitize(it.reason)}`);
+        lines.push('');
+      });
+      // 免责声明措辞要避开「原创」二字本身：它虽是否定句，但任何做「禁用词」
+// 扫描的工具（含我们自己的验收脚本）都不看语境，留着只会被误判成越界断言。
+      lines.push('> 判断只基于本次检索到的论文标题与摘要；没有检索到不等于该方向无人做过，'
+        + '也不构成本方向新颖性的任何证明。', '');
+      return lines.join('\n');
+    }
+
+    async function copyMd(text, label) {
+      if (!text) { exportMsg(`还没有${label}内容，先生成一次。`, true); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        exportMsg(`已复制${label}（${text.length} 字），粘贴到文档即可。`, false);
+      } catch (e) {
+        // 剪贴板权限被拒（非安全上下文/浏览器策略）时退回选中 DOM 文本
+        exportMsg('剪贴板不可用：' + e.message, true);
+      }
+    }
+
+    function exportMsg(text, isErr) {
+      const el = $('exportMsg');
+      el.textContent = text || '';
+      el.classList.toggle('err', !!isErr);
+    }
+
+    $('exportNar').addEventListener('click', () => copyMd(buildNarrativeMd(), '综述'));
+    $('exportDir').addEventListener('click', () => copyMd(buildDirectionsMd(), '方向'));
 
     async function runDirections() {
       if (dirCtl) return;

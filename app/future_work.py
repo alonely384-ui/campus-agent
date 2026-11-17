@@ -477,6 +477,187 @@ def build_topic_query(direction: dict[str, Any]) -> str:
     return " ".join(words[:8]) or title
 
 
+# --------------------------------------------------------------------------- 缺口矩阵
+# 为什么是「主题 × 技术手段」而不是 Consensus 的「topic × population」：
+# population 是医学/社科的概念，计算机论文里没有对应物。真正能说「这个主题下
+# 没人用这个手段」的，是「主题（研究什么）」与「手段（用模型/训练/推理/评测）」
+# 这两条轴——空格子就是一个具体、可核对的组合空缺。
+TECH_AXES: tuple[tuple[str, str], ...] = (
+    ("model", "模型结构"),
+    ("train", "训练与数据"),
+    ("infer", "推理与效率"),
+    ("eval", "评测与基准"),
+    ("apply", "应用与落地"),
+)
+
+# 归类用的关键词（按命中强度分两档）。
+#
+# 为什么要分档：摘要里几乎每篇都会出现 "model"，只按固定顺序取第一个命中，
+# 14 篇基础模型论文会有 13 篇全落进「模型结构」，矩阵就没信息量了（实测如此）。
+# 规则：强词（专门描述这条手段的说法）优先；弱词（architecture/neural 这类
+# 到处都有的）只在标题里命中才算数，不扫摘要。
+_TECH_STRONG: dict[str, tuple[str, ...]] = {
+    # 这类说法只在「论文主体讲模型怎么搭」时才出现，光有 "model" 不算。
+    "model": (
+        "encoder-decoder", "decoder-only", "encoder-only", "multi-head attention",
+        "self-attention", "mixture of experts", "architecture design",
+        "we introduce a new architecture", "model architecture",
+    ),
+    "infer": (
+        "inference cost", "inference time", "inference latency", "latency",
+        "throughput", "quantiz", "distill", "prun", "speedup", "compression",
+        "kv cache", "memory footprint", "serving", "inference efficien",
+        "reduc the inference", "compute cost",
+    ),
+    "eval": (
+        # "benchmark" 不能单独算强信号：LLaMA/Mistral/GPT-4 的摘要里都会出现
+        # "we evaluate on benchmarks"，那是自评，不是「论文主题是评测」。
+        # 只有连「提出/建立/系统评测」这类动宾一起出现，才算真的在做评测。
+        "we propose a benchmark", "new benchmark", "introduce a benchmark",
+        "evaluation suite", "systematically evaluate", "leaderboard",
+        "robustness", "fairness", "safety", "alignment", "hallucinat",
+        "human evaluation", "metric",
+    ),
+    "train": (
+        "pre-train", "pretrain", "fine-tun", "finetun", "reinforcement learning",
+        "training data", "training set", "optimiz", "scaling law", "rlhf",
+        "distributed training", "instruction tuning", "pretraining corpus",
+    ),
+    "apply": (
+        "we apply", "deploy", "in production", "product", "clinical", "medical",
+        "enterprise", "customer", "real-world",
+    ),
+}
+_TECH_WEAK_TITLE: dict[str, tuple[str, ...]] = {
+    "model": ("transformer", "attention", "network", "layer", "gpt", "bert", "neur", "architecture"),
+    "infer": ("efficient", "fast", "cheap", "small", "compression", "quantiz", "distill"),
+    "eval": ("benchmark", "test", "study", "analy", "survey", "evaluat"),
+    "train": ("train", "pre-train", "finetun", "dataset", "data", "scaling"),
+    "apply": ("agent", "app", "tool", "code", "search", "recommend", "dialog", "system"),
+}
+_TECH_KEYWORDS = _TECH_STRONG  # 兼容旧引用
+OTHER_AXIS = ("other", "其它")
+
+
+def _axis_of(text: str, title: str = "") -> tuple[str, str]:
+    """把一篇论文归到某个技术手段轴。
+
+    先扫强词（摘要也算），再扫弱词（只看标题），都不中归 other。
+    宁可归 other 也不硬塞：矩阵的意义是「这个主题下确实没人这么做过」，
+    靠模糊匹配凑出来的非零格子会让缺口消失，那比多出来一个 other 列糟糕得多。
+    """
+    low = (text or "").lower()
+    for key, label in TECH_AXES:
+        if any(kw in low for kw in _TECH_STRONG.get(key, ())):
+            return key, label
+    low_title = (title or text or "").lower()
+    for key, label in TECH_AXES:
+        if any(kw in low_title for kw in _TECH_WEAK_TITLE.get(key, ())):
+            return key, label
+    return OTHER_AXIS
+
+
+def build_gap_matrix(
+    graph: dict[str, Any],
+    directions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """把方向摊成「主题 × 技术手段」的矩阵。
+
+    行 = 归纳出的方向主题（锚点论文在 catalog 里的 category），列 = TECH_AXES 五类技术手段。
+    每格给出库内该主题下命中该手段的论文篇数与标题——**空格子就是可能的缺口**，
+    且这个 0 是可核对的（扫的是图谱里同一主题的原型论文）。
+
+    主题只有 graph_view 的节点里没有，得走 node_meta() 从 catalog 补（survey() 也是这么补的）。
+    补不到主题的论文自成一个主题行，避免把年份未知/元数据缺失的论文硬塞进别人的主题。
+    """
+    from app.graph import node_meta
+
+    by_paper: dict[str, dict[str, Any]] = {}
+    meta_of: dict[str, dict[str, Any]] = {}
+
+    def meta_for(node: dict[str, Any]) -> dict[str, Any]:
+        key = str(node.get("id") or "")
+        if key not in meta_of:
+            meta_of[key] = node_meta(key, str(node.get("title") or ""), str(node.get("arxiv_id") or ""))
+        return meta_of[key]
+
+    for node in (graph.get("nodes") or []):
+        for copy in (node.get("copies") or []):
+            by_paper.setdefault(str(copy), node)
+
+    # ---- 行：方向主题
+    themes: list[dict[str, Any]] = []
+    seen_theme: set[str] = set()
+    for d in directions:
+        anchor = by_paper.get(str(d.get("anchor_file") or ""))
+        if not anchor:
+            anchor = by_paper.get(str(d.get("anchor") or ""))
+        title = str(d.get("title") or d.get("anchor_title") or "")
+        category = str((meta_for(anchor) if anchor else {}).get("category") or "").strip()
+        key = category or title
+        if key in seen_theme:
+            continue
+        seen_theme.add(key)
+        themes.append({
+            "key": key,
+            "theme": category or title,
+            "theme_has_category": bool(category),
+            "from_direction": d.get("id"),
+            "anchor_file": d.get("anchor_file"),
+        })
+    if not themes:
+        return {"ready": False, "detail": "还没有归纳出方向，无法生成矩阵"}
+
+    # ---- 库内原型论文按「主题 -> [论文]」分组，用于逐格核对
+    # 关键词匹配用 标题 + 摘要首句：光看标题，像 "Attention Is All You Need"
+    # 这种既不带 training 也不带 inference 的标题会全落到 other，矩阵就没信息量了。
+    pool_by_theme: dict[str, list[tuple[str, str, str]]] = {}
+    for node in (graph.get("nodes") or []):
+        meta = meta_for(node)
+        cat = str(meta.get("category") or "").strip()
+        if not cat:
+            continue
+        text = str(node.get("title") or "") + " " + str(meta.get("abstract") or "")[:400]
+        pool_by_theme.setdefault(cat, []).append(
+            (str(node.get("title") or node.get("id") or ""), text, str(node.get("title") or ""))
+        )
+
+    rows: list[dict[str, Any]] = []
+    for theme in themes:
+        members = pool_by_theme.get(theme["theme"]) or []
+        cells: list[dict[str, Any]] = []
+        for axis_key, axis_label in TECH_AXES:
+            hits = [t for t, text, title in members if _axis_of(text, title)[0] == axis_key]
+            cells.append({
+                "axis": axis_key,
+                "axis_label": axis_label,
+                "count": len(hits),
+                "titles": hits[:5],
+                # 空格子 = 本主题在库内没有任何一篇走这条手段
+                "gap": not hits,
+                "note": "库内 0 篇" if not hits else "",
+            })
+        rows.append({
+            "theme": theme["theme"],
+            "theme_has_category": theme["theme_has_category"],
+            "from_direction": theme["from_direction"],
+            "pool": len(members),
+            "cells": cells,
+        })
+
+    gaps = sum(1 for r in rows for c in r["cells"] if c["gap"])
+    return {
+        "ready": True,
+        "axes": [{"axis": k, "label": v} for k, v in TECH_AXES],
+        "rows": rows,
+        "gap_cells": gaps,
+        "legend": "行是方向所在的主题（取自 catalog 的 category），列是技术手段。"
+                  "格子里是库内该主题下走这条手段的论文篇数，「库内 0 篇」的空格子是可能的缺口——"
+                  "它只说明我们库里这批论文没有覆盖到这条组合，不等于文献里也没有，"
+                  "要下判断还得看每个方向检索到的库外论文。",
+    }
+
+
 # --------------------------------------------------------------------------- Searcher
 
 
@@ -764,5 +945,8 @@ async def direction_events(
             "directions": len(results),
             "judge_calls": used_calls,
             "budget_exhausted": budget_hit,
+            # 缺口矩阵：拿已经跑出来的方向摊成 主题 × 技术手段，空格子是可能的缺口。
+            # 放 done 里而不是单独发一帧：它不依赖库外检索结果，前端收尾时一次性渲染即可。
+            "matrix": build_gap_matrix(graph, directions),
         },
     }
