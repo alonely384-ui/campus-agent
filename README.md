@@ -25,6 +25,7 @@
 - [技术栈与模块](#技术栈与模块)
 - [项目目录](#项目目录)
 - [本地部署](#本地部署)
+- [桌面版](#桌面版)
 - [测试与工程质量](#测试与工程质量)
 - [安全设计](#安全设计)
 - [能力边界与已知限制](#能力边界与已知限制)
@@ -424,6 +425,66 @@ API Key 的三条约定：
 ### 管理员配置
 
 公开演示与管理保护需要同时成立。`ADMIN_TOKEN` 与 `ADMIN_COOKIE_SECRET` 必须同时配置，缺一即管理接口返回 503（并非放行）。会话 Cookie 为 `HttpOnly` + `SameSite=Strict`，生产环境附加 `Secure`，有效期 2 小时。
+
+---
+
+## 桌面版
+
+仓库里只有桌面端的**源码**（`desktop/`），可执行文件是构建产物，不随仓库分发。
+
+### 它由什么组成
+
+`desktop/main.py` 用 pywebview 开一个本地窗口，窗口内部起同一套 FastAPI，然后加载 `http://127.0.0.1:<port>/ui/`：
+
+```python
+uvicorn.run("app.main:app", host="127.0.0.1", port=port)
+# 窗口随后加载 http://127.0.0.1:{port}/ui/
+```
+
+也就是说桌面版和网页版**共用同一份后端与前端**，没有分支代码——改一处，两边一起变。桌面壳自己只负责三件事：选一个空闲端口、把数据包解压到本地目录、开窗口。
+
+### 打包
+
+```bash
+python scripts/build_desktop.py
+```
+
+分两步：先把 `data/` 中运行时真正需要的内容（向量库、本地模型、论文 PDF、结构化总表、引用图谱、目录清单）打成一个数据包，再交给 PyInstaller 出单文件 exe。
+
+| 产物 | 大小 |
+|---|---:|
+| `dist/科研小助手.exe` | 459 MB（数据包已内嵌） |
+| `desktop/_bundle/data.zip` | 472 MB |
+
+数据包用 STORED（不压缩）：里面是 PDF、SQLite 页和 ONNX 权重，本身就压不动，deflate 只会多花十几倍时间换几个百分点。
+
+### 首次启动会发生什么
+
+exe 自带数据包，第一次运行解压到 `%LOCALAPPDATA%\ResearchAssistant`，之后靠 `.data_version` 戳判断是否复用，不重复解压。首次启动多等 1–2 分钟，之后再启动约 10 秒进入可交互状态。
+
+### 实测
+
+2026-11-19，Windows 11 / Python 3.12.10，`dist/科研小助手.exe`（481,288,198 B）：
+
+```
+/health 200 after 10.1s : {"status":"ok","version":"2.1.0"}
+
+200  /ui/               200  /ui/library.html    200  /ui/discover.html
+200  /ui/graph.html     200  /ui/analysis.html   200  /ui/writing.html
+200  /ui/compare.html   200  /papers             200  /graph
+200  /graph/survey
+
+真实提问「Transformer 的多头注意力相比单头注意力解决了什么问题？」
+  → 3.9 秒出现「展开依据与局限」，console errors 0
+  → 答案四段齐全（结论/依据/局限/下一步），折叠区可见五角色执行记录
+
+关闭窗口 → 残留进程 0，端口 8756 释放
+```
+
+### 两点边界
+
+- `dist/`、`build/`、`desktop/_bundle/` 都在 `.gitignore` 内，仓库里没有任何二进制文件。需要 exe 就本地按上面的命令构建——459 MB 也不适合进仓库。
+- 自动化测试覆盖的是后端与前端逻辑（`tests/` 下 979 条），**桌面壳本身没有自动化测试**，它的可用性是靠上面这种人工启动验证保证的。
 
 ---
 
