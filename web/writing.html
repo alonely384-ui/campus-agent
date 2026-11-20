@@ -862,6 +862,12 @@ $('btnChart').onclick = async () => {
     if (chartInst) chartInst.dispose();
     chartInst = echarts.init($('chartBox'), null, { renderer: 'canvas' });
     chartInst.setOption(d.option);
+    // 切到本 tab 的一瞬间容器可能还没完成布局：echarts.init 量到 0 宽会退回
+    // 100px 默认值，整张图被压在左边一条、轴标签挤成 "828384858687"（实测）。
+    // 等布局落定后再量一次，预览和导出的 PNG 才对得上。
+    const fitChart = () => { if (chartInst) chartInst.resize(); };
+    requestAnimationFrame(fitChart);
+    setTimeout(fitChart, 120);
 
     $('cap3').textContent = d.caption || '（caption 生成失败，可重试）';
     const susp = d.caption_suspect_numbers || [];
