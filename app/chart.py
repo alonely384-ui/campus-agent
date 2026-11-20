@@ -253,7 +253,18 @@ def build_echarts(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> di
                 if labels is not None and i < len(labels):
                     point = {"value": point, "name": labels[i]}
                 pts.append(point)
-            series.append({"type": "scatter", "name": col, "data": pts})
+            series.append({
+                "type": "scatter",
+                "name": col,
+                "data": pts,
+                # 点旁边直接写出类别名。演示和出图时「哪个点是哪个模型」必须
+                # 一眼看出来，不能靠鼠标悬停；点太多会糊，只在 <=20 行时开。
+                **(
+                    {"label": {"show": True, "position": "right", "formatter": "{b}", "fontSize": 10}}
+                    if labels is not None and len(df) <= 20
+                    else {}
+                ),
+            })
         # 与 export_png 用同一套对数判断：预览和导出的图必须长一样，
         # 否则演示时前端看着挤成一坨、下载的 PNG 却是舒展的，解释不清。
         x_axis = {"name": x, "type": "value", **_padded_range(df[x])}
@@ -267,6 +278,8 @@ def build_echarts(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> di
         return {
             "title": {"text": title},
             "tooltip": {"trigger": "item"},
+            # 多列时两条 series 靠颜色区分，没有图例就分不清哪组是哪个指标
+            "legend": {"data": ys, "type": "scroll", "top": 0} if len(ys) > 1 else {},
             "xAxis": x_axis,
             "yAxis": y_axis,
             "series": series,
