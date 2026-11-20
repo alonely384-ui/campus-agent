@@ -13,10 +13,13 @@ PNG 都是同一个文件。这个 bug 在纯函数层完全看不出来，只�
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+ROOT = Path(__file__).resolve().parent.parent
 
 CSV = (
     "model,accuracy,f1,params_M\n"
@@ -49,6 +52,21 @@ def test_form_kind_absent_falls_back_to_auto_choice():
     r = _post(CSV)
     assert r.status_code == 200, r.text[:300]
     assert r.json()["spec"]["kind"] in ("line", "bar", "scatter", "radar", "radar3d", "pie")
+
+
+def test_frontend_sends_kind_in_form_not_query():
+    """前端必须把 kind / note 放进 FormData。
+
+    FastAPI 的 ``Form(...)`` 只读请求体，不做查询参数回退。前端若把 kind
+    拼到 URL 上（``fetch('/writing/chart?' + qs)``），接口收到的永远是空串，
+    用户选什么图型都落到自动选型——接口层测试全绿也发现不了，所以这里
+    直接读前端源码钉住这个契约。
+    """
+    html = (ROOT / "web" / "writing.html").read_text(encoding="utf-8")
+    assert "fd.append('kind'" in html, "前端没有把 kind 放进 FormData"
+    assert "fd.append('note'" in html, "前端没有把 note 放进 FormData"
+    assert "qs.set('kind'" not in html, "前端又把 kind 拼回 URL 了"
+    assert "writing/chart?' + qs" not in html, "前端又给 /writing/chart 拼查询串了"
 
 
 def test_caption_never_contains_chinese():

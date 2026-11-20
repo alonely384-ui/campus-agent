@@ -851,10 +851,11 @@ $('btnChart').onclick = async () => {
   btn.disabled = true;
   setStatus($('st3'), '解析并生成中…', 'work');
   try {
-    const qs = new URLSearchParams();
-    if (kind) qs.set('kind', kind);
-    if (note) qs.set('note', note);
-    const r = await fetch('/writing/chart?' + qs.toString(), { method: 'POST', body: fd });
+    // kind / note 必须放进 FormData：接口用 Form(...) 接收，
+    // 拼到 URL 上会被 FastAPI 当成查询参数丢掉，用户选什么图型都拿到自动选型的结果。
+    if (kind) fd.append('kind', kind);
+    if (note) fd.append('note', note);
+    const r = await fetch('/writing/chart', { method: 'POST', body: fd });
     if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
     const d = await r.json();
 
