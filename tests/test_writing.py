@@ -790,6 +790,59 @@ def test_build_echarts_multi_y_bar_draws_every_column():
     assert opt["yAxis"]["name"] == "", "多列时不能把列名串塞进轴标题"
 
 
+def test_scatter_spec_moves_category_column_to_label():
+    """用户选散点图时，类别列不能当 x 轴——否则 float('GPT-4') 直接抛异常。
+
+    实测故障：写作者选「散点图」生成，接口 400，前端只显示「失败：
+    could not convert string to float: 'GPT-4'」。修复后类别列降级成点标签，
+    x/y 都换成数值列。
+    """
+    df = ch.load_csv(
+        "model,mmlu,humaneval,gsm8k\n"
+        "GPT-4,86.4,67.0,92.0\n"
+        "Claude 3 Opus,86.8,84.9,95.0\n"
+        "Gemini 1.5 Pro,85.9,84.1,91.7\n"
+    )
+    info = ch.profile(df)
+    spec = ch._fit_scatter_spec(
+        info, {"kind": "scatter", "x": "model", "y": "mmlu,humaneval,gsm8k"}
+    )
+    assert spec["x"] == "mmlu", spec
+    assert spec["label"] == "model", spec
+    assert "model" not in spec["y"].split(","), spec
+    assert spec["y"] == "humaneval,gsm8k", spec
+
+
+def test_scatter_spec_keeps_numeric_x():
+    """x 本来就是数值列时不许乱改，也不该凭空多出 label。"""
+    df = ch.load_csv("params,score\n117,60\n1542,75\n175000,85\n")
+    spec = ch._fit_scatter_spec(
+        ch.profile(df), {"kind": "scatter", "x": "params", "y": "score"}
+    )
+    assert spec["x"] == "params"
+    assert spec["y"] == "score"
+    assert "label" not in spec
+
+
+def test_scatter_spec_reports_when_numeric_columns_too_few():
+    """只有一列数值时给一句能看懂的话，而不是让 float() 抛原始异常。"""
+    df = ch.load_csv("name,score\nalpha,1.0\nbeta,2.0\n")
+    with pytest.raises(ValueError, match="至少两列数值"):
+        ch._fit_scatter_spec(ch.profile(df), {"kind": "scatter", "x": "name", "y": ""})
+
+
+def test_scatter_echarts_points_carry_category_names():
+    """散点图每个点要带上原来的类别名，否则图上认不出哪个点是谁。"""
+    df = ch.load_csv(
+        "model,a,b\nGPT-4,86.4,67.0\nClaude 3 Opus,86.8,84.9\n"
+    )
+    spec = ch._fit_scatter_spec(ch.profile(df), {"kind": "scatter", "x": "model", "y": "a,b"})
+    opt = ch.build_echarts(df, spec)
+    pts = opt["series"][0]["data"]
+    assert pts[0]["name"] == "GPT-4", pts[0]
+    assert pts[0]["value"] == [86.4, 67.0], pts[0]
+
+
 def test_bar_axis_keeps_zero_baseline():
     """柱状图 y 轴不能贴数据截断。
 

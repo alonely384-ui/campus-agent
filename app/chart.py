@@ -164,6 +164,35 @@ def choose_chart(info: dict[str, Any], df: pd.DataFrame | None = None) -> dict[s
     return {"kind": "bar", "x": "", "y": ""}
 
 
+def _fit_scatter_spec(info: dict[str, Any], spec: dict[str, str]) -> dict[str, str]:
+    """把散点图 spec 修到可画：x 必须是数值列，类别列降级成点标签。
+
+    用户显式选「散点图」时，``choose_chart`` 留下的 x 往往正是那个类别列
+    （如 ``model``）。``build_echarts`` 会对 x 逐点取 ``float()``，遇到
+    ``'GPT-4'`` 直接抛 ``could not convert string to float``，接口返回 400、
+    前端状态栏只剩一句「失败」——实测就是这么崩的。
+
+    所以统一换成数值列；原来的类别列记到 ``spec["label"]``，让网页 tooltip
+    和导出 PNG 能把点标出来。数值列不足两列时给一句能看懂的话，而不是
+    让 float() 抛原始异常。
+    """
+    nums = info.get("numeric", [])
+    if len(nums) < 2:
+        raise ValueError(f"散点图需要至少两列数值数据，这份 CSV 只有 {len(nums)} 列")
+    orig_x = spec.get("x", "")
+    ys = [c for c in spec.get("y", "").split(",") if c in nums]
+    if orig_x in nums:
+        spec["x"] = orig_x
+        rest = [c for c in ys if c != orig_x] or [c for c in nums if c != orig_x]
+    else:
+        spec["x"] = nums[0]
+        if orig_x:
+            spec["label"] = orig_x
+        rest = [c for c in nums if c != nums[0]]
+    spec["y"] = ",".join(rest[:3])
+    return spec
+
+
 def _series(df: pd.DataFrame, x: str, y: str, limit: int = 30) -> tuple[list, list]:
     """取 x 轴与 y 轴数据，超量截断。
 
@@ -210,13 +239,20 @@ def build_echarts(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> di
 
     if kind == "scatter":
         ys = [c for c in y.split(",") if c]
+        # x 被降级成数值列时，原来的类别列（model / 方法名）在这里补回来当点标签，
+        # 否则散点图上只有坐标、认不出哪个点是谁。
+        label_col = spec.get("label", "")
+        labels = df[label_col].astype(str).tolist() if label_col and label_col in df.columns else None
         series = []
         for col in ys:
             pts = []
-            for a, b in zip(df[x], df[col], strict=False):
+            for i, (a, b) in enumerate(zip(df[x], df[col], strict=False)):
                 if pd.isna(a) or pd.isna(b):
                     continue
-                pts.append([float(a), float(b)])
+                point: Any = [float(a), float(b)]
+                if labels is not None and i < len(labels):
+                    point = {"value": point, "name": labels[i]}
+                pts.append(point)
             series.append({"type": "scatter", "name": col, "data": pts})
         # 与 export_png 用同一套对数判断：预览和导出的图必须长一样，
         # 否则演示时前端看着挤成一坨、下载的 PNG 却是舒展的，解释不清。
@@ -550,8 +586,22 @@ def export_png(df: pd.DataFrame, spec: dict[str, str], title: str = "") -> bytes
         fig, ax = plt.subplots(figsize=(6.4, 4.6), dpi=200, subplot_kw={"polar": True})
 
     if kind == "scatter" and y:
+        label_col = spec.get("label", "")
+        # 点数太多时逐点标字会糊成一团，只在小样本（≤20 行）上标。
+        labels = (
+            df[label_col].astype(str).tolist()
+            if label_col and label_col in df.columns and len(df) <= 20
+            else None
+        )
         for col in [c for c in y.split(",") if c]:
             ax.scatter(df[x], df[col], s=18, label=col, alpha=0.75)
+            if labels is not None:
+                for (a, b), name in zip(zip(df[x], df[col], strict=False), labels, strict=False):
+                    if pd.notna(a) and pd.notna(b):
+                        ax.annotate(
+                            name, (a, b), fontsize=6, alpha=0.8,
+                            xytext=(3, 3), textcoords="offset points",
+                        )
         ax.set_xlabel(x)
         if _needs_log(df[x]):
             # 参数量这种从 0.34 到 540 的列，线性轴上小模型会挤成一点，
@@ -764,6 +814,8 @@ async def make_chart(raw_csv: bytes, kind: str = "", extra: str = "") -> dict[st
             if kind == "radar3d":
                 nums = nums[:3]
             spec["y"] = ",".join(nums)
+        if kind == "scatter":
+            spec = _fit_scatter_spec(info, spec)
 
     option = build_echarts(df, spec)
 
