@@ -1,6 +1,6 @@
 # 公网全功能测试报告
 
-- 被测地址：https://research-agent.top
+- 被测地址：https://<your-domain>
 - 部署版本：`bd13278`
 - 测试时间：2026-11-17 22:00 ~ 22:20（北京时间）
 - 测试方式：真实 HTTP 请求打服务器真实接口 + Playwright 驱动本机 Chrome 打开公网页面

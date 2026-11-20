@@ -29,7 +29,7 @@
 本机访问生产必须加 `--noproxy "*"`，否则会被本机网络代理拦成 502——**看到 502 先确认是不是代理问题，不要误判成服务器故障**（这一轮我就差点误判）。
 
 ```bash
-B=http://156.239.2.206:8000
+B=http://<server-ip>:8000
 for p in /health /papers /reader/papers /papers/topics /settings /nonexistent; do
   printf "%-18s -> " "$p"
   curl -s --noproxy "*" -o /dev/null -w "%{http_code} %{size_download}\n" --max-time 15 "$B$p"
@@ -150,27 +150,27 @@ systemctl status campus-agent --no-pager -l | tail -25
 
 ```bash
 # 1) 匿名 /health —— 关键判据：不应再有 model 字段
-curl -s --noproxy "*" http://156.239.2.206:8000/health
+curl -s --noproxy "*" http://<server-ip>:8000/health
 # 期望：{"status":"ok","version":"0.1.0"}
 # 如果仍含 "model":"deepseek-chat" → 没重启成功，回到 S4
 
 # 2) 公开读接口正常（大小应与第 0 节基线接近）
-curl -s --noproxy "*" -o /dev/null -w "%{http_code} %{size_download}\n" http://156.239.2.206:8000/papers
-curl -s --noproxy "*" -o /dev/null -w "%{http_code} %{size_download}\n" http://156.239.2.206:8000/reader/papers
+curl -s --noproxy "*" -o /dev/null -w "%{http_code} %{size_download}\n" http://<server-ip>:8000/papers
+curl -s --noproxy "*" -o /dev/null -w "%{http_code} %{size_download}\n" http://<server-ip>:8000/reader/papers
 # 期望：200 且 size > 4000
 
 # 3) 管理接口被挡（证明安全层生效）
-curl -s --noproxy "*" -o /dev/null -w "%{http_code}\n" http://156.239.2.206:8000/settings
+curl -s --noproxy "*" -o /dev/null -w "%{http_code}\n" http://<server-ip>:8000/settings
 # 期望：401（若 .env 没配密钥则为 503，属正常）
 
 # 4) 未知路径文案变成中文（证明新代码确实在跑）
-curl -s --noproxy "*" http://156.239.2.206:8000/nonexistent
+curl -s --noproxy "*" http://<server-ip>:8000/nonexistent
 # 期望：{"detail":"未找到该接口"}（旧代码是英文 "Not Found"）
 ```
 
 ### S6 · 浏览器验收
 
-1. 打开 `http://156.239.2.206:8000/ui/index.html`
+1. 打开 `http://<server-ip>:8000/ui/index.html`
 2. 页脚应显示「服务正常 · v0.1.0」，**没有「模型 undefined」**
 3. 上传一篇 PDF → 进入阅读页 → 章节树正常
 4. 提一个问题 → 回答正常流式返回

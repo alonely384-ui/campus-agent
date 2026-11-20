@@ -234,8 +234,8 @@ POST /chat 2MB                               413  {"detail":"请求体超过 1MB
 
 ### 6.1 高：生产服务器当前宕机，且 SSH 进不去
 
-- `http://156.239.2.206:8000` 全部端点 502
-- `ssh -o BatchMode=yes root@156.239.2.206` → `Permission denied (publickey,password)`，本机无可用私钥
+- `http://<server-ip>:8000` 全部端点 502
+- `ssh -o BatchMode=yes root@<server-ip>` → `Permission denied (publickey,password)`，本机无可用私钥
 - **本次整改无法部署**，因为部署前置条件（服务器可用 + 能备份 + 能回滚）不满足
 - 这是阻塞项，与代码质量无关
 
@@ -274,7 +274,7 @@ POST /chat 2MB                               413  {"detail":"请求体超过 1MB
 
 ### 7.1 前置（全部满足才能开始）
 
-- [ ] 服务器恢复运行，`ssh root@156.239.2.206` 可登录
+- [ ] 服务器恢复运行，`ssh root@<server-ip>` 可登录
 - [ ] `git -C /opt/campus-agent log -1` 确认当前 HEAD
 - [ ] `cp /root/.env /root/.env.backup-$(date +%Y%m%d-%H%M)` 备份环境变量
 - [ ] `git rev-parse HEAD > /root/deploy-rollback-head.txt` 记录回滚点

@@ -59,7 +59,7 @@ ARXIV_API = "http://export.arxiv.org/api/query"
 CROSSREF_API = "https://api.crossref.org/works"
 OPENALEX_API = "https://api.openalex.org/works"
 # OpenAlex 礼貌池标识。带 mailto 的请求限速宽很多，用域名占位避免写进个人信息。
-OPENALEX_MAILTO = "campus-agent@research-agent.top"
+OPENALEX_MAILTO = "campus-agent@example.org"
 USER_AGENT = "campus-agent/0.1 (research demo; contact: local)"
 TIMEOUT = 20.0
 

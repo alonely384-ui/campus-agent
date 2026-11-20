@@ -12,7 +12,7 @@
 
 ### 0.1 生产服务器当前是宕的
 
-审计期间探测 `http://156.239.2.206:8000`，前后不一致：
+审计期间探测 `http://<server-ip>:8000`，前后不一致：
 
 ```
 第一次探测（12 个端点）：
@@ -32,8 +32,8 @@
 
 **我无法登上服务器确认原因**：
 ```
-$ ssh -o BatchMode=yes root@156.239.2.206
-root@156.239.2.206: Permission denied (publickey,password).
+$ ssh -o BatchMode=yes root@<server-ip>
+root@<server-ip>: Permission denied (publickey,password).
 ```
 本机当前**没有可用的 SSH 私钥**（DEPLOY-GUIDE 里记录的免密配置不在这台机器上或已失效）。
 
@@ -607,7 +607,7 @@ sleep 8
 | 5 | 限流生效 | 连发 20 次 `/chat`，最后几条 | `429` |
 | 6 | 登录可用 | `curl -c /tmp/c.txt -X POST -d '{"token":"<TOKEN>"}' -H 'Content-Type: application/json' localhost:8000/admin/login` | `200` + Set-Cookie |
 | 7 | 带 Cookie 读配置 | `curl -b /tmp/c.txt localhost:8000/settings` | `200` |
-| 8 | 密钥不入库 | `git grep -i "admin_token\|campus2026"` | 无真实值 |
+| 8 | 密钥不入库 | `git grep -i "admin_token\|<admin-password>"` | 无真实值 |
 
 ### 7.4 回滚方案
 
